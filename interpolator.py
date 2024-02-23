@@ -92,8 +92,17 @@ def findNodes(point, r, theta, phi):
 @jit(nb.float64(nb.types.Array(nb.float64, 1, "C"), nb.types.Array(nb.float64, 1, "C")), nopython=True)
 
 def volume(point1, point2):
-	#return abs(((Rmaj/2)*(point2[0]**2 - point1[0]**2) + (1/3)*(point2[0]**3 - point1[0]**3)) * (point2[1] - point1[1])*(point2[2] - point1[2])) # using small angle theorem: sin(x)~x
+	# Calculate the volume of the cell defined by two opposite corners
+	# point1 and point2 are 3D arrays with the (r,th,phi) coordinates of two opposite corners
+	# Each corner is defined by its (r,th,phi) coordinates
+	# The volume is calculated as the absolute value of the determinant of the Jacobian matrix
+    # The Jacobian matrix is defined by the differences between the coordinates of the two corners
+	# The volume is returned as a float
+	
+    # ????  CHECK THIS FORMULA ????
+	
 	return abs(  (Rmaj/2)*(point2[0]**2 - point1[0]**2)*(point2[1] - point1[1])*(point2[2] - point1[2]) + (1/3)*(point2[0]**3 - point1[0]**3)*np.sin(point2[1] - point1[1])*(point2[2] - point1[2]) )
+
 
 ## INTERPOLATE THE VALUES OF THE MAGNETIC FIELDS AT THE PARTICLE LOCATION
 #############
