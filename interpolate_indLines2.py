@@ -10,6 +10,8 @@ from numpy import ndarray as a
 from numba import jit, prange
 import numba as nb
 
+from coordtrans import *
+
 Rmaj = 0.72 #[m]
 Rmin = 0.19 #[m]
 
@@ -17,7 +19,7 @@ Rmin = 0.19 #[m]
 Bx,By,Bz = np.load('Bxyz_out.npy')
 Bnorm = np.load('Bnorm_out.npy')
 
-# Generate uniform grid of points along (r,phi,th) coordinates
+# Generate uniform grid of points along (r,th,phi) coordinates
 #
 # Coordinates
 #
@@ -39,189 +41,6 @@ R = np.linspace( 0.0, Rmin, nr)
 THETA = np.linspace( 0, 2*np.pi, ntheta)
 PHI = np.linspace( 0, 2*np.pi, nphi)
 
-
-####################
-## DEFINE FUNCTIONS:
-####################
-
-## TRANSFORM TO CARTESIAN COORDINATES
-#############
-#@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toX(r, theta, phi, Rmajor):
-	return (Rmajor + r*np.cos(theta))*np.cos(phi)
-#@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toY(r, theta, phi, Rmajor):
-	return (Rmajor + r*np.cos(theta))*np.sin(phi)
-#@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toZ(r, theta, phi, Rmajor):
-	return r*np.sin(theta)
-
-## TRANSFORM TO TOROIDAL COORDINATES
-#############
-@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toR(x, y, z, Rmajor):
-	return np.sqrt( x**2 + y**2 + z**2 + Rmajor**2 - 2*Rmajor*np.sqrt(x**2 + y**2) )
-@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toTHETA(x, y, z, Rmajor):
-	den = np.sqrt(x**2 + y**2) - Rmajor
-	temp = np.arctan2(z,den)
-	temp2 = np.where(temp<0, 2*np.pi+temp, temp)
-	return temp2.item()
-@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
-def toPHI(x, y, z, Rmajor):
-	temp = np.arctan2(y,x)
-	temp2 = np.where(temp<0, 2*np.pi+temp, temp)
-	return temp2.item()
-
-
-## FIND THE 8 CORNER POINTS OF THE CELL CONTAINING THE PARTICLE
-## RETURN AS A LIST OF TUPLES
-#############
-@jit(nb.types.Array(nb.int32, 2, "C")
-(nb.types.Array(nb.float64, 1, "C"), nb.types.Array(nb.float64, 1, "C", readonly=True), nb.types.Array(nb.float64, 1, "C", readonly=True), nb.types.Array(nb.float64, 1, "C", readonly=True)), nopython=True)
-def findNodes(point, r, theta, phi):
-	th_loc = np.float64
-	ph_loc = np.float64
-	
-	r_loc = float(point[0])
-	th_loc = np.fmod(point[1], (2*np.pi)) # periodic boundary
-	ph_loc = np.fmod(point[2], (2*np.pi)) # periodic boundary
-	if point[0] > Rmin:
-		print('POINT OUTSIDE OF MESH!')
-		rlb = nr-1
-		thlb = ntheta-1 
-		phlb = nphi-1
-	else:
-		#temp1 = np.where(r_loc < (r + dr)) 
-		#rlb = temp1[0][0]
-		
-		#rlb = r_loc // dr
-		rlb = np.floor(r_loc/dr)
-
-		#temp2 = np.where(th_loc < (theta + dtheta))
-		#thlb = temp2[0][0]
-		
-		#thlb = th_loc // dtheta
-		thlb = np.floor(th_loc/dtheta)
-		#thlb = np.fmod(thlb, ntheta)
-		
-		#temp3 = np.where(ph_loc < (phi + dphi))
-		#phlb = temp3[0][0]
-		
-		#phlb = ph_loc // dphi
-		phlb = np.floor(ph_loc/dphi)
-		#phlb = np.fmod(phlb, nphi)
-
-	nodeOut = np.array(
-			[(rlb, thlb, phlb),                                              (rlb+1, thlb, phlb),
-			(rlb, np.fmod((thlb+1),len(theta)), phlb),                       (rlb+1, np.fmod((thlb+1),len(theta)), phlb),
-			(rlb, thlb, np.fmod((phlb+1),len(phi))),                         (rlb+1, thlb, np.fmod((phlb+1),len(phi))),
-			(rlb, np.fmod((thlb+1),len(theta)), np.fmod((phlb+1),len(phi))), (rlb+1, np.fmod((thlb+1),len(theta)), np.fmod((phlb+1),len(phi)))],
-			dtype=np.int32)
-			
-	return nodeOut
-
-## CALCULATE THE VOLUME OF THE CELL DEFINED BY TWO OPPOSITE CORNERS
-#############
-@jit(nb.float64(nb.types.Array(nb.float64, 1, "C"), nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def volume(point1, point2):
-	#return abs(((Rmaj/2)*(point2[0]**2 - point1[0]**2) + (1/3)*(point2[0]**3 - point1[0]**3)) * (point2[1] - point1[1])*(point2[2] - point1[2])) # using small angle theorem: sin(x)~x
-	return abs(  (Rmaj/2)*(point2[0]**2 - point1[0]**2)*(point2[1] - point1[1])*(point2[2] - point1[2]) + (1/3)*(point2[0]**3 - point1[0]**3)*np.sin(point2[1] - point1[1])*(point2[2] - point1[2]) )
-
-## INTERPOLATE THE VALUES OF THE MAGNETIC FIELDS AT THE PARTICLE LOCATION
-#############
-@jit(nb.types.Array(nb.float64, 1, "C")
-(nb.types.Array(nb.float64, 1, "C"),
-nb.types.Array(nb.float64, 1, "C", readonly=True), nb.types.Array(nb.float64, 1, "C", readonly=True), nb.types.Array(nb.float64, 1, "C", readonly=True),
-nb.types.Array(nb.float64, 3, "C", readonly=True),nb.types.Array(nb.float64, 3, "C", readonly=True),nb.types.Array(nb.float64, 3, "C", readonly=True)),
-nopython=True)
-def interpField(point, r, theta, phi, bx, by, bz):
-	vols = np.zeros(8)
-	t_bx = 0.
-	t_by = 0.
-	t_bz = 0.
-	
-	point_tor = np.array([toR(point[0], point[1], point[2], Rmaj), toTHETA(point[0], point[1], point[2], Rmaj), toPHI(point[0], point[1], point[2], Rmaj)])
-	cellpts = findNodes(point_tor, r, theta, phi)
-	for j in range(8):
-		thetaj = np.fmod(cellpts[j][1],len(THETA))
-		phij = np.fmod(cellpts[j][2],len(PHI))
-		# fmod already done in 'findNodes'
-		#cpoint = np.array([R[cellpts[j][0]], 
-		#					THETA[cellpts[j][1]],
-		#					PHI[cellpts[j][2]]])
-		cpoint = np.array([R[cellpts[j][0]], 
-							THETA[thetaj],
-							PHI[phij]]) #modulus on periodic boundaries
-		vols[j] = volume(point_tor, cpoint)
-		t_bx += vols[j] * Bx[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
-		t_by += vols[j] * By[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
-		t_bz += vols[j] * Bz[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
-	t_bx = t_bx/sum(vols)
-	t_by = t_by/sum(vols)
-	t_bz = t_bz/sum(vols)
-	t_b = np.array([t_bx,t_by,t_bz])
-
-	return t_b
-
-
-## ==================================== ##-
-## FIELD LINE SOLVER (FROM "Bfield.py") ##
-## ==================================== ##
-@jit(nb.types.Array(nb.float64, 1, "C")(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def blines(t,y):
-	B = np.zeros((3,1))
-	X=y[0]
-	Y=y[1]
-	Z=y[2]
-	direction=y[3]
-	point = np.array([ X, Y, Z ])
-
-	B = interpField(point, R, THETA, PHI, Bx, By, Bz)
-	Bnorm = np.sqrt(B[0]**2 + B[1]**2 + B[2]**2)
-	dY    = np.zeros(4)
-	dY[0] = direction * B[0]/Bnorm
-	dY[1] = direction * B[1]/Bnorm
-	dY[2] = direction * B[2]/Bnorm
-	dY[3] = 0.0
-	return dY
-
-
-## ====== ##
-## EVENTS ##
-## ====== ##
-## DETERMINE WHETHER POINT IS WITHIN VACUUM VESSEL
-## >0, WITHIN VESSEL, <=0, OUTSIDE VESSEL
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def inVV(t, point):
-	return Rmin - toR(point[0],point[1], point[2],  Rmaj) - 0.0001
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi0(t, point):
-	return 0.*(np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi9(t, point):
-	return 1. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi18(t, point):
-	return 2. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi27(t, point):
-	return 3. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi36(t, point):
-	return 4. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi45(t, point):
-	return 5. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi54(t, point):
-	return 6. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi63(t, point):
-	return 7. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
-@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def isphi72(t, point):
-	return 8. * (np.pi/20.) - toPHI(point[0],point[1], point[2],  Rmaj)
 
 
 ## (NOT?) PARALLELIZABLE FUNCTION FOR NUMBA (Lot's of Field Lines!)
