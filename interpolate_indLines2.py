@@ -17,6 +17,19 @@ Rmin = 0.19 #[m]
 Bx,By,Bz = np.load('Bxyz_out.npy')
 Bnorm = np.load('Bnorm_out.npy')
 
+# Generate uniform grid of points along (r,phi,th) coordinates
+#
+# Coordinates
+#
+#       r : [m] radial coordinate
+#       theta : [rad] poloidal angle
+#       phi : [rad] toroidal angle
+#
+# Ranges 
+#
+#       0.0 < r < Rmin
+#       0.0 < theta < 2*pi (full poloidal extension)
+#       0.0 < phi < 2*pi (full toroidal extension)
 nphi, ntheta, nr = Bx.shape
 dr = Rmin/(nr-1)
 dtheta = 2*np.pi/(ntheta-1)
