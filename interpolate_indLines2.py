@@ -5,6 +5,7 @@ from math import copysign
 from math import fmod
 import scipy as sp
 import numpy as np
+from mesh import *
 from numpy import ndarray as a
 
 from numba import jit, prange
@@ -40,8 +41,6 @@ dphi = 2*np.pi/(nphi-1)
 R = np.linspace( 0.0, Rmin, nr)
 THETA = np.linspace( 0, 2*np.pi, ntheta)
 PHI = np.linspace( 0, 2*np.pi, nphi)
-
-
 
 ## (NOT?) PARALLELIZABLE FUNCTION FOR NUMBA (Lot's of Field Lines!)
 #@jit(parallel=True)#, nogil=True)

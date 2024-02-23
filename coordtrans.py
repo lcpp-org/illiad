@@ -2,14 +2,18 @@ import numpy as np
 from numba import jit
 import numba as nb
 
-## TRANSFORM TO CARTESIAN COORDINATES
-#############
+# COORDINATE TRANSFORMATION: 
+#       FROM -- CYLINDRICAL COORDINATES ON THE POLOIDAL PLANE (r,theta,phi)
+#         TO -- CARTESIAN COORDINATES (x,y,z)
+
 #@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
 def toX(r, theta, phi, Rmajor):
 	return (Rmajor + r*np.cos(theta))*np.cos(phi)
+
 #@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
 def toY(r, theta, phi, Rmajor):
 	return (Rmajor + r*np.cos(theta))*np.sin(phi)
+
 #@jit(nb.float64(nb.float64, nb.float64, nb.float64, nb.float64), nopython=True)
 def toZ(r, theta, phi, Rmajor):
 	return r*np.sin(theta)
