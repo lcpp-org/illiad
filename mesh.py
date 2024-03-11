@@ -21,8 +21,8 @@ class Mesh:
         self.r = np.array([])
         self.theta = np.array([])
         self.phi = np.array([])
-        self.Rmaj = 0.0 
-        self.Rmin = 0.0
+        self.R0 = 0.0 
+        self.a = 0.0
         self.dr = 0.0
         self.dtheta = 0.0
         self.dphi = 0.0
@@ -30,15 +30,55 @@ class Mesh:
         self.ntheta = 0.0
         self.nphi = 0.0
 
-def setMeshValues(mesh):
-    mesh.Rmaj = 0.72
-    mesh.Rmin = 0.19
+    def setMeshValues(self, R0, a):
+        self.R0 = R0
+        self.a = a
 
-class Field:
-    def __init__(self, Bx, By, Bz):
+
+    def XYZ_to_deltaWall(self, dum, p_XYZ):
+        
+        self.XYZ_to_deltaWall.terminal = True
+        x, y, z = p_XYZ
+
+        r = np.sqrt( x**2 + y**2 + z**2 + self.R0**2 - 2*self.R0*np.sqrt(x**2 + y**2) )
+        return r - self.a
+
+
+
+class Field(Mesh):
+    #def __init__(self, Bx, By, Bz):
+
+        #self.Bx = Bx
+        #self.By = By
+        #self.Bz = Bz
+        #
+        #self.nphi, self.ntheta, self.nr = Bx.shape
+        #
+        #self.dr     = self.a / (self.nr-1)
+        #self.dtheta = 2*np.pi / (self.ntheta-11)
+        #self.dphi   = 2*np.pi / (self.nphi-1)
+        #
+        #self.r     = np.linspace(0.0, self.Rmin, self.nr)
+        #self.theta = np.linspace(0.0, 2*np.pi, self.ntheta)
+        #self.phi   = np.linspace(0.0, 2*np.pi, self.nphi)
+
+    def populateField(self, Bx, By, Bz):
+        
         self.Bx = Bx
         self.By = By
         self.Bz = Bz
+
+        self.nphi, self.ntheta, self.nr = Bx.shape
+
+        self.dr     = self.a / (self.nr-1)
+        self.dtheta = 2*np.pi / (self.ntheta-1)
+        self.dphi   = 2*np.pi / (self.nphi-1)
+
+        self.r     = np.linspace(0.0, self.a, self.nr)
+        self.theta = np.linspace(0.0, 2*np.pi, self.ntheta)
+        self.phi   = np.linspace(0.0, 2*np.pi, self.nphi)
+
+
 
 #P_XYZ = np.array([0.0, 0.0, 0.0])
 

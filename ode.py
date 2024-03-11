@@ -8,8 +8,8 @@ from numba import jit
 ## ==================================== ##-
 ## FIELD LINE SOLVER (FROM "Bfield.py") ##
 ## ==================================== ##
-@jit(nb.types.Array(nb.float64, 1, "C")(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
-def blines(t,y):
+#@jit(nb.types.Array(nb.float64, 1, "C")(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
+def blines(t,y, field):
     B = np.zeros((3,1))
     X=y[0]
     Y=y[1]
@@ -17,7 +17,7 @@ def blines(t,y):
     direction=y[3]
     point = np.array([ X, Y, Z ])
 
-    B = interpField(point, Mesh, Field)
+    B = interpField(point, field)
     Bnorm = np.sqrt(B[0]**2 + B[1]**2 + B[2]**2)
     dY    = np.zeros(4)
     dY[0] = direction * B[0]/Bnorm

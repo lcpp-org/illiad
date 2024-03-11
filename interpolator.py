@@ -2,7 +2,8 @@ import numpy as np
 from numpy import ndarray as a
 
 from coordtrans import *
-import mesh
+from mesh import *
+#import mesh
 
 import numba as nb
 from numba import jit 
@@ -24,7 +25,7 @@ from numba import jit
 #   
 #     iNodes: 2D array with the indices of the 8 corner points of the cell
 #
-def findNodes(point, r, theta, phi):
+def findNodes(point, mesh):
   
     #th_loc = np.float64
     #ph_loc = np.float64
@@ -40,14 +41,14 @@ def findNodes(point, r, theta, phi):
     #nphi   = len(phi)
     # inherit values from mesh class
 
-    if r_loc > mesh.Rmin:
+    if r_loc > mesh.a:
         print('POINT OUTSIDE OF MESH!')
         
         # Cast the indices to the last element of the array
         # This is to make sure the interpolation function does not fail
-        rlb  = mesh.nr-1
-        thlb = mesh.ntheta-1 
-        phlb = mesh.nphi-1
+        rlb  = mesh.nr-2
+        thlb = mesh.ntheta-2 
+        phlb = mesh.nphi-2
 
     else:
         
@@ -78,7 +79,7 @@ def findNodes(point, r, theta, phi):
 #############
 ###@jit(nb.float64(nb.types.Array(nb.float64, 1, "C"), nb.types.Array(nb.float64, 1, "C")), nopython=True)
 
-def volume(point1, point2):
+def volume(point1, point2, mesh):
     # Calculate the volume of the cell defined by two opposite corners
     # point1 and point2 are 3D arrays with the (r,th,phi) coordinates of two opposite corners
     # Each corner is defined by its (r,th,phi) coordinates
@@ -90,7 +91,7 @@ def volume(point1, point2):
     theta1, theta2 = np.sort([point1[0], point2[0]])
     phi1, phi2 = np.sort([point1[0], point2[0]])
     
-    return ( (mesh.Rmaj/2.)*(r2**2 - r1**2)*(theta2 - theta1) + (1./3.)*(r2**3 - r1**3)*np.sin(theta2 - theta1) ) * (phi2 - phi1)
+    return ( (mesh.R0/2.)*(r2**2 - r1**2)*(theta2 - theta1) + (1./3.)*(r2**3 - r1**3)*np.sin(theta2 - theta1) ) * (phi2 - phi1)
     
     #return abs(  (Rmaj/2)*(point2[0]**2 - point1[0]**2)*(point2[1] - point1[1])*(point2[2] - point1[2]) + (1/3)*(point2[0]**3 - point1[0]**3)*np.sin(point2[1] - point1[1])*(point2[2] - point1[2]) )
 
@@ -103,28 +104,29 @@ def volume(point1, point2):
 ###nb.types.Array(nb.float64, 3, "C", readonly=True),nb.types.Array(nb.float64, 3, "C", readonly=True),nb.types.Array(nb.float64, 3, "C", readonly=True)),
 ###nopython=True)
 
-def interpField(point, mesh, bx, by, bz):
+#def interpField(point, mesh, field):
+def interpField(point, field):
     vols = np.zeros(8)
-    t_bx = 0.
-    t_by = 0.
-    t_bz = 0.
-        
-    point_tor = np.array([toR(point[0], point[1], point[2], mesh.Rmaj), toTHETA(point[0], point[1], point[2], mesh.Rmaj), toPHI(point[0], point[1], point[2], mesh.Rmaj)])
+    #t_bx = 0.
+    #t_by = 0.
+    #t_bz = 0.
     
-    cellpts = findNodes(point_tor, r, theta, phi)
+    point_rtp = XYZ_to_RTP(point, field)
+    cellpts = findNodes(point_rtp, field)
     
     for j in range(8):
         rj = cellpts[j][0]
-        thetaj = np.fmod(cellpts[j][1],len(THETA))
-        phij = np.fmod(cellpts[j][2],len(PHI))
+        thetaj = np.fmod(cellpts[j][1], field.ntheta)
+        phij = np.fmod(cellpts[j][2], field.nphi)
 
-        cpoint = np.array([R[rj],  THETA[thetaj], PHI[phij]])
+        cpoint = np.array([field.r[rj],  field.theta[thetaj], field.phi[phij]])
 
-        vols[j] = volume(point_tor, cpoint)
+        vols[j] = volume(point_rtp, cpoint, field)
 
-        t_bx += vols[j] * Bx[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
-        t_by += vols[j] * By[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
-        t_bz += vols[j] * Bz[cellpts[j][2], cellpts[j][1], cellpts[j][0]]
+        t_bx += vols[j] * field.Bx[phij, thetaj, rj]
+        t_by += vols[j] * field.By[phij, thetaj, rj]
+        t_bz += vols[j] * field.Bz[phij, thetaj, rj]
+    
     t_bx = t_bx/sum(vols)
     t_by = t_by/sum(vols)
     t_bz = t_bz/sum(vols)
