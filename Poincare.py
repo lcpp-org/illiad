@@ -17,20 +17,18 @@ Bx, By, Bz = np.load('input_files/i3_hires_Bxyz.npy')
 b_hidra.loadCartesianField(Bx, By, Bz)
 
 
-
 ##====================##
 ## SET UP FIELD LINES ##
 ##====================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 14+13
+Nlines = 6#14+13
 spins = 500
 length = (2*np.pi * b_hidra.R0) * spins
 
-fl_R0 = np.array(np.linspace( -0.01, 0.120, Nlines))
+fl_R0 = np.array(np.linspace( 0.120, 0.070, Nlines))
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
-#fl_THETA0 = np.array(np.linspace( 0.00, 0.00, Nlines))
-#fl_PHI0 = np.array(np.linspace( np.pi/5., np.pi/5., Nlines))
+
 
 
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
@@ -40,7 +38,6 @@ ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
 #print('Initial Conditions (XYZ): ', ICs_XYZ)
-
 
 
 ##============##
@@ -124,7 +121,7 @@ for n, phi_plot in enumerate(phi_range):
         np.save('Poincare_output_'+str(n)+'_'+str(i), f_output)
 
         #plt.scatter(th_f, r_f, s=0.1, c=UIUCcol[int(np.fmod(i,len(UIUCcol))
-        plt.scatter(th_f, r_f, s=0.09)
+        plt.scatter(th_f, r_f, s=0.08)
 
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))

@@ -74,8 +74,11 @@ class CartesianField(Mesh):
         point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
 
         r_loc  = point_RTP[0]
-        th_loc = np.fmod(point_RTP[1], (2*np.pi)) # keep theta within 0 and 2pi
-        ph_loc = np.fmod(point_RTP[2], (2*np.pi)) # keep phi within 0 and 2pi
+        th_loc = point_RTP[1]
+        ph_loc = point_RTP[2]
+
+        #th_loc = np.fmod(point_RTP[1], (2*np.pi)) # keep theta within 0 and 2pi
+        #ph_loc = np.fmod(point_RTP[2], (2*np.pi)) # keep phi within 0 and 2pi
 
         if r_loc > self.a:
             # determine whether point is within mesh domain
@@ -85,15 +88,16 @@ class CartesianField(Mesh):
 
             #t_b = np.array([1., 1., 1.])
             rlb  = self.nr - 2
-            thlb = self.ntheta - 2 
-            phlb = self.nphi - 2
+            #thlb = self.ntheta - 2 
+            #phlb = self.nphi - 2
 
         else:
             # Point is within the mesh, and we can find the indices
             # (here "lb" stands for "lower bound")
             rlb = np.floor(r_loc/self.dr)
-            thlb = np.floor(th_loc/self.dtheta)
-            phlb = np.floor(ph_loc/self.dphi)
+
+        thlb = np.floor(th_loc/self.dtheta)
+        phlb = np.floor(ph_loc/self.dphi)
 
         # Return the indices of the 8 corner points of the cell
         # Validation of the indices is not done here

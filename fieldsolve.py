@@ -5,8 +5,11 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import scipy.special as special
+
 from numba import jit, prange
 import numba as nb
+
+#from coordtrans import RTP_to_XYZ
 
 ## READ COIL INPUT FILE
 coilfile = "coils.wega_with_VFCoils"
@@ -33,9 +36,6 @@ for i, dum in enumerate(coil_delim):
 
 
 
-
-
-
 ## /START stuff that should be a mesh class method
 ## DEFINE GEOMETRY
 Rmajor = np.float64
@@ -44,7 +44,7 @@ Rminor = 0.19 #[m]
 
 ## DEFINE MESH RESOLUTION
 ##mesh_spacings = dr[meters], dtheta[radians], dphi[radians]
-rough  = [ 0.003, 4.*(np.pi/180), 4.*(np.pi/180.)]
+rough  = [ 0.004, 4.*(np.pi/180), 4.*(np.pi/180.)]
 lo_res = [ 0.002, 4.*(np.pi/180), 2.*(np.pi/180.)]
 hi_res = [ 0.001, 2.*(np.pi/180), 1.*(np.pi/180.)]
 
@@ -52,10 +52,10 @@ hi_res = [ 0.001, 2.*(np.pi/180), 1.*(np.pi/180.)]
 ## 0: NOT PERIODIC
 ## 1: 2PI PERIODIC
 ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
-mesh_periodicity = [ 0, 1, 5]
+mesh_periodicity = [ 0, 1, 1]
 
 ## SELECT RESOLUTION
-dr, dtheta, dphi = hi_res
+dr, dtheta, dphi = lo_res
 
 
 r_prd, theta_prd, phi_prd = mesh_periodicity
@@ -67,27 +67,34 @@ phi_maximum   = (2*np.pi) / max(1, phi_prd)
 
 ## IF THE DIMENSION IS NOT PERIODIC, START AT 0
 ## IF IT IS PERIODIC, START AT DX (WHERE X IS THE COORDINATE)
-r_minimum     =     dr * min(1, r_prd)
-theta_minimum = dtheta * min(1, theta_prd)
-phi_minimum   =   dphi * min(1, phi_prd)
+#r_minimum     =     dr * min(1, r_prd)
+#theta_minimum = dtheta * min(1, theta_prd)
+#phi_minimum   =   dphi * min(1, phi_prd)
+r_minimum     = 0.0
+theta_minimum = 0.0
+phi_minimum   = 0.0
 
+"""
 ## GET PROPER GRID SPACING
 ## (DEPENDS ON IF WE ARE STARTING AT 0 OR DX (WHERE X IS THE COORDINATE)
 if r_prd == 0:
-    nr = int((r_maximum + dr)/dr)
+    nr = int(r_maximum/dr + 1)
 else: 
     nr = int(r_maximum/dr)
 
 if theta_prd == 0:
-    ntheta = int((theta_maximum + dtheta)/dtheta)
+    ntheta = int(theta_maximum/dtheta + 1)
 else: 
     ntheta = int(theta_maximum/dtheta)
 
 if phi_prd == 0:
-    nphi = int((phi_maximum + dphi)/dphi)
+    nphi = int(phi_maximum/dphi + 1)
 else: 
     nphi = int(phi_maximum/dphi)
-
+"""
+nr = int(r_maximum/dr + 1)
+ntheta = int(theta_maximum/dtheta + 1)
+nphi = int(phi_maximum/dphi + 1)
 ## /END stuff that should be a mesh class method
 
 
@@ -149,13 +156,17 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
     for i in prange(0, int(R.size)):
         for j in prange(0, int(THETA.size)):
             for k in prange(0, int(PHI.size)):
-                point = np.zeros((3,1), dtype=np.float64)
+                point_xyz = np.zeros((3,1), dtype=np.float64)
                 Bpoint = np.zeros(3, dtype=np.float64)
-                point[0] = (Rmajor + R[i]*np.cos(THETA[j])) * np.cos(PHI[k]) #X
-                point[1] = (Rmajor + R[i]*np.cos(THETA[j])) * np.sin(PHI[k]) #Y
-                point[2] = -R[i]*np.sin(THETA[j]) #Z
+
+                #point_rtp = np.array([R[i], THETA[j], PHI[k]])
+                #point_xyz[0], point_xyz[1], point_xyz[2] = RTP_to_XYZ(point_rtp, Rmajor)
+                
+                point_xyz[0] = (Rmajor + R[i]*np.cos(THETA[j])) * np.cos(PHI[k]) #X
+                point_xyz[1] = (Rmajor + R[i]*np.cos(THETA[j])) * np.sin(PHI[k]) #Y
+                point_xyz[2] = -1. * R[i] * np.sin(THETA[j]) #Z
     
-                Bpoint = biotsavart(filament, point,  current, N)
+                Bpoint = biotsavart(filament, point_xyz,  current, N)
                 
                 Bxcoil[i][j][k] = Bpoint[0]
                 Bycoil[i][j][k] = Bpoint[1]
@@ -211,13 +222,8 @@ for n, coil in enumerate(mycoils):
 
 ## OUTPUT ARRAY OF VECTORS AND ARRAY OF MAGNITUDE
 Bxyz = np.array([Bxsum, Bysum, Bzsum])
-np.save('Bxyz_iota-1q3_hires_5Periodic', Bxyz)
+np.save('Bxyz_iota-1q3_lores_originalNodeDefs', Bxyz)
 
-
-
-
-#Bnorm = np.sqrt(Bxsum**2 + Bysum**2 + Bzsum**2)
-#np.save('Bnorm_out', Bnorm)
 
 """
 ## PLOT POLOIDAL CROSS-SECTIONS
