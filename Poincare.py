@@ -4,103 +4,91 @@ import os as os
 
 from mesh import *
 from coordtrans import *
-from interpolator import *
-from ode import *
+from ode import blines, solvePoincare
 
 
-
-#Bx, By, Bz = np.load('~HIDRA\input_files\Bxyz_out.npy')
-#path = 'input_files/'
-
+##============================##
+## DEFINE MESH AND LOAD FIELD ##
+##============================##
+b_hidra = CartesianField()
+b_hidra.setToroidalGeometry(0.72, 0.19)
 
 Bx, By, Bz = np.load('input_files/i3_hires_Bxyz.npy')
-b_hidra = Field()
-b_hidra.setMeshValues(0.72, 0.19)
-b_hidra.populateField(Bx, By, Bz)
+b_hidra.loadCartesianField(Bx, By, Bz)
 
-## EVENTS
-from phi_events import *
 
+
+##====================##
+## SET UP FIELD LINES ##
+##====================##
+## NEED A BETTER WAY TO SET UP INITIAL POINTS!
+Nlines = 14+13
+spins = 500
+length = (2*np.pi * b_hidra.R0) * spins
+
+fl_R0 = np.array(np.linspace( -0.01, 0.120, Nlines))
+fl_THETA0 = 0.0 * np.ones(Nlines)
+fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
+#fl_THETA0 = np.array(np.linspace( 0.00, 0.00, Nlines))
+#fl_PHI0 = np.array(np.linspace( np.pi/5., np.pi/5., Nlines))
+
+
+ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
+print('Initial Conditions (RTP): ', ICs_RTP)
+
+ICs_XYZ = np.zeros(shape=(Nlines, 3))
+for i in range(Nlines):
+    ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
+#print('Initial Conditions (XYZ): ', ICs_XYZ)
+
+
+
+##============##
+## SET EVENTS ##
+##============##
 def inVV(t, p_XYZ, mesh):
-    inVV.terminal = True
     x, y, z = p_XYZ[:3]
 
     r = np.sqrt( x**2 + y**2 + z**2 + mesh.R0**2 - 2*mesh.R0*np.sqrt(x**2 + y**2) )
     return r - mesh.a
+inVV.terminal = True
+
+import phi_events
+poincare_events = [inVV, 
+                    phi_events.isphi9, 
+                    phi_events.isphi18, 
+                    phi_events.isphi27, 
+                    phi_events.isphi36, 
+                    phi_events.isphi45, 
+                    phi_events.isphi54, 
+                    phi_events.isphi63, 
+                    phi_events.isphi72]
 
 
-def solvePoincare(init_conds, Nlines, lineLength, field):
-    data = [None]*Nlines
-        
-    #mesh.XYZ_to_deltaWall.terminal = True
-    #setattr(mesh.XYZ_to_deltaWall, terminal, True)
-    inVV.terminal = True
-    isphi0.direction = -1.0
-    isphi9.direction = -1.0
-    isphi18.direction = -1.0
-    isphi27.direction = -1.0
-    isphi36.direction = -1.0
-    isphi45.direction = -1.0
-    isphi54.direction = -1.0
-    isphi63.direction = -1.0
-    isphi72.direction = -1.0
-    
-    poincare_events = [inVV, isphi0, isphi9, isphi18, isphi27, isphi36, isphi45, isphi54, isphi63, isphi72]
-    #poincare_events = [isphi0, isphi9, isphi18, isphi27, isphi36, isphi45, isphi54, isphi63, isphi72]
-    t_min = lineLength[0]
-    t_max = 0.
-    tloc = np.zeros(1)
-    temp_size = int(init_conds[0].size)
-        
-    # Loop through number of fieldlines	
-    for i in range(temp_size):
-        print('Line #', str(i+1))
-        Y0 = np.array([ fieldlines_X0[i], fieldlines_Y0[i], fieldlines_Z0[i], -fieldlines_direction[i]]) # ToDo: Use init_conds!!
-        span = (0.0, lineLength[i])
-        fieldlines = sp.integrate.solve_ivp(blines, span, Y0, args = ([field]),
-                dense_output=False,
-                events = poincare_events, 
-                method='RK45', max_step=5e-4, rtol=1e-9, atol=1e-9) #3e-4
-        print('List of Event 0: ', fieldlines.y_events[0])
-        print('List of Event 2: ', fieldlines.y_events[2])
-        data[i] = fieldlines.y_events
-    return data, t_min, t_max
+##===============================================##
+## SOLVE FOR EACH INITIAL CONDITION CONCURRENTLY ##
+##===============================================##
+Poincare_output = [None]*Nlines
 
+from functools import partial
+import concurrent.futures
+from time import perf_counter
 
+t_start = perf_counter()
+with concurrent.futures.ProcessPoolExecutor() as executor:
+    solvePoincare_x = partial(solvePoincare, lineLength=length, field=b_hidra, solver_events=poincare_events)
+    Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
+t_stop = perf_counter()
+elapsed_time = t_stop - t_start
+print(f'## All Solvers Finished in {elapsed_time} seconds\n###############')
 
-##=================================== ##
-## SET UP FIELD LINES AND CALL SOLVER ##
-##=================================== ##
-## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nx = 3
-Ny = 1
-Nz = 1
-spins = 5
-Nlines = Nx*Ny*Nz
-
-#fl_R0 = np.array(np.linspace( 0.120, 0.010, Nlines))
-fl_R0 = np.array(np.linspace( 0.000, 0.090, Nlines))
-fl_THETA0 = np.array(np.linspace( 0.00, 0.00, Nlines))
-fl_PHI0 = np.array(np.linspace( np.pi/5., np.pi/5., Nlines))
-
-fieldlines_X0 = toX(fl_R0, fl_THETA0, fl_PHI0, b_hidra.R0)
-fieldlines_Y0 = toY(fl_R0, fl_THETA0, fl_PHI0, b_hidra.R0)
-fieldlines_Z0 = toZ(fl_R0, fl_THETA0, fl_PHI0, b_hidra.R0)
-fieldlines_direction = np.ones( Nlines )
-fieldlines_length = np.ones( Nlines ) * 2*np.pi * b_hidra.R0 * spins
-
-init_conds = np.array([ fieldlines_X0, fieldlines_Y0, fieldlines_Z0, -fieldlines_direction])
-
-
-
-Poincare_output, tmin, tmax = solvePoincare(init_conds, Nlines, fieldlines_length, b_hidra)
+# convert 'generator' to 'list'
+Poincare_output = list(Poincare_output)
 
 
 ## ============== ##
 ## POINCARE PLOTS ##
 ## ============== ##
-
-## PLOTTING SETUP
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
@@ -108,38 +96,20 @@ from matplotlib.colors import ListedColormap
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-## Define functions without numba @jit decorations
-def toR_nbless(x, y, z, Rmajor):
-    return np.sqrt( x**2 + y**2 + z**2 + Rmajor**2 - 2*Rmajor*np.sqrt(x**2 + y**2) )
-
-def toTHETA_nbless(x, y, z, Rmajor):
-    den = np.sqrt(x**2 + y**2) - Rmajor
-    temp = np.arctan2(z,den)
-    temp2 = np.where(temp<0, 2*np.pi+temp, temp)
-    return temp2.item()
-
-def toPHI_nbless(x, y, z, Rmajor):
-    temp = np.arctan2(y,x)
-    temp2 = np.where(temp<0, 2*np.pi+temp, temp)
-    return temp2.item()
-
-def fieldline_phi(t, target_phi, fl_xyz):
-    jimx, jimy, jimz, temp = fl_xyz(t)
-    fl_phi = toPHI_nbless(jimx, jimy, jimz, b_hidra.R0)
-    return fl_phi - target_phi
-
 UIUCcol = ('#13294B', '#FF5F0F', '#4D69A0', '#C84113')
 
-phi_range = np.linspace(0., (2/5)*np.pi, 9)
+phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
 for n, phi_plot in enumerate(phi_range):
-    print('###########\n## PHI: ', phi_plot*(180/np.pi))
-    print('###########')
+    #print('###########\n## PHI: ', phi_plot*(180/np.pi))
+    print('## PHI: ', phi_plot*(180/np.pi))
+    #print('###########')
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
-    
-    #print('^%^%^: ', len(Poincare_output))
+
+    #print('len of output: ', len(Poincare_output))
     for i in range(len(Poincare_output)):
         t_pts = Poincare_output[i][n+1] #skip wall event
+        print(f'{len(t_pts)} points in Suface {i}')
         #print('t_pts:', t_pts)
         r_f = np.zeros(len(t_pts))
         th_f = np.zeros(len(t_pts))
@@ -147,21 +117,15 @@ for n, phi_plot in enumerate(phi_range):
 
         for j in range(len(t_pts)):
             #print('t_point ', t_pts[j])
-            x_f = t_pts[j][0]
-            y_f = t_pts[j][1]
-            z_f = t_pts[j][2]
-            r_f[j] = toR_nbless(x_f, y_f, z_f, b_hidra.R0)
-            th_f[j] = toTHETA_nbless(x_f, y_f, z_f, b_hidra.R0)
-            ph_f[j] = toPHI_nbless(x_f, y_f, z_f, b_hidra.R0)
-        print('phi at tpts: ', ph_f*(180./np.pi))
-        
+            r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], b_hidra.R0)
+        #print('phi at tpts: ', ph_f*(180./np.pi))
+
         f_output = np.array([th_f, r_f])
         np.save('Poincare_output_'+str(n)+'_'+str(i), f_output)
-        
+
         #plt.scatter(th_f, r_f, s=0.1, c=UIUCcol[int(np.fmod(i,len(UIUCcol))
-        plt.scatter(th_f, r_f, s=0.1)
-        #endif
-    
+        plt.scatter(th_f, r_f, s=0.09)
+
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
     plt.savefig('Poincare_phi={:03.0f}.png'.format(phi_plot*180/np.pi),dpi=900)
