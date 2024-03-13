@@ -22,15 +22,15 @@ def blines(t, p_XYZ, field):
 ##===============##
 ## DEFINE SOLVER ##
 ##===============##
-def solvePoincare(init_cond, lineLength, field, solver_events):
-    print('IC: ', init_cond)
+def solvePoincare(init_cond, maxLength, field, solver_events):
+    print('Start IC: ', init_cond)
 
-    span = (0.0, lineLength)
+    span = (0.0, maxLength)
     fieldlines = solve_ivp(blines, span, init_cond, args = ([field]),
             dense_output=False,
             events = solver_events, 
-            #method='LSODA', rtol=1e-12, atol=1e-7) 
-            #method='DOP853', max_step=1e-2, rtol=1e-12, atol=1e-10) #3e-4 
+            #method='LSODA', rtol=1e-12, atol=1e-10) 
+            #method='DOP853', rtol=1e-12, atol=1e-10) #3e-4 max_step=1e-2, 
             method='RK45', max_step=1e-2, rtol=1e-12, atol=1e-10) #3e-4 
 
     if fieldlines.success:

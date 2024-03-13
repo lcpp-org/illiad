@@ -158,9 +158,7 @@ cython_debug/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
-input_files/Bxyz_iota-1q3_hires_5Periodic.npy
-input_files/Bxyz_iota-1q3_hires_notPeriodic.npy
-input_files/i3_hires_Bxyz.npy
 coils.wega_with_VFCoils
 fieldsolve.py
-input_files/Bxyz_iota-1q3_lores_NotPeriodic.npy
+input_files/*
+output/*

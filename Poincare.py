@@ -1,10 +1,18 @@
 import numpy as np
 import scipy as sp
-import os as os
 
 from mesh import *
 from coordtrans import *
 from ode import blines, solvePoincare
+import class_outputHandler as out
+
+
+##============================##
+##   SET UP OUTPUT FOLDERS    ##
+## (GIVER YOUR OUTPUT A NAME) ##
+##============================##
+simOut = out.outputHandler()
+simOut.setupOutputDirectory("TEST_RUN2")
 
 
 ##============================##
@@ -12,23 +20,20 @@ from ode import blines, solvePoincare
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
-
-Bx, By, Bz = np.load('input_files/i3_hires_Bxyz.npy')
-b_hidra.loadCartesianField(Bx, By, Bz)
+b_hidra.loadCartesianField_fromFile('i3_hires_Bxyz.npy')
 
 
 ##====================##
 ## SET UP FIELD LINES ##
 ##====================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 6#14+13
-spins = 500
+Nlines = 6#41
+spins = 20
 length = (2*np.pi * b_hidra.R0) * spins
 
-fl_R0 = np.array(np.linspace( 0.120, 0.070, Nlines))
+fl_R0 = np.array(np.linspace( 0.130, 0.010, Nlines))
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
-
 
 
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
@@ -92,8 +97,8 @@ from matplotlib.colors import ListedColormap
 
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
-
-UIUCcol = ('#13294B', '#FF5F0F', '#4D69A0', '#C84113')
+#from cycler import cycler
+#UIUCcol = ['#13294B', '#FF5F0F', '#4D69A0', '#C84113']
 
 phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
 for n, phi_plot in enumerate(phi_range):
@@ -118,12 +123,15 @@ for n, phi_plot in enumerate(phi_range):
         #print('phi at tpts: ', ph_f*(180./np.pi))
 
         f_output = np.array([th_f, r_f])
-        np.save('Poincare_output_'+str(n)+'_'+str(i), f_output)
+        fname = 'Poincare_output_'+str(n)+'_'+str(i)
+        simOut.saveNumpyData(f_output, fname)
 
-        #plt.scatter(th_f, r_f, s=0.1, c=UIUCcol[int(np.fmod(i,len(UIUCcol))
-        plt.scatter(th_f, r_f, s=0.08)
+        plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
 
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
-    plt.savefig('Poincare_phi={:03.0f}.png'.format(phi_plot*180/np.pi),dpi=900)
+
+    plot_name = 'Poincare_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
+    simOut.saveFig(plot_name)
+
 plt.close('all')

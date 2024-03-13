@@ -1,4 +1,5 @@
 import numpy as np
+import os as os
 from coordtrans import XYZ_to_RTP
 
 # define a class with mesh information
@@ -65,6 +66,26 @@ class CartesianField(Mesh):
         else: print("ERROR: Input Array dimensions do not match!")
 
 
+    def loadCartesianField_fromFile(self, name):
+        # This function loads a vector field as a 3-dimensional scalar array for each cartesian vector
+        # The grid properties are assumed from the dimensions of the input arrays
+        #!! A better input data structure is needed to define dimension order, dimension size, and periodicity
+
+        #self.module_path = os.path.realpath(os.path.dirname(__file__))
+        try:
+            self.Bx, self.By, self.Bz = np.load('input_files/'+name)
+        except OSError as error:
+            print(error)
+
+        if self.Bx.shape == self.By.shape and self.Bx.shape == self.Bz.shape:
+            self.nphi, self.ntheta, self.nr = self.Bx.shape
+
+            self.dr     = self.a / (self.nr-1)
+            self.dtheta = 2*np.pi / (self.ntheta-1)
+            self.dphi   = 2*np.pi / (self.nphi-1)
+        else: print("ERROR: Input Array dimensions do not match!")
+
+
     def interpField(self, point_XYZ):
         # Method to return the interpolated field values at a point defined in Cartesian coordinates
         # Interpolation  done via a weighted sum of field values at each node of the enclosing cell
@@ -77,19 +98,15 @@ class CartesianField(Mesh):
         th_loc = point_RTP[1]
         ph_loc = point_RTP[2]
 
-        #th_loc = np.fmod(point_RTP[1], (2*np.pi)) # keep theta within 0 and 2pi
-        #ph_loc = np.fmod(point_RTP[2], (2*np.pi)) # keep phi within 0 and 2pi
+        #th_loc = np.fmod(point_RTP[1], (2*np.pi)) # keep theta within 0 and theta_max!
+        #ph_loc = np.fmod(point_RTP[2], (2*np.pi)) # keep phi within 0 and phi_max!
 
         if r_loc > self.a:
             # determine whether point is within mesh domain
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
             #print('POINT OUTSIDE OF MESH!')
-
-            #t_b = np.array([1., 1., 1.])
             rlb  = self.nr - 2
-            #thlb = self.ntheta - 2 
-            #phlb = self.nphi - 2
 
         else:
             # Point is within the mesh, and we can find the indices
