@@ -13,6 +13,13 @@ import class_outputHandler as out
 ##============================##
 simOut = out.outputHandler()
 simOut.setupOutputDirectory("TEST_RUN2")
+simOut.startLog()
+
+simOut.log.debug("debug msg")
+simOut.log.info("info msg")
+simOut.log.warning("warning msg")
+simOut.log.error("error msg")
+simOut.log.critical("critical msg")
 
 
 ##============================##
@@ -78,7 +85,7 @@ from time import perf_counter
 
 t_start = perf_counter()
 with concurrent.futures.ProcessPoolExecutor() as executor:
-    solvePoincare_x = partial(solvePoincare, lineLength=length, field=b_hidra, solver_events=poincare_events)
+    solvePoincare_x = partial(solvePoincare, maxLength=length, field=b_hidra, solver_events=poincare_events)
     Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
 t_stop = perf_counter()
 elapsed_time = t_stop - t_start
