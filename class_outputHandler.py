@@ -47,7 +47,7 @@ class outputHandler:
 
     def startLog(self):
             #def setupLogger:
-        log = logging.getLogger("Poincare")
+        self.log = logging.getLogger("Poincare")
 
         logging_config = {
             "version": 1,
@@ -66,19 +66,19 @@ class outputHandler:
                 "stdout": {
                     "class": "logging.StreamHandler",
                     "level": "INFO",
-                    "formatter": "detailed",
+                    "formatter": "simple",
                     "stream": "ext://sys.stdout",
                 },
                 "stderr": {
                     "class": "logging.StreamHandler",
                     "level": "WARNING",
-                    "formatter": "detailed",
+                    "formatter": "simple",
                     "stream": "ext://sys.stderr",
                 },
                 "file": {
                     "class": "logging.handlers.RotatingFileHandler",
                     "level": "INFO",
-                    "formatter": "simple",
+                    "formatter": "detailed",
                     "filename": self.run_dir + "/simLog.log",
                     "maxBytes": 100000000, #100MB
                     "backupCount": 5
@@ -92,6 +92,11 @@ class outputHandler:
 
         logging.config.dictConfig(config=logging_config)
         self.log.info("Started Logger")
+        #simOut.log.debug("debug msg")
+        #simOut.log.info("info msg")
+        #simOut.log.warning("warning msg")
+        #simOut.log.error("error msg")
+        #simOut.log.critical("critical msg")
 
 
 

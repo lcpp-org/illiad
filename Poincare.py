@@ -12,14 +12,8 @@ import class_outputHandler as out
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
 simOut = out.outputHandler()
-simOut.setupOutputDirectory("TEST_RUN2")
+simOut.setupOutputDirectory("TEST_RUN3")
 simOut.startLog()
-
-simOut.log.debug("debug msg")
-simOut.log.info("info msg")
-simOut.log.warning("warning msg")
-simOut.log.error("error msg")
-simOut.log.critical("critical msg")
 
 
 ##============================##
@@ -44,7 +38,7 @@ fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
 
 
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
-print('Initial Conditions (RTP): ', ICs_RTP)
+simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')
 
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
@@ -89,10 +83,11 @@ with concurrent.futures.ProcessPoolExecutor() as executor:
     Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
 t_stop = perf_counter()
 elapsed_time = t_stop - t_start
-print(f'## All Solvers Finished in {elapsed_time} seconds\n###############')
+simOut.log.info(f'ALL SOLVERS FINISHED IN {elapsed_time} seconds\n###############\n\n')
 
 # convert 'generator' to 'list'
 Poincare_output = list(Poincare_output)
+
 
 
 ## ============== ##
@@ -109,16 +104,14 @@ plt.rcParams.update({'figure.autolayout':True})
 
 phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
 for n, phi_plot in enumerate(phi_range):
-    #print('###########\n## PHI: ', phi_plot*(180/np.pi))
-    print('## PHI: ', phi_plot*(180/np.pi))
-    #print('###########')
+    simOut.log.info(f'## PHI: {phi_plot*(180/np.pi)}')
+
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
 
-    #print('len of output: ', len(Poincare_output))
     for i in range(len(Poincare_output)):
         t_pts = Poincare_output[i][n+1] #skip wall event
-        print(f'{len(t_pts)} points in Suface {i}')
+        simOut.log.info(f'\t{len(t_pts)} points in Suface {i}')
         #print('t_pts:', t_pts)
         r_f = np.zeros(len(t_pts))
         th_f = np.zeros(len(t_pts))
@@ -127,7 +120,7 @@ for n, phi_plot in enumerate(phi_range):
         for j in range(len(t_pts)):
             #print('t_point ', t_pts[j])
             r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], b_hidra.R0)
-        #print('phi at tpts: ', ph_f*(180./np.pi))
+        simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')
 
         f_output = np.array([th_f, r_f])
         fname = 'Poincare_output_'+str(n)+'_'+str(i)
@@ -142,3 +135,5 @@ for n, phi_plot in enumerate(phi_range):
     simOut.saveFig(plot_name)
 
 plt.close('all')
+
+simOut.log.info('## SIM FINISHED ##\n\n\n\n')
