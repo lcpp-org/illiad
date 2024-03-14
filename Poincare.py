@@ -11,8 +11,8 @@ import class_outputHandler as out
 ##   SET UP OUTPUT FOLDERS    ##
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
-simOut = out.outputHandler()
-simOut.setupOutputDirectory("TEST_RUN3")
+# right now, data and plots WILL be overwritten if the directory already exists!
+simOut = out.outputHandler("24lines_500spins")
 simOut.startLog()
 
 
@@ -28,22 +28,22 @@ b_hidra.loadCartesianField_fromFile('i3_hires_Bxyz.npy')
 ## SET UP FIELD LINES ##
 ##====================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 6#41
-spins = 20
+Nlines = 24#41
+spins = 500
 length = (2*np.pi * b_hidra.R0) * spins
 
-fl_R0 = np.array(np.linspace( 0.130, 0.010, Nlines))
+fl_R0 = np.array(np.linspace( 0.120, 0.028, Nlines))
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
 
-
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
-simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')
 
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
-#print('Initial Conditions (XYZ): ', ICs_XYZ)
+
+simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')    
+simOut.log.debug('Initial Conditions (XYZ): ', ICs_XYZ)
 
 
 ##============##
@@ -66,8 +66,6 @@ poincare_events = [inVV,
                     phi_events.isphi54, 
                     phi_events.isphi63, 
                     phi_events.isphi72]
-
-
 ##===============================================##
 ## SOLVE FOR EACH INITIAL CONDITION CONCURRENTLY ##
 ##===============================================##
@@ -111,22 +109,22 @@ for n, phi_plot in enumerate(phi_range):
 
     for i in range(len(Poincare_output)):
         t_pts = Poincare_output[i][n+1] #skip wall event
-        simOut.log.info(f'\t{len(t_pts)} points in Suface {i}')
-        #print('t_pts:', t_pts)
+
         r_f = np.zeros(len(t_pts))
         th_f = np.zeros(len(t_pts))
         ph_f = np.zeros(len(t_pts))
 
         for j in range(len(t_pts)):
-            #print('t_point ', t_pts[j])
             r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], b_hidra.R0)
-        simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')
 
         f_output = np.array([th_f, r_f])
         fname = 'Poincare_output_'+str(n)+'_'+str(i)
         simOut.saveNumpyData(f_output, fname)
 
         plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
+
+        simOut.log.debug(f'\t{len(t_pts)} points in Suface {i}')
+        simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')        
 
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))

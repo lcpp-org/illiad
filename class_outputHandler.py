@@ -6,15 +6,18 @@ import logging
 import logging.config
 
 class outputHandler:
-    def __init__(self):
+    # Class to handle output and logging
+    # Creates an output folder underneath the module directory if none exists
+    # Creates a 'run_name' sub-directory in '\output' with further sub-dirs for plot and data output
+    # includes a method to instantiate and configure logging
+    # includes methods for storing data output and plots output in proper sub-directories
+    def __init__(self, run_name):
         # get script directory
         self.module_path = os.path.realpath(os.path.dirname(__file__))
 
         self.log = logging.getLogger("Poincare")
 
-
-    def setupOutputDirectory(self, run_name):
-       
+    #def setupOutputDirectory(self, run_name):
         self.module_path = os.path.realpath(os.path.dirname(__file__))
         print(f'Executing script in {self.module_path}')
 
@@ -44,9 +47,8 @@ class outputHandler:
             print(error)
 
 
-
     def startLog(self):
-            #def setupLogger:
+        # Creates a logger instance and configures the logging opions, handlers, formatting, etc.        
         self.log = logging.getLogger("Poincare")
 
         logging_config = {
@@ -91,7 +93,7 @@ class outputHandler:
         }
 
         logging.config.dictConfig(config=logging_config)
-        self.log.info("Started Logger")
+        self.log.info(f"Started Logger in {self.run_dir}")
         #simOut.log.debug("debug msg")
         #simOut.log.info("info msg")
         #simOut.log.warning("warning msg")
@@ -99,14 +101,14 @@ class outputHandler:
         #simOut.log.critical("critical msg")
 
 
-
-
     def saveNumpyData(self, data, name):
+        # method to store a numpy array in the \data sub-directory
         name_loc = os.path.join( self.data_dir, name)
         np.save(name_loc, data)
 
 
     def saveFig(self, name):
+        # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
         plt.savefig(name_loc, dpi=900)
 

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.integrate import solve_ivp
+import logging
 #import numba as nb
 #from numba import jit
 
@@ -23,7 +24,8 @@ def blines(t, p_XYZ, field):
 ## DEFINE SOLVER ##
 ##===============##
 def solvePoincare(init_cond, maxLength, field, solver_events):
-    print('Start IC: ', init_cond)
+    log = logging.getLogger()
+    log.info(f'Start IC: {init_cond}')
 
     span = (0.0, maxLength)
     fieldlines = solve_ivp(blines, span, init_cond, args = ([field]),
@@ -34,13 +36,13 @@ def solvePoincare(init_cond, maxLength, field, solver_events):
             method='RK45', max_step=1e-2, rtol=1e-12, atol=1e-10) #3e-4 
 
     if fieldlines.success:
-        print('\nSolver Success for IC: ', init_cond)
+        log.info(f'Solver Success for IC:{init_cond}')
     else:
-        print('\nSolver Failure for IC: ', init_cond)
+        log.critical(f'Solver Failure for IC:{init_cond}')
 
     data = fieldlines.y_events
 
-    print('List of Wall Events: ', fieldlines.y_events[0])
+    log.info(f'Wall Events: {fieldlines.y_events[0]}')
     #print('List of Event 1: ', fieldlines.y_events[1])
 
     return data

@@ -1,6 +1,8 @@
 import numpy as np
+from math import degrees
 import os as os
 from coordtrans import XYZ_to_RTP
+import logging
 
 # define a class with mesh information
 class Mesh:
@@ -20,6 +22,7 @@ class Mesh:
     # dphi: grid spacing in the phi direction
 
     def __init__(self):
+        self.log = logging.getLogger()
         self.R0 = 0.0
         self.a = 0.0
 
@@ -63,7 +66,16 @@ class CartesianField(Mesh):
             self.dr     = self.a / (self.nr-1)
             self.dtheta = 2*np.pi / (self.ntheta-1)
             self.dphi   = 2*np.pi / (self.nphi-1)
-        else: print("ERROR: Input Array dimensions do not match!")
+
+            self.log.info(f'Cartesian Vector field loaded:\n'
+                           +'# -----------------------------------\n'
+                          +f'# Shape: {Bx.shape}\n'
+                          +f'# dr = {self.dr} m.\n'
+                          +f'# dtheta = {degrees(self.dtheta)} deg.\n'
+                          +f'# dphi = {degrees(self.dphi)} deg.\n'
+                           +'# -----------------------------------\n')
+            
+        else: self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
 
 
     def loadCartesianField_fromFile(self, name):
@@ -75,7 +87,8 @@ class CartesianField(Mesh):
         try:
             self.Bx, self.By, self.Bz = np.load('input_files/'+name)
         except OSError as error:
-            print(error)
+            self.log.critical(error)
+            self.log.critical("INPUT FILE NOT FOUND!!")
 
         if self.Bx.shape == self.By.shape and self.Bx.shape == self.Bz.shape:
             self.nphi, self.ntheta, self.nr = self.Bx.shape
@@ -83,7 +96,16 @@ class CartesianField(Mesh):
             self.dr     = self.a / (self.nr-1)
             self.dtheta = 2*np.pi / (self.ntheta-1)
             self.dphi   = 2*np.pi / (self.nphi-1)
-        else: print("ERROR: Input Array dimensions do not match!")
+
+            self.log.info(f'Cartesian Vector field loaded from file {name}:\n'
+                           +'# -----------------------------------\n'
+                          +f'# Shape: {self.Bx.shape}\n'
+                          +f'# dr = {self.dr} m.\n'
+                          +f'# dtheta = {degrees(self.dtheta)} deg.\n'
+                          +f'# dphi = {degrees(self.dphi)} deg.\n'
+                           +'# ------------------------------------\n')
+
+        else: self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
 
 
     def interpField(self, point_XYZ):
