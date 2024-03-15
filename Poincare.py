@@ -12,7 +12,7 @@ import class_outputHandler as out
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
 # right now, data and plots WILL be overwritten if the directory already exists!
-simOut = out.outputHandler("Bmesh-hires_period5_1line100spins_test_the_13th_Part5")
+simOut = out.outputHandler("negY_ode-andGlobalXform_eventsFixed")
 simOut.startLog()
 
 
@@ -21,11 +21,9 @@ simOut.startLog()
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
-b_hidra.loadCartesianField_fromFile('Bxyz_iota_1q3_hires_1Period.npy', 0,1,1)
+b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_1Period.npy', 0,1,1)
 #b_hidra.loadCartesianField_fromFile('Bxyz_iota_1q3_hires_5Period.npy', 0,1,5)
 #b_hidra.loadCartesianField_fromFile('Bxyz_iota-1q3_lores_5Period.npy', 0,1,5)
-
-
 
 
 ##====================##

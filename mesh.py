@@ -135,15 +135,17 @@ class CartesianField(Mesh):
 
 
             self.log.info(f'Cartesian Vector field loaded from file {name}:\n'
-                           +'# -----------------------------------\n'
-                          +f'# Shape: {self.Bx.shape}\n'
-                          +f'# r_min/max = {self.r_min}/{self.r_max}\n'
-                          +f'# theta_min/max = {degrees(self.theta_min)}/{degrees(self.theta_max)}\n'
-                          +f'# phi_min/max = {degrees(self.phi_min)}/{degrees(self.phi_max)}\n'
+                           +'# --------- FIELD MESH DATA --------- #\n'
+                           +'# ----------------------------------- #\n'
+                          +f'# Size: {self.Bx.shape}\n'
+                          +f'# Periodicity: {self.periodicity}\n'
+                          +f'# r min/max [meters]= {self.r_min}/{self.r_max}\n'
+                          +f'# theta min/max [deg.]= {degrees(self.theta_min)}/{degrees(self.theta_max)}\n'
+                          +f'# phi min/max [deg.]= {degrees(self.phi_min)}/{degrees(self.phi_max)}\n'
                           +f'# dr = {self.dr} m.\n'
                           +f'# dtheta = {degrees(self.dtheta)} deg.\n'
                           +f'# dphi = {degrees(self.dphi)} deg.\n'
-                           +'# ------------------------------------\n')
+                           +'# ------------------------------------ #\n')
 
         else: self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
 
@@ -250,8 +252,8 @@ class CartesianField(Mesh):
         #if self.periodicity[2]>1: # phi periodicity
         #if ph_locN > 0:
         phi_rotation = int(ph_locN) * self.phi_max #(2*np.pi)/self.periodicity[2] # angle of transform
-        bx_rotatedPhi = t_bx*cos(phi_rotation) - t_by*sin(phi_rotation)
-        by_rotatedPhi = t_bx*sin(phi_rotation) + t_by*cos(phi_rotation)
+        bx_rotatedPhi = t_bx*cos(phi_rotation) + t_by*sin(phi_rotation)
+        by_rotatedPhi = t_bx*sin(phi_rotation) - t_by*cos(phi_rotation)
         bz_rotatedPhi = t_bz
 
         t_b = np.array([bx_rotatedPhi, by_rotatedPhi, bz_rotatedPhi])#/totalVolume

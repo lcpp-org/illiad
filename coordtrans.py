@@ -1,26 +1,34 @@
 import numpy as np
 import numba as nb
 
-##
+
 ## TRANSFORM TO CARTESIAN COORDINATES
 ##
 #@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
 def RTP_to_XYZ(p_RTP, Rmajor):
+    # Function to take in a point defined in r-theta-phi coordinates
+    # And return a point in Cartesian coordinates
+    # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+    # convention: +phi is clockwise when viewed from above
     r, theta, phi = p_RTP[:3]
     
     x = (Rmajor + r*np.cos(theta)) * np.cos(phi)
-    y = (Rmajor + r*np.cos(theta)) * np.sin(phi)
+    y = (-1) * (Rmajor + r*np.cos(theta)) * np.sin(phi)
     z = r * np.sin(theta)
     p_XYZ = np.array([x, y, z])
     
     return p_XYZ
 
 
-##
+
 ## TRANSFORM TO TOROIDAL COORDINATES
 ##
 @nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
 def XYZ_to_RTP(p_XYZ, Rmajor):
+    # Function to take in a point defined in Cartesian coordinates
+    # And return a point in r-theta-phi coordinates
+    # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+    # convention: +phi is clockwise when viewed from above
     x, y, z = p_XYZ
 
     r = np.sqrt( x**2 + y**2 + z**2 + Rmajor**2 - 2*Rmajor*np.sqrt(x**2 + y**2) )
@@ -31,7 +39,7 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
     # here we shift the domain to (0 to 2*pi)
     if theta<0: theta += 2*np.pi
 
-    phi = np.arctan2(y,x)
+    phi = (-1) * np.arctan2(y,x)
     # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
     if phi<0: phi += 2*np.pi
