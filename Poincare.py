@@ -12,7 +12,7 @@ import class_outputHandler as out
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
 # right now, data and plots WILL be overwritten if the directory already exists!
-simOut = out.outputHandler("24lines_500spins")
+simOut = out.outputHandler("Bmesh-hires_period5_1line100spins_test_the_13th_Part5")
 simOut.startLog()
 
 
@@ -21,18 +21,23 @@ simOut.startLog()
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
-b_hidra.loadCartesianField_fromFile('i3_hires_Bxyz.npy')
+b_hidra.loadCartesianField_fromFile('Bxyz_iota_1q3_hires_1Period.npy', 0,1,1)
+#b_hidra.loadCartesianField_fromFile('Bxyz_iota_1q3_hires_5Period.npy', 0,1,5)
+#b_hidra.loadCartesianField_fromFile('Bxyz_iota-1q3_lores_5Period.npy', 0,1,5)
+
+
 
 
 ##====================##
 ## SET UP FIELD LINES ##
 ##====================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 24#41
-spins = 500
+Nlines = 1 #41
+spins = 40
 length = (2*np.pi * b_hidra.R0) * spins
 
-fl_R0 = np.array(np.linspace( 0.120, 0.028, Nlines))
+fl_R0 = np.array(np.linspace( 0.010, 0.06, Nlines))
+#fl_R0 = np.array(np.linspace( 0.120, 0.0025, Nlines))
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
 
@@ -42,8 +47,8 @@ ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
 
-simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')    
-simOut.log.debug('Initial Conditions (XYZ): ', ICs_XYZ)
+simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')
+#simOut.log.debug(f'Initial Conditions (XYZ): {ICs_XYZ}')
 
 
 ##============##
@@ -106,6 +111,8 @@ for n, phi_plot in enumerate(phi_range):
 
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
+    #ax.set_theta_zero_location("E")
+    #ax.set_theta_direction(+1)
 
     for i in range(len(Poincare_output)):
         t_pts = Poincare_output[i][n+1] #skip wall event
@@ -123,8 +130,8 @@ for n, phi_plot in enumerate(phi_range):
 
         plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
 
-        simOut.log.debug(f'\t{len(t_pts)} points in Suface {i}')
-        simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')        
+        #simOut.log.debug(f'\t{len(t_pts)} points in Suface {i}')
+        #simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')        
 
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))

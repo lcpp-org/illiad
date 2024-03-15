@@ -11,7 +11,7 @@ import logging
 #@jit(nb.types.Array(nb.float64, 1, "C")(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
 def blines(t, p_XYZ, field):
     B = np.zeros(3)
-    direction= -1
+    direction= 1
 
     B = field.interpField(p_XYZ[:3])
 
