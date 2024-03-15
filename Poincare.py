@@ -12,7 +12,7 @@ import class_outputHandler as out
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
 # right now, data and plots WILL be overwritten if the directory already exists!
-simOut = out.outputHandler("negY_ode-andGlobalXform_eventsFixed")
+simOut = out.outputHandler("fieldlines_testing_1")
 simOut.startLog()
 
 
@@ -21,21 +21,19 @@ simOut.startLog()
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
-b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_1Period.npy', 0,1,1)
-#b_hidra.loadCartesianField_fromFile('Bxyz_iota_1q3_hires_5Period.npy', 0,1,5)
-#b_hidra.loadCartesianField_fromFile('Bxyz_iota-1q3_lores_5Period.npy', 0,1,5)
+#b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_1Period.npy', 0,1,1)
+b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_5Period.npy', 0, 1, 5)
 
 
 ##====================##
 ## SET UP FIELD LINES ##
 ##====================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 1 #41
-spins = 40
+Nlines = 6
+spins = 200
 length = (2*np.pi * b_hidra.R0) * spins
 
-fl_R0 = np.array(np.linspace( 0.010, 0.06, Nlines))
-#fl_R0 = np.array(np.linspace( 0.120, 0.0025, Nlines))
+fl_R0 = np.array(np.linspace( 0.120, 0.040, Nlines))
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
 
@@ -45,7 +43,7 @@ ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
 
-simOut.log.info(f'Initial Conditions (RTP): {ICs_RTP}')
+simOut.log.info(f'Initial Conditions (RTP):\n{ICs_RTP}')
 #simOut.log.debug(f'Initial Conditions (XYZ): {ICs_XYZ}')
 
 
@@ -86,7 +84,7 @@ t_stop = perf_counter()
 elapsed_time = t_stop - t_start
 simOut.log.info(f'ALL SOLVERS FINISHED IN {elapsed_time} seconds\n###############\n\n')
 
-# convert 'generator' to 'list'
+# convert generator to list
 Poincare_output = list(Poincare_output)
 
 

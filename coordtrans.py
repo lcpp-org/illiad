@@ -47,3 +47,20 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
     p_RTP = np.array([r, theta, phi])
 
     return p_RTP
+
+
+
+#@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
+def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
+    # Function takes in a cartesian vector and a phi angle
+    # Returns the cartesian values of the vector rotated by phi degrees
+    # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+    # convention: +phi is clockwise when viewed from above
+    rotated_XYZ = np.zeros(3)
+    xFormMatrix = np.array([[ np.cos(delta_phi), -np.sin(delta_phi), 0.0],
+                            [ np.sin(delta_phi), np.cos(delta_phi), 0.0],
+                            [               0.0,               0.0, 1.0]])
+    
+    rotated_XYZ = np.dot(vec_XYZ, xFormMatrix)
+
+    return rotated_XYZ

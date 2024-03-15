@@ -1,7 +1,7 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from coordtrans import XYZ_to_RTP
+from coordtrans import XYZ_to_RTP, rot_vecXYZ_byPHI
 import logging
 
 # define a class with mesh information
@@ -41,6 +41,7 @@ class Mesh:
         self.r_min = 0
         self.theta_min = 0
         self.phi_min = 0
+
 
     def setToroidalGeometry(self, R0, a):
         self.R0 = R0
@@ -91,7 +92,6 @@ class CartesianField(Mesh):
         # The grid properties are assumed from the dimensions of the input arrays
         #!! A better input data structure is needed to define dimension order, dimension size, and periodicity
 
-        #self.module_path = os.path.realpath(os.path.dirname(__file__))
         try:
             self.Bx, self.By, self.Bz = np.load('input_files/'+name)
         except OSError as error:
@@ -101,10 +101,7 @@ class CartesianField(Mesh):
         if self.Bx.shape == self.By.shape and self.Bx.shape == self.Bz.shape:
 
             self.nr, self.ntheta, self.nphi = self.Bx.shape
-
-            #self.periodicity = np.array([0, 1, 1]) #hack! set outside
-            self.periodicity = np.array([r_period, theta_period, phi_period]) #hack! set outside
-
+            self.periodicity = np.array([r_period, theta_period, phi_period])
 
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
@@ -136,7 +133,6 @@ class CartesianField(Mesh):
 
             self.log.info(f'Cartesian Vector field loaded from file {name}:\n'
                            +'# --------- FIELD MESH DATA --------- #\n'
-                           +'# ----------------------------------- #\n'
                           +f'# Size: {self.Bx.shape}\n'
                           +f'# Periodicity: {self.periodicity}\n'
                           +f'# r min/max [meters]= {self.r_min}/{self.r_max}\n'
@@ -155,27 +151,20 @@ class CartesianField(Mesh):
         # Interpolation  done via a weighted sum of field values at each node of the enclosing cell
         # The weight function is calculated as the volume of the octant opposed to the node
 
-        # Get the location of the point in RTP coordinates
-        # domains:
-        # r: 0 -> minor Radius
-        # theta: 0 -> 2pi
-        # phi: 0 -> 2pi
+        # Get the location of the point in RTP coordinates,
+        # keep in domains:
+        # r:        0.0 -> r_max     (minor Radius)
+        # theta: dtheta -> theta_max (2pi/Nperiods)
+        # phi:     dphi -> phi_max   (2pi/Nperiods)
         point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
-        r_loc  = point_RTP[0]
+        r_local  = point_RTP[0]
 
-        th_loc_old = point_RTP[1]
-        ph_loc_old = point_RTP[2]
+        th_localN, th_local = divmod(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
+        ph_localN, ph_local = divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
 
-        th_locN, th_loc_new = divmod(point_RTP[1], self.theta_max) # keep theta within 0 a   nd theta_max!
-        ph_locN, ph_loc_new = divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
+        point_RTP_local = np.array([r_local, th_local, ph_local])
 
-        #elf.log.debug(f'modTheta = old:{degrees(th_loc_old)}, new:{degrees(th_loc_new)}')
-        #elf.log.debug(f'modPhi = old:{degrees(ph_loc_old)}, new:{degrees(ph_loc_new)}')
-
-        #elf.log.debug(f'Theta current N = {int(th_locN)}, modTheta = old:{degrees(th_loc_old)}, new:{degrees(th_loc_new)}')
-        #elf.log.debug(f'Phi current N = {int(ph_locN)}, modPhi = old:{degrees(ph_loc_old)}, new:{degrees(ph_loc_new)}')
-
-        if r_loc > self.a:
+        if r_local > self.r_max:
             # determine whether point is within mesh domain
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
@@ -184,78 +173,69 @@ class CartesianField(Mesh):
 
         else:
             # Point is within the mesh, and we can find the indices
-            # (here "lb" stands for "lower bound")
-            rindex_lo = floor(r_loc/self.dr)
+            # (here "lo" stands for lower bound
+            rindex_lo = floor(r_local/self.dr)
 
         rindex_hi = rindex_lo + 1
 
-        thindex_hi = floor(th_loc_new/self.dtheta)
-        phindex_hi = floor(ph_loc_new/self.dphi)
+        thindex_hi = floor(th_local/self.dtheta)
+        thindex_lo = thindex_hi - 1        
 
-        thindex_lo = thindex_hi - 1
+        phindex_hi = floor(ph_local/self.dphi)
         phindex_lo = phindex_hi - 1
 
         # Return the indices of the 8 corner points of the cell
         # Validation of the indices is not done here
         nodeIndexArray = np.array(
-             [[rindex_lo,  thindex_lo, phindex_lo ], [rindex_hi, thindex_lo, phindex_lo],
+            [[rindex_lo,  thindex_lo, phindex_lo ], [rindex_hi, thindex_lo, phindex_lo ],
              [rindex_lo,  thindex_hi, phindex_lo ], [rindex_hi, thindex_hi, phindex_lo ],
              [rindex_lo,  thindex_lo, phindex_hi ], [rindex_hi, thindex_lo, phindex_hi ],
              [rindex_lo,  thindex_hi, phindex_hi ], [rindex_hi, thindex_hi, phindex_hi ]],
             dtype=np.int32)
 
         # antiNodeArray will return the node indices diagonally "opposite" the node in nodeArray
+        # note that proper functioning depends on ordering of nodeIndexArray
         antiNodeArray = np.flip(nodeIndexArray, 0)
 
-        t_bx = 0.
-        t_by = 0.
-        t_bz = 0.
         totalVolume = 0.
+        node_vecXYZ = np.zeros(3)
+        local_vecXYZ = np.zeros(3)
+        global_vecXYZ = np.zeros(3)
 
-        bx_rotatedPhi = 0.
-        by_rotatedPhi = 0.
-        bz_rotatedPhi = 0.
-
-        #for node, antiNode in enumerate(zip(nodeArray, antiNodeArray)):
+        # cycle through nodes, solving for the field and the weight function
         for n, node in enumerate(nodeIndexArray):
-            node_i = node[0]
-            node_j  = node[1]
-            node_k = node[2]
+            # get node and antiNode indices
+            node_i, node_j, node_k = node
+            antiNode_i, antiNode_j, antiNode_k = antiNodeArray[n]
 
-            antiNode_i = antiNodeArray[n][0]
-            antiNode_j  = antiNodeArray[n][1]
-            antiNode_k = antiNodeArray[n][2]
+            node_vecXYZ[0] = self.Bx[node_i, node_j, node_k]
+            node_vecXYZ[1] = self.By[node_i, node_j, node_k]
+            node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
+            # transform the field if the node is < dphi
+            if node_k < 0.:
+                node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
 
+            # calculate anitNode rtp values from indices for input in to 'subElementVolume'
             antiNode_r = antiNode_i * self.dr
             antiNode_theta = (antiNode_j + 1) * self.dtheta
             antiNode_phi = (antiNode_k + 1) * self.dphi
-
             antiNode_rtp = np.array([antiNode_r, antiNode_theta, antiNode_phi])
 
-            antiNode_subVolume = self.subElementVolume(point_RTP, antiNode_rtp)
+            # calculate the wieght function as the volume of the point-antiNode subelement
+            antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
+
 
             totalVolume += antiNode_subVolume
-            t_bx += antiNode_subVolume * self.Bx[node_i, node_j, node_k]
-            t_by += antiNode_subVolume * self.By[node_i, node_j, node_k]
-            t_bz += antiNode_subVolume * self.Bz[node_i, node_j, node_k]
+            local_vecXYZ += node_vecXYZ * antiNode_subVolume
+
         #  return the sum of weighted values divided by the total
-        #t_b = np.array([t_bx, t_by, t_bz])/totalVolume
-        t_bx = t_bx/totalVolume
-        t_by = t_by/totalVolume
-        t_bz = t_bz/totalVolume
+        local_vecXYZ = local_vecXYZ / totalVolume
 
         # if the mesh is defined with periodic symmetry, we must 
         # perform a rotational transform based on which 'period' of the mesh
         # the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
+        phi_rotation = int(ph_localN) * self.phi_max  # angle of transform
+        global_vecXYZ = rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
 
-        #if self.periodicity[2]>1: # phi periodicity
-        #if ph_locN > 0:
-        phi_rotation = int(ph_locN) * self.phi_max #(2*np.pi)/self.periodicity[2] # angle of transform
-        bx_rotatedPhi = t_bx*cos(phi_rotation) + t_by*sin(phi_rotation)
-        by_rotatedPhi = t_bx*sin(phi_rotation) - t_by*cos(phi_rotation)
-        bz_rotatedPhi = t_bz
-
-        t_b = np.array([bx_rotatedPhi, by_rotatedPhi, bz_rotatedPhi])#/totalVolume
-
-        return t_b
+        return global_vecXYZ
