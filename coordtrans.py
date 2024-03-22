@@ -8,7 +8,7 @@ import numba as nb
 def RTP_to_XYZ(p_RTP, Rmajor):
     # Function to take in a point defined in r-theta-phi coordinates
     # And return a point in Cartesian coordinates
-    # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+    # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
     r, theta, phi = p_RTP[:3]
     
@@ -27,7 +27,7 @@ def RTP_to_XYZ(p_RTP, Rmajor):
 def XYZ_to_RTP(p_XYZ, Rmajor):
     # Function to take in a point defined in Cartesian coordinates
     # And return a point in r-theta-phi coordinates
-    # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+    # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
     x, y, z = p_XYZ
 
@@ -50,7 +50,7 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
 
 
 
-#@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
+@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
 def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
     # Function takes in a cartesian vector and a phi angle
     # Returns the cartesian values of the vector rotated by phi degrees

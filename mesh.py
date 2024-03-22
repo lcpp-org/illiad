@@ -148,7 +148,7 @@ class CartesianField(Mesh):
 
     def interpField(self, point_XYZ):
         # Method to return the interpolated field values at a point defined in Cartesian coordinates
-        # Interpolation  done via a weighted sum of field values at each node of the enclosing cell
+        # Interpolation done via a weighted sum of field values at each node of the enclosing cell
         # The weight function is calculated as the volume of the octant opposed to the node
 
         # Get the location of the point in RTP coordinates,
@@ -157,8 +157,8 @@ class CartesianField(Mesh):
         # theta: dtheta -> theta_max (2pi/Nperiods)
         # phi:     dphi -> phi_max   (2pi/Nperiods)
         point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
+        
         r_local  = point_RTP[0]
-
         th_localN, th_local = divmod(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
         ph_localN, ph_local = divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
 

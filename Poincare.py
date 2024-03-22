@@ -12,8 +12,9 @@ import class_outputHandler as out
 ## (GIVER YOUR OUTPUT A NAME) ##
 ##============================##
 # right now, data and plots WILL be overwritten if the directory already exists!
-simOut = out.outputHandler("fieldlines_testing_1")
+simOut = out.outputHandler("fieldlines_1000spin_56lines_RK45")
 simOut.startLog()
+
 
 
 ##============================##
@@ -34,6 +35,9 @@ spins = 200
 length = (2*np.pi * b_hidra.R0) * spins
 
 fl_R0 = np.array(np.linspace( 0.120, 0.040, Nlines))
+#fl_R0 = np.array(np.linspace( 0.100, -0.010, Nlines))
+#fl_R0 = np.array(np.linspace( 0.108, 0.080, Nlines))
+#fl_R0 = (0.080) * np.ones(Nlines)
 fl_THETA0 = 0.0 * np.ones(Nlines)
 fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
 
@@ -76,9 +80,10 @@ from functools import partial
 import concurrent.futures
 from time import perf_counter
 
+solvePoincare_x = partial(solvePoincare, maxLength=length, field=b_hidra, solver_events=poincare_events)
+
 t_start = perf_counter()
 with concurrent.futures.ProcessPoolExecutor() as executor:
-    solvePoincare_x = partial(solvePoincare, maxLength=length, field=b_hidra, solver_events=poincare_events)
     Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
 t_stop = perf_counter()
 elapsed_time = t_stop - t_start
@@ -88,18 +93,17 @@ simOut.log.info(f'ALL SOLVERS FINISHED IN {elapsed_time} seconds\n##############
 Poincare_output = list(Poincare_output)
 
 
-
 ## ============== ##
 ## POINCARE PLOTS ##
 ## ============== ##
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
+#from cycler import cycler
+#UIUCcol = ['#13294B', '#FF5F0F', '#4D69A0', '#C84113']
 
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
-#from cycler import cycler
-#UIUCcol = ['#13294B', '#FF5F0F', '#4D69A0', '#C84113']
 
 phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
 for n, phi_plot in enumerate(phi_range):
@@ -125,9 +129,6 @@ for n, phi_plot in enumerate(phi_range):
         simOut.saveNumpyData(f_output, fname)
 
         plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
-
-        #simOut.log.debug(f'\t{len(t_pts)} points in Suface {i}')
-        #simOut.log.debug(f'phi (deg.) at tpts: {ph_f*(180./np.pi)}')        
 
     ax.set_rmax(b_hidra.a)
     plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))

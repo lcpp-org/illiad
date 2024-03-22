@@ -94,11 +94,6 @@ class outputHandler:
 
         logging.config.dictConfig(config=logging_config)
         self.log.info(f"Started Logger in {self.run_dir}")
-        #simOut.log.debug("debug msg")
-        #simOut.log.info("info msg")
-        #simOut.log.warning("warning msg")
-        #simOut.log.error("error msg")
-        #simOut.log.critical("critical msg")
 
 
     def saveNumpyData(self, data, name):
