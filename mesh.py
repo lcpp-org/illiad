@@ -53,10 +53,9 @@ class Mesh:
         r1, theta1, phi1 = point1
         r2, theta2, phi2 = point2
 
-        term1 = self.R0 * (r2**2 - r1**2)/2. * (theta2 - theta1) * (phi2 - phi1) 
+        term1 = self.R0 * (r2**2 - r1**2)/2. *       (theta2 - theta1) * (phi2 - phi1) 
         term2 =           (r2**3 - r1**3)/3. * np.sin(theta2 - theta1) * (phi2 - phi1) 
         return abs(term1 + term2)
-        #return abs(( (self.R0/2.)*(r2**2 - r1**2)*(theta2 - theta1) + (1./3.)*(r2**3 - r1**3)*np.sin(theta2 - theta1) ) * (phi2 - phi1))
 
 
 class CartesianField(Mesh):
@@ -179,7 +178,7 @@ class CartesianField(Mesh):
         rindex_hi = rindex_lo + 1
 
         thindex_hi = floor(th_local/self.dtheta)
-        thindex_lo = thindex_hi - 1        
+        thindex_lo = thindex_hi - 1
 
         phindex_hi = floor(ph_local/self.dphi)
         phindex_lo = phindex_hi - 1
@@ -215,7 +214,7 @@ class CartesianField(Mesh):
             if node_k < 0.:
                 node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
 
-            # calculate anitNode rtp values from indices for input in to 'subElementVolume'
+            # calculate antiNode rtp values from indices for input in to 'subElementVolume'
             antiNode_r = antiNode_i * self.dr
             antiNode_theta = (antiNode_j + 1) * self.dtheta
             antiNode_phi = (antiNode_k + 1) * self.dphi
@@ -223,7 +222,6 @@ class CartesianField(Mesh):
 
             # calculate the wieght function as the volume of the point-antiNode subelement
             antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
-
 
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
