@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import logging
 import logging.config
 
-class outputHandler:
+class IOHandler:
     # Class to handle output and logging
     # Creates an output folder underneath the module directory if none exists
     # Creates a 'run_name' sub-directory in '\output' with further sub-dirs for plot and data output
@@ -17,22 +17,23 @@ class outputHandler:
 
         self.log = logging.getLogger("Poincare")
 
-    #def setupOutputDirectory(self, run_name):
         self.module_path = os.path.realpath(os.path.dirname(__file__))
         print(f'Executing script in {self.module_path}')
 
         # Create output directories if none exist
         self.output_dir = os.path.join(self.module_path,'output')
         try:
+            print('Creating output directory if none exists...')
             os.mkdir(self.output_dir)
         except OSError as error:
-            print(error)
+            pass#print()
 
         self.run_dir = os.path.join(self.output_dir, run_name)
+        print(f'Creating Run Directory: "{run_name}"')
         try:
             os.mkdir(self.run_dir)
         except OSError as error:
-            print(error)
+            print('Run Directory already exists!')
 
         self.data_dir = os.path.join(self.run_dir, 'data')
         try:
@@ -85,6 +86,7 @@ class outputHandler:
                     "maxBytes": 100000000, #100MB
                     "backupCount": 5
                 }
+
             },
 
             "loggers": {
@@ -95,15 +97,29 @@ class outputHandler:
         logging.config.dictConfig(config=logging_config)
         self.log.info(f"Started Logger in {self.run_dir}")
 
+        # create runStats file
+        # create output file?
+
 
     def saveNumpyData(self, data, name):
         # method to store a numpy array in the \data sub-directory
         name_loc = os.path.join( self.data_dir, name)
         np.save(name_loc, data)
 
+    def loadNumpyData(self, name):
+        # method to load a numpy array from the \data sub-directory
+        name_loc = os.path.join( self.data_dir, name)
+        print(f'loading file: "{name_loc}"')
 
+        return np.load(name_loc)
+        #try:
+        #    return np.load(name_loc)
+        #except OSError as error:
+        #    print('FILE DOES NOT EXIST!')
+    
     def saveFig(self, name):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
         plt.savefig(name_loc, dpi=900)
 
+    #def wallOutput(self, )
