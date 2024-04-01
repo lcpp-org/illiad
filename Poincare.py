@@ -1,141 +1,124 @@
 import numpy as np
 import scipy as sp
+import glob
 
+import class_outputHandler as out
 from mesh import *
 from coordtrans import *
-from ode import blines, solvePoincare
-import class_outputHandler as out
+#from ode import blines, solvePoincare
 
-
-##============================##
-##   SET UP OUTPUT FOLDERS    ##
-## (GIVER YOUR OUTPUT A NAME) ##
-##============================##
-# right now, data and plots WILL be overwritten if the directory already exists!
-simOut = out.outputHandler("fieldlines_1000spin_56lines_RK45")
+## SET UP RUN DIRECTORY ##
+##======================##
+# RIGHT NOW, DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("FullTest_i3-errField_10")
 simOut.startLog()
+Nlines = 6+5
+spins = 800
 
 
-
-##============================##
 ## DEFINE MESH AND LOAD FIELD ##
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
-#b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_1Period.npy', 0,1,1)
-b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_5Period.npy', 0, 1, 5)
+b_hidra.loadCartesianField_fromFile('Bxyz_i-1q4_hires_5Period.npy', 0, 1, 5)
+#b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_5Period.npy', 0, 1, 5)
+#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
 
 
-##====================##
-## SET UP FIELD LINES ##
-##====================##
+## SET UP POINCARE SEED POINTS ##
+##=============================##
 ## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 6
-spins = 200
-length = (2*np.pi * b_hidra.R0) * spins
-
-fl_R0 = np.array(np.linspace( 0.120, 0.040, Nlines))
-#fl_R0 = np.array(np.linspace( 0.100, -0.010, Nlines))
-#fl_R0 = np.array(np.linspace( 0.108, 0.080, Nlines))
-#fl_R0 = (0.080) * np.ones(Nlines)
-fl_THETA0 = 0.0 * np.ones(Nlines)
-fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
-
+fl_R0     = np.array(np.linspace( 0.120, 0.070, Nlines))
+fl_THETA0 = np.zeros(Nlines)
+fl_PHI0   = np.ones(Nlines) * (np.pi/5.)
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
 
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
 
+length = (2*np.pi * b_hidra.R0) * spins
 simOut.log.info(f'Initial Conditions (RTP):\n{ICs_RTP}')
-#simOut.log.debug(f'Initial Conditions (XYZ): {ICs_XYZ}')
 
+## GENERATE POINCARE PLOTS/DATA ##
+##==============================##
+from poincare_gen import Gen_Poincare
+tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, 'Poincare')
+print(f'{tMax=}')
 
-##============##
-## SET EVENTS ##
-##============##
-def inVV(t, p_XYZ, mesh):
-    x, y, z = p_XYZ[:3]
+## IDENTIFY LAST-CLOSED FLUX SURFACE ##
+##===================================##
+maxTime = max(tMax)
+LCFS_index = tMax.index(maxTime)
 
-    r = np.sqrt( x**2 + y**2 + z**2 + mesh.R0**2 - 2*mesh.R0*np.sqrt(x**2 + y**2) )
-    return r - mesh.a
-inVV.terminal = True
+## IMPORT CORRESOPONDING POINCARE SURFACE ##
+## GENERATE 'SEED SHELLS' OF IC's         ##
+## EXPANDING CO-AXIALLY WITH LCFS         ##
+##========================================##
+simOut.log.info('GENERATING SEED POINTS:\n')
 
-import phi_events
-poincare_events = [inVV, 
-                    phi_events.isphi9, 
-                    phi_events.isphi18, 
-                    phi_events.isphi27, 
-                    phi_events.isphi36, 
-                    phi_events.isphi45, 
-                    phi_events.isphi54, 
-                    phi_events.isphi63, 
-                    phi_events.isphi72]
-##===============================================##
-## SOLVE FOR EACH INITIAL CONDITION CONCURRENTLY ##
-##===============================================##
-Poincare_output = [None]*Nlines
+from point_generators import generateSeedShells
 
-from functools import partial
-import concurrent.futures
-from time import perf_counter
+# structured to eventually generate seeds from the same flux surface at different phi angles
+phiGen_list = [36] # list of phi angles to generated shells
+#expand_dr = [ 0.002, 0.004, 0.008, 0.010]  # define number of 'shells' (dr) to generate
+expand_dr = [ 0.004, 0.008, 0.010, 0.014]  # define number of 'shells' (dr) to generate
+ntheta = 90 # number of equally-spaced theta points for each shell
 
-solvePoincare_x = partial(solvePoincare, maxLength=length, field=b_hidra, solver_events=poincare_events)
+seed_subset = []
+seed_list = []
+#seed_array = numpy.zeros(( 3, ntheta*len(phiGen_list) ))
+#seed_array = np.empty(3)
+for phi_gen_deg in phiGen_list:
+    #phi_gen_deg = 36
+    phi_gen = phi_gen_deg*(np.pi/180)
 
-t_start = perf_counter()
-with concurrent.futures.ProcessPoolExecutor() as executor:
-    Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
-t_stop = perf_counter()
-elapsed_time = t_stop - t_start
-simOut.log.info(f'ALL SOLVERS FINISHED IN {elapsed_time} seconds\n###############\n\n')
+    filename = f'Poincare_output_{phi_gen_deg:03d}_{LCFS_index:d}.npy'
+    th_in, r_in = simOut.loadNumpyData(filename)
 
-# convert generator to list
-Poincare_output = list(Poincare_output)
+    seed_subset = generateSeedShells(expand_dr, ntheta, r_in, th_in, phi_gen, b_hidra, simOut, 'SeedShell_test1')
+    seed_list.extend(seed_subset)
+    #np.vstack((seed_array, seed_subset))
+seed_array = np.array(seed_list)
+# need to +=, hstack, whatever into single list of IC's
 
+## RE-RUN 'POINCARE' WITH SEED ARRAY ##
+##===================================##
+simOut.log.info('RE-RUNNING POINCARE PLOT GENERATOR WITH NEW SEED POINTS:\n')
+spins = 500
+length = (2*np.pi * b_hidra.R0) * spins
 
-## ============== ##
-## POINCARE PLOTS ##
-## ============== ##
+simOut.log.info(f'Initial Conditions (XYZ):\n{len(seed_array)} points')
+tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, 'SeedPts')
+
+## POST-SOLVER OUTPUT
+####################
+wallPtArray = np.transpose( np.array(wallPt_output2) )
+simOut.saveNumpyData(wallPtArray, 'Wallpoints')
+
+phi_plot = wallPtArray[2]
+theta_plot = wallPtArray[1]
+simOut.log.info(f'Plotting wall hits. Total events = {wallPtArray[0].size}:\n')
+
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.colors import ListedColormap
-#from cycler import cycler
-#UIUCcol = ['#13294B', '#FF5F0F', '#4D69A0', '#C84113']
 
-plt.rcParams.update({'font.size': 10})
-plt.rcParams.update({'figure.autolayout':True})
+plt.figure()
+plt.scatter(phi_plot, theta_plot, s=1)
+plt.grid(True) 
 
-phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
-for n, phi_plot in enumerate(phi_range):
-    simOut.log.info(f'## PHI: {phi_plot*(180/np.pi)}')
+plt.xlim(0., 2*np.pi)
+plt.ylim(0., 2*np.pi)
+plt.xlabel(r'$\phi$')
+plt.ylabel(r'$\theta$')
+plt.xticks([1/2*np.pi, 2/2*np.pi, 3/2*np.pi, 4/2*np.pi], 
+           [r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$', r'$2\pi$'] )
+plt.yticks([1/2*np.pi, 2/2*np.pi, 3/2*np.pi, 4/2*np.pi], 
+           [r'$\frac{\pi}{2}$', r'$\pi$', r'$\frac{3\pi}{2}$', r'$2\pi$'] )
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, polar=True)
-    #ax.set_theta_zero_location("E")
-    #ax.set_theta_direction(+1)
+plt.title('Distribution of Field Line Intersection with Vacuum-Vessel Wall')
+simOut.saveFig('Wall_Points')
+#plt.show()
 
-    for i in range(len(Poincare_output)):
-        t_pts = Poincare_output[i][n+1] #skip wall event
-
-        r_f = np.zeros(len(t_pts))
-        th_f = np.zeros(len(t_pts))
-        ph_f = np.zeros(len(t_pts))
-
-        for j in range(len(t_pts)):
-            r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], b_hidra.R0)
-
-        f_output = np.array([th_f, r_f])
-        fname = 'Poincare_output_'+str(n)+'_'+str(i)
-        simOut.saveNumpyData(f_output, fname)
-
-        plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
-
-    ax.set_rmax(b_hidra.a)
-    plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
-
-    plot_name = 'Poincare_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
-    simOut.saveFig(plot_name)
-
-plt.close('all')
-
+## END RUN
 simOut.log.info('## SIM FINISHED ##\n\n\n\n')
