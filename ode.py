@@ -39,33 +39,23 @@ def solvePoincare(init_cond, maxLength, field, solver_events):
     fieldlines = solve_ivp(blines, span, init_cond, args = ([field]),
             dense_output=False,
             events = solver_events, 
-            method='RK45', rtol=1e-9, atol=1e-9) #3e-4                    # 1
-            #method='RK45', rtol=1e-10, atol=1e-10) #3e-4                  # 2
+            method='RK45', rtol=1e-9, atol=1e-9) #3e-4                # 1
+            #method='RK45', rtol=1e-10, atol=1e-10) #3e-4              # 2
 
     t_stopInd = perf_counter()
     elapsed_timeInd = t_stopInd - t_startInd
 
-
     tmax = np.max(fieldlines.t)
-    #pathLength = np.hstack((init_cond_rtp, tmax))
 
     if fieldlines.status == 0: #solver ran to max. time
-        wallSpot = np.array([-1, 0., 0.]) # filter on negative r values later
-
+        #wallSpot = np.array([0., 0., 0.]) # filter on negative r values later
         log.info(f'Success!: IC={init_cond}\tTook {elapsed_timeInd} sec.\tWall Event at t= {fieldlines.t_events[0]}')
-
     elif fieldlines.status == 1: #termination event
         log.info(f'Success!: IC={init_cond}\tTook {elapsed_timeInd} sec.\tWall Event at t= {fieldlines.t_events[0]}')
-        wallSpot = XYZ_to_RTP(fieldlines.y_events[0][0], field.R0) # first point in wall event
-
-        #log.info(f'Result: IC(rtp)={init_cond_rtp}, tmax={tmax}, wallPt(rtp)={wallSpot}')
-
+        #wallSpot = XYZ_to_RTP(fieldlines.y_events[0][0], field.R0) # first point in wall event
     else: #solver failure
         log.critical(f'FAILURE!: IC:{init_cond}')
 
     data = fieldlines.y_events
 
-    #log.info(f'Wall Event at t= {fieldlines.t_events[0]}')
-
-    #return pathLength, data
     return tmax, data
