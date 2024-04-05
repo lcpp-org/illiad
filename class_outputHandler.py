@@ -1,5 +1,7 @@
 import os as os
 import numpy as np
+import pandas as pd
+
 import matplotlib.pyplot as plt
 
 import logging
@@ -17,7 +19,7 @@ class IOHandler:
 
         self.log = logging.getLogger("Poincare")
 
-        self.module_path = os.path.realpath(os.path.dirname(__file__))
+        #self.module_path = os.path.realpath(os.path.dirname(__file__))
         print(f'Executing script in {self.module_path}')
 
         # Create output directories if none exist
@@ -55,6 +57,7 @@ class IOHandler:
         logging_config = {
             "version": 1,
             "disable_existing_loggers": False,
+
             "formatters": {
                 "simple": {
                     "format": "[%(levelname)s]: %(message)s",
@@ -101,15 +104,23 @@ class IOHandler:
         # create output file?
 
 
+    def createSubDir(self, name):
+        self.sub_dir = os.path.join(self.plot_dir, name)
+        try:
+            os.mkdir(self.sub_dir)
+        except OSError as error:
+            pass#print('Run Directory already exists!')
+
     def saveNumpyData(self, data, name):
         # method to store a numpy array in the \data sub-directory
         name_loc = os.path.join( self.data_dir, name)
+        #self.log.info(f'saving numpy file: "{name_loc}"')
         np.save(name_loc, data)
 
     def loadNumpyData(self, name):
         # method to load a numpy array from the \data sub-directory
         name_loc = os.path.join( self.data_dir, name)
-        print(f'loading file: "{name_loc}"')
+        self.log.info(f'loading numpy file: "{name_loc}"')
 
         return np.load(name_loc)
         #try:
@@ -120,6 +131,32 @@ class IOHandler:
     def saveFig(self, name):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
-        plt.savefig(name_loc, dpi=900)
+        plt.savefig(name_loc, dpi=600)
+
+    def loadPorts_fromCSV(self, name):
+        # method to load the HIDRA port locations and sizes
+        name_loc = name #os.path.join('self.module_path', name)
+ 
+        portdata = pd.read_csv(
+            name_loc,
+            header=None,
+            index_col=None,
+            skiprows=1,
+            delim_whitespace=False,
+            engine='python')
+        
+        ## PARSE DATA
+        #p_type = portdata.loc[:,0].values
+        p_phi = np.array(portdata.loc[:,2].values)
+        p_theta = np.array(portdata.loc[:,3].values)
+        p_rmaj = np.array(portdata.loc[:,4].values)
+        p_rmin = np.array(portdata.loc[:,5].values)
+        p_dia = np.array(portdata.loc[:,6].values/1000) # convert mm to meters
+        p_height = np.degrees(np.arcsin(p_dia/p_rmin)) # calculate height in degrees
+        p_width =  np.degrees(np.arcsin(p_dia/p_rmaj)) # calculate width in degrees
+
+        return np.array([p_phi, p_theta, p_width, p_height])
+
+
 
     #def wallOutput(self, )
