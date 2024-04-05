@@ -7,10 +7,13 @@ from ode import blines, solvePoincare
 from coordtrans import XYZ_to_RTP
 
 def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
+    
+    outputHandler.createSubDir(anlys_name)
 
     ## SOLVER SETUP
     Nlines = ICs_XYZ.shape[0]
 
+    # avert your eyes
     poincare_events = [ phi_events.inVV, 
                         phi_events.isphi9, 
                         phi_events.isphi18, 
@@ -80,14 +83,8 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
         pathLength_ += [pLngth]
         Poincare_output_ += [out[1:]]
 
-        #print(f'{out[0]=}')
         if out[0].any():
-            #print('reg output: ' +str( XYZ_to_RTP(out[0][0], field_.R0)) )
             wall_output_ += [XYZ_to_RTP(out[0][0], field_.R0)]
-        #else:
-        #    print('sub output: ' +str( np.array([-1., 0., 0.])) )
-        #    wall_output_ += [ np.array([-1., 0., 0.])]
-    #print(f'{pathLength_=}')
 
 
     ## POST-SOLVER OUTPUT
@@ -107,7 +104,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
 
         fig = plt.figure()
         ax = fig.add_subplot(111, polar=True)
-
+        
         # Looping over each initial condition
         for i in range(len(Poincare_output_)):
             t_pts = Poincare_output_[i][n] #skip wall event
@@ -120,7 +117,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
                 r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], field_.R0)
 
             f_output = np.array([th_f, r_f])
-            fname = f'Poincare_output_{degrees(phi_plot):03.0f}_{i}'
+            fname = anlys_name + f'_{degrees(phi_plot):03.0f}_{i}'
             outputHandler.saveNumpyData(f_output, fname)
 
             plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
@@ -128,9 +125,8 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
         ax.set_rmax(field_.a)
         plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
 
-        plot_name = anlys_name+'_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
+        plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
         outputHandler.saveFig(plot_name)
         plt.close()
-    #plt.close('all')
 
     return pathLength_, Poincare_output_, wall_output_
