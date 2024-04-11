@@ -1,132 +1,154 @@
 import numpy as np
 import scipy as sp
-import os as os
+import glob
 
+import class_outputHandler as out
 from mesh import *
 from coordtrans import *
-from ode import blines, solvePoincare
+from poincare_gen import Gen_Poincare
+#from ode import blines, solvePoincare
+import matplotlib.pyplot as plt
+#from matplotlib import cm
+from matplotlib import patches
 
 
-##============================##
+## SET UP RUN DIRECTORY ##
+##======================##
+# RIGHT NOW, DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("i3ideal_9-72_4cm")
+simOut.startLog()
+
+
 ## DEFINE MESH AND LOAD FIELD ##
 ##============================##
 b_hidra = CartesianField()
 b_hidra.setToroidalGeometry(0.72, 0.19)
 
-Bx, By, Bz = np.load('input_files/i3_hires_Bxyz.npy')
-b_hidra.loadCartesianField(Bx, By, Bz)
+#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q4_hires_5Period.npy', 0, 1, 5)
+b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_5Period.npy', 0, 1, 5)
+#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
 
 
+## SET UP POINCARE SEED POINTS ##
+##=============================##
+## NEED A BETTER WAY TO SET UP INITIAL POINT-9S!
+Nlines = 15 #25
+spins = 700
 
-##====================##
-## SET UP FIELD LINES ##
-##====================##
-## NEED A BETTER WAY TO SET UP INITIAL POINTS!
-Nlines = 14+13
-spins = 500
-length = (2*np.pi * b_hidra.R0) * spins
-
-fl_R0 = np.array(np.linspace( -0.01, 0.120, Nlines))
-fl_THETA0 = 0.0 * np.ones(Nlines)
-fl_PHI0 = (np.pi/5.) * np.ones(Nlines)
-#fl_THETA0 = np.array(np.linspace( 0.00, 0.00, Nlines))
-#fl_PHI0 = np.array(np.linspace( np.pi/5., np.pi/5., Nlines))
-
+fl_R0     = np.array(np.linspace( 0.130, 0.095, Nlines))
+fl_THETA0 = np.zeros(Nlines)
+fl_PHI0   = np.ones(Nlines) * (np.pi/5.)
 
 ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
-print('Initial Conditions (RTP): ', ICs_RTP)
-
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
 for i in range(Nlines):
     ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
-#print('Initial Conditions (XYZ): ', ICs_XYZ)
+
+length = (2*np.pi * b_hidra.R0) * spins
+simOut.log.info(f'Initial Conditions (RTP):\n{ICs_RTP}')
 
 
+## GENERATE POINCARE PLOTS/DATA ##
+##==============================##
+tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, 'Poincare')
+simOut.log.info(f'{tMax=}')
 
-##============##
-## SET EVENTS ##
-##============##
-def inVV(t, p_XYZ, mesh):
-    x, y, z = p_XYZ[:3]
+plt.figure()
+plt.plot(fl_R0, tMax, '-k')
+plt.title('Connection length vs. r(IC)')
+simOut.saveFig('connectLengths')
+plt.close()
 
-    r = np.sqrt( x**2 + y**2 + z**2 + mesh.R0**2 - 2*mesh.R0*np.sqrt(x**2 + y**2) )
-    return r - mesh.a
-inVV.terminal = True
-
-import phi_events
-poincare_events = [inVV, 
-                    phi_events.isphi9, 
-                    phi_events.isphi18, 
-                    phi_events.isphi27, 
-                    phi_events.isphi36, 
-                    phi_events.isphi45, 
-                    phi_events.isphi54, 
-                    phi_events.isphi63, 
-                    phi_events.isphi72]
+## IDENTIFY LAST-CLOSED FLUX SURFACE ##
+##===================================##
+maxTime = max(tMax)
+LCFS_index = tMax.index(maxTime)
 
 
-##===============================================##
-## SOLVE FOR EACH INITIAL CONDITION CONCURRENTLY ##
-##===============================================##
-Poincare_output = [None]*Nlines
+#LCFS_index = 10
+simOut.log.info(f'{LCFS_index=}')
 
-from functools import partial
-import concurrent.futures
-from time import perf_counter
+## IMPORT CORRESOPONDING POINCARE SURFACE ##
+## GENERATE 'SEED SHELLS' OF IC's         ##
+## EXPANDING CO-AXIALLY WITH LCFS         ##
+##========================================##
+simOut.log.info('GENERATING SEED POINTS:\n')
 
-t_start = perf_counter()
-with concurrent.futures.ProcessPoolExecutor() as executor:
-    solvePoincare_x = partial(solvePoincare, lineLength=length, field=b_hidra, solver_events=poincare_events)
-    Poincare_output = executor.map(solvePoincare_x, ICs_XYZ)
-t_stop = perf_counter()
-elapsed_time = t_stop - t_start
-print(f'## All Solvers Finished in {elapsed_time} seconds\n###############')
+from point_generators import generateSeedShells
 
-# convert 'generator' to 'list'
-Poincare_output = list(Poincare_output)
+# generate seeds from the same flux surface at different phi angles
+
+# list of phi angles to generated shells
+phiGen_list = [9, 18, 27, 36, 45, 54, 63, 72, 81, 90, 99, 108, 117, 126, 135, 144, 153, 162, 171, 180,
+            189, 198, 207, 216, 225, 234, 243, 252, 261, 270, 279, 288, 297, 306, 315, 324, 333, 342, 351]
+# define number of 'shells' (dr) to generate
+expand_dr = [ 0.020]#, 0.010, 0.014]  
+# number of equally-spaced theta points for each shell
+ntheta = 90 
+
+seed_subset = []
+seed_list = []
+
+for phi_gen_deg in phiGen_list:
+
+    phi_gen = phi_gen_deg*(np.pi/180)
+
+    filename = f'Poincare_{phi_gen_deg:03d}_{LCFS_index:d}.npy'
+    th_in, r_in = simOut.loadNumpyData(filename)
+
+    seed_subset = generateSeedShells(expand_dr, ntheta, r_in, th_in, phi_gen, b_hidra, simOut, 'SeedPts_360Phi_2cm')
+    seed_list.extend(seed_subset)
+
+seed_array = np.array(seed_list)
 
 
-## ============== ##
-## POINCARE PLOTS ##
-## ============== ##
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.colors import ListedColormap
+## RE-RUN 'POINCARE' WITH SEED ARRAY ##
+##===================================##
+simOut.log.info('RE-RUNNING POINCARE PLOT GENERATOR WITH NEW SEED POINTS:\n')
+spins = 400
+length = (2*np.pi * b_hidra.R0) * spins
 
-plt.rcParams.update({'font.size': 10})
+simOut.log.info(f'Initial Conditions (XYZ):\n{len(seed_array)} points')
+tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, 'SeedPts_360Phi_2cm')
+
+
+## POST-SOLVER OUTPUT
+####################
+wallPtArray = np.transpose( np.array(wallPt_output2) )
+simOut.saveNumpyData(wallPtArray, 'Wallpoints_360Phi_2cm')
+
+#wallPtArray = simOut.loadNumpyData('Wallpoints_i4err.npy')
+
+phi_plot = wallPtArray[2]
+phi_plot = phi_plot*(-1) + 2*np.pi
+theta_plot = wallPtArray[1]
+for i in range(len(theta_plot)):
+    if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+
+simOut.log.info(f'Plotting wall hits. Total events = {wallPtArray[0].size}:\n')
+
+## Import data on port size/locations for plotting
+ports = simOut.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
+
+plt.rcParams.update({'font.size': 6})
 plt.rcParams.update({'figure.autolayout':True})
 
-UIUCcol = ('#13294B', '#FF5F0F', '#4D69A0', '#C84113')
+fig = plt.figure()
+ax = fig.add_subplot(polar=False, aspect=0.2)
+for port in ports.T:
+    port_plot = patches.Ellipse((port[0], port[1]), port[2], port[3], fill=True, alpha=0.3, facecolor='black')
+    ax.add_patch(port_plot)
 
-phi_range = np.linspace( np.pi/20., (2/5)*np.pi, 8)
-for n, phi_plot in enumerate(phi_range):
-    #print('###########\n## PHI: ', phi_plot*(180/np.pi))
-    print('## PHI: ', phi_plot*(180/np.pi))
-    #print('###########')
-    fig = plt.figure()
-    ax = fig.add_subplot(111, polar=True)
+plt.scatter(phi_plot*(180/np.pi), theta_plot*(180/np.pi), s=0.2, c='k')
+plt.grid(True) 
+plt.xlim(0, 360)
+plt.xticks(np.linspace(9, 360, 40))
+plt.ylim(-180, 180)
+plt.yticks(np.linspace(-180, 180, 5), ['Inner Midplane', 'Bottom', 'Outer Midplane', 'Top', 'Inner Midplane'])
 
-    #print('len of output: ', len(Poincare_output))
-    for i in range(len(Poincare_output)):
-        t_pts = Poincare_output[i][n+1] #skip wall event
-        print(f'{len(t_pts)} points in Suface {i}')
-        #print('t_pts:', t_pts)
-        r_f = np.zeros(len(t_pts))
-        th_f = np.zeros(len(t_pts))
-        ph_f = np.zeros(len(t_pts))
+plt.title('Distribution of Field Line Intersections with Vacuum-Vessel Wall')
+simOut.saveFig('Wallpoints_SeedPts_allPhi_2cm')
 
-        for j in range(len(t_pts)):
-            #print('t_point ', t_pts[j])
-            r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], b_hidra.R0)
-        #print('phi at tpts: ', ph_f*(180./np.pi))
 
-        f_output = np.array([th_f, r_f])
-        np.save('Poincare_output_'+str(n)+'_'+str(i), f_output)
-
-        #plt.scatter(th_f, r_f, s=0.1, c=UIUCcol[int(np.fmod(i,len(UIUCcol))
-        plt.scatter(th_f, r_f, s=0.09)
-
-    ax.set_rmax(b_hidra.a)
-    plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
-    plt.savefig('Poincare_phi={:03.0f}.png'.format(phi_plot*180/np.pi),dpi=900)
-plt.close('all')
+## END RUN ##
+simOut.log.info('## SIM FINISHED ##\n\n\n\n')

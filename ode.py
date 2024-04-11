@@ -1,20 +1,25 @@
 import numpy as np
 import scipy as sp
 from scipy.integrate import solve_ivp
-#import numba as nb
-#from numba import jit
+from time import perf_counter
+import logging
+
+from coordtrans import *
 
 ## ==================================== ##-
 ## FIELD LINE SOLVER (FROM "Bfield.py") ##
 ## ==================================== ##
-#@jit(nb.types.Array(nb.float64, 1, "C")(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
 def blines(t, p_XYZ, field):
     B = np.zeros(3)
-    direction= -1
+    direction = 1
 
     B = field.interpField(p_XYZ[:3])
 
-    dY = direction * B/np.linalg.norm(B)
+    # hard-coded, hacky error field implementation
+    #B[0] += 0.0002
+    #B[1] += -0.0002
+
+    dY = direction * B / np.linalg.norm(B)
 
     return dY
 
@@ -22,25 +27,35 @@ def blines(t, p_XYZ, field):
 ##===============##
 ## DEFINE SOLVER ##
 ##===============##
-def solvePoincare(init_cond, lineLength, field, solver_events):
-    print('IC: ', init_cond)
+def solvePoincare(init_cond, maxLength, field, solver_events):
+    log = logging.getLogger()
 
-    span = (0.0, lineLength)
+    init_cond_rtp = XYZ_to_RTP(init_cond, field.R0)
+    log.info(f'Start IC: {init_cond_rtp}')
+
+    span = (0.0, maxLength)
+
+    t_startInd = perf_counter()
     fieldlines = solve_ivp(blines, span, init_cond, args = ([field]),
             dense_output=False,
             events = solver_events, 
-            #method='LSODA', rtol=1e-12, atol=1e-7) 
-            #method='DOP853', max_step=1e-2, rtol=1e-12, atol=1e-10) #3e-4 
-            method='RK45', max_step=1e-2, rtol=1e-12, atol=1e-10) #3e-4 
+            method='RK45', rtol=1e-9, atol=1e-9) #3e-4                # 1
+            #method='RK45', rtol=1e-10, atol=1e-10) #3e-4              # 2
 
-    if fieldlines.success:
-        print('\nSolver Success for IC: ', init_cond)
-    else:
-        print('\nSolver Failure for IC: ', init_cond)
+    t_stopInd = perf_counter()
+    elapsed_timeInd = t_stopInd - t_startInd
+
+    tmax = np.max(fieldlines.t)
+
+    if fieldlines.status == 0: #solver ran to max. time
+        #wallSpot = np.array([0., 0., 0.]) # filter on negative r values later
+        log.info(f'Success!: IC={init_cond}\tTook {elapsed_timeInd} sec.\tWall Event at t= {fieldlines.t_events[0]}')
+    elif fieldlines.status == 1: #termination event
+        log.info(f'Success!: IC={init_cond}\tTook {elapsed_timeInd} sec.\tWall Event at t= {fieldlines.t_events[0]}')
+        #wallSpot = XYZ_to_RTP(fieldlines.y_events[0][0], field.R0) # first point in wall event
+    else: #solver failure
+        log.critical(f'FAILURE!: IC:{init_cond}')
 
     data = fieldlines.y_events
 
-    print('List of Wall Events: ', fieldlines.y_events[0])
-    #print('List of Event 1: ', fieldlines.y_events[1])
-
-    return data
+    return tmax, data
