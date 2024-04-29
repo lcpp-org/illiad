@@ -6,12 +6,14 @@ import phi_events
 from ode import blines, solvePoincare
 from coordtrans import XYZ_to_RTP
 
-def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
+def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     
     outputHandler.createSubDir(anlys_name)
 
     ## SOLVER SETUP
     Nlines = ICs_XYZ.shape[0]
+    outputHandler.log.info(f'Begin running {Nlines} Initial Conditions for max. { int(length/(2*np.pi * field_.R0))} spins...')
+    #outputHandler.log.info(f'Max. # of spins: {length/ (2*np.pi * field_.R0):d}')
 
     # avert your eyes
     poincare_events = [ phi_events.inVV, 
@@ -59,11 +61,11 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
 
     ## SOLVER
     ##########
-    solver_output = [None]*Nlines
-
     from functools import partial
     import concurrent.futures
     from time import perf_counter
+
+    solver_output = [None]*Nlines
 
     solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver_events=poincare_events)
 
@@ -116,13 +118,19 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, anlys_name):
             for j in range(len(t_pts)):
                 r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], field_.R0)
 
-            f_output = np.array([th_f, r_f])
-            fname = anlys_name + f'_{degrees(phi_plot):03.0f}_{i}'
-            outputHandler.saveNumpyData(f_output, fname)
+            if saveData:
+                f_output = np.array([th_f, r_f])
+                fname = anlys_name + f'_{degrees(phi_plot):03.0f}_{i}'
+                outputHandler.saveNumpyData(f_output, fname)
+            else:
+                pass
 
-            plt.scatter(th_f, r_f, marker='.', s=1.5, linewidths=0.0)
+            plt.scatter(th_f, r_f, marker='.', s=1.5, c='k', linewidths=0.0)
 
         ax.set_rmax(field_.a)
+        ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+        ax.yaxis.set_tick_params(labelsize=5)
+        ax.grid(linewidth = 0.25, linestyle=':', c='k')
         plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
 
         plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_plot*180/np.pi)

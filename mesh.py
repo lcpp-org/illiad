@@ -167,7 +167,6 @@ class CartesianField(Mesh):
             # determine whether point is within mesh domain
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
-            #print('POINT OUTSIDE OF MESH!')
             rindex_lo  = self.nr - 2
 
         else:
@@ -235,5 +234,5 @@ class CartesianField(Mesh):
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
         phi_rotation = int(ph_localN) * self.phi_max  # angle of transform
         global_vecXYZ = rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
-
-        return global_vecXYZ
+        
+        return global_vecXYZ, ph_localN

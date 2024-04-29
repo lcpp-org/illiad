@@ -26,10 +26,16 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     
     sortedMagCenter = magCenterCoords[np.argsort(magCenterCoords[:,0])]
 
+    theta_spl = sortedMagCenter.T[0]
+    rad_spl = sortedMagCenter.T[1]
+
     ## SPLINING
     # perform curve-fitting (smoothing spline)
     # function and derivative continuity not enforced across periodic boundary (would need fancier spline)
-    fSurface_splineParms = splrep(sortedMagCenter.T[0], sortedMagCenter.T[1], s=1E-3, per=True)
+    fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-3, k=3, per=True, quiet=1)
+
+    #seedPts_magCenter = splev(theta_evals, fSurface_splineParms)
+
     seedPts_0 = splev(theta_evals, fSurface_splineParms)
     derivs =  splev(theta_evals, fSurface_splineParms, der=1)
 
@@ -42,6 +48,10 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     plt.plot(thetaPlot, splev(thetaPlot, fSurface_splineParms), '-k', linewidth=0.25) # fitted spline curve
     
     ax.set_rmax(field.a)
+    ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+    ax.yaxis.set_tick_params(labelsize=5)
+    ax.grid(linewidth = 0.25, linestyle=':', c='k')
+
     plt.title('Spline fit to Last Closed Flux Surface')
     
     outputHandler.saveFig( 'LCFS_phi={:03.0f}_splineFit.png'.format(phi*180/np.pi) )
@@ -78,7 +88,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
 
     ax.set_rmax(field.a)
     plt.title(r'Generated Seed Points, $\phi$={:02.0f}$\degree$'.format(phi*180/np.pi))
-    plot_name = filename+'/'+'SeedShellPoints_phi={:03.0f}.png'.format(phi*180/np.pi)
+    plot_name = filename+'/'+'InitConds_phi={:03.0f}.png'.format(phi*180/np.pi)
     outputHandler.saveFig(plot_name)
     plt.close()
 

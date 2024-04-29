@@ -5,14 +5,13 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import scipy.special as special
-
 from numba import jit, prange
 import numba as nb
 
-#from coordtrans import RTP_to_XYZ
+from coordtrans import RTP_to_XYZ
 
 ## READ COIL INPUT FILE
-coilfile = "coils.wega_with_VFCoils"
+coilfile = "input_files/coils.wega_with_VFCoils"
 coildata = pd.read_csv(
 coilfile,
 header=None,
@@ -35,67 +34,76 @@ for i, dum in enumerate(coil_delim):
         mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
 
 
-
 ## /START stuff that should be a mesh class method
 ## DEFINE GEOMETRY
+output_name = 'Bxyz_iota-1q3_MAXPOWER_hires_95p5pct'
+
 Rmajor = np.float64
 Rmajor = 0.72 #[m]
 Rminor = 0.19 #[m]
 
+
 ## DEFINE MESH RESOLUTION
-##mesh_spacings = dr[meters], dtheta[radians], dphi[radians]
-rough  = [ 0.004, 4.*(np.pi/180), 4.*(np.pi/180.)]
-lo_res = [ 0.002, 4.*(np.pi/180), 2.*(np.pi/180.)]
-hi_res = [ 0.001, 2.*(np.pi/180), 1.*(np.pi/180.)]
+rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
+lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
+hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
+
+mesh_size = hi_res
 
 ## DEFINE MESH PERIODICITY
 ## 0: NOT PERIODIC
 ## 1: 2PI PERIODIC
 ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
-mesh_periodicity = [ 0, 1, 1]
+mesh_periodicity = [ 0, 1, 5]
 
-## SELECT RESOLUTION
-dr, dtheta, dphi = lo_res
-
+nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
+ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
+nphi   = int( mesh_size[2] / max(1, mesh_periodicity[2]) )
 
 r_prd, theta_prd, phi_prd = mesh_periodicity
 
-r_maximum     =  (Rminor) / max(1, r_prd)
-theta_maximum = (2*np.pi) / max(1, theta_prd)
-phi_maximum   = (2*np.pi) / max(1, phi_prd)
+print(f' nr = {nr}')
+print(f' ntheta = {ntheta}')
+print(f' nphi = {nphi}')
 
 
 ## IF THE DIMENSION IS NOT PERIODIC, START AT 0
 ## IF IT IS PERIODIC, START AT DX (WHERE X IS THE COORDINATE)
-#r_minimum     =     dr * min(1, r_prd)
-#theta_minimum = dtheta * min(1, theta_prd)
-#phi_minimum   =   dphi * min(1, phi_prd)
-r_minimum     = 0.0
-theta_minimum = 0.0
-phi_minimum   = 0.0
+if r_prd:
+    r_maximum = Rminor.r_prd
+    dr = r_maximum/nr
+    r_minimum = dr
+else:
+    r_maximum = Rminor
+    dr = r_maximum/(nr-1)
+    r_minimum = 0.
 
-"""
-## GET PROPER GRID SPACING
-## (DEPENDS ON IF WE ARE STARTING AT 0 OR DX (WHERE X IS THE COORDINATE)
-if r_prd == 0:
-    nr = int(r_maximum/dr + 1)
-else: 
-    nr = int(r_maximum/dr)
+if theta_prd:
+    theta_maximum = (2*np.pi) / theta_prd
+    dtheta = theta_maximum/ntheta
+    theta_minimum = dtheta
+else:
+    theta_maximum = (2*np.pi)
+    dtheta = theta_maximum/(ntheta-1)
+    theta_minimum = 0.
+    
+if phi_prd:
+    phi_maximum = (2*np.pi) / phi_prd
+    dphi = phi_maximum/nphi
+    phi_minimum = dphi
+else:
+    phi_maximum = (2*np.pi)
+    dphi = phi_maximum/(nphi-1)
+    phi_minimum = 0.
 
-if theta_prd == 0:
-    ntheta = int(theta_maximum/dtheta + 1)
-else: 
-    ntheta = int(theta_maximum/dtheta)
 
-if phi_prd == 0:
-    nphi = int(phi_maximum/dphi + 1)
-else: 
-    nphi = int(phi_maximum/dphi)
-"""
-nr = int(r_maximum/dr + 1)
-ntheta = int(theta_maximum/dtheta + 1)
-nphi = int(phi_maximum/dphi + 1)
-## /END stuff that should be a mesh class method
+print(f' r max. = {r_maximum}')
+print(f' theta max. = {theta_maximum}')
+print(f' phi max. = {phi_maximum}')
+
+print(f' r min. = {r_minimum}')
+print(f' theta min. = {theta_minimum}')
+print(f' phi min. = {phi_minimum}')
 
 
 ## /START maybe more stuff that should be a mesh class method
@@ -104,9 +112,9 @@ i_R     = np.linspace(     r_minimum,     r_maximum,     nr).astype(np.float64)
 i_THETA = np.linspace( theta_minimum, theta_maximum, ntheta).astype(np.float64)
 i_PHI   = np.linspace(   phi_minimum,   phi_maximum,   nphi).astype(np.float64)
 
-print(f'R array length {i_R.size}: {i_R}')
-print(f'THETA array length {i_THETA.size}: {np.degrees(i_THETA)}')
-print(f'PHI array length {i_PHI.size}: {np.degrees(i_PHI)}')
+print(f'nr={nr}, R array length {i_R.size}: {i_R}')
+print(f'ntheta={ntheta}, THETA array length {i_THETA.size}: {np.degrees(i_THETA)}')
+print(f'nphi={nphi}, PHI array length {i_PHI.size}: {np.degrees(i_PHI)}')
 
 
 @jit(nb.types.Array(nb.float64, 1, "C")
@@ -116,8 +124,6 @@ def biotsavart( filament, point, current, Npoints):
     ##  TAKES IN A SINGLE POINT,
     ## SOLVES B FIELD DUE TO EVERY POINT IN FILAMENT USING BIOT-SAVART LAW,
     ## RETURNS FOR CARTESIAN FIELD VECTORS 
-
-
     B = np.zeros((3,1), dtype=np.float64)
     midpoint = np.zeros((Npoints, 3))
     i= np.int32
@@ -140,13 +146,11 @@ def biotsavart( filament, point, current, Npoints):
     return B[0]
 
 
-
 @jit(nopython=True, parallel=True, nogil=True)
 def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
     ## CONVERTS R-THETA-PHI POSITION TO X-Y-Z,
     ## CALLS BIOTSAVART FOR EVERY POINT IN THE R-PHI-THETA MESH, 
     ## OUTPUTS CARTESIAN FIELD VECTORS FOR EACH POINT IN MESH
-
     Bxcoil = np.zeros((R.size, THETA.size, PHI.size), dtype=np.float64)
     Bycoil = np.zeros((R.size, THETA.size, PHI.size), dtype=np.float64)
     Bzcoil = np.zeros((R.size, THETA.size, PHI.size), dtype=np.float64)
@@ -155,24 +159,20 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
 
     for i in prange(0, int(R.size)):
         for j in prange(0, int(THETA.size)):
-            for k in prange(0, int(PHI.size)):
-                point_xyz = np.zeros((3,1), dtype=np.float64)
+            for k in range(0, int(PHI.size)):
+                point = np.zeros((3,1), dtype=np.float64)
                 Bpoint = np.zeros(3, dtype=np.float64)
+                point[0] = (Rmajor + R[i]*np.cos(THETA[j])) * np.cos(PHI[k]) #X
+                point[1] = -(Rmajor + R[i]*np.cos(THETA[j])) * np.sin(PHI[k]) #Y
+                point[2] = R[i]*np.sin(THETA[j]) #Z
+                #point = RTP_to_XYZ(np.array([R[i], THETA[j], PHI[k]]), Rmajor)
 
-                #point_rtp = np.array([R[i], THETA[j], PHI[k]])
-                #point_xyz[0], point_xyz[1], point_xyz[2] = RTP_to_XYZ(point_rtp, Rmajor)
-                
-                point_xyz[0] = (Rmajor + R[i]*np.cos(THETA[j])) * np.cos(PHI[k]) #X
-                point_xyz[1] = (Rmajor + R[i]*np.cos(THETA[j])) * np.sin(PHI[k]) #Y
-                point_xyz[2] = -1. * R[i] * np.sin(THETA[j]) #Z
-    
-                Bpoint = biotsavart(filament, point_xyz,  current, N)
-                
+                Bpoint = biotsavart(filament, point,  current, N)
+
                 Bxcoil[i][j][k] = Bpoint[0]
                 Bycoil[i][j][k] = Bpoint[1]
                 Bzcoil[i][j][k] = Bpoint[2]
                 
-    
     return Bxcoil, Bycoil, Bzcoil
 
 
@@ -199,12 +199,12 @@ for n, coil in enumerate(mycoils):
     bby = np.zeros((i_R.size, i_THETA.size, i_PHI.size), dtype= np.float64)
     bbz = np.zeros((i_R.size, i_THETA.size, i_PHI.size), dtype= np.float64)
     current = np.double
-    
+
     print('Coil({:02d}'.format(n+1)+'/{:02d}) '.format(len(mycoils))+coiltype[n])
     if coiltype[n] == 'Helix':
-        current = turns[n]*900
+        current = turns[n] * 6390 * 0.955
     elif coiltype[n] == 'toroidal_field':
-        current = turns[n]*486
+        current = turns[n] * 3500
     elif coiltype[n] == 'Vertical_Field_Coil':
         current = turns[n]*0.
     else: print('COIL-TYPE ERROR!')
@@ -222,8 +222,10 @@ for n, coil in enumerate(mycoils):
 
 ## OUTPUT ARRAY OF VECTORS AND ARRAY OF MAGNITUDE
 Bxyz = np.array([Bxsum, Bysum, Bzsum])
-np.save('Bxyz_iota-1q3_lores_originalNodeDefs', Bxyz)
+np.save(output_name, Bxyz)
 
+Bnorm = np.sqrt(Bxsum**2 + Bysum**2 + Bzsum**2)
+np.save('Bnorm_iota-1q3_MAXPOWER_hires', Bnorm)
 
 """
 ## PLOT POLOIDAL CROSS-SECTIONS
@@ -231,13 +233,13 @@ contours = np.linspace(0.010, 0.150, 30)
 rr,tt = np.meshgrid(i_R,i_THETA)
 
 for i, p in enumerate(i_PHI):
-    Bnormplot = Bnorm[i][:][:]
+    Bzplot = Bzsum[:][:][i]
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
     ax.set_rmax(Rminor)
-    plt.contourf(np.transpose(tt),np.transpose(rr),Bnormplot.T, 30, cmap='cividis')
+    plt.contourf(np.transpose(tt),np.transpose(rr),Bzplot.T, 30, cmap='cividis')
     plt.colorbar()
-    plt.title(r'B-field magnitude of HIDRA, $\phi$={:2.0f}$\degree$'.format(p*180/np.pi))
+    plt.title(r'Bz of HIDRA, $\phi$={:2.0f}$\degree$'.format(p*180/np.pi))
     plt.savefig('plots\HIDRA-i4_phi={:2.0f}.png'.format(p*180/np.pi),dpi=300)
 plt.show()
 """
