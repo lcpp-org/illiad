@@ -68,8 +68,7 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
 
 # transform from theta,r about (Geometric Axis)
 # to (Magnetic Axis): theta=pi, r=0.0187m
-def axisShift(rho, theta, r_delt_):
-
+def axisShift(rho, theta, r_delt_): 
     #rprime = np.sqrt(r_delt_**2 + rho**2 + 2*rho*r_delt_*np.cos(theta))
     #thetaprime = np.arctan2( (rho*np.sin(theta)), r_delt_+rprime*np.cos(theta))
     #if thetaprime<0.: thetaprime += 2*np.pi

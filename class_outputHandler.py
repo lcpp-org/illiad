@@ -131,7 +131,7 @@ class IOHandler:
     def saveFig(self, name):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
-        plt.savefig(name_loc, dpi=600)
+        plt.savefig(name_loc, dpi=400)
 
     def loadPorts_fromCSV(self, name):
         # method to load the HIDRA port locations and sizes

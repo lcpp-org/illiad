@@ -1,10 +1,10 @@
 import numpy as np
-import logging
 from math import degrees
 
 import phi_events
-from ode import blines, solvePoincare
+from ode import solvePoincare
 from coordtrans import XYZ_to_RTP
+
 
 def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     
@@ -13,7 +13,6 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     ## SOLVER SETUP
     Nlines = ICs_XYZ.shape[0]
     outputHandler.log.info(f'Begin running {Nlines} Initial Conditions for max. { int(length/(2*np.pi * field_.R0))} spins...')
-    #outputHandler.log.info(f'Max. # of spins: {length/ (2*np.pi * field_.R0):d}')
 
     # avert your eyes
     poincare_events = [ phi_events.inVV, 
@@ -62,15 +61,13 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     ## SOLVER
     ##########
     from functools import partial
-    import concurrent.futures
+    import concurrent.futures as cf
     from time import perf_counter
-
-    solver_output = [None]*Nlines
 
     solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver_events=poincare_events)
 
     t_start = perf_counter()
-    with concurrent.futures.ProcessPoolExecutor() as executor:
+    with cf.ProcessPoolExecutor() as executor:
         solver_output = executor.map(solvePoincare_x, ICs_XYZ)
 
     t_stop = perf_counter()
@@ -81,6 +78,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     pathLength_=[]
     Poincare_output_ = []
     wall_output_ = []
+
     for pLngth, out in solver_output:
         pathLength_ += [pLngth]
         Poincare_output_ += [out[1:]]
@@ -92,8 +90,6 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     ## POST-SOLVER OUTPUT
     ####################
     import matplotlib.pyplot as plt
-    from matplotlib import cm
-    from matplotlib.colors import ListedColormap
 
     plt.rcParams.update({'font.size': 10})
     plt.rcParams.update({'figure.autolayout':True})
@@ -104,7 +100,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     for n, phi_plot in enumerate(phi_range):
         outputHandler.log.info(f'\tPHI: {phi_plot*(180/np.pi)}')
 
-        fig = plt.figure()
+        fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
         
         # Looping over each initial condition
@@ -131,8 +127,8 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
         ax.set_rticks(np.arange(0.0, 0.19, 0.02))
         ax.yaxis.set_tick_params(labelsize=5)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
-        plt.title(r'Poincare Plot, $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi))
-
+        plt.title(r'Cross-section: $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi), loc='left')
+        #plt.tight_layout()
         plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
         outputHandler.saveFig(plot_name)
         plt.close()

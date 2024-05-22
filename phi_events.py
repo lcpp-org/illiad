@@ -4,10 +4,9 @@ from coordtrans import XYZ_to_RTP
 from mesh import *
 
 def inVV(t, p_XYZ, mesh):
-	#x, y, z = p_XYZ[:3]
-	#r = np.sqrt( x**2 + y**2 + z**2 + mesh.R0**2 - 2*mesh.R0*np.sqrt(x**2 + y**2) )
 	p_RTP = XYZ_to_RTP(p_XYZ[:3], mesh.R0)
-	return p_RTP[0] - mesh.a
+	return mesh.a - p_RTP[0]
+inVV.direction = -1.0
 inVV.terminal = True
 
 
@@ -249,12 +248,5 @@ isphi351.direction = 1.0
 
 #@jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C")), nopython=True)
 def isphi360(t, p_XYZ, mesh):
-
-	#B, period_ = mesh.interpField(p_XYZ[:3])
-	#return  period_ - 4.
-
-	p_RTP = XYZ_to_RTP(p_XYZ[:3], mesh.R0)
-	return p_RTP[2] - 5e-2 #- 40. * (np.pi/20.)
-	#return 0
- 
-isphi360.direction = 1
+	return p_XYZ[1]
+isphi360.direction = -1
