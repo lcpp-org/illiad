@@ -10,14 +10,13 @@ from coordtrans import *
 ## FIELD LINE SOLVER (FROM "Bfield.py") ##
 ## ==================================== ##
 def blines(t, p_XYZ, field):
-    B = np.zeros(3)
     direction = 1
-
+    B = np.zeros(3)
     B, dum_ = field.interpField(p_XYZ[:3])
 
     # hard-coded, hacky error field implementation
-    #B[0] += 0.0002
-    #B[1] += -0.0002
+    B[0] += 0.0002
+    B[1] += -0.0002
 
     dY = direction * B / np.linalg.norm(B)
 

@@ -95,6 +95,8 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     plt.rcParams.update({'figure.autolayout':True})
 
     phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
+
+
     # Looping over each phi angle
     outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
     for n, phi_plot in enumerate(phi_range):
@@ -102,10 +104,15 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
 
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
-        
-        # Looping over each initial condition
+
+        maxLength = 0
         for i in range(len(Poincare_output_)):
-            t_pts = Poincare_output_[i][n] #skip wall event
+            maxLength = max(maxLength, len(Poincare_output_[i][n]))
+
+        # Looping over each initial condition
+        scatter_points = np.zeros([len(Poincare_output_), 2, maxLength])
+        for i in range(len(Poincare_output_)):
+            t_pts = Poincare_output_[i][n]
 
             r_f = np.zeros(len(t_pts))
             th_f = np.zeros(len(t_pts))
@@ -115,20 +122,25 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
                 r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], field_.R0)
 
             if saveData:
-                f_output = np.array([th_f, r_f])
-                fname = anlys_name + f'_{degrees(phi_plot):03.0f}_{i}'
-                outputHandler.saveNumpyData(f_output, fname)
+                scatter_points[i][0][:th_f.size] = th_f
+                scatter_points[i][1][:r_f.size] = r_f
             else:
                 pass
 
             plt.scatter(th_f, r_f, marker='.', s=1.5, c='k', linewidths=0.0)
+
+        if saveData:
+            f_output = scatter_points
+            fname = anlys_name + f'_{degrees(phi_plot):03.0f}'
+            outputHandler.saveNumpyData(f_output, fname)
+        else:
+            pass 
 
         ax.set_rmax(field_.a)
         ax.set_rticks(np.arange(0.0, 0.19, 0.02))
         ax.yaxis.set_tick_params(labelsize=5)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
         plt.title(r'Cross-section: $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi), loc='left')
-        #plt.tight_layout()
         plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
         outputHandler.saveFig(plot_name)
         plt.close()
