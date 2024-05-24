@@ -12,7 +12,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
 
     ## SOLVER SETUP
     Nlines = ICs_XYZ.shape[0]
-    outputHandler.log.info(f'Begin running {Nlines} Initial Conditions for max. { int(length/(2*np.pi * field_.R0))} spins...')
+    outputHandler.log.info('Begin running {} Initial Conditions for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
 
     # avert your eyes
     poincare_events = [ phi_events.inVV, 
@@ -67,12 +67,12 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver_events=poincare_events)
 
     t_start = perf_counter()
-    with cf.ProcessPoolExecutor() as executor:
+    with cf.ProcessPoolExecutor(max_workers=32) as executor:
         solver_output = executor.map(solvePoincare_x, ICs_XYZ)
 
     t_stop = perf_counter()
     tot_elapsed_time = t_stop - t_start
-    outputHandler.log.info(f'ALL SOLVERS FINISHED IN {tot_elapsed_time} seconds\n###############\n\n')
+    outputHandler.log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(tot_elapsed_time))
 
     # Parse output into lists
     pathLength_=[]
@@ -100,7 +100,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     # Looping over each phi angle
     outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
     for n, phi_plot in enumerate(phi_range):
-        outputHandler.log.info(f'\tPHI: {phi_plot*(180/np.pi)}')
+        outputHandler.log.info('\tPHI: {}'.format(phi_plot*(180/np.pi)))
 
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
@@ -110,7 +110,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
             maxLength = max(maxLength, len(Poincare_output_[i][n]))
 
         # Looping over each initial condition
-        scatter_points = np.zeros([len(Poincare_output_), 2, maxLength])
+        scatter_points = np.full([len(Poincare_output_), 2, maxLength], fill_value=np.nan)
         for i in range(len(Poincare_output_)):
             t_pts = Poincare_output_[i][n]
 
@@ -131,7 +131,8 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
 
         if saveData:
             f_output = scatter_points
-            fname = anlys_name + f'_{degrees(phi_plot):03.0f}'
+            #fname = anlys_name + f'_{degrees(phi_plot):03.0f}'
+            fname = anlys_name + '_{:03.0f}'.format(degrees(phi_plot))
             outputHandler.saveNumpyData(f_output, fname)
         else:
             pass 

@@ -9,7 +9,8 @@ plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
 def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, filename):
-    
+    r_in = r_in[~np.isnan(r_in)]
+    th_in = th_in[~np.isnan(th_in)]
     outputHandler.createSubDir(filename)
 
     theta_evals = np.linspace(0, 2*np.pi*(1 - 1/Ntheta), Ntheta)
@@ -34,7 +35,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     ## SPLINING
     # perform curve-fitting (smoothing spline)
     # function and derivative continuity not enforced across periodic boundary (would need fancier spline)
-    fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-4, k=3, per=False, quiet=1)
+    fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-4, k=3, per=True, quiet=1)
 
     seedPts_0 = splev(theta_evals, fSurface_splineParms)
     derivs =  splev(theta_evals, fSurface_splineParms, der=1)
@@ -53,7 +54,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     ax.yaxis.set_tick_params(labelsize=5)
     ax.grid(linewidth = 0.25, linestyle=':', c='k')
 
-    plt.title(f'Spline fit to Last Closed Flux Surface @ phi={phi*180/np.pi}')
+    plt.title('Spline fit to Last Closed Flux Surface @ phi={}'.format(phi*180/np.pi))
     
     outputHandler.saveFig( 'LCFS_phi={:03.0f}_splineFit.png'.format(phi*180/np.pi) )
     plt.close()

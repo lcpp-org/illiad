@@ -162,3 +162,5 @@ coils.wega_with_VFCoils
 fieldsolve.py
 input_files/*
 output/*
+*.o1*
+*.e1*

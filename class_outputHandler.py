@@ -1,6 +1,6 @@
 import os as os
 import numpy as np
-import pandas as pd
+#import pandas as pd
 
 import matplotlib.pyplot as plt
 
@@ -20,7 +20,7 @@ class IOHandler:
         self.log = logging.getLogger("Poincare")
 
         #self.module_path = os.path.realpath(os.path.dirname(__file__))
-        print(f'Executing script in {self.module_path}')
+        print('Executing script in {}'.format(self.module_path))
 
         # Create output directories if none exist
         self.output_dir = os.path.join(self.module_path,'output')
@@ -31,7 +31,7 @@ class IOHandler:
             pass#print()
 
         self.run_dir = os.path.join(self.output_dir, run_name)
-        print(f'Creating Run Directory: "{run_name}"')
+        print('Creating Run Directory: "{}"'.format(run_name))
         try:
             os.mkdir(self.run_dir)
         except OSError as error:
@@ -120,7 +120,7 @@ class IOHandler:
     def loadNumpyData(self, name):
         # method to load a numpy array from the \data sub-directory
         name_loc = os.path.join( self.data_dir, name)
-        self.log.info(f'loading numpy file: "{name_loc}"')
+        self.log.info('loading numpy file: "{}"'.format(name_loc))
 
         return np.load(name_loc)
         #try:
@@ -133,29 +133,29 @@ class IOHandler:
         name_loc = os.path.join( self.plot_dir, name)
         plt.savefig(name_loc, dpi=400)
 
-    def loadPorts_fromCSV(self, name):
-        # method to load the HIDRA port locations and sizes
-        name_loc = name #os.path.join('self.module_path', name)
+    #def loadPorts_fromCSV(self, name):
+    #    # method to load the HIDRA port locations and sizes
+    #    name_loc = name #os.path.join('self.module_path', name)
  
-        portdata = pd.read_csv(
-            name_loc,
-            header=None,
-            index_col=None,
-            skiprows=1,
-            delim_whitespace=False,
-            engine='python')
+    #    portdata = pd.read_csv(
+    #        name_loc,
+    #        header=None,
+    #        index_col=None,
+    #        skiprows=1,
+    #        delim_whitespace=False,
+    #        engine='python')
         
         ## PARSE DATA
         #p_type = portdata.loc[:,0].values
-        p_phi = np.array(portdata.loc[:,2].values)
-        p_theta = np.array(portdata.loc[:,3].values)
-        p_rmaj = np.array(portdata.loc[:,4].values)
-        p_rmin = np.array(portdata.loc[:,5].values)
-        p_dia = np.array(portdata.loc[:,6].values/1000) # convert mm to meters
-        p_height = np.degrees(np.arcsin(p_dia/p_rmin)) # calculate height in degrees
-        p_width =  np.degrees(np.arcsin(p_dia/p_rmaj)) # calculate width in degrees
+    #    p_phi = np.array(portdata.loc[:,2].values)
+    #    p_theta = np.array(portdata.loc[:,3].values)
+    #    p_rmaj = np.array(portdata.loc[:,4].values)
+    #    p_rmin = np.array(portdata.loc[:,5].values)
+    #    p_dia = np.array(portdata.loc[:,6].values/1000) # convert mm to meters
+    #    p_height = np.degrees(np.arcsin(p_dia/p_rmin)) # calculate height in degrees
+    #    p_width =  np.degrees(np.arcsin(p_dia/p_rmaj)) # calculate width in degrees
 
-        return np.array([p_phi, p_theta, p_width, p_height])
+    #    return np.array([p_phi, p_theta, p_width, p_height])
 
 
 
