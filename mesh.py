@@ -23,15 +23,15 @@ spec = [
         ('r_min', nb.float32),
         ('theta_min', nb.float32),
         ('phi_min', nb.float32),
-        ('Bx', nb.types.Array(nb.float64, 1, "C")),
-        ('By', nb.types.Array(nb.float64, 1, "C")),
-        ('Bz', nb.types.Array(nb.float64, 1, "C")),
-        ('periodicity', nb.types.Array(nb.int32, 1, "C")),
+        ('Bx', nb.types.Array(nb.float64, 3, "C")),
+        ('By', nb.types.Array(nb.float64, 3, "C")),
+        ('Bz', nb.types.Array(nb.float64, 3, "C")),
+        ('periodicity', nb.int32[:]),
     ]
 
 
 # define a class with mesh information
-@jitclass(spec)
+#@jitclass(spec)
 class Mesh:
     # Class to store the mesh information
     #
@@ -69,11 +69,11 @@ class Mesh:
         self.theta_min = 0
         self.phi_min = 0
 
-        self.Bx = np.empty(1, dtype=np.float64)
-        self.By = np.empty(1, dtype=np.float64)
-        self.Bz = np.empty(1, dtype=np.float64)
+        self.Bx: nb.float64[:][:][:]
+        self.By: nb.float64[:][:][:]
+        self.Bz: nb.float64[:][:][:]
 
-        self.periodicity = np.empty(1, dtype=np.int32)
+        self.periodicity: nb.int32[:]
 
     def setToroidalGeometry(self, R0, a):
         self.R0 = R0
@@ -89,19 +89,26 @@ class Mesh:
         term2 =           (r2**3 - r1**3)/3. * np.sin(theta2 - theta1) * (phi2 - phi1) 
         return np.abs(term1 + term2)
 
-    def loadCartesianField(self, Bx, By, Bz, r_period, theta_period, phi_period):
+    def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5])):
         # This function loads a vector field as a 3-dimensional scalar array for each cartesian vector
         # The grid properties are assumed from the dimensions of the input arrays
         #!! A better input data structure is needed to define dimension order, dimension size, and periodicity
-        if Bx.shape == By.shape and Bx.shape == Bz.shape:
+        #if Bx_.shape == By_.shape and Bx_.shape == Bz_.shape:
             #self.nphi, self.ntheta, self.nr = Bx.shape
 
-            self.Bx = Bx
-            self.By = By
-            self.Bz = Bz
+            self.nr, self.ntheta, self.nphi = Bx_.shape
 
-            self.nr, self.ntheta, self.nphi = Bx.shape
-            self.periodicity = np.array([r_period, theta_period, phi_period])
+            self.periodicity = period_
+
+            #self.Bx = np.resize(Bx_, Bx_.shape)
+            #self.By = np.resize(By_, Bx_.shape)
+            #self.Bz = np.resize(Bz_, Bx_.shape)
+
+            self.Bx = Bx_
+            self.By = By_
+            self.Bz = Bz_
+
+
 
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
@@ -138,7 +145,7 @@ class Mesh:
             #              +'# dphi = {} deg.\n'.format(degrees(self.dphi))
             #               +'# -----------------------------------\n')
             
-        else: pass#self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
+        #else: pass#self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
 
 
 

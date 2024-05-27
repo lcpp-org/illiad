@@ -12,7 +12,7 @@ from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY ##
 ##======================##
-simOut = out.IOHandler("1q3ERR_batchTest10") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("1q3ERR_batchTest11") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 
@@ -27,16 +27,21 @@ b_hidra.setToroidalGeometry(0.72, 0.19)
 #b_hidra.loadCartesianField_fromFile('Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
 #b_hidra.loadCartesianField_fromFile('Bxyz_i-1q4_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
 
-BX, BY, BZ = np.load('input_files/Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy')
-b_hidra.loadCartesianField(BX, BY, BZ, 0, 1, 5)
+#BX, BY, BZ = np.load('input_files/Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy')
+BX, BY, BZ = np.load('input_files/Bxyz_i-1q4_hires_5Period_IH-95p5pct.npy')
+
+simOut.log.info('Input  data type:{}'.format(type(BX)))
+simOut.log.info('Input Array data type:{}'.format(BX.dtype))
+
+b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
 
 
 
-"""
+
 ## SET UP POINCARE SEED POINTS ##
 ##=============================##
 Nlines = 15+13 #25
-spins = 600
+spins = 750
 
 fl_R0     = np.array(np.linspace( 0.140, 0.005, Nlines))
 fl_THETA0 = np.zeros(Nlines)
@@ -53,7 +58,7 @@ simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
 
 ## GENERATE POINCARE DATA ##
 ##==============================##
-tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare')
+tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
 
 
 ## IDENTIFY LAST-CLOSED FLUX SURFACE ##
@@ -69,19 +74,18 @@ plt.xlabel('Minor radius [m]')
 plt.xlabel('Connection length [m]')
 simOut.saveFig('connectLengths')
 plt.close()
-"""
 
 
 # Assuming surfaces are ordered from 'out' to 'in':
 ## This returns the LCFS 'inside' ALL open flux surfaces
-#openSurface_ind = [i for i, t in enumerate(tMax) if t != maxTime] # Get indices of open flux surfaces
-#LCFS_index = max(openSurface_ind) + 1
+openSurface_ind = [i for i, t in enumerate(tMax) if t != maxTime] # Get indices of open flux surfaces
+LCFS_index = max(openSurface_ind) + 1
 
 ## This returns the most 'outer' LCFS
 #LCFS_index = tMax.index(maxTime)
 
 ## Manually select LCFS index
-LCFS_index = 11 
+#LCFS_index = 11 
 
 simOut.log.info('LCFS_index={}'.format(LCFS_index))
 
@@ -124,7 +128,9 @@ spins = 350
 length = (2*np.pi * b_hidra.R0) * spins
 
 simOut.log.info('Initial Conditions (XYZ):\n{} points'.format(len(seed_array)))
-tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, False, 'SeedPts_{jonny:.0f}mm'.format(jonny=expand_dr[0]*1000))
+
+subName = 'SeedPts_{:.0f}mm'.format(expand_dr[0]*1000)
+tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, False, subName, 'RK45', 1e-8, 1e-14)
 
 
 

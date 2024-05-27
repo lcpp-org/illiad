@@ -26,7 +26,7 @@ def blines(t, p_XYZ, field):
 ##===============##
 ## DEFINE SOLVER ##
 ##===============##
-def solvePoincare(init_cond, maxLength, field, solver_events):
+def solvePoincare(init_cond, maxLength, field, solver, rtl, atl, solver_events):
     log = logging.getLogger()
 
     init_cond_rtp = XYZ_to_RTP(init_cond, field.R0)
@@ -36,7 +36,8 @@ def solvePoincare(init_cond, maxLength, field, solver_events):
     fieldlines = solve_ivp(blines, (0.0, maxLength), init_cond, args = ([field]),
             dense_output=False,
             events = solver_events, 
-            method='RK45', rtol=1e-8, atol=1e-14)
+            method=solver, rtol=rtl, atol=atl)
+            #method='RK45', rtol=1e-8, atol=1e-14)
             #method='LSODA', rtol=1e-7, atol=1e-14)#, first_step=1e-5)
             #method='DOP853', rtol=1e-6, atol=1e-14)
     t_stopInd = perf_counter()

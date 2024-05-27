@@ -6,7 +6,7 @@ from ode import solvePoincare
 from coordtrans import XYZ_to_RTP
 
 
-def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
+def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name, solvr, rtl_, atl_):
     
     outputHandler.createSubDir(anlys_name)
 
@@ -64,7 +64,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name):
     import concurrent.futures as cf
     from time import perf_counter
 
-    solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver_events=poincare_events)
+    solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver=solvr, rtl= rtl_, atl=atl_, solver_events=poincare_events)
 
     t_start = perf_counter()
     with cf.ProcessPoolExecutor(max_workers=32) as executor:
