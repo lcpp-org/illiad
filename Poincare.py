@@ -7,12 +7,13 @@ from matplotlib import patches
 import class_outputHandler as out
 from mesh import *
 from coordtrans import *
+from anlys_funcs import *
 from poincare_gen import Gen_Poincare
 
 
 ## SET UP RUN DIRECTORY ##
 ##======================##
-simOut = out.IOHandler("1q3ERR_batchTest11") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("1q3ERR_otherTest1") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 
@@ -22,72 +23,40 @@ simOut.startLog()
 b_hidra = Mesh()
 b_hidra.setToroidalGeometry(0.72, 0.19)
 
-#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q4_hires_5Period.npy', 0, 1, 5)
-#b_hidra.loadCartesianField_fromFile('Bxyz_negY_i-1q3_hires_5Period.npy', 0, 1, 5)
-#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
-#b_hidra.loadCartesianField_fromFile('Bxyz_i-1q4_hires_5Period_IH-95p5pct.npy', 0, 1, 5)
-
-#BX, BY, BZ = np.load('input_files/Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy')
 BX, BY, BZ = np.load('input_files/Bxyz_i-1q4_hires_5Period_IH-95p5pct.npy')
-
 simOut.log.info('Input  data type:{}'.format(type(BX)))
 simOut.log.info('Input Array data type:{}'.format(BX.dtype))
 
 b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
 
 
-
-
-## SET UP POINCARE SEED POINTS ##
-##=============================##
-Nlines = 15+13 #25
-spins = 750
-
-fl_R0     = np.array(np.linspace( 0.140, 0.005, Nlines))
-fl_THETA0 = np.zeros(Nlines)
-fl_PHI0   = np.ones(Nlines) * (2*np.pi - (np.pi/5.))
-
-ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
-ICs_XYZ = np.zeros(shape=(Nlines, 3))
-for i in range(Nlines):
-    ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
-
-length = (2*np.pi * b_hidra.R0) * spins
-simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
-
-
-## GENERATE POINCARE DATA ##
-##==============================##
-tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
+### SET UP POINCARE SEED POINTS ##
+###=============================##
+#Nlines = 16
+#spins = 250
+#
+#fl_R0     = np.array(np.linspace( 0.140, 0.065, Nlines))
+#fl_THETA0 = np.zeros(Nlines)
+#fl_PHI0   = np.ones(Nlines) * (2*np.pi - (np.pi/5.))
+#
+#ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
+#ICs_XYZ = np.zeros(shape=(Nlines, 3))
+#for i in range(Nlines):
+#    ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
+#
+#length = (2*np.pi * b_hidra.R0) * spins
+#simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
+#
+#
+### GENERATE POINCARE DATA ##
+###==============================##
+#tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
 
 
 ## IDENTIFY LAST-CLOSED FLUX SURFACE ##
 ##===================================##
-#simOut.log.info(f'{tMax=}')
-maxTime = np.max(tMax)
-plt.figure()
-plt.plot(fl_R0, tMax, '-o', c='k')
-plt.title(r'Connection length vs. $r_{initial} (@{}\phi=324\degree)$')
-plt.yscale('log')
-plt.grid(True, which='both')
-plt.xlabel('Minor radius [m]')
-plt.xlabel('Connection length [m]')
-simOut.saveFig('connectLengths')
-plt.close()
-
-
-# Assuming surfaces are ordered from 'out' to 'in':
-## This returns the LCFS 'inside' ALL open flux surfaces
-openSurface_ind = [i for i, t in enumerate(tMax) if t != maxTime] # Get indices of open flux surfaces
-LCFS_index = max(openSurface_ind) + 1
-
-## This returns the most 'outer' LCFS
-#LCFS_index = tMax.index(maxTime)
-
-## Manually select LCFS index
-#LCFS_index = 11 
-
-simOut.log.info('LCFS_index={}'.format(LCFS_index))
+#LCFS_index = identifyLCFS(LCFStype='inner', fl_R0, tMax, outputHandler=simOut)
+LCFS_index = identifyLCFS(LCFStype='input', num=10, outputHandler=simOut)
 
 
 ## GENERATE 'SEED SHELLS' OF IC's ##
@@ -100,22 +69,17 @@ seed_subset = []
 seed_list = []
 
 phiGen_list = np.linspace(9, 360, 40, dtype=int).tolist() # list of phi angles to generated shells
-expand_dr   = [0.030]                                     # define number of 'shells' (delta-r) to generate
+expand_dr   = [0.010]                                     # define number of 'shells' (delta-r) to generate
 ntheta      = 90                                          # number of equally-spaced theta points for each shell
 
 # generate seeds from the same flux surface at different phi angles
 for phi_gen_deg in phiGen_list:
-
-    phi_gen = phi_gen_deg*(np.pi/180)
-
-    #filename = f'Poincare_{phi_gen_deg:03d}_{LCFS_index:d}.npy'
     filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
     th_in, r_in = simOut.loadNumpyData(filename)[LCFS_index]
-    #th_in, r_in = simOut.loadNumpyData(filename)
 
+    phi_gen = phi_gen_deg*(np.pi/180)
     seed_subset = generateSeedShells(expand_dr, ntheta, r_in, th_in, phi_gen, 
         b_hidra, simOut, 'SeedPts_{:.0f}mm'.format(expand_dr[0]*1000))
-
     seed_list.extend(seed_subset)
 
 seed_array = np.array(seed_list)
@@ -134,9 +98,10 @@ tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, leng
 
 
 
+
+## ================== ##
 ## POST-SOLVER OUTPUT ##
 ## ================== ##
-#wallPtArray = simOut.loadNumpyData('Wallpoints_3cm.npy')
 wallPtArray = np.transpose( np.array(wallPt_output2) ) 
 simOut.saveNumpyData(wallPtArray, 'Wallpoints_{:.0f}mm'.format(expand_dr[0]*1000))
 
