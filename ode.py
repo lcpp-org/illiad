@@ -37,9 +37,6 @@ def solvePoincare(init_cond, maxLength, field, solver, rtl, atl, solver_events):
             dense_output=False,
             events = solver_events, 
             method=solver, rtol=rtl, atol=atl)
-            #method='RK45', rtol=1e-8, atol=1e-14)
-            #method='LSODA', rtol=1e-7, atol=1e-14)#, first_step=1e-5)
-            #method='DOP853', rtol=1e-6, atol=1e-14)
     t_stopInd = perf_counter()
     elapsed_timeInd = t_stopInd - t_startInd
 
@@ -47,9 +44,9 @@ def solvePoincare(init_cond, maxLength, field, solver, rtl, atl, solver_events):
 
     if fieldlines.status == 0: #solver ran to max. time
         #log.info(f'Success!: IC\tTook {:0.3f} sec.\tWall Event at t={}'.format(elapsed_timeInd, fieldlines.t_events[0]))
-        log.info('Success!: IC\tTook {} sec.\tWall Event at t={}'.format(elapsed_timeInd, fieldlines.t_events[0]))
+        log.info('Success!:\tSolver took {:.4f} sec.\tWall Event at t={}'.format(elapsed_timeInd, fieldlines.t_events[0]))
     elif fieldlines.status == 1: #termination event
-        log.info('Success!: IC\tTook {} sec.\tWall Event at t={}'.format(elapsed_timeInd, fieldlines.t_events[0]))
+        log.info('Success!:\tSolver took {:.4f} sec.\tWall Event at t={}'.format(elapsed_timeInd, fieldlines.t_events[0]))
     else: #solver failure
         log.critical('FAILURE!: IC:{}'.format(init_cond))
 

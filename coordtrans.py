@@ -68,11 +68,25 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
 
 # transform from theta,r about (Geometric Axis)
 # to (Magnetic Axis): theta=pi, r=0.0187m
-def axisShift(rho, theta, r_delt_): 
-    #rprime = np.sqrt(r_delt_**2 + rho**2 + 2*rho*r_delt_*np.cos(theta))
-    #thetaprime = np.arctan2( (rho*np.sin(theta)), r_delt_+rprime*np.cos(theta))
-    #if thetaprime<0.: thetaprime += 2*np.pi
-    #xformed_Coord = np.array([thetaprime, rprime])
-    
-    xformed_Coord = np.array([theta, rho])
-    return xformed_Coord
+def axisShift(rho, theta, rdel, thdel_): 
+    #print(f'{rdel=}')
+    #xformed_Coord = np.array([theta, rho])
+    #return xformed_Coord
+    rprime = np.sqrt( rho**2 + rdel**2 - 2*rho*rdel*np.cos(theta - thdel_) )
+
+    chi = np.arcsin((rho/rprime) * np.sin(theta - thdel_))
+
+    condition = rho**2 > rprime**2 + rdel**2
+    chi = np.where(condition, np.pi - chi, chi)
+    chi = np.where(chi<0, chi + 2*np.pi, chi)
+
+    opt1 = thdel_ - chi + np.pi
+    opt2 = thdel_ - chi - np.pi
+
+    thetaprime = np.where(theta>thdel_, opt1, opt2 )
+    thetaprime = np.where(thetaprime<0, thetaprime + 2*np.pi, thetaprime)    
+
+    return np.array([thetaprime, rprime])
+
+
+

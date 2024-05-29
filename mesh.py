@@ -1,7 +1,7 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from coordtrans import XYZ_to_RTP, rot_vecXYZ_byPHI
+from coordtrans import XYZ_to_RTP#, rot_vecXYZ_byPHI
 import logging
 
 import numba as nb
@@ -89,6 +89,21 @@ class Mesh:
         term2 =           (r2**3 - r1**3)/3. * np.sin(theta2 - theta1) * (phi2 - phi1) 
         return np.abs(term1 + term2)
 
+    def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
+        # Function takes in a cartesian vector and a phi angle
+        # Returns the cartesian values of the vector rotated by phi degrees
+        # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+        # convention: +phi is clockwise when viewed from above
+        rotated_XYZ = np.zeros(3)
+        xFormMatrix = np.array([[ np.cos(delta_phi), -np.sin(delta_phi), 0.0],
+                                [ np.sin(delta_phi),  np.cos(delta_phi), 0.0],
+                                [               0.0,                0.0, 1.0]])
+
+        rotated_XYZ = np.dot(vec_XYZ, xFormMatrix)
+
+        return rotated_XYZ
+
+
     def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5])):
         # This function loads a vector field as a 3-dimensional scalar array for each cartesian vector
         # The grid properties are assumed from the dimensions of the input arrays
@@ -146,7 +161,6 @@ class Mesh:
             #               +'# -----------------------------------\n')
             
         #else: pass#self.log.critical("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
-
 
 
 #    def loadCartesianField_fromFile(self, name, r_period, theta_period, phi_period):
@@ -275,7 +289,8 @@ class Mesh:
             node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
             # transform the field if the node is < dphi
             if node_k < 0.:
-                node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
+                #node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
+                node_vecXYZ = self.rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
 
             # calculate antiNode rtp values from indices for input in to 'subElementVolume'
             antiNode_r = antiNode_i * self.dr
@@ -285,6 +300,7 @@ class Mesh:
 
             # calculate the wieght function as the volume of the point-antiNode subelement
             antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
+            #antiNode_subVolume = subElementVolume(point_RTP_local, antiNode_rtp, self.R0)
 
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
@@ -297,7 +313,8 @@ class Mesh:
         # the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
         phi_rotation = int(ph_localN) * self.phi_max  # angle of transform
-        global_vecXYZ = rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
+        #global_vecXYZ = rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
+        global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
         return global_vecXYZ, ph_localN
 
