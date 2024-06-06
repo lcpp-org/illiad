@@ -2,6 +2,7 @@ import numpy as np
 from math import degrees
 
 import phi_events
+from anlys_funcs import Output_Poincare
 from ode import solvePoincare
 from coordtrans import XYZ_to_RTP
 
@@ -12,7 +13,7 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name, s
 
     ## SOLVER SETUP
     Nlines = ICs_XYZ.shape[0]
-    outputHandler.log.info('Begin running {} Initial Conditions for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
+
 
     # avert your eyes
     poincare_events = [ phi_events.inVV, 
@@ -66,8 +67,10 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name, s
 
     solvePoincare_x = partial(solvePoincare, maxLength=length, field=field_, solver=solvr, rtl= rtl_, atl=atl_, solver_events=poincare_events)
 
+    outputHandler.log.info('Begin running {} Initial Conditions for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
+
     t_start = perf_counter()
-    with cf.ProcessPoolExecutor(max_workers=32) as executor:
+    with cf.ProcessPoolExecutor(max_workers=24) as executor:
         solver_output = executor.map(solvePoincare_x, ICs_XYZ)
 
     t_stop = perf_counter()
@@ -94,56 +97,20 @@ def Gen_Poincare(field_, ICs_XYZ, length, outputHandler, saveData, anlys_name, s
     plt.rcParams.update({'font.size': 10})
     plt.rcParams.update({'figure.autolayout':True})
 
-    phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
 
+    phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
 
     # Looping over each phi angle
     outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
-    for n, phi_plot in enumerate(phi_range):
-        outputHandler.log.info('\tPHI: {}'.format(phi_plot*(180/np.pi)))
 
-        fig = plt.figure(figsize=(6, 6))
-        ax = fig.add_subplot(111, polar=True)
+    num_sets = len(Poincare_output_)
 
-        maxLength = 0
-        for i in range(len(Poincare_output_)):
-            maxLength = max(maxLength, len(Poincare_output_[i][n]))
-
-        # Looping over each initial condition
-        scatter_points = np.full([len(Poincare_output_), 2, maxLength], fill_value=np.nan)
-        for i in range(len(Poincare_output_)):
-            t_pts = Poincare_output_[i][n]
-
-            r_f = np.zeros(len(t_pts))
-            th_f = np.zeros(len(t_pts))
-            ph_f = np.zeros(len(t_pts))
-
-            for j in range(len(t_pts)):
-                r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], field_.R0)
-
-            if saveData:
-                scatter_points[i][0][:th_f.size] = th_f
-                scatter_points[i][1][:r_f.size] = r_f
-            else:
-                pass
-
-            plt.scatter(th_f, r_f, marker='.', s=1.5, c='k', linewidths=0.0)
-
-        if saveData:
-            f_output = scatter_points
-            #fname = anlys_name + f'_{degrees(phi_plot):03.0f}'
-            fname = anlys_name + '_{:03.0f}'.format(degrees(phi_plot))
-            outputHandler.saveNumpyData(f_output, fname)
-        else:
-            pass 
-
-        ax.set_rmax(field_.a)
-        ax.set_rticks(np.arange(0.0, 0.19, 0.02))
-        ax.yaxis.set_tick_params(labelsize=5)
-        ax.grid(linewidth = 0.25, linestyle=':', c='k')
-        plt.title(r'Cross-section: $\phi$={:02.0f}$\degree$'.format(phi_plot*180/np.pi), loc='left')
-        plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_plot*180/np.pi)
-        outputHandler.saveFig(plot_name)
-        plt.close()
+    iter_in = enumerate(phi_range)
+    Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_, anlys_name=anlys_name, outputHandler=outputHandler)
+    with cf.ProcessPoolExecutor(max_workers=24) as executor:
+        outs = executor.map(Output_Poincare_x, iter_in)
+    
+    for out in outs:
+        outputHandler.log.info(out)
 
     return pathLength_, Poincare_output_, wall_output_

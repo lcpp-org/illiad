@@ -1,15 +1,22 @@
 #!/bin/bash
 #
-#SBATCH --time=00:30:00                     # Job run time (hh:mm:ss)
+#SBATCH --time=02:00:00                     # Job run time (hh:mm:ss)
 #SBATCH --nodes=1                           # Number of nodes
-#SBATCH --ntasks-per-node=1                 # Number of MPI processes per node
-#SBATCH --job-name=test2                    # Name of batch job
-#SBATCH --partition=secondary-eth                   # Partition (queue)
-#SBATCH --output=test2_out.o%j              # Name of batch job output file
-#SBATCH --error=test2.e%j                   # Name of batch job error file
-##SBATCH --mail-user=spgula2@illinois.edu   # Send email notifications
-##SBATCH --mail-type=BEGIN,END              # Type of email notification to send
+#SBATCH --cpus-per-task=24                  # Number of compute threads per proc
+#SBATCH --job-name=realRun1q4               # Name of batch job
+#SBATCH --partition=eng-research            # Partition (queue)
+#SBATCH --gpus-per-node=0                   # Avoid getting emails from IT
+#SBATCH --output=realRun1q4.o%j             # Name of batch job output file
+#SBATCH --error=realRun1q4.e%j              # Name of batch job error file
+#SBATCH --mail-user=spgula2@illinois.edu    # Send email notifications
+#SBATCH --mail-type=END                     # Type of email notification to send
+#SBATCH --account=dcurreli-npre-eng         # Who is your handler?
+
 ###########################################################################
 
-module load python/3
-python3 Poincare.py
+
+module load python/3.9.16
+#module load gcc/11.2.0
+export PYTHONPATH=/home/${USER}/scratch/mypython3:${PYTHONPATH}
+
+python3 Poincare_1q4.py

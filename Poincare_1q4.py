@@ -13,7 +13,7 @@ from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY ##
 ##======================##
-simOut = out.IOHandler("1q3ERR_run3") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("1q4ERR_run1") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 
@@ -23,7 +23,7 @@ simOut.startLog()
 b_hidra = Mesh()
 b_hidra.setToroidalGeometry(0.72, 0.19)
 
-BX, BY, BZ = np.load('input_files/Bxyz_i-1q3_hires_5Period_IH-95p5pct.npy')
+BX, BY, BZ = np.load('input_files/Bxyz_i-1q4_hires_5Period_IH-95p5pct.npy')
 simOut.log.info('Input  data type:{}'.format(type(BX)))
 simOut.log.info('Input Array data type:{}'.format(BX.dtype))
 
@@ -56,14 +56,8 @@ b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
 #
 ### IDENTIFY LAST-CLOSED FLUX SURFACE ##
 ###===================================##
-#LCFS_index = identifyLCFS(LCFStype='inner', 
-#                          iconds=fl_R0, 
-#                          t_maxs=tMax, 
-#                          outputHandler=simOut)
-
-LCFS_index = identifyLCFS(LCFStype='input', 
-                          num=14, 
-                          outputHandler=simOut)
+#LCFS_index = identifyLCFS(LCFStype='inner', iconds=fl_R0, t_maxs=tMax, outputHandler=simOut)
+LCFS_index = identifyLCFS(LCFStype='input', num=11, outputHandler=simOut)
 
 simOut.log.info('LCFS_index = {}'.format(LCFS_index))
 
@@ -74,7 +68,7 @@ simOut.log.info('GENERATING SEED POINTS:\n')
 from point_generators import generateSeedShells
 
 phiGen_list = np.linspace(9, 360, 40, dtype=int).tolist() # list of phi angles to generated shells
-expand_dr   = [0.020]                                     # define number of 'shells' (delta-r) to generate
+expand_dr   = [0.030]                                     # define number of 'shells' (delta-r) to generate
 ntheta      = 90                                          # number of equally-spaced theta points for each shell
 
 # generate seeds from the same flux surface at different phi angles
@@ -104,7 +98,6 @@ subName = 'SeedPts_{:.0f}mm'.format(expand_dr[0]*1000)
 tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, False, subName, 'RK45', 1e-8, 1e-14)
 
 
-
 ## ================== ##
 ## POST-SOLVER OUTPUT ##
 ## ================== ##
@@ -119,14 +112,14 @@ for i in range(len(theta_plot)):
 
 simOut.log.info('Plotting wall hits. Total events = {}:\n'.format(wallPtArray[0].size))
 
-## Import data on port size/locations for plotting
-#ports = simOut.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
-
 plt.rcParams.update({'font.size': 6})
 plt.rcParams.update({'figure.autolayout':True})
 
 fig = plt.figure()
 ax = fig.add_subplot(polar=False, aspect=0.2)
+
+## Import data on port size/locations for plotting
+#ports = simOut.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
 
 # Plot HIDRA ports
 #for port in ports.T:
