@@ -63,7 +63,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     ## SPLINING
     # perform curve-fitting (smoothing spline)
     # function and derivative continuity not enforced across periodic boundary (would need fancier spline)
-    fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-6, k=3, per=True, quiet=1)
+    fSurface_splineParms = splrep(theta_spl, rad_spl, s=2e-5, k=3, per=True, quiet=1)
 
     theta_evals = np.linspace(0, 2*np.pi*(1 - 1/Ntheta), Ntheta)
     seedPts_0 = splev(theta_evals, fSurface_splineParms)

@@ -8,6 +8,7 @@ plt.rcParams.update({'figure.autolayout':True})
 
 from coordtrans import XYZ_to_RTP
 
+
 def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=logging.getLogger(), num=11):
     """Function returns the index of the Last-Closed Flux Surface, with the option
         to input it directly, or determine it as the outermost confined surface, 
@@ -59,10 +60,9 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
         outputHandler.saveFig('connectLengths')
         plt.close()
 
+    outputHandler.log.info('LCFS_index = {}'.format(LCFS_index))
 
     return LCFS_index
-
-
 
 
 
@@ -79,8 +79,8 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
 
     maxLength = 0
     #num_sets = len(Pdata)
-    print('len(Pdata)={}'.format(len(Pdata)))
-    print('num_sets={}'.format(num_sets))
+    #print('len(Pdata)={}'.format(len(Pdata)))
+    #print('num_sets={}'.format(num_sets))
     for i in range(num_sets):
         maxLength = max(maxLength, len(Pdata[i][n]))
 

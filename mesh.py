@@ -48,10 +48,10 @@ class Mesh:
     # dtheta: grid spacing in the theta direction
     # dphi: grid spacing in the phi direction
 
-    def __init__(self):
+    def __init__(self, R0=0.0, a=0.0):
         #self.log = logging.getLogger()
-        self.R0 = 0.0
-        self.a = 0.0
+        self.R0 = R0
+        self.a = a
 
         self.dr = 0.0
         self.dtheta = 0.0

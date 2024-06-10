@@ -1,6 +1,8 @@
 import numpy as np
 import scipy as sp
-#import glob
+
+import matplotlib
+matplotlib.use('Agg') #fixes "Runtime Error: main thread is not in main loop"
 import matplotlib.pyplot as plt
 from matplotlib import patches
 
@@ -16,7 +18,6 @@ from poincare_gen import Gen_Poincare
 simOut = out.IOHandler("1q4ERR_run1") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
-
 ## DEFINE MESH AND LOAD FIELD ##
 ##============================##
 #b_hidra = CartesianField()
@@ -28,7 +29,6 @@ simOut.log.info('Input  data type:{}'.format(type(BX)))
 simOut.log.info('Input Array data type:{}'.format(BX.dtype))
 
 b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
-
 
 ## SET UP POINCARE SEED POINTS ##
 ##=============================##
@@ -48,28 +48,25 @@ b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
 #length = (2*np.pi * b_hidra.R0) * spins
 #simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
 #
-#
 ### GENERATE POINCARE DATA ##
-###==============================##
+###========================##
 #tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
-#
 #
 ### IDENTIFY LAST-CLOSED FLUX SURFACE ##
 ###===================================##
 #LCFS_index = identifyLCFS(LCFStype='inner', iconds=fl_R0, t_maxs=tMax, outputHandler=simOut)
-LCFS_index = identifyLCFS(LCFStype='input', num=11, outputHandler=simOut)
 
+LCFS_index = identifyLCFS(LCFStype='input', num=11, outputHandler=simOut)
 simOut.log.info('LCFS_index = {}'.format(LCFS_index))
 
 ## GENERATE 'SEED SHELLS' OF IC's ##
-## EXPANDING CO-AXIALLY WITH LCFS ##
 ##================================##
 simOut.log.info('GENERATING SEED POINTS:\n')
 from point_generators import generateSeedShells
 
 phiGen_list = np.linspace(9, 360, 40, dtype=int).tolist() # list of phi angles to generated shells
 expand_dr   = [0.030]                                     # define number of 'shells' (delta-r) to generate
-ntheta      = 90                                          # number of equally-spaced theta points for each shell
+ntheta      = 15                                          # number of equally-spaced theta points for each shell
 
 # generate seeds from the same flux surface at different phi angles
 seed_subset = []
@@ -85,7 +82,6 @@ for phi_gen_deg in phiGen_list:
 
 seed_array = np.array(seed_list)
 
-
 ## RE-RUN 'POINCARE' WITH SEED ARRAY ##
 ##===================================##
 simOut.log.info('RE-RUNNING POINCARE PLOT GENERATOR WITH NEW SEED POINTS:\n')
@@ -97,8 +93,6 @@ simOut.log.info('Initial Conditions (XYZ):\n{} points'.format(len(seed_array)))
 subName = 'SeedPts_{:.0f}mm'.format(expand_dr[0]*1000)
 tMax2, Poincare_output2, wallPt_output2 = Gen_Poincare(b_hidra, seed_array, length, simOut, False, subName, 'RK45', 1e-8, 1e-14)
 
-
-## ================== ##
 ## POST-SOLVER OUTPUT ##
 ## ================== ##
 wallPtArray = np.transpose( np.array(wallPt_output2) ) 
