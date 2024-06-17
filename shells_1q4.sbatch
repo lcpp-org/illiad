@@ -2,19 +2,21 @@
 #
 #SBATCH --time=02:00:00                     # Job run time (hh:mm:ss)
 #SBATCH --nodes=1                           # Number of nodes to request
-#SBATCH --ntasks-per-node=24                # Number of cpus per node
-#SBATCH --job-name=Poincare1q3                   # Name of batch job
-#SBATCH --partition=secondary            # Partition (queue)
+#SBATCH --ntasks-per-node=64                # Number of cpus per node
+#SBATCH --job-name=1q3shells                # Name of batch job
+#SBATCH --partition=eng-research-gpu        # Partition (queue)
 #SBATCH --gpus-per-node=0                   # Avoid getting emails from IT
-#SBATCH --output=Poincare1q3.o%j                 # Name of batch job output file
-#SBATCH --error=Poincare1q3.e%j                  # Name of batch job error file
+#SBATCH --output=1q3shells.o%j              # Name of batch job output file
+#SBATCH --error=1q3shells.e%j               # Name of batch job error file
 #SBATCH --mail-user=spgula2@illinois.edu    # Send email notifications
 #SBATCH --mail-type=END                     # Type of email notification to send
 #SBATCH --account=dcurreli-npre-eng         # Who is your handler?
 
 ###########################################################################
 
+
 module load python/3.9.16
+#module load gcc/11.2.0
 export PYTHONPATH=/home/${USER}/scratch/mypython3:${PYTHONPATH}
 
-python3 runPoincare_1q4.py
+python3 runShells_1q4.py
