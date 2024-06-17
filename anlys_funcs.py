@@ -71,16 +71,12 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
     num_sets = len(Pdata)
     rminor = field_.a
     rmajor = field_.R0
-    n, phi_ = iter    
-    outputHandler.log.info('\tPHI: {}'.format(phi_*(180/np.pi)))
+    n, phi_ = iter
 
     fig = plt.figure(figsize=(6, 6))
     ax = fig.add_subplot(111, polar=True)
 
     maxLength = 0
-    #num_sets = len(Pdata)
-    #print('len(Pdata)={}'.format(len(Pdata)))
-    #print('num_sets={}'.format(num_sets))
     for i in range(num_sets):
         maxLength = max(maxLength, len(Pdata[i][n]))
 
@@ -88,12 +84,13 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
     scatter_points = np.full([num_sets, 2, maxLength], fill_value=np.nan)
     for i in range(num_sets):
         t_pts = Pdata[i][n]
+        point_total = len(t_pts)
 
-        r_f = np.zeros(len(t_pts))
-        th_f = np.zeros(len(t_pts))
-        ph_f = np.zeros(len(t_pts))
+        r_f = np.zeros(point_total)
+        th_f = np.zeros(point_total)
+        ph_f = np.zeros(point_total)
 
-        for j in range(len(t_pts)):
+        for j in range(point_total):
             r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], rmajor)
 
         if saveData:

@@ -13,7 +13,7 @@ from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY ##
 ##======================##
-simOut = out.IOHandler("1q3ERR_run3") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("1q3ERR_wtfTesting1") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 
@@ -32,38 +32,38 @@ b_hidra.loadCartesianField(BX, BY, BZ, np.array([0, 1, 5], dtype=np.int32))
 
 ## SET UP POINCARE SEED POINTS ##
 ##=============================##
-#Nlines = 41
-#spins = 1500
-#
-##l_R0     = np.array(np.linspace( 0.140, 0.065, Nlines))
-#fl_R0     = np.array(np.linspace( 0.120, 0.020, Nlines))
-#fl_THETA0 = np.zeros(Nlines)
-#fl_PHI0   = np.ones(Nlines) * (2*np.pi - (np.pi/5.))
-#
-#ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
-#ICs_XYZ = np.zeros(shape=(Nlines, 3))
-#for i in range(Nlines):
-#    ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
-#
-#length = (2*np.pi * b_hidra.R0) * spins
-#simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
-#
-#
-### GENERATE POINCARE DATA ##
-###==============================##
-#tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
-#
-#
-### IDENTIFY LAST-CLOSED FLUX SURFACE ##
-###===================================##
-#LCFS_index = identifyLCFS(LCFStype='inner', 
-#                          iconds=fl_R0, 
-#                          t_maxs=tMax, 
-#                          outputHandler=simOut)
+Nlines = 41
+spins = 1500
 
-LCFS_index = identifyLCFS(LCFStype='input', 
-                          num=14, 
+#l_R0     = np.array(np.linspace( 0.140, 0.065, Nlines))
+fl_R0     = np.array(np.linspace( 0.120, 0.020, Nlines))
+fl_THETA0 = np.zeros(Nlines)
+fl_PHI0   = np.ones(Nlines) * (2*np.pi - (np.pi/5.))
+
+ICs_RTP = np.transpose(np.vstack([fl_R0, fl_THETA0, fl_PHI0]))
+ICs_XYZ = np.zeros(shape=(Nlines, 3))
+for i in range(Nlines):
+    ICs_XYZ[i] = RTP_to_XYZ(ICs_RTP[i], b_hidra.R0)
+
+length = (2*np.pi * b_hidra.R0) * spins
+simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
+
+
+## GENERATE POINCARE DATA ##
+##==============================##
+tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, ICs_XYZ, length, simOut, True, 'Poincare', 'LSODA', 1e-7, 1e-14)
+
+
+## IDENTIFY LAST-CLOSED FLUX SURFACE ##
+##===================================##
+LCFS_index = identifyLCFS(LCFStype='inner', 
+                          iconds=fl_R0, 
+                          t_maxs=tMax, 
                           outputHandler=simOut)
+
+#LCFS_index = identifyLCFS(LCFStype='input', 
+#                          num=14, 
+#                          outputHandler=simOut)
 
 simOut.log.info('LCFS_index = {}'.format(LCFS_index))
 
@@ -74,7 +74,7 @@ simOut.log.info('GENERATING SEED POINTS:\n')
 from point_generators import generateSeedShells
 
 phiGen_list = np.linspace(9, 360, 40, dtype=int).tolist() # list of phi angles to generated shells
-expand_dr   = [0.020]                                     # define number of 'shells' (delta-r) to generate
+expand_dr   = [0.030]                                     # define number of 'shells' (delta-r) to generate
 ntheta      = 90                                          # number of equally-spaced theta points for each shell
 
 # generate seeds from the same flux surface at different phi angles

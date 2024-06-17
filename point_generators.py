@@ -10,13 +10,19 @@ plt.rcParams.update({'figure.autolayout':True})
 
 def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, filename):
     outputHandler.createSubDir(filename)
-
     r_in = r_in[~np.isnan(r_in)]
     th_in = th_in[~np.isnan(th_in)]
+
+    # hack solution, need to determine why an extra 30 copies of 1 initial condition are being appended to this event
+    phi_deg = int(phi*180/np.pi)
+    if phi_deg == 324:
+        r_in = r_in[30:]
+        th_in = th_in[30:]
+
     th_size = th_in.size
 
     # find the centroid(?) by average positions
-    # two for loops, wow
+    # two 'for loops', wow
     x_in = np.empty(th_size)
     y_in = np.empty(th_size)
     z_in = np.empty(th_size)
@@ -28,43 +34,33 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     z_avg = (np.max(z_in) + np.min(z_in))/2
     XYZ_delta = np.array([x_avg, y_avg, z_avg])
 
-    #XYZ_delta = np.mean(np.array([x_in, y_in, z_in]), axis=1)
-
-
-
     # shift origin of r, theta coordinates from geometric center to magnetic axis
     # then sort points on theta
     magCenterCoords = np.empty((th_size, 2))
-    #r_delta, th_delta, dum = XYZ_to_RTP(XYZ_delta, field.R0)
     RTP_delta = XYZ_to_RTP(XYZ_delta, field.R0)
     RTP_delta_rev = np.copy(RTP_delta)
     RTP_delta_rev[1] = RTP_delta_rev[1] + np.pi
-    #print(f'{RTP_delta=}')
-
 
     for i, theta, in enumerate(th_in):
         magCenterCoords[i] = axisShift(r_in[i], theta, *RTP_delta[:2])
-    #print(f'{magCenterCoords.shape=}')
 
     # Sort data in increasing theta
     sortedMagCenter = magCenterCoords[np.argsort(magCenterCoords[:,0])]
-    theta_spl = sortedMagCenter.T[0]
-    rad_spl = sortedMagCenter.T[1]
+    theta_pts = sortedMagCenter.T[0]
+    rad_pts = sortedMagCenter.T[1]
 
+    # Append data to either end for pseudo-periodicity (smooth spline endpoints)
+    append_length = int(th_size/2)
+    th_A = np.copy(theta_pts[append_length:-1]) - 2*np.pi
+    rad_A = np.copy(rad_pts[append_length:-1])
+    th_B = np.copy(theta_pts[1:append_length]) + 2*np.pi
+    rad_B = np.copy(rad_pts[1:append_length])
 
-    # Append data to either end for smooth spline endpoints
-    theta_spl= np.append(theta_spl, theta_spl[:15]+2*np.pi)
-    rad_spl= np.append(rad_spl, rad_spl[:15])
-
-    theta_spl= np.append(theta_spl[:15]-2*np.pi, theta_spl)
-    rad_spl= np.append(rad_spl[:15], rad_spl)
-
+    theta_spl = np.concatenate((th_A, theta_pts, th_B))
+    rad_spl = np.concatenate((rad_A, rad_pts, rad_B))
 
     ## SPLINING
-    # perform curve-fitting (smoothing spline)
-    # function and derivative continuity not enforced across periodic boundary (would need fancier spline)
-    fSurface_splineParms = splrep(theta_spl, rad_spl, s=2e-5, k=3, per=True, quiet=1)
-
+    fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-4, k=3, per=False, quiet=1)
     theta_evals = np.linspace(0, 2*np.pi*(1 - 1/Ntheta), Ntheta)
     seedPts_0 = splev(theta_evals, fSurface_splineParms)
     derivs =  splev(theta_evals, fSurface_splineParms, der=1)
@@ -77,51 +73,35 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
 
     rPlotGeo = geoCenterCoords[1]
     thetaPlotGeo = geoCenterCoords[0]
-    #rPlotGeo = rPlot
-    #thetaPlotGeo = thetaPlot
 
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
-
     plt.scatter(th_in, r_in, s=1) # geo-axis points
     plt.scatter(theta_spl, rad_spl, s=1) # mag-axis points
-
-    #plt.plot(thetaPlot, splev(thetaPlot, fSurface_splineParms), '-k', linewidth=0.5) # fitted spline curve
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
-    
     ax.set_rmax(field.a)
     ax.set_rticks(np.arange(0.0, 0.19, 0.02))
     ax.yaxis.set_tick_params(labelsize=5)
     ax.grid(linewidth = 0.25, linestyle=':', c='k')
-
     plt.title('Spline fit to Last Closed Flux Surface @ phi={}'.format(phi*180/np.pi))
     spline_name = filename+'/'+'LCFS_phi={:03.0f}_splineFit.png'.format(phi*180/np.pi)
     outputHandler.saveFig(spline_name)
     plt.close()
 
 
-
-
     ## Calculating (and plotting) the seed points
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
-    #plt.plot(thetaPlot, splev(thetaPlot, fSurface_splineParms), '-k', linewidth=1) # fitted spline curve
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
     output_ind_geo = np.zeros((Ntheta, 2))
     output_ind     = np.zeros((Ntheta, 3))
     output_ind_XYZ = np.zeros((Ntheta, 3))
     outData = []
 
-    #adj_dr = dr
-    #seedPt = seedPts_0 + adj_dr
-
-
     for dr in drList:
         for i, theta in enumerate(theta_evals):
             # scale delta-r to achieve uniform expansion normal to surface
-            #adj_dr = dr
             adj_dr = dr * np.sqrt(1 + derivs[i]**2)
-            #seedPt = min(field.a, seedPts_0[i] + adj_dr)
             seedPt = seedPts_0[i] + adj_dr
             
             # shift back to geometric axis
@@ -134,9 +114,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
         
         plt.plot(output_ind_geo[:,0], output_ind_geo[:,1], '--o', linewidth=0.25, markersize=0.50)
         
-        outData.extend(output_ind_XYZ)
-
-
+        outData.extend(np.copy(output_ind_XYZ))
 
     ax.set_rmax(field.a)
     ax.set_rticks(np.arange(0.0, 0.19, 0.02))
@@ -148,9 +126,8 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     outputHandler.saveFig(plot_name)
     plt.close()
 
-
     outArray = np.asarray(outData)
     outputHandler.saveNumpyData(outArray, filename)
 
-    outputHandler.log.info('Seed Shell Generated')
+
     return outArray
