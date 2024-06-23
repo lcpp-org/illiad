@@ -27,21 +27,17 @@ def blines(t, p_XYZ, field):
 ## DEFINE SOLVER ##
 ##===============##
 def solvePoincare(particle, field, solver, rtl, atl, solver_events):
+    log = logging.getLogger()
+    log.info('Start IC: {}'.format(particle.particleID))
 
     if particle.type == 'ion':
-        #print('pos0_XYZ: {}'.format(particle.pos0_XYZ))
-        #print('vel0_XYZ: {}'.format(particle.vel0_XYZ))
         init_cond = np.concatenate((particle.pos0_XYZ, particle.vel0_XYZ))
-        print('init_cond: {}'.format(init_cond))
     else:
         init_cond = particle.pos0_XYZ
 
     maxLength = particle.maxLife
-    log = logging.getLogger()
-    log.info('Start IC: {}'.format(particle.particleID))
 
     t_startInd = perf_counter()
-    #fieldlines = solve_ivp(blines, (0.0, maxLength), init_cond, args = ([field]),
     fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond, args = ([field]),
             dense_output=False,
             events = solver_events, 

@@ -29,7 +29,7 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
     # And return a point in r-theta-phi coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
-    x, y, z = p_XYZ
+    x, y, z = p_XYZ[:3]
 
     r = np.sqrt( x**2 + y**2 + z**2 + Rmajor**2 - 2*Rmajor*np.sqrt(x**2 + y**2) )
 

@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-
+#import phi_events
 
 
 class Particle:
@@ -13,15 +13,18 @@ class Particle:
         types = ['fieldline', 'ion']
         if self.type not in types:
             raise ValueError("Invalid particle type. Expected one of: %s" % types)
+        
         Particle.particleCount += 1
         self.particleID = Particle.particleCount
         self.charge: np.float32
         self.mass: np.float32
-        self.pos0_XYZ = np.zeros(3, dtype=np.float64)
-        self.vel0_XYZ = np.zeros(3, dtype=np.float64)
-        self.pos_XYZ = np.zeros(3, dtype=np.float64)
-        self.vel_XYZ = np.zeros(3, dtype=np.float64)
+        self.charge_mass_ratio: np.float32
         self.maxLife: np.float32
+
+        self.pos0_XYZ = np.zeros(3, dtype=np.float32)
+        self.vel0_XYZ = np.zeros(3, dtype=np.float32)
+        #self.pos_XYZ = np.zeros(3, dtype=np.float64)
+        #self.vel_XYZ = np.zeros(3, dtype=np.float64)
 
 
 
@@ -54,34 +57,48 @@ class fieldLine(Particle):
 class Ion(Particle):
     def __init__(self, init_XYZ, mass_amu, charge_z, maxlife):
         super().__init__('ion')
+        self.terminated = False
+
         self.pos0_XYZ = np.asarray(init_XYZ)
-        self.vel0_XYZ = np.zeros(3, dtype=np.float64)
+        self.vel0_XYZ = np.zeros(3, dtype=np.float32)
         self.maxLife = maxlife
+
         self.charge = charge_z * 1.60217663E-19 # Coulombs
         self.mass = mass_amu * 1.66053907E-27 # kilograms
         self.charge_mass_ratio = self.charge / self.mass
+
 
     def initialize_velocity(self, v0_XYZ):
         self.vel0_XYZ = np.asarray(v0_XYZ)
         self.vel_XYZ = self.vel0_XYZ
 
-    #def pushXYZ(self, t, p_XYZ, Bfield):
+    def initialize_output(self, dt, tmax):
+        N = tmax // dt + 1
+        self.pos_XYZ = np.zeros([int(N), 3]) #size output array
+        self.vel_XYZ = np.zeros([int(N), 3]) #size output array
+
+    def set_pos(self, index, value):
+        self.pos_XYZ[index] = np.copy(value)
+
+    def set_vel(self, index, value):
+        self.vel_XYZ[index] = np.copy(value)
+
     def pushXYZ(self, t, state_XYZ, Bfield):
-        #direction = 1
         B = np.zeros(3)
-        E = np.zeros(3)
         pos = state_XYZ[:3]
         vel = state_XYZ[3:]
 
         B, dum_ = Bfield.interpField(pos)
-        if Bfield.errField==True:
-            B[0] += 0.0002
-            B[1] += -0.0002
+
+        # hard-code for MOAR SPEDE?
+        #if Bfield.errField==True:
+        B[0] += 0.0002
+        B[1] += -0.0002
 
         dpos_dt = vel
-        dvel_dt = self.charge_mass_ratio * (E + np.cross(vel, B))
-        
-        return np.concatenate((dpos_dt, dvel_dt))
-
-    def storePath(self):
-        pass
+        dvel_dt = self.charge_mass_ratio * np.cross(vel, B)
+        # concatenate expensive?
+        #new_state = np.concatenate((dpos_dt, dvel_dt))
+        new_state = np.array([dpos_dt[0], dpos_dt[1], dpos_dt[2], 
+                              dvel_dt[0], dvel_dt[1], dvel_dt[2]]) 
+        return new_state
