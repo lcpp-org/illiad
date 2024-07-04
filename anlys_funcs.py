@@ -8,7 +8,7 @@ plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
 from coordtrans import XYZ_to_RTP
-#import phi_events
+import phi_events
 
 
 def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=logging.getLogger(), num=11):
@@ -121,55 +121,57 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
     return '\tPHI: {}'.format(phi_*(180/np.pi))
 
 
-#def boris_solver(ion, dt, tmax, Bfield):
-#    log = logging.getLogger()
-#    log.info('Start IC: {}, {}'.format(ion.particleID, ion.pos0_XYZ))
-#    t_startInd = perf_counter()
-#    B = np.empty(3, dtype=np.float64)
-#
-#    wallPt = np.zeros(3)
-#    N: np.int32v
-#    N = int((tmax // dt) + 1)
-#    # Need particle parms: qdt2m, v0, p0
-#    qdt2m = ion.charge_mass_ratio * dt/2
-#    ion.set_pos(0, ion.pos0_XYZ)
-#    ion.set_vel(0, ion.vel0_XYZ)
-#    #log.info('pos_XYZ[0]={}'.format(ion.pos_XYZ[0]))
-#
-#    ## Stepping through dt's until tmax (!!OR TERMINAL CONDITION!!):
-#    for k in range(N-1):
-#        B, dum_ = Bfield.interpField(ion.pos_XYZ[k])
-#        
-#        tvec = qdt2m * B# tvec given by (4-4, Eq11)
-#        vprime = ion.vel_XYZ[k] + np.cross(ion.vel_XYZ[k], tvec)# vminus is incremented (4-4, Eq10), get vprime
-#        svec = 2*tvec / ( 1 + (np.linalg.norm(tvec)*np.linalg.norm(tvec)) )# svec given by (4-4, Eq13)
-#        #log.info('tvec:{}, vprime:{}, svec:{}'.format(tvec, vprime, svec))
-#        #ion.vel_XYZ[k+1] = ion.vel_XYZ[k] + np.cross(vprime, svec)# from vminus, vprime, svec (4-4, Eq12), get vplus 
-#        #ion.pos_XYZ[k+1] = np.copy(ion.pos_XYZ[k] + ion.vel_XYZ[k+1] * dt)# from vplus, dt, get xplus
-#        vplus = ion.vel_XYZ[k] + np.cross(vprime, svec)# from vminus, vprime, svec (4-4, Eq12), get vplus 
-#        xplus = ion.pos_XYZ[k] + vplus * dt# from vplus, dt, get xplus
-#
-#        ion.set_vel(k+1, vplus)
-#        ion.set_pos(k+1, xplus)
-#                    
-#        ion.maxLife = (k+1)*dt
-#        #log.info('ion.pos_XYZ[k+1]={}'.format(ion.pos_XYZ[k+1]))
-#        if phi_events.inVV(1, ion.pos_XYZ[k+1], Bfield) < 0.0:
-#            ion.terminated = True
-#            wallPt = ion.pos_XYZ[k+1]
-#            break
-#
-#    t_stopInd = perf_counter()
-#    elapsed_timeInd = t_stopInd - t_startInd
-#
-#    #ion.pos_XYZ = ion.pos_XYZ[~np.isnan(ion.pos_XYZ)]
-#    #ion.vel_XYZ = ion.vel_XYZ[~np.isnan(ion.vel_XYZ)]
-#    log.info('pos_XYZ: {}'.format(ion.pos_XYZ))
-#
-#    if ion.terminated:
-#        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t={:.5f}, k={}'
-#                 .format(ion.particleID, ion.particleCount, elapsed_timeInd, ion.maxLife, ion.maxLife//dt))
-#    else:
-#        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t='
-#                 .format(ion.particleID, ion.particleCount, elapsed_timeInd))
-#    return wallPt
+def boris_solver(ion, dt, tmax, Bfield):
+    """Function to take in a particle and field object and solves the particle path until termination even or tmax
+       using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4)"""
+    log = logging.getLogger()
+    log.info('Start IC: {}, {}'.format(ion.particleID, ion.pos0_XYZ))
+    t_startInd = perf_counter()
+
+    B = np.empty(3, dtype=np.float64)
+    wallPt = np.zeros(3)
+    N = int((tmax // dt) + 1)
+    # Need particle parms: qdt2m, v0, p0
+    qdt2m = ion.charge_mass_ratio * dt/2
+    ion.set_pos(0, ion.pos0_XYZ)
+
+    v_k = ion.vel0_XYZ
+    ## STEPPING THROUGH DTs
+    for k in range(N-1):
+        B, dum_ = Bfield.interpField(ion.pos_XYZ[k])
+        tvec = qdt2m * B# tvec given by (4-4, Eq11)
+
+        #vprime = v_k + np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
+        vprime = v_k + np.array([v_k[1]*tvec[2] - v_k[2]*tvec[1], 
+                                 v_k[2]*tvec[0] - v_k[0]*tvec[2],
+                                 v_k[0]*tvec[1] - v_k[1]*tvec[0]])   #np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
+
+        svec = 2*tvec / ( 1 + (np.linalg.norm(tvec)*np.linalg.norm(tvec)) )# svec given by (4-4, Eq13)
+
+        #vplus = v_k + np.cross(vprime, svec)# from vminus, vprime, svec (4-4, Eq12), get vplus 
+        vplus = v_k + np.array([vprime[1]*svec[2] - vprime[2]*svec[1], 
+                                 vprime[2]*svec[0] - vprime[0]*svec[2],
+                                 vprime[0]*svec[1] - vprime[1]*svec[0]]) # from vminus, vprime, svec (4-4, Eq12), get vplus 
+
+        xplus = ion.pos_XYZ[k] + vplus*dt # from vplus, dt, get xplus
+
+        v_k = vplus
+        ion.set_pos(k+1, xplus)
+        
+        ion.maxLife = (k+1)*dt
+        if phi_events.inVV(1, ion.pos_XYZ[k+1], Bfield) < 0.0:
+            ion.terminated = True
+            wallPt = ion.pos_XYZ[k+1]
+            break
+
+    t_stopInd = perf_counter()
+    elapsed_timeInd = t_stopInd - t_startInd
+
+    if ion.terminated:
+        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t={:.5f}, k={}'
+                 .format(ion.particleID, ion.particleCount, elapsed_timeInd, ion.maxLife, ion.maxLife//dt))
+    else:
+        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t='
+                 .format(ion.particleID, ion.particleCount, elapsed_timeInd))
+        
+    return (wallPt, ion.pos_XYZ)

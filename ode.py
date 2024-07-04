@@ -48,9 +48,11 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
     tmax = np.max(fieldlines.t)
 
     if fieldlines.status == 0: #solver ran to max. time
-        log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'.format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
+        log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
+                 .format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
     elif fieldlines.status == 1: #termination event
-        log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'.format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
+        log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
+                 .format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
     else: #solver failure
         log.critical('FAILURE!: Particle {}'.format(particle.particleID))
 

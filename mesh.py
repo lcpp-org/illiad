@@ -1,11 +1,11 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from coordtrans import XYZ_to_RTP#, rot_vecXYZ_byPHI
+from coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
 import logging
 
 import numba as nb
-from numba.experimental import jitclass
+#from numba.experimental import jitclass
 #spec = [
 #        ('R0', nb.float32),
 #        ('a', nb.float32),
@@ -64,10 +64,10 @@ class Mesh:
         self.r_min = 0
         self.theta_min = 0
         self.phi_min = 0
-        self.Bx: nb.float64[:][:][:]
-        self.By: nb.float64[:][:][:]
-        self.Bz: nb.float64[:][:][:]
-        self.periodicity: nb.int32[:]
+        self.Bx: np.float64[:][:][:]
+        self.By: np.float64[:][:][:]
+        self.Bz: np.float64[:][:][:]
+        self.periodicity: np.int32[:]
         self.errField: np.bool
 
 

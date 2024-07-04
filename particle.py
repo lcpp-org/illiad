@@ -46,7 +46,6 @@ class fieldLine(Particle):
             B[1] += -0.0002
 
         dY = direction * B / np.linalg.norm(B)
-
         return dY
 
     def storePath(self):
@@ -75,13 +74,14 @@ class Ion(Particle):
     def initialize_output(self, dt, tmax):
         N = tmax // dt + 1
         self.pos_XYZ = np.zeros([int(N), 3]) #size output array
-        self.vel_XYZ = np.zeros([int(N), 3]) #size output array
+        #self.vel_XYZ = np.zeros([int(N), 3]) #size output array
 
     def set_pos(self, index, value):
         self.pos_XYZ[index] = np.copy(value)
 
     def set_vel(self, index, value):
-        self.vel_XYZ[index] = np.copy(value)
+        #self.vel_XYZ[index] = np.copy(value)
+        self.vel0_XYZ = np.copy(value)
 
     def pushXYZ(self, t, state_XYZ, Bfield):
         B = np.zeros(3)

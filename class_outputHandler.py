@@ -1,7 +1,5 @@
 import os as os
 import numpy as np
-#import pandas as pd
-#import csv
 
 import matplotlib.pyplot as plt
 
@@ -9,11 +7,13 @@ import logging
 import logging.config
 
 class IOHandler:
-    # Class to handle output and logging
-    # Creates an output folder underneath the module directory if none exists
-    # Creates a 'run_name' sub-directory in '\output' with further sub-dirs for plot and data output
-    # includes a method to instantiate and configure logging
-    # includes methods for storing data output and plots output in proper sub-directories
+    """
+    Class to handle output and logging.
+    Creates an output folder underneath the module directory if none exists.
+    Creates a 'run_name' sub-directory in '\output' with further sub-dirs for plot and data output.
+    Includes a method to instantiate and configure logging.
+    Includes methods for storing data output and plots output in proper sub-directories.
+    """
     def __init__(self, run_name):
         # get script directory
         self.module_path = os.path.realpath(os.path.dirname(__file__))
@@ -135,42 +135,20 @@ class IOHandler:
         plt.savefig(name_loc, dpi=400)
 
     def loadPorts_fromCSV(self, name):
-        pass
-        # method to load the HIDRA port locations and sizes
-        #name_loc = name #os.path.join('self.module_path', name)
+        """ 
+        Method to load the HIDRA port locations and sizes for plotting.
+        Returns array of locations in phi, theta coordinates, and height and width in degrees.
+        """
+        name_loc = name #os.path.join('self.module_path', name)
+        portdata = np.loadtxt(name_loc, delimiter=',', skiprows=1, usecols=[2,3,4,5,6])
 
-        #with open('input_files/HIDRA_ports.csv', newline='') as csvfile:
-        #reader = csv.DictReader(csvfile)
-        #    for row in reader:
-        #        print(row)
-
-        #portdata = csv.DictReader(name_loc)
-        
-        #portdata = pd.read_csv(
-        #    name_loc,
-        #    header=None,
-        #    index_col=None,
-        #    skiprows=1,
-        #    delim_whitespace=False,
-        #    engine='python')
-"""
         ## PARSE DATA
-        #p_type = portdata.loc[:,0].values
-        p_phi = np.array(portdata.loc[:,2].values)
-        p_theta = np.array(portdata.loc[:,3].values)
-        p_rmaj = np.array(portdata.loc[:,4].values)
-        p_rmin = np.array(portdata.loc[:,5].values)
-        p_dia = np.array(portdata.loc[:,6].values/1000) # convert mm to meters
+        p_phi = portdata[:,0]
+        p_theta = portdata[:,1]
+        p_rmaj = portdata[:,2]
+        p_rmin = portdata[:,3]
+        p_dia = portdata[:,4]/1000 # convert mm to meters
         p_height = np.degrees(np.arcsin(p_dia/p_rmin)) # calculate height in degrees
         p_width =  np.degrees(np.arcsin(p_dia/p_rmaj)) # calculate width in degrees
 
         return np.array([p_phi, p_theta, p_width, p_height])
-"""
-
-'Phi (toroidal) [deg.]'
-'Theta (poloidal)[deg.]'
-'Major radius [m]'
-'Minor radius [m]'
-'Port Dia. [mm]'
-
-    #def wallOutput(self, )
