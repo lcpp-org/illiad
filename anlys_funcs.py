@@ -2,6 +2,8 @@ import numpy as np
 import logging
 from math import degrees
 from time import perf_counter
+from functools import partial
+import concurrent.futures as cf
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
@@ -121,6 +123,31 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
     return '\tPHI: {}'.format(phi_*(180/np.pi))
 
 
+def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
+    ion_ = ion_list[0]
+    log = logging.getLogger()
+    log.info('###########################################################################')
+    log.info('RUNNING BORIS-BUNEMAN SOLVER WITH NEW ION SEED POINTS:')
+    log.info('Initial Conditions:\t{} points'.format(len(ion_list)))
+    log.info('Ions:\tmass={}[amu], q={}[Coulomb], ion temp.={}[eV]'#, initial velocity={:.0f} [m/s]'
+             .format(ion_.mass, ion_.charge, ion_temp_eV))#, init_v_phi))
+    log.info('Shells generated at delta-r(s) of {}mm from LCFS'.format(dr_String))
+    log.info('SOLVER SETTINGS: tmax: {}sec., dt: {}sec., N={}pts'.format(tmax, dt, int(tmax/dt)))
+    log.info('###########################################################################\n')
+
+
+    ## PARALLELIZATION WITH CONCURRENT FUTURES 'MAP' OVER EACH PARTICLE
+    boris_x = partial(boris_solver, dt=dt, tmax=tmax, Bfield=b_hidra)
+    t_start = perf_counter()
+    with cf.ProcessPoolExecutor(max_workers=40) as executor:
+        boris_output_ = executor.map(boris_x, ion_list)#, chunksize=2)
+    t_stop = perf_counter()
+    tot_elapsed_time = t_stop - t_start
+    log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(tot_elapsed_time))
+
+    return boris_output_
+
+
 def boris_solver(ion, dt, tmax, Bfield):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax
        using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4)"""
@@ -133,12 +160,14 @@ def boris_solver(ion, dt, tmax, Bfield):
     N = int((tmax // dt) + 1)
     # Need particle parms: qdt2m, v0, p0
     qdt2m = ion.charge_mass_ratio * dt/2
-    ion.set_pos(0, ion.pos0_XYZ)
+    ion.setPosition(0, ion.pos0_XYZ)
 
     v_k = ion.vel0_XYZ
     ## STEPPING THROUGH DTs
     for k in range(N-1):
         B, dum_ = Bfield.interpField(ion.pos_XYZ[k])
+        #B[0] +=  0.002 # error field Bx
+        #B[1] += -0.002 # error field By
         tvec = qdt2m * B# tvec given by (4-4, Eq11)
 
         #vprime = v_k + np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
@@ -150,13 +179,12 @@ def boris_solver(ion, dt, tmax, Bfield):
 
         #vplus = v_k + np.cross(vprime, svec)# from vminus, vprime, svec (4-4, Eq12), get vplus 
         vplus = v_k + np.array([vprime[1]*svec[2] - vprime[2]*svec[1], 
-                                 vprime[2]*svec[0] - vprime[0]*svec[2],
-                                 vprime[0]*svec[1] - vprime[1]*svec[0]]) # from vminus, vprime, svec (4-4, Eq12), get vplus 
+                                vprime[2]*svec[0] - vprime[0]*svec[2],
+                                vprime[0]*svec[1] - vprime[1]*svec[0]]) # from vminus, vprime, svec (4-4, Eq12), get vplus 
 
         xplus = ion.pos_XYZ[k] + vplus*dt # from vplus, dt, get xplus
-
         v_k = vplus
-        ion.set_pos(k+1, xplus)
+        ion.setPosition(k+1, xplus)
         
         ion.maxLife = (k+1)*dt
         if phi_events.inVV(1, ion.pos_XYZ[k+1], Bfield) < 0.0:

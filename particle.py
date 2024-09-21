@@ -44,7 +44,8 @@ class fieldLine(Particle):
         #    B[0] += 0.0002
         #    B[1] += -0.0002
 
-        dY = direction * B / np.linalg.norm(B)
+        #dY = direction * B / np.linalg.norm(B)
+        dY = direction * B / np.sqrt(B[0]*B[0] + B[1]*B[1] + B[2]*B[2])
         return dY
 
     def storePath(self):

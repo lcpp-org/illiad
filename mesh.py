@@ -86,9 +86,9 @@ class Mesh:
             self.Bz = Bz_
             self.errField = errField
 
-            if self.errField:
-                self.Bx += 0.0002
-                self.By += -0.0002
+            #if errField:
+            #    self.Bx[:,:,:] += 0.0002
+            #    self.By[:,:,:] += -0.0002
 
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
@@ -231,4 +231,8 @@ class Mesh:
         phi_rotation = int(ph_localN) * self.phi_max  # angle of transform
         global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
+        if self.errField:
+            global_vecXYZ[0] += 0.0002
+            global_vecXYZ[1] += -0.0002
+
         return global_vecXYZ, ph_localN
