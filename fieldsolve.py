@@ -36,7 +36,7 @@ for i, dum in enumerate(coil_delim):
 
 ## /START stuff that should be a mesh class method
 ## DEFINE GEOMETRY
-output_name = 'Bxyz_iota-1q3_MAXPOWER_hires_95p5pct'
+output_name = 'HIDRA_i4ERR_hires'
 
 Rmajor = np.float64
 Rmajor = 0.72 #[m]
@@ -202,9 +202,9 @@ for n, coil in enumerate(mycoils):
 
     print('Coil({:02d}'.format(n+1)+'/{:02d}) '.format(len(mycoils))+coiltype[n])
     if coiltype[n] == 'Helix':
-        current = turns[n] * 6390 * 0.955
+        current = turns[n] * 790 * 0.955
     elif coiltype[n] == 'toroidal_field':
-        current = turns[n] * 3500
+        current = turns[n] * 486
     elif coiltype[n] == 'Vertical_Field_Coil':
         current = turns[n]*0.
     else: print('COIL-TYPE ERROR!')
@@ -225,7 +225,7 @@ Bxyz = np.array([Bxsum, Bysum, Bzsum])
 np.save(output_name, Bxyz)
 
 Bnorm = np.sqrt(Bxsum**2 + Bysum**2 + Bzsum**2)
-np.save('Bnorm_iota-1q3_MAXPOWER_hires', Bnorm)
+np.save('Bnorm_HIDRA_i4ERR_hires', Bnorm)
 
 """
 ## PLOT POLOIDAL CROSS-SECTIONS
