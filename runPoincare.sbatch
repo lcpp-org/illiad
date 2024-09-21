@@ -2,14 +2,14 @@
 #
 #SBATCH --time=02:00:00                     # Job run time (hh:mm:ss)
 #SBATCH --nodes=1                           # Number of nodes to request
-#SBATCH --ntasks-per-node=40                # Number of cpus per node
-#SBATCH --job-name=1q4Poincare              # Name of batch job
-#SBATCH --partition=eng-research-gpu        # Partition (queue)
+#SBATCH --ntasks-per-node=64                # Number of cpus per node
+#SBATCH --job-name=Poincare1q4              # Name of batch job
+#SBATCH --partition=secondary               # Partition (queue)
 #SBATCH --gpus-per-node=0                   # Avoid getting emails from IT
-#SBATCH --output=1q4Poincare.o%j            # Name of batch job output file
-#SBATCH --error=1q4Poincare.e%j             # Name of batch job error file
+#SBATCH --output=Poincare1q4.o%j            # Name of batch job output file
+#SBATCH --error=Poincare1q4.e%j             # Name of batch job error file
 #SBATCH --mail-user=spgula2@illinois.edu    # Send email notifications
-#SBATCH --mail-type=END                     # Type of email notification to send
+#SBATCH --mail-type=BEGIN,END               # Type of email notification to send
 #SBATCH --account=dcurreli-npre-eng         # Who is your handler?
 
 ###########################################################################
