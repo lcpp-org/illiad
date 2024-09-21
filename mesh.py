@@ -87,8 +87,8 @@ class Mesh:
             self.errField = errField
 
             if self.errField:
-                self.Bx += 0. #0.0002
-                self.By += 0. #-0.0002
+                self.Bx += 0.0002
+                self.By += -0.0002
 
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
