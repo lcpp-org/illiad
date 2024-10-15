@@ -150,7 +150,31 @@ class Mesh:
         rotated_XYZ = np.dot(vec_XYZ, xFormMatrix)
 
         return rotated_XYZ
+    
+    def subElementVolumes(self, point1, nodeIndexArray):
+        # this method takes in a point and array of points usrrounding it defined (r, theta, phi) coordinates
+        # returns the sum of the weighted values divided by the total volume
+        
+        #volumes = np.zeros(2**(len(corners)))            
 
+        r1, theta1, phi1 = point1
+        volumes = np.zeros(len(nodeIndexArray))
+
+        for i, point2 in enumerate(reversed(nodeIndexArray)):
+            
+            antiNode_i, antiNode_j, antiNode_k = point2
+
+            r2 = antiNode_i * self.dr
+            theta2 = (antiNode_j + 1) * self.dtheta
+            phi2 = (antiNode_k + 1) * self.dphi
+
+
+            term1 = self.R0 * (r2**2 - r1**2)/2. *       (theta2 - theta1) * (phi2 - phi1) 
+            term2 =           (r2**3 - r1**3)/3. * np.sin(theta2 - theta1) * (phi2 - phi1) 
+            volumes[i] = abs(term1 + term2)
+
+        return volumes, sum(volumes)
+    
     def interpField(self, point_XYZ):
         """
         Method to return the interpolated field values at a point defined in Cartesian coordinates
@@ -183,7 +207,39 @@ class Mesh:
         thindex_lo = thindex_hi - 1
         phindex_hi = np.floor(ph_local/self.dphi)
         phindex_lo = phindex_hi - 1
+        """
+        corners = [[rindex_lo, rindex_hi], [thindex_lo, thindex_hi], [phindex_lo, phindex_hi]]
+        
+        for phi_num,node_k in enumerate(corners[2]):
+            for theta_num,node_j in enumerate(corners[1]):
+                for r_num,node_i in enumerate(corners[0]):
+                    
+                    antiNode_i, antiNode_j, antiNode_k = corners[0][1-r_num], corners[1][1-theta_num], corners[2][1-phi_num]
+                    
+                    node_vecXYZ[0] = self.Bx[node_i, node_j, node_k]
+                    node_vecXYZ[1] = self.By[node_i, node_j, node_k]
+                    node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
+                    
+                    if node_k < 0.:
+                        node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
 
+                    # calculate antiNode rtp values from indices for input in to 'subElementVolume'
+                    
+                    antiNode_r = antiNode_i * self.dr
+                    antiNode_theta = (antiNode_j + 1) * self.dtheta
+                    antiNode_phi = (antiNode_k + 1) * self.dphi
+                    antiNode_rtp = np.array([antiNode_r, antiNode_theta, antiNode_phi])
+                    
+                    # calculate the weight function as the volume of the point-antiNode subelement
+                    antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
+
+                    totalVolume += antiNode_subVolume
+                    
+                    local_vecXYZ += node_vecXYZ * antiNode_subVolume
+        
+        local_vecXYZ = local_vecXYZ / totalVolume
+
+        """
         # Return the indices of the 8 corner points of the cell
         # Validation of the indices is not done here
         nodeIndexArray = np.array(
@@ -217,10 +273,28 @@ class Mesh:
             antiNode_theta = (antiNode_j + 1) * self.dtheta
             antiNode_phi = (antiNode_k + 1) * self.dphi
             antiNode_rtp = np.array([antiNode_r, antiNode_theta, antiNode_phi])
-            # calculate the wieght function as the volume of the point-antiNode subelement
+            # calculate the weight function as the volume of the point-antiNode subelement
             antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
+        
+        """
+        antiNode_subVolumes, totalVolume = self.subElementVolumes(point_RTP_local, nodeIndexArray)
+
+        for n, node in enumerate(nodeIndexArray):
+            # get node and antiNode indices
+            node_i, node_j, node_k = node
+
+            node_vecXYZ[0] = self.Bx[node_i, node_j, node_k]
+            node_vecXYZ[1] = self.By[node_i, node_j, node_k]
+            node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
+            # transform the field if the node is < dphi
+            if node_k < 0.:
+                node_vecXYZ = rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
+
+            local_vecXYZ += node_vecXYZ * antiNode_subVolumes[n]
+        """
+
         #  return the sum of weighted values divided by the total
         local_vecXYZ = local_vecXYZ / totalVolume
 
