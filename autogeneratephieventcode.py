@@ -58,8 +58,19 @@ def create_phi_events(name, name2, eventspacing):
             new_contents.insert(start+j, poincare_gen_lines[j])
         
         new_contents[6] = f"import {name[:-3]} \n"
+        done = 0
+        for i,line in enumerate(new_contents):
+            if "phi_range = np.linspace( np.pi/20., 2*np.pi," in line:
+                new_contents[i] = f"    phi_range = np.linspace( np.pi/20., 2*np.pi, {360/eventspacing:.0f}) \n"
+                done = 1
+                
+            elif "with cf.ProcessPoolExecutor(max_workers=" in line and done == 1:
+                new_contents[i] = f"    with cf.ProcessPoolExecutor(max_workers={360/eventspacing:.0f}) as executor: \n"
+                
+
+
         f.seek(0)
         f.truncate()
         f.writelines(new_contents)
     
-create_phi_events("phi_events_9.py","variable_poincare_gen.py", 9)
+create_phi_events("phi_events_5.py","variable_poincare_gen.py", 5)

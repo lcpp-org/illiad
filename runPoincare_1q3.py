@@ -4,11 +4,11 @@ from mesh import *
 from particle import *
 from coordtrans import RTP_to_XYZ
 from anlys_funcs import identifyLCFS
-from poincare_gen import Gen_Poincare
+from variable_poincare_gen import Gen_Poincare
 
 
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q3_tests") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3_tests_new_eventcount") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
