@@ -61,7 +61,7 @@ def create_phi_events(name, name2, eventspacing):
         done = 0
         for i,line in enumerate(new_contents):
             if "phi_range = np.linspace( np.pi/20., 2*np.pi," in line:
-                new_contents[i] = f"    phi_range = np.linspace( np.pi/20., 2*np.pi, {360/eventspacing:.0f}) \n"
+                new_contents[i] = f"    phi_range = np.linspace( np.pi/{180/eventspacing:.0f}., 2*np.pi, {360/eventspacing:.0f}) \n"
                 done = 1
                 
             elif "with cf.ProcessPoolExecutor(max_workers=" in line and done == 1:

@@ -125,7 +125,7 @@ def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl
     plt.rcParams.update({'figure.autolayout':True})
 
     outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
-    phi_range = np.linspace( np.pi/20., 2*np.pi, 72) 
+    phi_range = np.linspace( np.pi/36., 2*np.pi, 72) 
 
     # Looping over each phi angle
     iter_in = enumerate(phi_range)
