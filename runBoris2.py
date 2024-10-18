@@ -11,19 +11,20 @@ from anlys_funcs import *
 from poincare_gen import Gen_Poincare
 from point_generators import generateSeedShells
 from particle import *
+# test change
 
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler("HIDRA_1q4ERR_1500s") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simIO = out.IOHandler("HIDRA_1q3ERR_2000s") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-BX, BY, BZ = np.load('input_files/HIDRA_i4ERR_hires.npy')
+BX, BY, BZ = np.load('input_files/HIDRA_i3ERR_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
 
 ## IDENTIFY LAST-CLOSED FLUX SURFACE
-LCFS_index = identifyLCFS(LCFStype='input', num=6, outputHandler=simIO)
+LCFS_index = identifyLCFS(LCFStype='input', num=7, outputHandler=simIO)
 
 kg_per_amu = 1.66054E-27
 kboltz = 1.602E-19 # Joules/eV
@@ -33,15 +34,15 @@ He_mass = 4.002602 #amu
 ## DEFINE RUN CONDITIONS (PARTICLE TYPE, # OF PARTICLES, INIT. POSITION AND VELOCITY, ETC)
 simIO.log.info('GENERATING SEED POINTS:\n')
 phiGen_list = np.linspace(9, 360, 40, dtype=int).tolist() # list of phi angles to generated shells
-ntheta      = 120                                          # number of equally-spaced theta points for each shell
-expand_dr   = [0.000, 0.010, 0.020]       # define number of 'shells' (delta-r) to generate
+ntheta      = 90                                          # number of equally-spaced theta points for each shell
+expand_dr   = [0.000, 0.005, 0.010, 0.015, 0.020]       # define number of 'shells' (delta-r) to generate
 
 delimiter = '-'
 dr_String = delimiter.join(str(int(dr*1000)) for dr in expand_dr)
 
 ## GENERATE LIST OF INITIAL CONDITIONS FOR IONS
 ion_mass = Li_mass
-charge_num = 1
+charge_num = 2
 ion_temp_eV = 2.
 init_v_phi = np.sqrt(2 * kboltz * ion_temp_eV / (ion_mass * kg_per_amu)) # calculate v_(most probable) from ion temperature & mass
 
@@ -83,6 +84,7 @@ boris_output = boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String
 wallPt_output1 = []
 for i, data in enumerate(boris_output):
     wall_point, path = data
+    
     ion_list[i].pos_XYZ = path
     notZero = [True if x!=0. else False for x in wall_point]
     if any(notZero):
@@ -92,9 +94,7 @@ for i, data in enumerate(boris_output):
 wallPt_output2 = np.asarray(wallPt_output1)
 
 wallPtArray = np.transpose(np.array(wallPt_output2)) 
-simIO.saveNumpyData(wallPtArray, 'Wallpoints_{}mm'.format(dr_String))
-
-
+simIO.saveNumpyData(wallPtArray, 'Wallpoints_{}mm_{}eV'.format(dr_String, int(ion_temp_eV)))
 
 ##################################
 ## POST-SOLVER OUTPUT (WALL PLOT)
@@ -120,7 +120,7 @@ for port in ports.T:
     ax.add_patch(port_plot)
 
 # plot wall event locations
-plt.scatter(phi_plot_deg, theta_plot_deg, s=1, c='k', linewidths=0.0)
+plt.scatter(phi_plot_deg, theta_plot_deg, s=0.5, c='k', linewidths=0.0)
 ax.grid(linewidth = 0.25, linestyle=':', c='grey')
 
 plt.xlabel('Toroidal Angle, $\phi$, $[\degree]$')
@@ -141,6 +141,7 @@ plt.close()
 simIO.log.info('...finished\n')
 
 
+
 ##################################
 ## POST-SOLVER OUTPUT ( *3D* WALL PLOT)
 simIO.log.info('Attempting 3D plot...')
@@ -158,7 +159,10 @@ for i in range(len(theta_plot)):
 
 fig = plt.figure()
 ax2 = fig.add_subplot(projection='3d')
+
+# plot wall event locations
 ax2.scatter(xyz_plt.T[0], xyz_plt.T[1], xyz_plt.T[2], s=0.25, c='k', linewidths=0.0)
+
 ax2.set_xlim3d(-1, 1)
 ax2.set_ylim3d(-1, 1)
 ax2.set_zlim3d(-1, 1)
@@ -169,6 +173,7 @@ plt.title('Distribution of Field Line Intersections with HIDRA Wall\n'
 simIO.saveFig('Wallpoints3D_BorisPts_{}mm_{}eV.png'.format(dr_String, int(ion_temp_eV)))
 plt.close()
 simIO.log.info('...finished\n')
+
 
 
 ##############################################

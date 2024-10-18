@@ -1,5 +1,4 @@
- ############
- ## IMPORTS
+## IMPORTS
 import pandas as pd
 import numpy as np
 from mpl_toolkits import mplot3d
@@ -7,7 +6,6 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from numba import jit, prange
 import numba as nb
-
 from coordtrans import RTP_to_XYZ
 
 ## READ COIL INPUT FILE
@@ -22,9 +20,8 @@ names=range(6)) #irregularly-sized rows, pad with NaN's
 
 ## PARSE COIL DATA
 coil_delim = coildata.loc[coildata[5].isnull()==False].index.values.tolist() # find index of rows with coil tag
-
-coiltype = coildata.iloc[coil_delim][5].values
-turns = [coildata.iloc[i-1][3] for i in coil_delim]
+coiltype = coildata.iloc[coil_delim][5].values #parsing coil type 
+turns = [coildata.iloc[i-1][3] for i in coil_delim] # parsing turns from row before delimiter
 
 mycoils = [None]*len(coil_delim)
 for i, dum in enumerate(coil_delim):
@@ -32,7 +29,6 @@ for i, dum in enumerate(coil_delim):
         mycoils[i] = coildata.iloc[:coil_delim[i], 0:4]
     else:
         mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
-
 
 ## /START stuff that should be a mesh class method
 ## DEFINE GEOMETRY
@@ -42,12 +38,10 @@ Rmajor = np.float64
 Rmajor = 0.72 #[m]
 Rminor = 0.19 #[m]
 
-
 ## DEFINE MESH RESOLUTION
 rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
 lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
 hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
-
 mesh_size = hi_res
 
 ## DEFINE MESH PERIODICITY
@@ -61,11 +55,6 @@ ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
 nphi   = int( mesh_size[2] / max(1, mesh_periodicity[2]) )
 
 r_prd, theta_prd, phi_prd = mesh_periodicity
-
-print(f' nr = {nr}')
-print(f' ntheta = {ntheta}')
-print(f' nphi = {nphi}')
-
 
 ## IF THE DIMENSION IS NOT PERIODIC, START AT 0
 ## IF IT IS PERIODIC, START AT DX (WHERE X IS THE COORDINATE)
@@ -96,15 +85,15 @@ else:
     dphi = phi_maximum/(nphi-1)
     phi_minimum = 0.
 
-
+print(f' nr = {nr}')
+print(f' ntheta = {ntheta}')
+print(f' nphi = {nphi}')
 print(f' r max. = {r_maximum}')
 print(f' theta max. = {theta_maximum}')
 print(f' phi max. = {phi_maximum}')
-
 print(f' r min. = {r_minimum}')
 print(f' theta min. = {theta_minimum}')
 print(f' phi min. = {phi_minimum}')
-
 
 ## /START maybe more stuff that should be a mesh class method
 ## CREATE REGULARLY-=SPACED ARRAYS FOR EACH COORDINATE
@@ -116,14 +105,14 @@ print(f'nr={nr}, R array length {i_R.size}: {i_R}')
 print(f'ntheta={ntheta}, THETA array length {i_THETA.size}: {np.degrees(i_THETA)}')
 print(f'nphi={nphi}, PHI array length {i_PHI.size}: {np.degrees(i_PHI)}')
 
-
 @jit(nb.types.Array(nb.float64, 1, "C")
 (nb.types.Array(nb.float64, 2, "C"), nb.types.Array(nb.float64, 2, "C"), nb.float64, nb.int8), 
 nopython=True)
 def biotsavart( filament, point, current, Npoints):
-    ##  TAKES IN A SINGLE POINT,
-    ## SOLVES B FIELD DUE TO EVERY POINT IN FILAMENT USING BIOT-SAVART LAW,
-    ## RETURNS FOR CARTESIAN FIELD VECTORS 
+    """ Solves for the magnetic field at a single point 
+    by using the Biot-Savart Law along a single filament 
+    of current, returns Cartesian Field Vectors"""
+    
     B = np.zeros((3,1), dtype=np.float64)
     midpoint = np.zeros((Npoints, 3))
     i= np.int32
@@ -144,7 +133,6 @@ def biotsavart( filament, point, current, Npoints):
         B[0,2] += dB[0,2]
 
     return B[0]
-
 
 @jit(nopython=True, parallel=True, nogil=True)
 def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
@@ -175,8 +163,7 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
                 
     return Bxcoil, Bycoil, Bzcoil
 
-
-""" ### COIL CURRENTS
+### COIL CURRENTS
 ## HELICAL
 # I_H = 900A (1/3)
 # I_H = 790A (1/4)
@@ -187,26 +174,22 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
 # I_T = 581A (1/7)
 ## VERTICAL
 # I_V = 0
-"""
+
 Bxsum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
 Bysum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
 Bzsum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
-#Bnorm = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
 
 ## CALLS FIELDSOLVER FOR EVERY CURRENT LOOP, SUMS RESULTS
 for n, coil in enumerate(mycoils):
-    bbx = np.zeros((i_R.size, i_THETA.size, i_PHI.size), dtype= np.float64)
-    bby = np.zeros((i_R.size, i_THETA.size, i_PHI.size), dtype= np.float64)
-    bbz = np.zeros((i_R.size, i_THETA.size, i_PHI.size), dtype= np.float64)
     current = np.double
 
     print('Coil({:02d}'.format(n+1)+'/{:02d}) '.format(len(mycoils))+coiltype[n])
     if coiltype[n] == 'Helix':
-        current = turns[n] * 790 * 0.955
+        current = turns[n] * 900 # * 0.955 # Otte's error field correction
     elif coiltype[n] == 'toroidal_field':
         current = turns[n] * 486
     elif coiltype[n] == 'Vertical_Field_Coil':
-        current = turns[n]*0.
+        current = turns[n] * 0.
     else: print('COIL-TYPE ERROR!')
 
     thiscoil = np.asarray(coil, dtype=np.float64)
@@ -217,29 +200,9 @@ for n, coil in enumerate(mycoils):
     Bxsum += bbx
     Bysum += bby
     Bzsum += bbz
-    
 ## /END maybe more stuff that should be a mesh class method
+
 
 ## OUTPUT ARRAY OF VECTORS AND ARRAY OF MAGNITUDE
 Bxyz = np.array([Bxsum, Bysum, Bzsum])
 np.save(output_name, Bxyz)
-
-Bnorm = np.sqrt(Bxsum**2 + Bysum**2 + Bzsum**2)
-np.save('Bnorm_HIDRA_i4ERR_hires', Bnorm)
-
-"""
-## PLOT POLOIDAL CROSS-SECTIONS
-contours = np.linspace(0.010, 0.150, 30)
-rr,tt = np.meshgrid(i_R,i_THETA)
-
-for i, p in enumerate(i_PHI):
-    Bzplot = Bzsum[:][:][i]
-    fig = plt.figure()
-    ax = fig.add_subplot(111, polar=True)
-    ax.set_rmax(Rminor)
-    plt.contourf(np.transpose(tt),np.transpose(rr),Bzplot.T, 30, cmap='cividis')
-    plt.colorbar()
-    plt.title(r'Bz of HIDRA, $\phi$={:2.0f}$\degree$'.format(p*180/np.pi))
-    plt.savefig('plots\HIDRA-i4_phi={:2.0f}.png'.format(p*180/np.pi),dpi=300)
-plt.show()
-"""

@@ -6,23 +6,20 @@ from coordtrans import RTP_to_XYZ
 from anlys_funcs import identifyLCFS
 from poincare_gen import Gen_Poincare
 
-
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q3ERR") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3ERR_10-3Test2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-BX, BY, BZ = np.load('input_files/HIDRA_i4ERR_hires.npy')
+BX, BY, BZ = np.load('input_files/HIDRA_i3ERR_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
 
 ## SET UP INITIAL POSITIONS IN RTP COORDS
-Nlines = 21 #21
-spins = 1500
-length = (2*np.pi * b_hidra.R0) * spins
-IC_Rad = np.array(np.linspace( 0.120, 0.020, Nlines))
-ICs_RTP = np.array([[R, 0., 2*np.pi - (np.pi/5.)] for R in IC_Rad])
+Nlines = 16+15
+IC_Rad = np.array(np.linspace( 0.170, 0.02, Nlines))
+ICs_RTP = np.array([[R, np.pi, 2*np.pi - (np.pi/5.)] for R in IC_Rad]) #THETA=pi, r increasing towards high-field side
 
 ## CONVERT TO XYZ COORDS
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
@@ -31,6 +28,8 @@ for i in range(Nlines):
 
 ## GENERATE POINCARE DATA
 simOut.log.info('Initial Conditions (RTP):\n{}'.format(ICs_RTP))
+spins = 1000
+length = (2*np.pi * b_hidra.R0) * spins
 fieldlines = [fieldLine(init_cond, length) for init_cond in ICs_XYZ]
 tMax, Poincare_output, wallPt_output = Gen_Poincare(b_hidra, fieldlines, simOut, 'Poincare', 'LSODA', 1e-7, 1e-32)
 
