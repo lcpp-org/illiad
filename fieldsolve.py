@@ -6,8 +6,53 @@ import matplotlib.pyplot as plt
 import scipy.special as special
 from numba import jit, prange
 import numba as nb
+
 from coordtrans import RTP_to_XYZ
 
+#################
+## USER INPUTS ##
+#################
+
+## NAME YOUR OUTPUT FILE
+output_name = 'HIDRA_i4ERR_hires'
+
+## DEFINE MESH RESOLUTION
+rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
+lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
+hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
+mesh_size = hi_res
+
+
+### REFERENCE COIL CURRENTS NORMALLY RUN ON HIDRA
+## TOROIDAL
+# I_T = 486A (1/3, 1/4, 1/5)
+# I_T = 581A (1/7)
+## HELICAL
+# I_H = 900A (1/3)
+# I_H = 790A (1/4)
+# I_H = 710A (1/5)
+# I_H = 581A (1/7)
+## VERTICAL
+# I_V = 0
+
+# Multiplier applied to helical current,
+# Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field
+# Based on characterization of WEGA by Otte[REF]
+# (Set to 1.0 if ideal field is desired)
+err_mult = 0.955
+
+# INPUT COIL CURRENTS
+I_toro = 486.
+I_heli = 790. * err_mult
+I_vert = 0.
+
+########################
+## END OF USER INPUTS ##
+########################
+
+
+
+## /START stuff that should be a mesh class method
 ## READ COIL INPUT FILE
 coilfile = "input_files/coils.wega_with_VFCoils"
 coildata = pd.read_csv(
@@ -30,19 +75,11 @@ for i, dum in enumerate(coil_delim):
     else:
         mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
 
-## /START stuff that should be a mesh class method
-## DEFINE GEOMETRY
-output_name = 'HIDRA_i4ERR_hires'
 
 Rmajor = np.float64
 Rmajor = 0.72 #[m]
 Rminor = 0.19 #[m]
 
-## DEFINE MESH RESOLUTION
-rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
-lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
-hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
-mesh_size = hi_res
 
 ## DEFINE MESH PERIODICITY
 ## 0: NOT PERIODIC
@@ -59,7 +96,7 @@ r_prd, theta_prd, phi_prd = mesh_periodicity
 ## IF THE DIMENSION IS NOT PERIODIC, START AT 0
 ## IF IT IS PERIODIC, START AT DX (WHERE X IS THE COORDINATE)
 if r_prd:
-    r_maximum = Rminor.r_prd
+    r_maximum = Rminor*r_prd
     dr = r_maximum/nr
     r_minimum = dr
 else:
@@ -85,15 +122,10 @@ else:
     dphi = phi_maximum/(nphi-1)
     phi_minimum = 0.
 
-print(f' nr = {nr}')
-print(f' ntheta = {ntheta}')
-print(f' nphi = {nphi}')
-print(f' r max. = {r_maximum}')
-print(f' theta max. = {theta_maximum}')
-print(f' phi max. = {phi_maximum}')
-print(f' r min. = {r_minimum}')
-print(f' theta min. = {theta_minimum}')
-print(f' phi min. = {phi_minimum}')
+print(' nr={}, ntheta={}, nphi={}'.format(nr, ntheta, nphi))
+print(' max. r={}, max. theta={}, max. phi={}'.format(r_maximum, theta_maximum, phi_maximum))
+print(' min. r={}, min. theta={}, min. phi={}'.format(r_minimum, theta_minimum, phi_minimum))
+
 
 ## /START maybe more stuff that should be a mesh class method
 ## CREATE REGULARLY-=SPACED ARRAYS FOR EACH COORDINATE
@@ -101,9 +133,6 @@ i_R     = np.linspace(     r_minimum,     r_maximum,     nr).astype(np.float64)
 i_THETA = np.linspace( theta_minimum, theta_maximum, ntheta).astype(np.float64)
 i_PHI   = np.linspace(   phi_minimum,   phi_maximum,   nphi).astype(np.float64)
 
-print(f'nr={nr}, R array length {i_R.size}: {i_R}')
-print(f'ntheta={ntheta}, THETA array length {i_THETA.size}: {np.degrees(i_THETA)}')
-print(f'nphi={nphi}, PHI array length {i_PHI.size}: {np.degrees(i_PHI)}')
 
 @jit(nb.types.Array(nb.float64, 1, "C")
 (nb.types.Array(nb.float64, 2, "C"), nb.types.Array(nb.float64, 2, "C"), nb.float64, nb.int8), 
@@ -143,7 +172,7 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
     Bycoil = np.zeros((R.size, THETA.size, PHI.size), dtype=np.float64)
     Bzcoil = np.zeros((R.size, THETA.size, PHI.size), dtype=np.float64)
 
-    N = int(filament[1].size) #len(filament[1])
+    N = int(filament[1].size)
 
     for i in prange(0, int(R.size)):
         for j in prange(0, int(THETA.size)):
@@ -163,33 +192,21 @@ def fieldsolver(R, THETA, PHI, filament, current, Rmajor):
                 
     return Bxcoil, Bycoil, Bzcoil
 
-### COIL CURRENTS
-## HELICAL
-# I_H = 900A (1/3)
-# I_H = 790A (1/4)
-# I_H = 710A (1/5)
-# I_H = 581A (1/7)
-## TOROIDAL
-# I_T = 486A (1/3, 4, 5)
-# I_T = 581A (1/7)
-## VERTICAL
-# I_V = 0
 
 Bxsum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
 Bysum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
 Bzsum = np.zeros((i_R.size,i_THETA.size,i_PHI.size))
-
 ## CALLS FIELDSOLVER FOR EVERY CURRENT LOOP, SUMS RESULTS
 for n, coil in enumerate(mycoils):
     current = np.double
 
     print('Coil({:02d}'.format(n+1)+'/{:02d}) '.format(len(mycoils))+coiltype[n])
     if coiltype[n] == 'Helix':
-        current = turns[n] * 900 # * 0.955 # Otte's error field correction
+        current = turns[n] * I_heli # * 0.955 # Otte's error field correction
     elif coiltype[n] == 'toroidal_field':
-        current = turns[n] * 486
+        current = turns[n] * I_toro
     elif coiltype[n] == 'Vertical_Field_Coil':
-        current = turns[n] * 0.
+        current = turns[n] * I_vert
     else: print('COIL-TYPE ERROR!')
 
     thiscoil = np.asarray(coil, dtype=np.float64)

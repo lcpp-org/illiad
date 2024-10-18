@@ -160,7 +160,7 @@ cython_debug/
 #.idea/
 coils.wega_with_VFCoils
 fieldsolve.py
-input_files/*
+input_files/*.npy
 output/*
 *.o1*
 *.e1*

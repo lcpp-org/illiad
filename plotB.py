@@ -4,13 +4,26 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
+
+from mesh import *
+
 Rmaj = 0.72 #[m]
 Rmin = 0.19 #[m]
 
 Bx,By,Bz = np.load('input_files/Bxyz_iota-1q3_MAXPOWER_hires.npy')
 Bnorm = np.load('input_files/Bnorm_iota-1q3_MAXPOWER_hires.npy')
 print('Bnorm.shape={}'.format(Bnorm.shape))
-nr, ntheta, nphi = Bnorm.shape
+mesh_size = Bx.shape
+nr, ntheta, nphi = Bx.shape
+
+
+### DEFINE MESH AND LOAD FIELD
+#BX, BY, BZ = np.load('input_files/HIDRA_i4ERR_hires.npy')
+#mesh_prd = np.array([0, 1, 5], dtype=np.int32)
+#b_hidra = Mesh(R0=0.72, a=0.19)
+#b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
+
+
 
 theta_periods = 1
 phi_periods = 5
@@ -43,9 +56,9 @@ rb,tb,pb = np.meshgrid(R,THETA,PHI)
 ###		 0)]
 
 # CALCULATE B-COMPONENTS #
-Br = np.zeros(Bnorm.shape)
-Bpol = np.zeros(Bnorm.shape)
-Btor = np.zeros(Bnorm.shape)
+Br = np.zeros(mesh_size)
+Bpol = np.zeros(mesh_size)
+Btor = np.zeros(mesh_size)
 for i in range(0, R.size):
 	for j in range(0, THETA.size):
 		for k in range(0, PHI.size):
@@ -58,7 +71,7 @@ for i in range(0, R.size):
 				Bpol[i][j][k] = (-1)*Bx[i][j][k]*np.sin(THETA[j])*np.cos(PHI[k]) + By[i][j][k]*np.sin(THETA[j])*np.sin(PHI[k]) + Bz[i][j][k]*np.cos(THETA[j])
 
 			Btor[i][j][k] = (-1)*Bx[i][j][k]*np.sin(PHI[k]) - By[i][j][k]*np.cos(PHI[k])
-print(Bnorm.shape)
+print(mesh_size)
 
 
 def plot_Xsection(title, data, filename, phi_toPlot):
