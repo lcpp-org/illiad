@@ -3,7 +3,6 @@ import numba as nb
 
 
 ## TRANSFORM TO CARTESIAN COORDINATES
-##
 @nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "A"), nb.float64), nopython=True)
 def RTP_to_XYZ(p_RTP, Rmajor):
     # Function to take in a point defined in r-theta-phi coordinates
@@ -20,16 +19,14 @@ def RTP_to_XYZ(p_RTP, Rmajor):
     return p_XYZ
 
 
-
 ## TRANSFORM TO TOROIDAL COORDINATES
-##
 @nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
 def XYZ_to_RTP(p_XYZ, Rmajor):
     # Function to take in a point defined in Cartesian coordinates
     # And return a point in r-theta-phi coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
-    x, y, z = p_XYZ
+    x, y, z = p_XYZ[:3]
 
     r = np.sqrt( x**2 + y**2 + z**2 + Rmajor**2 - 2*Rmajor*np.sqrt(x**2 + y**2) )
 
@@ -48,8 +45,7 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
 
     return p_RTP
 
-
-
+## ROTATE A CARTESIAN VECTOR BY ANGLE DELTA_PHI
 @nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
 def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
     # Function takes in a cartesian vector and a phi angle
@@ -66,13 +62,24 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
     return rotated_XYZ
 
 
-# transform from theta,r about (Geometric Axis)
-# to (Magnetic Axis): theta=pi, r=0.0187m
-def axisShift(rho, theta, r_delt_): 
-    #rprime = np.sqrt(r_delt_**2 + rho**2 + 2*rho*r_delt_*np.cos(theta))
-    #thetaprime = np.arctan2( (rho*np.sin(theta)), r_delt_+rprime*np.cos(theta))
-    #if thetaprime<0.: thetaprime += 2*np.pi
-    #xformed_Coord = np.array([thetaprime, rprime])
-    
-    xformed_Coord = np.array([theta, rho])
-    return xformed_Coord
+# TRANSFORM FROM THETA,R ABOUT (GEOMETRIC AXIS)
+# TO (MAGNETIC AXIS): THETA=PI, R=0.0187M
+def axisShift(rho, theta, rdel, thdel_): 
+    #print(f'{rdel=}')
+    #xformed_Coord = np.array([theta, rho])
+    #return xformed_Coord
+    rprime = np.sqrt( rho**2 + rdel**2 - 2*rho*rdel*np.cos(theta - thdel_) )
+
+    chi = np.arcsin((rho/rprime) * np.sin(theta - thdel_))
+
+    condition = rho**2 > rprime**2 + rdel**2
+    chi = np.where(condition, np.pi - chi, chi)
+    chi = np.where(chi<0, chi + 2*np.pi, chi)
+
+    opt1 = thdel_ - chi + np.pi
+    opt2 = thdel_ - chi - np.pi
+
+    thetaprime = np.where(theta>thdel_, opt1, opt2 )
+    thetaprime = np.where(thetaprime<0, thetaprime + 2*np.pi, thetaprime)    
+
+    return np.array([thetaprime, rprime])
