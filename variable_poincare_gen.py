@@ -130,7 +130,7 @@ def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl
     # Looping over each phi angle
     iter_in = enumerate(phi_range)
     Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_, anlys_name=anlys_name, outputHandler=outputHandler, saveData=saveData)
-    with cf.ProcessPoolExecutor(max_workers=72) as executor: 
+    with cf.ProcessPoolExecutor(max_workers=16) as executor: 
         outs = executor.map(Output_Poincare_x, iter_in)
     
     # EXECUTE GENERATOR

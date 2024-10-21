@@ -8,7 +8,7 @@ from variable_poincare_gen import Gen_Poincare
 
 
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q3_tests_new_eventcount") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3_tests_new_spacing5") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
@@ -21,7 +21,7 @@ b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
 Nlines = 15 #21
 spins = 200
 length = (2*np.pi * b_hidra.R0) * spins
-IC_Rad = np.array(np.linspace( 0.120, 0.020, Nlines))
+IC_Rad = np.array(np.linspace(0.120, 0.020, Nlines))
 ICs_RTP = np.array([[R, 0., 2*np.pi - (np.pi/5.)] for R in IC_Rad])
 
 ## CONVERT TO XYZ COORDS
