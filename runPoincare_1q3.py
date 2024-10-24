@@ -7,25 +7,19 @@ from anlys_funcs import identifyLCFS
 from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY
-
-simOut = out.IOHandler("HIDRA_1q3_tests_new_spacing1") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3ERR_dphi1deg") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-BX, BY, BZ = np.load('input_files/Bxyz_iota-1q3_test_rough_95p5pct.npy')
-
+BX, BY, BZ = np.load('input_files/HIDRA_i3ERR_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
 
 ## SET UP INITIAL POSITIONS IN RTP COORDS
-
-Nlines = 15 #21
-spins = 200
-length = (2*np.pi * b_hidra.R0) * spins
-IC_Rad = np.array(np.linspace(0.120, 0.020, Nlines))
-ICs_RTP = np.array([[R, 0., 2*np.pi - (np.pi/5.)] for R in IC_Rad])
-
+Nlines = 16+15
+IC_Rad = np.array(np.linspace( 0.170, 0.02, Nlines))
+ICs_RTP = np.array([[R, np.pi, 2*np.pi - (np.pi/5.)] for R in IC_Rad]) #THETA=pi, r increasing towards high-field side
 
 ## CONVERT TO XYZ COORDS
 ICs_XYZ = np.zeros(shape=(Nlines, 3))
