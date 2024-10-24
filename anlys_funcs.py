@@ -162,12 +162,30 @@ def boris_solver(ion, dt, tmax, Bfield):
     qdt2m = ion.charge_mass_ratio * dt/2
     ion.setPosition(0, ion.pos0_XYZ)
 
+
     v_k = ion.vel0_XYZ
+
+    # Need v_n-1/2 to start
+    B, dum_ = Bfield.interpField(ion.pos_XYZ[0])
+
+    tvec = qdt2m * B# tvec given by (4-4, Eq11)
+
+    vprime = v_k + np.array([v_k[1]*tvec[2] - v_k[2]*tvec[1], 
+                         v_k[2]*tvec[0] - v_k[0]*tvec[2],
+                         v_k[0]*tvec[1] - v_k[1]*tvec[0]])   #np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
+    
+    svec = 2*tvec / ( 1 + (np.linalg.norm(tvec)*np.linalg.norm(tvec)) )# svec given by (4-4, Eq13)
+
+    vplus = v_k -  np.array([vprime[1]*svec[2] - vprime[2]*svec[1], 
+                            vprime[2]*svec[0] - vprime[0]*svec[2],
+                            vprime[0]*svec[1] - vprime[1]*svec[0]]) / 2 # from vminus, vprime, svec (4-4, Eq12), get vplus 
+
+    v_k = vplus
+
     ## STEPPING THROUGH DTs
     for k in range(N-1):
         B, dum_ = Bfield.interpField(ion.pos_XYZ[k])
-        #B[0] +=  0.002 # error field Bx
-        #B[1] += -0.002 # error field By
+
         tvec = qdt2m * B# tvec given by (4-4, Eq11)
 
         #vprime = v_k + np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime

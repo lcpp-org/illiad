@@ -86,10 +86,6 @@ class Mesh:
             self.Bz = Bz_
             self.errField = errField
 
-            #if errField:
-            #    self.Bx[:,:,:] += 0.0002
-            #    self.By[:,:,:] += -0.0002
-
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
                 self.dr = self.r_max / self.nr
@@ -307,6 +303,47 @@ class Mesh:
         
         if self.errField:
             global_vecXYZ[0] += 0.0002
-            global_vecXYZ[1] += -0.0002
+            global_vecXYZ[1] -= 0.0002
 
         return global_vecXYZ, ph_localN
+
+    def calculate_psi(self):
+        # EITHER CALCULATE ON FULL NON-PERIODIC MESH
+        # OR CALCULATE SEPARATE PSI_IDEAL AND PSI_ERROR
+
+        #############
+        # IDEAL PSI
+        ############
+        self.PSI_ideal = np.zeros((self.nr, self.ntheta, self.nphi))
+        # CALCULATE PSI FOR EACH R=0:
+        # [i,j,k]=position indices, [x,y,z]=summation indices
+        y_pi = int( (self.ntheta-1)/2 ) # index for theta=pi ( THETA: 0 ->2pi)
+        i_zero = 0 # index for r=0
+        for j in range (0, self.ntheta-1):
+            for k in range(0, self.nphi-1):
+                # SUM (B_Z*dA) FOR EACH:
+                for x in range(0, self.nr-1): # r: 0 TO a
+                    for z in range(0, self.nphi-1): # phi: 0 TO 2PI
+                        # theta: PI = k_pi
+                        dA = (self.R0 - x*self.dr) * self.dr * self.dphi
+                        self.PSI_ideal[i_zero][j][k] += self.Bz[x][y_pi][z] * dA
+
+        # CALCULATE PSI FOR EACH R !=0:
+        # ij,k=position indices, x,y,z=summation indices
+        for i in range(1, self.nr-1):
+            for j in range(0, self.ntheta-1):
+                y_theta = j # THETA: THETA
+                for k in range(0, self.nphi-1):
+                    # SUM (B_THETA*dA) FOR EACH:
+                    for x in range(0, i): # r: 0 TO r_position
+                        for z in range(0, self.nphi-1): # PHI: 0 TO 2PI
+                            Bpol = -self.Bx[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.cos(z*self.dphi) + self.By[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.sin(z*self.dphi) + self.Bz[x][y_theta][z]*np.cos(y_theta*self.dtheta)
+                            dA = (self.R0 + x*self.dr * np.cos(y_theta*self.dtheta)) * self.dr * self.dphi
+
+                            self.PSI_ideal[i][j][k] += Bpol * dA
+
+                    # Add the psi at r=0 for total psi
+                    self.PSI_ideal[i][j][k] += self.PSI_ideal[0][j][k]
+        # END IDEAL PSI CALCULATION
+
+

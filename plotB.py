@@ -9,7 +9,7 @@ Rmin = 0.19 #[m]
 
 Bx,By,Bz = np.load('input_files/Bxyz_iota-1q3_MAXPOWER_hires.npy')
 Bnorm = np.load('input_files/Bnorm_iota-1q3_MAXPOWER_hires.npy')
-print(f'{Bnorm.shape=}')
+print('Bnorm.shape={}'.format(Bnorm.shape))
 nr, ntheta, nphi = Bnorm.shape
 
 theta_periods = 1
