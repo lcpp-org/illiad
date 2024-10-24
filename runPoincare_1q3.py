@@ -7,7 +7,7 @@ from anlys_funcs import identifyLCFS
 from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q3ERR_10-3Test2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3ERR_dphi1deg") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
