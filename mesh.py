@@ -125,11 +125,16 @@ class Mesh:
         This method takes in 2 points defined (r, theta, phi) coordinates
         returns a scalar volume of the subelement defined these 2 diagonal points
         """
-        r1, theta1, phi1 = point1
-        r2, theta2, phi2 = point2
-        term1 = self.R0 * (r2**2 - r1**2)/2. *       (theta2 - theta1) * (phi2 - phi1) 
-        term2 =           (r2**3 - r1**3)/3. * np.sin(theta2 - theta1) * (phi2 - phi1) 
-        return np.abs(term1 + term2)
+        #r1, theta1, phi1 = point1
+        #r2, theta2, phi2 = point2
+        #dtheta = theta2 - theta1
+        #dphi = (phi2 - phi1)
+        #term1 = self.R0 * (r2*r2 - r1*r1)/2. *         dtheta * dphi
+        #term2 =           (r2*r2*r2 - r1*r1*r1)/3. * np.sin(dtheta) * dphi
+        #return np.abs(term1 + term2)
+    
+        dr, dtheta, dphi = np.abs( point2 - point1 )
+        return (self.R0 + point1[0] * np.cos(point1[1]) ) * point1[0] * dr * dtheta * dphi
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -197,26 +202,36 @@ class Mesh:
         local_vecXYZ = np.zeros(3)
         global_vecXYZ = np.zeros(3)
 
+
         # cycle through nodes, solving for the field and the weight function
         for n, node in enumerate(nodeIndexArray):
+
             # get node and antiNode indices
             node_i, node_j, node_k = node
             antiNode_i, antiNode_j, antiNode_k = antiNodeArray[n]
             node_vecXYZ[0] = self.Bx[node_i, node_j, node_k]
             node_vecXYZ[1] = self.By[node_i, node_j, node_k]
             node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
+
+
             # transform the field if the node is < dphi
             if node_k < 0.:
                 node_vecXYZ = self.rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
+
             # calculate antiNode rtp values from indices for input in to 'subElementVolume'
             antiNode_r = antiNode_i * self.dr
             antiNode_theta = (antiNode_j + 1) * self.dtheta
             antiNode_phi = (antiNode_k + 1) * self.dphi
+
             antiNode_rtp = np.array([antiNode_r, antiNode_theta, antiNode_phi])
+
             # calculate the wieght function as the volume of the point-antiNode subelement
             antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
+            
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
+
+
         #  return the sum of weighted values divided by the total
         local_vecXYZ = local_vecXYZ / totalVolume
 
