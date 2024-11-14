@@ -8,19 +8,19 @@ from poincare_gen import Gen_Poincare
 
 
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q4ERR_1500s") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3_deg1_angles_Vertical") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-BX, BY, BZ = np.load('input_files/HIDRA_i4ERR_hires.npy')
+BX, BY, BZ = np.load('input_files/i1q3_hires_torchTest1_Vertical.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)
 
 ## SET UP INITIAL POSITIONS IN RTP COORDS
-Nlines = 10 #21
-Angles = 5
-spins = 200
+Nlines = 20 #21
+Angles = 3
+spins = 400
 length = (2*np.pi * b_hidra.R0) * spins
 IC_Rad = np.array(np.linspace( 0.120, 0.020, Nlines))
 IC_THETA = np.array(np.linspace(0, np.pi, Angles))

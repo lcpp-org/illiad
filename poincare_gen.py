@@ -25,7 +25,7 @@ def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl
     ## PARALLELIZATION WITH CONCURRENT FUTURES 'MAP' OVER EACH PARTICLE
     outputHandler.log.info('Begin running {} Initial Conditions for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
     t_start = perf_counter()
-    with cf.ProcessPoolExecutor(max_workers=16) as executor:
+    with cf.ProcessPoolExecutor(max_workers=40) as executor:
         solver_output = executor.map(solvePoincare_x, fieldlines)
     t_stop = perf_counter()
     tot_elapsed_time = t_stop - t_start
