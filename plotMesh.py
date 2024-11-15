@@ -162,5 +162,5 @@ plt.axis('off')
 ax.grid(False)
 plt.margins(0.05)
 
-plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
+#plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
 plt.show()
