@@ -2,9 +2,6 @@
  ## IMPORTS
 import pandas as pd
 import numpy as np
-
-from mpl_toolkits import mplot3d
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
 from coordtrans import XYZ_to_RTP
@@ -56,28 +53,58 @@ def main():
         p = np.zeros(filament.shape[1])
 
         for i,point in enumerate(filament.T):
-            rtp = XYZ_to_RTP(np.ascontiguousarray(point), Rmajor)
-            r[i] = rtp[0]
-            t[i] = np.degrees(rtp[1])
-            p[i] = np.degrees(rtp[2])
+            radius, theta, phi = XYZ_to_RTP(np.ascontiguousarray(point), Rmajor)
+
+            r[i] = radius
+            t[i] = np.degrees(theta)
+            p[i] = np.degrees(-phi)+360 # Negative to flip to match the helical coils around HIDRA
             #X[i] = (r*np.cos(theta)) * np.cos(phi)
             #Y[i] = (-r*np.cos(theta)) * np.sin(phi)
             #Z[i] = r * np.sin(theta)
         
         if coiltype[n] == 'Helix':
-            if float(coilpts[0][3]) < 0:    c = 'r'
-            elif float(coilpts[0][3]) > 0:  c = 'g'
+            if float(coilpts[0][3]) < 0:    c = 'r'; firstTime=0
+            elif float(coilpts[0][3]) > 0:  c = 'g'; firstTime=0
             
-            pends = np.append(argrelextrema(p, np.greater), argrelextrema(p, np.less))
-            tends = np.append(argrelextrema(t, np.greater), argrelextrema(t, np.less))
+            highends = np.append(argrelextrema(p, np.greater), argrelextrema(p, np.less))
+            #highends = np.add(highends, np.ones(len(highends)))
+            lowends = np.append(argrelextrema(t, np.greater), argrelextrema(t, np.less))
+            #lowends = np.add(lowends, np.ones(len(lowends)))
             
-            edges = np.append(pends, tends)
+            edges = np.append(highends, lowends)
             edges = np.sort(edges)
-
+            edges = np.append(0, edges)
+            edges = np.append(edges, len(p)-1)
+            edges = np.array([int(edge) for edge in edges])
+            
+            
             for i in range(len(edges)-1):
                 start = edges[i]
                 stop = edges[i+1]
-                ax.plot(p[start:stop], t[start:stop], c)
+                fineTune = 20
+                if abs(start-stop) == 1: 
+                    if abs(p[stop]-p[start]) < 300 and abs(t[stop]-t[start]) < 300:
+                        """if firstTime == 0:
+                            plt.arrow(p[start],t[start], p[stop]-p[start],t[stop]-t[start], head_width=0.5, head_length=0.1, fc='k', ec='k')
+                            firstTime == 1
+                        else:"""
+                        xs = np.linspace(p[start], p[stop], fineTune)
+                        ys = np.linspace(t[start], t[stop], fineTune)
+                        ax.plot(xs, ys, c)
+                        ax.scatter(xs[0], ys[0], s = 5)
+                        ax.scatter(xs[1], ys[1], c = "orange", s = 5)
+                else:
+                    """if firstTime == 0:
+                        plt.arrow(p[start],t[start], p[stop]-p[start],t[stop]-t[start], head_width=0.5, head_length=0.1, fc='k', ec='k')
+                        firstTime == 1
+                    else:"""
+                    xs = np.linspace(p[start], p[stop], fineTune)
+                    ys = np.linspace(t[start], t[stop], fineTune)
+                    ax.plot(xs, ys, c) 
+                    ax.scatter(xs[0], ys[0], c = "blue", s = 15)
+                    ax.scatter(xs[1], ys[1], c = "orange", s = 15) 
+             
+            #ax.plot(p, t, c)
 
         elif coiltype[n] == 'toroidal_field':     ax.plot(p, t, c='b')
         #elif coiltype[n] == 'Vertical_Field_Coil': ax.plot(p, t, c='orange')
@@ -93,9 +120,8 @@ def main():
     #ax.set_yticks([])
     #ax.set_zticks([])
     #plt.axis('off')
-    ax.grid(False)
+    plt.grid(True)
     plt.margins(0.05)
-    plt.legend()
     #plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
     plt.show()
 
