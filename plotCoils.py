@@ -45,36 +45,36 @@ def main():
     for n, coil in enumerate(mycoils):
 
         coilpts = np.asarray(coil, dtype=np.float64)
-        thiscoil = torch.tensor(coilpts, dtype=torch.float64)
-        filament = np.ascontiguousarray(thiscoil.T[:3])
+        filament = np.ascontiguousarray(coilpts.T[:3])
         
         r = np.zeros(filament.shape[1])
         t = np.zeros(filament.shape[1])
         p = np.zeros(filament.shape[1])
 
-        for i,point in enumerate(filament.T):
+        for i,point in enumerate(filament.T): #filament has all of the points in XYZ coordinate system
             radius, theta, phi = XYZ_to_RTP(np.ascontiguousarray(point), Rmajor)
 
             r[i] = radius
             t[i] = np.degrees(theta)
-            p[i] = np.degrees(-phi)+360 # Negative to flip to match the helical coils around HIDRA
-            #X[i] = (r*np.cos(theta)) * np.cos(phi)
-            #Y[i] = (-r*np.cos(theta)) * np.sin(phi)
-            #Z[i] = r * np.sin(theta)
+            if t[i]>=180: #Adjusts the theta so the range is (-180,180)
+                t[i] -=360
+            p[i] = np.degrees(-phi)+360 # Negative to flip the orientation to match the helical coils around HIDRA
         
         if coiltype[n] == 'Helix':
-            if float(coilpts[0][3]) < 0:    c = 'r'; firstTime=0
-            elif float(coilpts[0][3]) > 0:  c = 'g'; firstTime=0
+            if float(coilpts[0][3]) < 0:    c = 'r'; firstTime=0 #Negative current is in red
+            elif float(coilpts[0][3]) > 0:  c = 'g'; firstTime=0 #Positive current is in green
             
+            #This code is used to cut up the helical coils so there aren't huge diagonal lines on the graph. It does this by finding the edges\
+            # where the coil cross a plane, splits it there and then graphs each individual split part for the filament\ 
+            # Edges is a list of these points where it crosses the plane; the dots are to clarify which way the coils are going (start -> stop)
+
             highends = np.append(argrelextrema(p, np.greater), argrelextrema(p, np.less))
-            #highends = np.add(highends, np.ones(len(highends)))
+            
             lowends = np.append(argrelextrema(t, np.greater), argrelextrema(t, np.less))
-            #lowends = np.add(lowends, np.ones(len(lowends)))
             
             edges = np.append(highends, lowends)
             edges = np.sort(edges)
-            edges = np.append(0, edges)
-            edges = np.append(edges, len(p)-1)
+            edges = np.append(0, np.append(edges, len(p)-1))
             edges = np.array([int(edge) for edge in edges])
             
             
@@ -82,44 +82,36 @@ def main():
                 start = edges[i]
                 stop = edges[i+1]
                 fineTune = 20
-                if abs(start-stop) == 1: 
-                    if abs(p[stop]-p[start]) < 300 and abs(t[stop]-t[start]) < 300:
-                        """if firstTime == 0:
-                            plt.arrow(p[start],t[start], p[stop]-p[start],t[stop]-t[start], head_width=0.5, head_length=0.1, fc='k', ec='k')
-                            firstTime == 1
-                        else:"""
+                if abs(start-stop) == 1: #The jumps across the graph have two edges that are one apart
+                    if abs(p[stop]-p[start]) < 300 and abs(t[stop]-t[start]) < 300: #there are however parts of the coil which are one
+                                                                                    # apart and dont jump across the graph so we should
+                                                                                    # still graph those
                         xs = np.linspace(p[start], p[stop], fineTune)
                         ys = np.linspace(t[start], t[stop], fineTune)
                         ax.plot(xs, ys, c)
                         ax.scatter(xs[0], ys[0], s = 5)
                         ax.scatter(xs[1], ys[1], c = "orange", s = 5)
-                else:
-                    """if firstTime == 0:
-                        plt.arrow(p[start],t[start], p[stop]-p[start],t[stop]-t[start], head_width=0.5, head_length=0.1, fc='k', ec='k')
-                        firstTime == 1
-                    else:"""
+                else: #everything should be graphed with the blue and orange dots to signify direction
                     xs = np.linspace(p[start], p[stop], fineTune)
                     ys = np.linspace(t[start], t[stop], fineTune)
                     ax.plot(xs, ys, c) 
                     ax.scatter(xs[0], ys[0], c = "blue", s = 15)
                     ax.scatter(xs[1], ys[1], c = "orange", s = 15) 
              
-            #ax.plot(p, t, c)
+            
 
         elif coiltype[n] == 'toroidal_field':     ax.plot(p, t, c='b')
-        #elif coiltype[n] == 'Vertical_Field_Coil': ax.plot(p, t, c='orange')
-        #else: print('COIL-TYPE ERROR!')
-        ax.vlines(180, 0, 360, 'black', linewidth=3)
+        elif coiltype[n] == 'Vertical_Field_Coil': two = 1+1 #dont plot the vertical coils
+        else: print('COIL-TYPE ERROR!')
         
 
-    plt.title('HIDRA Mesh')
+    plt.title('HIDRA Helical Coils')
     plt.xlabel('Phi Angle')
     plt.ylabel('Theta Angle')
 
-    #ax.set_xticks([])
-    #ax.set_yticks([])
-    #ax.set_zticks([])
-    #plt.axis('off')
+    ax.set_xticks(np.linspace(0,360,21))
+    ax.set_yticks(np.linspace(-180,180,21))
+    
     plt.grid(True)
     plt.margins(0.05)
     #plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
