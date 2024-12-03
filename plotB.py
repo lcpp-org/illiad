@@ -8,11 +8,11 @@ import class_outputHandler as out
 from mesh import *
 
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler("HIDRA_1q4_TorchTest2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simIO = out.IOHandler("+B_1q4_contours") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-Bx, By, Bz = np.load('input_files/i1q3_hires_torchTest1.npy')
+Bx, By, Bz = np.load('input_files/i1q4_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
@@ -23,7 +23,7 @@ mesh_dtheta = b_hidra.dtheta*2
 R     = np.linspace( b_hidra.r_min*2,       b_hidra.r_max,     int((b_hidra.nr//2)+1))
 THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
 #PHI   = np.linspace( b_hidra.phi_min*2,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-PHI   = np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+PHI   = np.array([54,126,198,270,342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
 #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
@@ -102,6 +102,32 @@ def plot_Xsection(title, data, filename, phi_toPlot):
 		simIO.saveFig(plot_name)
 	plt.close()
 
+def getValuesAlong0(title, data,phi_toPlot):
+	simIO.log.info("The values for {} are given for these radii \n {} \n ".format(title, R))
+	theta0s = []
+	for i, p in enumerate(phi_toPlot):
+		plot_data = np.transpose(data, [2,1,0])[i]
+		theta0 = plot_data[0]
+		theta0s.append(theta0)
+		simIO.log.info('{}\n at {}'.format(theta0, p*180/np.pi))
+	
+	fig = plt.figure()
+	ax = fig.add_subplot()
+	plt.title("{} diffferences".format(title))
+	for i, line in enumerate(theta0s):
+		ax.plot(R, line, label = "{}".format(PHI[i]*180/np.pi))
+	plt.legend()
+	plt.xticks(np.linspace(0, 0.19, 11))
+	#plt.show()
+	simIO.saveFig(title)
+	plt.close()
+
+getValuesAlong0("norm", Bnorm, PHI)
+getValuesAlong0("radial", Br, PHI)
+getValuesAlong0("poloidal", Bpol, PHI)
+getValuesAlong0("toroidal", Bnorm, PHI)
+
+'''
 ## NORM ##
 plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm_HIDRA_i3ERR_hires', PHI)
 ## RADIAL ##
@@ -110,6 +136,7 @@ plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial_HIDRA_i3ERR_hire
 plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal_HIDRA_i3ERR_hires', PHI)
 ### TOROIDAL ##
 plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal_HIDRA_i3ERR_hires', PHI)
+'''
 
 """
 ## WALL PLOTS

@@ -58,7 +58,7 @@ def main():
             t[i] = np.degrees(theta)
             if t[i]>=180: #Adjusts the theta so the range is (-180,180)
                 t[i] -=360
-            p[i] = np.degrees(-phi)+360 # Negative to flip the orientation to match the helical coils around HIDRA
+            p[i] = np.degrees(-phi) +360# Negative to flip the orientation to match the helical coils around HIDRA
         
         if coiltype[n] == 'Helix':
             if float(coilpts[0][3]) < 0:    c = 'r'; firstTime=0 #Negative current is in red
@@ -66,7 +66,7 @@ def main():
             
             #This code is used to cut up the helical coils so there aren't huge diagonal lines on the graph. It does this by finding the edges\
             # where the coil cross a plane, splits it there and then graphs each individual split part for the filament\ 
-            # Edges is a list of these points where it crosses the plane; the dots are to clarify which way the coils are going (start -> stop)
+            # Edges is a list of these points where it crosses the 0-360 plane; the dots are to clarify which way the coils are going (start -> stop)
 
             highends = np.append(argrelextrema(p, np.greater), argrelextrema(p, np.less))
             
@@ -89,8 +89,8 @@ def main():
                         xs = np.linspace(p[start], p[stop], fineTune)
                         ys = np.linspace(t[start], t[stop], fineTune)
                         ax.plot(xs, ys, c)
-                        ax.scatter(xs[0], ys[0], s = 5)
-                        ax.scatter(xs[1], ys[1], c = "orange", s = 5)
+                        ax.scatter(xs[0], ys[0], s = 15)
+                        ax.scatter(xs[1], ys[1], c = "orange", s = 15)
                 else: #everything should be graphed with the blue and orange dots to signify direction
                     xs = np.linspace(p[start], p[stop], fineTune)
                     ys = np.linspace(t[start], t[stop], fineTune)
@@ -106,11 +106,13 @@ def main():
         
 
     plt.title('HIDRA Helical Coils')
-    plt.xlabel('Phi Angle')
+    plt.xlabel('Phi Angle Physical (0 is West end, or some periodic multiple)')
     plt.ylabel('Theta Angle')
 
     ax.set_xticks(np.linspace(0,360,21))
     ax.set_yticks(np.linspace(-180,180,21))
+    ax.vlines([90,180,270], -200, 200, colors= 'k', linestyles="dashed", linewidth= 2)
+    ax.hlines(0, -10, 370, colors='k', linestyles='dashed', linewidth=2)
     
     plt.grid(True)
     plt.margins(0.05)
