@@ -32,8 +32,8 @@ mesh_size = hi_res
 ##########################
 # INPUT COIL CURRENTS:
 I_toro = 486.
-I_heli = 900.
-I_vert = -12.
+I_heli = 790.
+I_vert = 0.
 
 # Multiplier applied to helical current,
 # Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field

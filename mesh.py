@@ -1,7 +1,7 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
+from coordtrans import XYZ_to_RTP, RTP_to_XYZ #, rot_vecXYZ_byPHI
 import logging
 
 import numba as nb
@@ -147,7 +147,7 @@ class Mesh:
 
         return rotated_XYZ
 
-    def interpField(self, point_XYZ):
+    def interpField(self, point_XYZ, Cart = True):
         """
         Method to return the interpolated field values at a point defined in Cartesian coordinates
         Interpolation done via a weighted sum of field values at each node of the enclosing cell
@@ -158,13 +158,17 @@ class Mesh:
         theta: dtheta -> theta_max (2pi/Nperiods)
         phi:     dphi -> phi_max   (2pi/Nperiods)
         """
-        point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
+        if Cart:
+            point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
+        else:
+            point_RTP = point_XYZ
+
         r_local  = point_RTP[0]
         th_localN, th_local = np.divmod(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
         ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
         point_RTP_local = np.array([r_local, th_local, ph_local])
 
-        if r_local > self.r_max:
+        if r_local >= self.r_max:
             # determine whether point is within mesh domain
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
@@ -179,7 +183,7 @@ class Mesh:
         thindex_lo = thindex_hi - 1
         phindex_hi = np.floor(ph_local/self.dphi)
         phindex_lo = phindex_hi - 1
-
+        #print(rindex_lo,rindex_hi, th)
         # Return the indices of the 8 corner points of the cell
         # Validation of the indices is not done here
         nodeIndexArray = np.array(
