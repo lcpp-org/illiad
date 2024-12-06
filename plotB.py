@@ -8,11 +8,11 @@ import class_outputHandler as out
 from mesh import *
 
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler("+B_1q4_contours_4angles") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simIO = out.IOHandler("1q3_contours_10angles_deltas") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-Bx, By, Bz = np.load('input_files/i1q4_hires.npy')
+Bx, By, Bz = np.load('input_files/i1q3_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
@@ -22,8 +22,8 @@ mesh_ntheta = int(b_hidra.ntheta/2)
 mesh_dtheta = b_hidra.dtheta*2
 R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
 THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
-#PHI   = np.linspace( b_hidra.phi_min*2,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-PHI   = np.array([90, 180, 270, 360])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+#PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
+PHI   = np.array([18, 54, 90, 126, 162, 198, 234, 270, 306, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
 #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
@@ -102,43 +102,97 @@ def plot_Xsection(title, data, filename, phi_toPlot):
 		simIO.saveFig(plot_name)
 	plt.close()
 
-def getValuesAlong0(title, data,phi_toPlot):
-	simIO.log.info("The values for {} are given for these radii \n {} \n ".format(title, R))
+def calcMaxDifference(theta0s, xs):
+	theta0s = np.array(theta0s)
+	mostSpreadOut = 0
+	mostSpreadOutLoc = 0
+	variances = []
+	for i in range(len(theta0s[0])): #for every columne
+		column = theta0s[:, i]
+		mean = sum(column)/len(column)
+		summ = 0
+		for j in column:
+			summ += (j-mean)**2
+		variance = summ/(len(column)-1)
+		variances.append(variance)
+		if variance > mostSpreadOut:
+			mostSpreadOut = variance
+			mostSpreadOutLoc = i
+	
+	return xs[mostSpreadOutLoc], mostSpreadOut
+
+def getValuesAlong0(title, data,phi_toPlot, highToLow = False, deltas = False):
+	
+	if highToLow:
+		xs = np.concatenate((-1*R[::-1], R)) # high B edge to low B edge
+	else:
+		xs = R #for center to low B edge 
+	
+	
+	simIO.log.info("The values for {} are given for these radii \n {} \n ".format(title, xs))
 	theta0s = []
 	
 	for i, p in enumerate(phi_toPlot):
 		plot_data = np.transpose(data, [2,1,0])[i]
 		theta0 = plot_data[-1]# to get 360 degrees which is along the 0 degree
+		
+		if highToLow:
+			# for the high B to center
+			middleIndex = (len(plot_data)//2)-1 #This is at 178.988 degrees which is not necessarily parallel to 0 degrees
+			theta180 = plot_data[middleIndex][::-1]
+			theta0 = np.concatenate((theta180, theta0))
+			
+		
 		theta0s.append(theta0)
 		simIO.log.info('{}\n at {}'.format(theta0, p*180/np.pi))
 	
+	loc, variance = calcMaxDifference(theta0s, xs)
+	simIO.log.info("The data is most spread out at {} and the variance is {}".format(loc, variance))
+
 	fig = plt.figure()
 	ax = fig.add_subplot()
-	plt.title("{} diffferences".format(title))
+	if deltas:
+		if highToLow:
+			plt.title("{} differences based on {}, high B end to low B end".format(title, PHI[0]*180/np.pi))
+		else:
+			plt.title("{} differences based on {}, center to low B end".format(title, PHI[0]*180/np.pi))
+		for i in range(1, len(theta0s)):
+			theta0s[i] = theta0s[i]-theta0s[0]
+		theta0s[0] = list(np.zeros(len(theta0s[0])))
+	else:
+		if highToLow:
+			plt.title("{} magnitudes, high B end to low B end".format(title))
+		else:
+			plt.title("{} magnitudes, center to low B end".format(title))
+	
+
 	for i, line in enumerate(theta0s):
-		ax.plot(R, line, label = "{}".format(PHI[i]*180/np.pi))
-	plt.legend()
-	plt.xticks(np.linspace(0, 0.19, 11))
+		ax.plot(xs, line, label = "{}".format(PHI[i]*180/np.pi))
+	plt.legend(fontsize=4)
+	#plt.xticks(np.linspace(0, 0.19, 11))
+	plt.xticks(xs[::10])
+	plt.tick_params(labelsize=5)
 	plt.yticks()
+	plt.grid()
 	#plt.show()
 	simIO.saveFig(title)
 	plt.close()
 
-getValuesAlong0("norm", Bnorm, PHI)
-getValuesAlong0("radial", Br, PHI)
-getValuesAlong0("poloidal", Bpol, PHI)
-getValuesAlong0("toroidal", Bnorm, PHI)
+getValuesAlong0("norm", Bnorm, PHI, False, True)
+getValuesAlong0("radial", Br, PHI, False, True)
+getValuesAlong0("poloidal", Bpol, PHI, False, True)
+getValuesAlong0("toroidal", Bnorm, PHI, False, True)
 
 
 ## NORM ##
-plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm', PHI)
 
 ## RADIAL ##
-plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial', PHI)
 ### POLOIDAL ##
-plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal', PHI)
 ### TOROIDAL ##
-plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal', PHI)
 
 
 """
