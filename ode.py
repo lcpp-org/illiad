@@ -37,6 +37,16 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
 
     maxLength = particle.maxLife
 
+
+    for event in solver_events:
+        if event.__name__ == 'inVV':
+            event.direction = -1.0
+        elif event.__name__ == 'isphi360':
+            event.direction = -particle.direction
+        else:
+            event.direction = particle.direction
+
+
     t_startInd = perf_counter()
     fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond, args = ([field]),
             dense_output=False,

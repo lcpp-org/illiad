@@ -7,11 +7,11 @@ from anlys_funcs import identifyLCFS
 from poincare_gen import Gen_Poincare
 
 ## SET UP RUN DIRECTORY
-simOut = out.IOHandler("HIDRA_1q3ERR_10-3Test2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simOut = out.IOHandler("HIDRA_1q3Test") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simOut.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-BX, BY, BZ = np.load('input_files/HIDRA_i3ERR_hires.npy')
+BX, BY, BZ = np.load('input_files/It486_Ih790_Iv000_0p955_hires.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(BX, BY, BZ, mesh_prd, errField=True)

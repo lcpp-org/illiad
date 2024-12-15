@@ -28,25 +28,22 @@ class Particle:
 
 
 class fieldLine(Particle):
-    def __init__(self, init_XYZ, maxlength):
+    def __init__(self, init_XYZ, maxlength, direction=1.0):
         super().__init__('fieldline')
         self.pos0_XYZ = init_XYZ
         self.maxLife = maxlength
+        self.direction = direction
         self.vel0_XYZ = 0
         self.charge = 0.
         self.mass = 0.
 
     def pushXYZ(self, t, p_XYZ, field):
-        direction = 1
         B = np.zeros(3)
         B, dum_ = field.interpField(p_XYZ[:3])
-        #if field.errField==True:
-        #    B[0] += 0.0002
-        #    B[1] += -0.0002
+        #B = field.interpField(p_XYZ)
 
-        #dY = direction * B / np.linalg.norm(B)
-        dY = direction * B / np.sqrt(B[0]*B[0] + B[1]*B[1] + B[2]*B[2])
-        return dY
+        dY = B / np.sqrt(B[0]*B[0] + B[1]*B[1] + B[2]*B[2])
+        return dY * self.direction
 
     def storePath(self):
         pass
@@ -65,14 +62,17 @@ class Ion(Particle):
         self.mass = mass_amu * 1.66053907E-27 # kilograms
         self.charge_mass_ratio = self.charge / self.mass
 
+        self.pos_XYZ = []
+
     def initVelocity(self, v0_XYZ):
         self.vel0_XYZ = np.asarray(v0_XYZ)
         self.vel_XYZ = self.vel0_XYZ
 
     def initOutput(self, dt, tmax):
-        N = tmax // dt + 1
+        #N = tmax // dt + 1
         #self.pos_XYZ = np.empty([int(N), 3]) #size output array
-        self.pos_XYZ = []
+        pass
+        #self.pos_XYZ = []
 
     def setPosition(self, index, value):
         #self.pos_XYZ[index] = np.copy(value)
