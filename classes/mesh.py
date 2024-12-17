@@ -1,35 +1,10 @@
 import numpy as np
-from math import degrees, sin, cos, floor
+#from math import degrees, sin, cos, floor
 import os as os
-from coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
+from utility.coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
 import logging
 
-import numba as nb
-#from numba.experimental import jitclass
-#spec = [
-#        ('R0', nb.float32),
-#        ('a', nb.float32),
-#        ('dr', nb.float32),
-#        ('dtheta', nb.float32),
-#        ('dphi', nb.float32),
-#        ('nr', nb.int32),
-#        ('ntheta', nb.int32),
-#        ('nphi', nb.int32),
-#        ('r_max', nb.float32),
-#        ('theta_max', nb.float32),
-#        ('phi_max', nb.float32),
-#        ('r_min', nb.float32),
-#        ('theta_min', nb.float32),
-#        ('phi_min', nb.float32),
-#        ('Bx', nb.types.Array(nb.float64, 3, "C")),
-#        ('By', nb.types.Array(nb.float64, 3, "C")),
-#        ('Bz', nb.types.Array(nb.float64, 3, "C")),
-#        ('periodicity', nb.int32[:]),
-#    ]
 
-
-# define a class with mesh information
-#@jitclass(spec)
 class Mesh:
     """
     Class to store the mesh data, properties, and interpolation methods
@@ -71,11 +46,16 @@ class Mesh:
         self.errField: np.bool
 
 
-    def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5]), errField=False):
+    #def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
+    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
         """
+
+        #self.log.info('Loading Cartesian Vector field from file: {}'.format(file_path))
+        Bx_, By_, Bz_ = np.load(file_path)
+
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
             print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
         else:
@@ -152,7 +132,7 @@ class Mesh:
 
         return rotated_XYZ
 
-    def interpField(self, point_XYZ):
+    def interpField(self, point_XYZ, Cart=True):
         """
         Method to return the interpolated field values at a point defined in Cartesian coordinates
         Interpolation done via a weighted sum of field values at each node of the enclosing cell
@@ -163,7 +143,11 @@ class Mesh:
         theta: dtheta -> theta_max (2pi/Nperiods)
         phi:     dphi -> phi_max   (2pi/Nperiods)
         """
-        point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
+        if Cart:
+            point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
+        else:
+            point_RTP = point_XYZ
+
         r_local  = point_RTP[0]
         th_localN, th_local = np.divmod(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
         ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
@@ -243,8 +227,10 @@ class Mesh:
         global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
         if self.errField:
-            global_vecXYZ[0] += 0.0002
-            global_vecXYZ[1] -= 0.0002
+            global_vecXYZ[0] += 0.0002 #0.0001414214 #0.0002
+            global_vecXYZ[1] += 0.0002 #0.0001414214 #0.0002
+
+            #global_vecXYZ[1] += 0.0002 #0.0002
 
         return global_vecXYZ, ph_localN
 
