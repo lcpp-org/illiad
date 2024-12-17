@@ -24,7 +24,9 @@ class IOHandler:
         print('Executing script in {}'.format(self.module_path))
 
         # Create output directories if none exist
-        self.output_dir = os.path.join(self.module_path,'output')
+        self.output_dir = os.path.join(self.module_path, '..', 'output')
+        self.output_dir = os.path.abspath(self.output_dir)
+        
         try:
             print('Creating output directory if none exists...')
             os.mkdir(self.output_dir)
