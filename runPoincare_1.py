@@ -10,7 +10,7 @@ from solver.poincare_gen import Gen_Poincare
 def main():
 
     ## SET UP RUN DIRECTORY
-    simOut = out.IOHandler("It486_Ih900_Iv000_0p955_rtol6_2x500spins") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+    simOut = out.IOHandler("It486_Ih900_Iv000_0p955_rtol6_49lines_2x300spins") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simOut.startLog()
 
     ## DEFINE MESH AND LOAD FIELD
@@ -19,14 +19,14 @@ def main():
 
 
     ## SET UP INITIAL POSITIONS IN RTP COORDS
-    NLINES = 13 + 12# + 24
+    NLINES = 13 + 12 + 24
     IC_Rad = np.array(np.linspace( 0.130, 0.01, NLINES))
 
     IC_THETA = 0. #np.pi
-    IC_PHI = np.pi #2*np.pi - (np.pi/5.) # at 324deg., plasma lines up nicely with midplane
+    IC_PHI = np.pi - 2*np.pi/5 #2*np.pi - (np.pi/5.) # at 324deg., plasma lines up nicely with midplane
 
     ## SET UP MAX LENGTH OF FIELD LINE TO INTEGRATE (1 SPIN=2*pi*R0)
-    SPINS = 500
+    SPINS = 300
 
     ##CREATE INITIAL CONDITIONS ARRAY IN (IN RTP)
     ICs_RTP = np.array([[R, IC_THETA, IC_PHI] for R in IC_Rad]) #THETA=pi, r increasing towards high-field side

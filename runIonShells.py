@@ -3,13 +3,13 @@ import scipy as sp
 import matplotlib.pyplot as plt
 from matplotlib import patches
 
-import class.class_outputHandler as out
-from class.mesh import *
-from helper_funcs.coordtrans import *
-from helper_funcs.anlys_funcs import *
+import classes.class_outputHandler as out
+from classes.mesh import *
+from utility.coordtrans import *
+from utility.anlys_funcs import *
 from solver.poincare_gen import Gen_Poincare
-from helper_funcs.point_generators import generateSeedShells
-from class.particle import *
+from utility.point_generators import generateSeedShells
+from classes.particle import *
 
 
 

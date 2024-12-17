@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-from helper_funcs.coordtrans import XYZ_to_RTP
+from utility.coordtrans import XYZ_to_RTP
 import phi_events
 
 

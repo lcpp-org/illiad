@@ -1,7 +1,7 @@
 import numpy as np
 #import numba as nb
-from helper_funcs.coordtrans import XYZ_to_RTP
-from class.mesh import *
+from utility.coordtrans import XYZ_to_RTP
+from classes.mesh import *
 import phi_events 
 #@nb.jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C"), Mesh.class_type.instance_type), nopython=True)
 def inVV(t, p_XYZ, Mesh):
