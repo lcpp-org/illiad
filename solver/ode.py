@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 from time import perf_counter
 import logging
 
-from coordtrans import *
+from utility.coordtrans import *
 
 ## ==================================== ##-
 ## FIELD LINE SOLVER (FROM "Bfield.py") ##
