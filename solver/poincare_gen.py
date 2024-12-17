@@ -1,18 +1,52 @@
 import numpy as np
-from math import degrees
+#from math import degrees
 from functools import partial
 import concurrent.futures as cf
 from time import perf_counter
 
 #import phi_events
 from phi_events import *
-from anlys_funcs import Output_Poincare
-from ode import solvePoincare
-from coordtrans import XYZ_to_RTP
-from particle import Particle
+from utility.anlys_funcs import Output_Poincare
+from solver.ode import solvePoincare
+from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
+from classes.particle import *
 
-def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl_, workers=40, saveData=True):
+#def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl_, workers=40, saveData=True):
+def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LSODA', rtl_=1e-6, atl_=1e-16, workers=6, saveData=True, double_line=False):
+    
     outputHandler.createSubDir(anlys_name)
+    
+    NLINES = len(ic_rtp_arr)
+
+    ## CONVERT TO XYZ COORDS
+    ICs_XYZ = np.zeros(shape=(NLINES, 3))
+    for i in range(NLINES):
+        ICs_XYZ[i] = RTP_to_XYZ(ic_rtp_arr[i], field_.R0)
+
+    # Print out a nicely-formatted boilerplate listing the parameters and their values as a table with a border
+    outputHandler.log.info("+----------------+-------------------------+")
+    outputHandler.log.info("| Parameter      | Value                   |")
+    outputHandler.log.info("+----------------+-------------------------+")
+    outputHandler.log.info(f"| SOLVER         | {solvr:<23} |")
+    outputHandler.log.info(f"| RTOL           | {rtl_:<23} |")
+    outputHandler.log.info(f"| ATOL           | {atl_:<23} |")
+    outputHandler.log.info(f"| THREADS        | {workers:<23} |")
+    outputHandler.log.info("+----------------+-------------------------+")
+    outputHandler.log.info(f"| NLINES         | {NLINES:<23} |")
+    outputHandler.log.info(f"| SPINS          | {spins:<23} |")
+    outputHandler.log.info("| Initial Conditions (RTP):                |")
+    for ic in ic_rtp_arr:
+        outputHandler.log.info(f"|     {str(ic):<23}   |")
+    outputHandler.log.info("+----------------+-------------------------+")
+
+
+    ## GENERATE POINCARE DATA
+    length = (2*np.pi * field_.R0) * spins
+    fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
+    if double_line:
+        fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ] #add fieldlines in opposite direction
+
+
 
     ## SOLVER SETUP
     Nlines = Particle.particleCount
@@ -453,7 +487,9 @@ def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl
         if out[0].any():
             wall_output_ += [XYZ_to_RTP(out[0][0], field_.R0)]
 
-
+    if double_line:
+        pathLength_ = [pathLength_[i]+pathLength_[i+NLINES] for i in range(0,NLINES)]
+        Poincare_output_ = [np.vstack((Poincare_output_[i], Poincare_output_[i+NLINES])) for i in range(0,NLINES)]
 
     ## POST-SOLVER OUTPUT
     ####################
