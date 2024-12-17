@@ -4,8 +4,8 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import class_outputHandler as out
-from mesh import *
+import class.class_outputHandler as out
+from class.mesh import *
 
 ## SET UP RUN DIRECTORY
 simIO = out.IOHandler("HIDRA_1q4_TorchTest2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!

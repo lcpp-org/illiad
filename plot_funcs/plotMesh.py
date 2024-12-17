@@ -11,7 +11,7 @@ import scipy.special as special
 from numba import jit, prange
 import numba as nb
 
-from coordtrans import RTP_to_XYZ
+from helper_funcs.coordtrans import RTP_to_XYZ
 
 Rmaj = 0.72 #[m]
 Rmin = 0.19 #[m]

@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib import patches, colors, cm, colormaps
 import copy
 
-import class_outputHandler as out
-from mesh import *
-from coordtrans import *
+import class.class_outputHandler as out
+from class.mesh import *
+from helper_funcs.coordtrans import *
 
 
 
