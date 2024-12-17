@@ -165,3 +165,4 @@ output/*
 *.o1*
 *.e1*
 NPR598/*
+Miniforge3-Linux-x86_64.sh
