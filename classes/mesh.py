@@ -228,7 +228,7 @@ class Mesh:
         
         if self.errField:
             global_vecXYZ[0] += 0.0002 #0.0001414214 #0.0002
-            global_vecXYZ[1] += 0.0002 #0.0001414214 #0.0002
+            global_vecXYZ[1] -= 0.0002 #0.0001414214 #0.0002
 
             #global_vecXYZ[1] += 0.0002 #0.0002
 
