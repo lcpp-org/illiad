@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 from time import perf_counter
+
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
@@ -12,14 +13,14 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'It486_Ih790err_lores_torchTest1'
+output_name = 'It3500_Ih6390_Iv000_0p955_hires'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
 rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
 lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
 hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
-mesh_size = lo_res
+mesh_size = hi_res
 
 # REF. COIL CURRENTS NORMALLY RUN ON HIDRA
 ##########################
@@ -31,8 +32,8 @@ mesh_size = lo_res
 # 1/7  | 581 | 581 |  00 #
 ##########################
 # INPUT COIL CURRENTS:
-I_toro = 486.
-I_heli = 790.
+I_toro = 3500.
+I_heli = 6390.
 I_vert = 0.
 
 # Multiplier applied to helical current,
@@ -97,8 +98,6 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
     tock = perf_counter()
     print('Solution took {:.5f}s'.format(tock-tick))
 
-    ## OUTPUT ARRAY OF VECTORS AND ARRAY OF MAGNITUDE
-    Bxyz[0] = -Bxyz[0] # NEED TO TROUBLE-SHOOT, GET RID OF THIS WORKAROUND
     return Bxyz
 
 def main():
