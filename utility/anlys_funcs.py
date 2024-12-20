@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-from utility.coordtrans import XYZ_to_RTP
+from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 import phi_events
 
 
@@ -352,3 +352,24 @@ def boris_solver(ion, dt, tmax, Bfield):
                  .format(ion.particleID, ion.particleCount, elapsed_timeInd))
         
     return (wallPt, ion.pos_XYZ)
+
+def find_Axis(theta_vals, r_vals, field):
+    """Function to find the geometric center of a set of points in r, theta coordinates"""
+    theta_size = theta_vals.size
+    ## CONVERT TO 2D XZ COORDINATES
+    x_in = np.empty(theta_size)
+    y_in = np.empty(theta_size)
+    z_in = np.empty(theta_size)
+    for i, theta, in enumerate(theta_vals):
+        x_in[i], y_in[i], z_in[i] = RTP_to_XYZ(np.array([r_vals[i], theta, 0.]), field.R0)
+
+    ## FIND THE AXIS BY AVERAGING THE POSITIONS
+    x_avg = np.average(x_in)
+    y_avg = 0.0
+    z_avg = np.average(z_in)
+
+    axis_xyz = np.array([x_avg, y_avg, z_avg])
+    
+    axis_rtp = XYZ_to_RTP(axis_xyz, field.R0)
+
+    return axis_rtp
