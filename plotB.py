@@ -7,12 +7,21 @@ import matplotlib.pyplot as plt
 import class_outputHandler as out
 from mesh import *
 
+'''
+Things to change include
+simIO out
+input magnetic file to be loaded
+angles for PHI
+booleans for highToLow and deltas for getValuesAlong0
+plot_XSection (comment out or not)
+
+'''
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler("1q3_contours_10angles_deltas") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simIO = out.IOHandler("Bfield_graphs/1q3_contours_6PFC_deltas_max") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-Bx, By, Bz = np.load('input_files/i1q3_hires.npy')
+Bx, By, Bz = np.load('input_files/i1q3_hires_max.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
@@ -23,7 +32,7 @@ mesh_dtheta = b_hidra.dtheta*2
 R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
 THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
 #PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-PHI   = np.array([18, 54, 90, 126, 162, 198, 234, 270, 306, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+PHI   = np.array([18, 45, 54, 117, 189, 261, 333])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
 #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
@@ -153,35 +162,38 @@ def getValuesAlong0(title, data,phi_toPlot, highToLow = False, deltas = False):
 	ax = fig.add_subplot()
 	if deltas:
 		if highToLow:
-			plt.title("{} differences based on {}, high B end to low B end".format(title, PHI[0]*180/np.pi))
+			plt.title("{} differences based on {}, [High B, Low B]".format(title.capitalize(), PHI[0]*180/np.pi))
 		else:
-			plt.title("{} differences based on {}, center to low B end".format(title, PHI[0]*180/np.pi))
+			plt.title("{} differences based on {}, [Center, Low B]".format(title.capitalize(), PHI[0]*180/np.pi))
 		for i in range(1, len(theta0s)):
 			theta0s[i] = theta0s[i]-theta0s[0]
 		theta0s[0] = list(np.zeros(len(theta0s[0])))
+		simIO.log.info("Here are the differences \n {} \n ".format(theta0s))
 	else:
 		if highToLow:
-			plt.title("{} magnitudes, high B end to low B end".format(title))
+			plt.title("{} magnitudes, [High B, Low B]".format(title.capitalize()))
 		else:
-			plt.title("{} magnitudes, center to low B end".format(title))
+			plt.title("{} magnitudes, [Center, Low B]".format(title.capitalize()))
 	
 
 	for i, line in enumerate(theta0s):
-		ax.plot(xs, line, label = "{}".format(PHI[i]*180/np.pi))
+		ax.plot(xs, line, label = "{:03.1f}".format(PHI[i]*180/np.pi))
 	plt.legend(fontsize=4)
 	#plt.xticks(np.linspace(0, 0.19, 11))
 	plt.xticks(xs[::10])
 	plt.tick_params(labelsize=5)
 	plt.yticks()
+	plt.xlabel("Distance from center - poloidally (m)")
+	plt.ylabel("Strength of field (T)")
 	plt.grid()
 	#plt.show()
 	simIO.saveFig(title)
 	plt.close()
 
-getValuesAlong0("norm", Bnorm, PHI, False, True)
-getValuesAlong0("radial", Br, PHI, False, True)
-getValuesAlong0("poloidal", Bpol, PHI, False, True)
-getValuesAlong0("toroidal", Bnorm, PHI, False, True)
+getValuesAlong0("Norm", Bnorm, PHI, False, True)
+getValuesAlong0("Radial", Br, PHI, False, True)
+getValuesAlong0("Poloidal", Bpol, PHI, False, True)
+getValuesAlong0("Toroidal", Bnorm, PHI, False, True)
 
 
 ## NORM ##
