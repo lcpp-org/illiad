@@ -12,13 +12,11 @@ from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 from classes.particle import *
 
 #def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl_, workers=40, saveData=True):
-def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LSODA', rtl_=1e-6, atl_=1e-16, workers=6, saveData=True, double_line=False):
-    
+def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LSODA', rtl_=1e-6, atl_=1e-16, workers=6, double_line=False, saveData=True):
     outputHandler.createSubDir(anlys_name)
     
-    NLINES = len(ic_rtp_arr)
-
     ## CONVERT TO XYZ COORDS
+    NLINES = len(ic_rtp_arr)
     ICs_XYZ = np.zeros(shape=(NLINES, 3))
     for i in range(NLINES):
         ICs_XYZ[i] = RTP_to_XYZ(ic_rtp_arr[i], field_.R0)
@@ -43,16 +41,16 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
     ## GENERATE POINCARE DATA
     length = (2*np.pi * field_.R0) * spins
     fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
-    if double_line:
-        fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ] #add fieldlines in opposite direction
-
-
 
     ## SOLVER SETUP
     Nlines = Particle.particleCount
 
-    ## EVENT LIST (avert your eyes)
+    if double_line:
+        # Add fieldlines in opposite direction
+        fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
 
+    ## EVENT LIST (avert your eyes)
+    """
     poincare_events = [ inVV,
                         isphi9,
                         isphi18,
@@ -94,10 +92,8 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
                         isphi342,
                         isphi351,
                         isphi360]
-
-
-
     """
+
     poincare_events = [ inVV, 
                         isphi1, 
                         isphi2, 
@@ -459,16 +455,13 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
                         isphi358, 
                         isphi359, 
                         isphi360] 
-    """
-
 
     ## SOLVER
-    
     length = fieldlines[0].maxLife
     solvePoincare_x = partial(solvePoincare, field=field_, solver=solvr, rtl= rtl_, atl=atl_, solver_events=poincare_events)
 
     ## PARALLELIZATION WITH CONCURRENT FUTURES 'MAP' OVER EACH PARTICLE
-    outputHandler.log.info('Begin running {} Initial Conditions for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
+    outputHandler.log.info('Begin running {} ICs for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
     t_start = perf_counter()
     with cf.ProcessPoolExecutor(max_workers=workers) as executor:
         solver_output = executor.map(solvePoincare_x, fieldlines)
@@ -488,8 +481,16 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
             wall_output_ += [XYZ_to_RTP(out[0][0], field_.R0)]
 
     if double_line:
+        # Combine the positive and negative fieldlines into one
         pathLength_ = [pathLength_[i]+pathLength_[i+NLINES] for i in range(0,NLINES)]
-        Poincare_output_ = [np.vstack((Poincare_output_[i], Poincare_output_[i+NLINES])) for i in range(0,NLINES)]
+        for line_index in range(0,NLINES):
+            for event_index in range(len(Poincare_output_[line_index])):
+                arr_a = Poincare_output_[line_index][event_index]
+                arr_b = Poincare_output_[line_index+NLINES][event_index]
+                if arr_a.any() and arr_b.any():
+                    Poincare_output_[line_index][event_index] = np.vstack((arr_a, arr_b))
+        Poincare_output_ = Poincare_output_[:NLINES]
+
 
     ## POST-SOLVER OUTPUT
     ####################
@@ -498,12 +499,14 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
     plt.rcParams.update({'figure.autolayout':True})
 
     outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
-    phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
+    #phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
+    phi_range = np.linspace( np.pi/180., 2*np.pi, 360)
 
     plot_workers = min(workers, 40)
     # LOOPING OVER EACH PHI ANGLE
     iter_in = enumerate(phi_range)
-    Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_, anlys_name=anlys_name, outputHandler=outputHandler, saveData=saveData)
+    Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_,
+                                 anlys_name=anlys_name, outputHandler=outputHandler, saveData=saveData)
     with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
         outs = executor.map(Output_Poincare_x, iter_in)
     

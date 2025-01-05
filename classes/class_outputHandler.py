@@ -131,10 +131,10 @@ class IOHandler:
         #except OSError as error:
         #    print('FILE DOES NOT EXIST!')
     
-    def saveFig(self, name):
+    def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
-        plt.savefig(name_loc, dpi=400)
+        plt.savefig(name_loc, dpi=dpi)
 
     def loadPorts_fromCSV(self, name):
         """ 

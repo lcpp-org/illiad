@@ -102,37 +102,28 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
 
 
 
-#def RTP_XYZ_JAC(p_rtp, Rmajor):
-#    ctheta = np.cos(p_rtp[1])
-#    stheta = np.sin(p_rtp[1])
-#    cphi = np.cos(p_rtp[2])
-#    sphi = np.sin(p_rtp[2])
-#    Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
-#                     [-stheta*cphi,  stheta*sphi, ctheta],
-#                     [       -sphi,        -cphi,     0]])
-#    
-#    return np.dot(Xform, p_rtp)
+def RTP_XYZ_JAC(p_rtp, vec_xyz):
+    ctheta = np.cos(p_rtp[1])
+    stheta = np.sin(p_rtp[1])
+    cphi = np.cos(p_rtp[2])
+    sphi = np.sin(p_rtp[2])
+    Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
+                     [-stheta*cphi,  stheta*sphi, ctheta],
+                     [       -sphi,        -cphi,     0]])
+    
+    return np.dot(Xform, vec_xyz)
 
 # TRANSFORM FROM THETA,R ABOUT (GEOMETRIC AXIS)
 # TO (MAGNETIC AXIS): THETA=PI, R=0.0187M
-def axisShift(rho, theta, rdel, thdel_): 
-    #print(f'{rdel=}')
-    #xformed_Coord = np.array([theta, rho])
-    #return xformed_Coord
-    rprime = np.sqrt( rho**2 + rdel**2 - 2*rho*rdel*np.cos(theta - thdel_) )
+def axisShift(rho, theta, rdel, thdel_, Rmaj=0.72): 
 
-    chi = np.arcsin((rho/rprime) * np.sin(theta - thdel_))
+    xprime = rho*np.cos(theta) - rdel*np.cos(thdel_)
+    zprime = rho*np.sin(theta) - rdel*np.sin(thdel_)
 
-    condition = rho**2 > rprime**2 + rdel**2
-    chi = np.where(condition, np.pi - chi, chi)
-    chi = np.where(chi<0, chi + 2*np.pi, chi)
-
-    opt1 = thdel_ - chi + np.pi
-    opt2 = thdel_ - chi - np.pi
-
-    thetaprime = np.where(theta>thdel_, opt1, opt2 )
-    thetaprime = np.where(thetaprime<0, thetaprime + 2*np.pi, thetaprime)    
-
+    rprime = np.sqrt(xprime**2 + zprime**2)
+    thetaprime = np.arctan2(zprime, xprime)
+    thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
+    
     return np.array([thetaprime, rprime])
 
 

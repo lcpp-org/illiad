@@ -153,7 +153,7 @@ class Mesh:
         ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
         point_RTP_local = np.array([r_local, th_local, ph_local])
 
-        if r_local > self.r_max:
+        if r_local >= self.r_max:
             # determine whether point is within mesh domain
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
