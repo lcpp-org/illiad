@@ -6,22 +6,6 @@ import logging
 
 from utility.coordtrans import *
 
-## ==================================== ##-
-## FIELD LINE SOLVER (FROM "Bfield.py") ##
-## ==================================== ##
-#def blines(t, p_XYZ, field):
-#    direction = 1
-#    B = np.zeros(3)
-#    B, dum_ = field.interpField(p_XYZ[:3])
-#
-#    # hard-coded, hacky error field implementation
-#    B[0] += 0.0002
-#    B[1] += -0.0002
-#
-#    dY = direction * B / np.linalg.norm(B)
-#
-#    return dY
-
 
 ##===============##
 ## DEFINE SOLVER ##
@@ -48,10 +32,11 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
 
 
     t_startInd = perf_counter()
-    fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond, args = ([field]),
-            dense_output=False,
-            events = solver_events, 
-            method=solver, rtol=rtl, atol=atl)
+    fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
+                            args = ([field]),
+                            dense_output=False,
+                            events = solver_events, 
+                            method=solver, rtol=rtl, atol=atl)
     t_stopInd = perf_counter()
     elapsed_timeInd = t_stopInd - t_startInd
 
@@ -59,12 +44,19 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
 
     if fieldlines.status == 0: #solver ran to max. time
         log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
-                 .format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
+            .format(particle.particleID,
+                    particle.particleCount,
+                    elapsed_timeInd,
+                    fieldlines.t_events[0]))
     elif fieldlines.status == 1: #termination event
         log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
-                 .format(particle.particleID, particle.particleCount, elapsed_timeInd, fieldlines.t_events[0]))
+            .format(particle.particleID,
+                    particle.particleCount,
+                    elapsed_timeInd,
+                    fieldlines.t_events[0]))
     else: #solver failure
-        log.critical('FAILURE!: Particle {}'.format(particle.particleID))
+        log.critical('FAILURE!: Particle {}'
+            .format(particle.particleID))
 
     data = fieldlines.y_events[:]
 

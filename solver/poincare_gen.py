@@ -502,7 +502,7 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
     #phi_range = np.linspace( np.pi/20., 2*np.pi, 40)
     phi_range = np.linspace( np.pi/180., 2*np.pi, 360)
 
-    plot_workers = min(workers, 40)
+    plot_workers = min(workers, 18)
     # LOOPING OVER EACH PHI ANGLE
     iter_in = enumerate(phi_range)
     Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_,
