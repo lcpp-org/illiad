@@ -30,13 +30,13 @@ def main():
     #NSURFACE = 40
     ## LOOP THROUGH PHI ANGLES
     ##########################
-    NTHETA = 90#24
+    NTHETA = 360 #24
     dtheta = 2*np.pi/NTHETA
     THETA_EVALSOG = np.linspace(dtheta, 2*np.pi, NTHETA)
-    #PHI_GENs = np.linspace(9, 360, 40)
-    PHI_GENs = np.linspace(1, 360, 360)
+    PHI_GENs = np.linspace(9, 360, 40)
+    #PHI_GENs = np.linspace(1, 360, 360)
 
-    plot_all = False
+    plot_all = True
     calc_flux = False
 
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
@@ -59,6 +59,13 @@ def main():
         if PHI_GEN_DEG == PHI_GENs[0]:
             flux = np.zeros([NSURFACE, len(PHI_GENs)])
             plotData_list = [ [0]*NSURFACE for _ in range(len(PHI_GENs)) ]
+
+        if plot_all:
+            fig = plt.figure()
+            ax1 = fig.add_subplot(221, polar=False)  
+            ax2 = fig.add_subplot(222)
+            #ax3 = fig.add_subplot(223, polar=True)  
+            ax4 = fig.add_subplot(224, polar=True)
 
         ## LOOP THROUGH FLUX SURFACES   
         for surf_index in range(LCFS_index, NSURFACE):
@@ -90,9 +97,17 @@ def main():
             radpoints_tr_MagAxis = np.zeros([num_subsets, NTHETA])
             theta_evals_MagAxis = np.zeros([num_subsets, NTHETA])
             points_tr_GeoAxis = np.zeros([num_subsets, NTHETA, 2])
+            subCenters_geo = np.zeros([num_subsets, 2])
 
-            ## subset loop      
+            
+            ## LOOP THROUGH SUBSETS     
             for subset_index in range(num_subsets):
+                if num_subsets > 1:
+                    subCenters_geo[subset_index][:] = axisShift(subsetCenters[subset_index][0], subsetCenters[subset_index][1], *MAG_AXIS_rev[:2])
+                else:
+                    subCenters_geo[subset_index][0] = subsetCenters[subset_index][1]
+                    subCenters_geo[subset_index][1] = subsetCenters[subset_index][0]
+                
                 theta_toSpline = subsetData[subset_index].T[0]
                 rad_toSpline = subsetData[subset_index].T[1]
                 th_size = theta_toSpline.size
@@ -102,11 +117,13 @@ def main():
                 if fail:
                     simIO.log.info( 'Surface #{}, fail: {}'.format(surf_index, bool(fail)) )
                     simIO.log.info('msg: {}'.format(msg))
+                else:
+                    pass#simIO.log.info('Surface #{}, res: {}'.format(surf_index, res))
 
                 # Create a set of regularly-spaced points evalutaed on the spline fit
                 radpoints_tr_LocAxis[subset_index] = splev(THETA_EVALSOG, fSurface_splineParms)
 
-                ## Loop through theta points
+                ## LOOP THROUGH THETA POINTS
                 for th_index, theta in enumerate(THETA_EVALSOG):
                     
                     ## Shift r, theta back relative to overall magnetic axis
@@ -138,37 +155,44 @@ def main():
             ## PLOTTING EACH FLUX SURFACE AT EACH PHI ANGLE
             ###########
             if plot_all:
-                fig = plt.figure()
-                ax = fig.add_subplot(221, polar=False)  
-                ax2 = fig.add_subplot(222)
-                #ax3 = fig.add_subplot(223, polar=True)  
-                ax4 = fig.add_subplot(224, polar=True)
+            #     fig = plt.figure()
+            #     ax1 = fig.add_subplot(221, polar=False)  
+            #     ax2 = fig.add_subplot(222)
+            #     #ax3 = fig.add_subplot(223, polar=True)  
+            #     ax4 = fig.add_subplot(224, polar=True)
 
                 # plot the spline fit
-                #if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): #filter out wild fits
-                for i in range(0, num_subsets):
-                    if np.any(theta_evals_MagAxis[i] < 355.*np.pi/180.) and np.any(theta_evals_MagAxis[i] < 5.*np.pi/180.):
-                        theta_evals_MagAxis[i] = np.where(theta_evals_MagAxis[i] < np.pi, theta_evals_MagAxis[i]+ 2*np.pi, theta_evals_MagAxis[i])
-                    ax.plot(theta_evals_MagAxis[i], radpoints_tr_MagAxis[i], '-', linewidth=0.7)#, label='$\psi=${:.4e}'.format(flux[surf_index][phi_index]) )
-                    
+                if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): #filter out wild fits
+                    for i in range(0, num_subsets):
+                        #if np.any(theta_evals_MagAxis[i] < 355.*np.pi/180.) and np.any(theta_evals_MagAxis[i] < 5.*np.pi/180.):
+                        #    theta_evals_MagAxis[i] = np.where(theta_evals_MagAxis[i] < np.pi, theta_evals_MagAxis[i]+ 2*np.pi, theta_evals_MagAxis[i])
+                        ax1.plot(theta_evals_MagAxis[i], radpoints_tr_MagAxis[i], '-', linewidth=0.4)#, label='$\psi=${:.4e}'.format(flux[surf_index][phi_index]) ) 
                 # plot the data points
-                ax.scatter(points_tr_MagAxis.T[0], points_tr_MagAxis.T[1], color='k', s=1, linewidths=0.0) # mag-axis point
-                # plot the centers of the subsets
-                ax.scatter(subsetCenters.T[1], subsetCenters.T[0], color='r', s=5, linewidths=0.0, zorder=5) # mag-axis point
+                ax1.scatter(points_tr_MagAxis.T[0], points_tr_MagAxis.T[1], color='k', s=0.25, linewidths=0.0) # mag-axis point
 
                 # Format and Save Plot
-                ax.set_ylim(0, 0.19)
-                ax.grid(linewidth = 0.25, linestyle=':', c='k')
-                ax.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0, fontsize='xx-small', ncols=2)
+                ax1.set_ylim(0, 0.19)
+                ax1.grid(linewidth = 0.25, linestyle=':', c='k')
+                ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0, fontsize='xx-small', ncols=2)
 
-                # plot the histogram
+                # Plot the histogram
                 ax2.bar(bin_edges[:-1], hist, width=np.diff(bin_edges), align='edge', edgecolor='k')
-                ax2.set_title('Spline fit to Last Flux Surface {} @ phi={}'.format(surf_index, PHI_GEN_DEG))
+                ax2.set_title('Spline fit to Last Flux Surface {} @ phi={}'.format(surf_index, PHI_GEN_DEG), fontsize=8)
+
+                # Plot something else
                 #ax3.scatter(theta_evals_MagAxis, radpoints_tr_MagAxis, s=2, linewidths=0.3) # mag-axis point
-                ax4.scatter(plotData_list[phi_index][surf_index].T[0], plotData_list[phi_index][surf_index].T[1], s=2, linewidths=0.3)
-                
-                simIO.saveFig(anlys_dir+'/Flux{:03d}_at_{:03d}deg.png'.format(surf_index, int(PHI_GEN_DEG)), dpi=300)
-                plt.close()
+
+                # Plot polar plot of fitted points and local centers
+                if np.all( plotData_list[phi_index][surf_index].T[1] < 0.19) and np.all( plotData_list[phi_index][surf_index].T[1] > 0.0): #filter out wild fits
+                    ax4.plot(plotData_list[phi_index][surf_index].T[0], plotData_list[phi_index][surf_index].T[1], markersize=0.1, linewidth=0.4)
+                    #ax4.scatter(subsetCenters.T[1], subsetCenters.T[0], color='k', s=3, linewidths=0.0, zorder=5) # mag-axis point
+                    ax4.scatter(subCenters_geo.T[0], subCenters_geo.T[1], color='k', s=3, linewidths=0.0, zorder=5) # mag-axis point
+
+                # simIO.saveFig(anlys_dir+'/Flux{:03d}_at_{:03d}deg.png'.format(surf_index, int(PHI_GEN_DEG)), dpi=300)
+                # plt.close()
+        if plot_all:
+            simIO.saveFig(anlys_dir+'/Flux_at_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=400)
+            plt.close()
 
         #/END surface
     #/END phi
@@ -176,7 +200,6 @@ def main():
     ## PLOT FLUX SURFACES
     #####################
     plot_surfIndex = [67, 41] #21
-    #plot_surfIndex = [34, 22] #21
     plotData_XYZ_list = []
 
     for surf_index in plot_surfIndex:

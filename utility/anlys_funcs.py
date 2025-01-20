@@ -370,10 +370,6 @@ def find_Axis(theta_vals, r_vals, field):
     y_avg = 0.0
     z_avg = np.average(z_in)
 
-    # x_avg = np.max(x_in) + np.min(x_in) / 2
-    # y_avg = 0.0
-    # z_avg = np.max(z_in) + np.min(z_in) / 2
-
     axis_xyz = np.array([x_avg, y_avg, z_avg])
     axis_rtp = XYZ_to_RTP(axis_xyz, field.R0)
 
@@ -381,9 +377,11 @@ def find_Axis(theta_vals, r_vals, field):
 
 
 
-def find_subsets(theta_r_pts, mag_axis, field):
+def find_subsets(theta_r_pts, mag_axis, field, BINS=30):
+    """Function to find contiguous subsets of points in theta-r space"""
+    test_flag = False
     # make a histogram of the point density vs theta
-    hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=30, range=(0, 2*np.pi))
+    hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=BINS, range=(0., 2*np.pi))
     dtheta_bin = bin_edges[1] - bin_edges[0]
 
     # find how many contiguous sets of adjacents bins there are
@@ -393,6 +391,7 @@ def find_subsets(theta_r_pts, mag_axis, field):
     if hist[0] > 0 and hist[-1] > 0 and len(contiguous_sets) > 1:
         contiguous_sets[0] = np.concatenate((contiguous_sets[-1], contiguous_sets[0]))
         contiguous_sets.pop()
+        test_flag = True
     num_sets = len(contiguous_sets)
 
     subsetData = []
@@ -410,26 +409,22 @@ def find_subsets(theta_r_pts, mag_axis, field):
 
         # sort the subset by theta
         thisSet_tr = thisSet_tr[np.argsort(thisSet_tr[:, 0])]
-        #print(f'{thisSet_tr=}')
 
-        # find the centers of the subsets, transform the coordinates relative to the local center
-        #if num_sets > 1:
+        # TESTING, ONLY CONSIDER 3 SUBSETS!
         # only split if there are between 3 and 5 subsets, treat rest as 1 set
-        if num_sets > 2 and num_sets < 6: 
+        if num_sets > 2 and num_sets < 4:
             subsetCenters[i][:] = find_Axis(thisSet_tr.T[0], thisSet_tr.T[1], field)[:2]
-            subsetCenters[i][0] += 0.005
+            # shift the data to be relative to the center of the subset
             thisSetLocAxis = np.array([axisShift(r, theta, *subsetCenters[i][:2]) for theta, r in thisSet_tr])
             thisSetLocAxis = thisSetLocAxis[np.argsort(thisSetLocAxis[:, 0])]
             subsetData += [thisSetLocAxis]
-        # if there is only 1 subset, keep the original magnetic axis
+        # if there is only 1 subset, or lots(noisy data), then keep the original magnetic axis
         else:
             subsetCenters[i][:] = mag_axis[:2]
             thisSetLocAxis = thisSet_tr
             subsetData = [theta_r_pts]
 
-        # subsetData += [thisSetLocAxis]
-
-    return subsetData, subsetCenters, hist, bin_edges
+    return subsetData, subsetCenters, hist, bin_edges, test_flag
 
 
 
@@ -446,6 +441,6 @@ def spline_Data(theta_pts, rad_pts):
     rad_B = rad_pts[1:append_length]
     rad_spl = np.concatenate((rad_A, rad_pts, rad_B))
     # spline parameters
-    fSurface_splineParms, res, fail, msg = splrep(theta_spl, rad_spl, k=1, s=1e-6, per=False, full_output=1, quiet=1)
+    fSurface_splineParms, res, fail, msg = splrep(theta_spl, rad_spl, k=3, s=1e-5, per=False, full_output=1, quiet=1)
 
     return fSurface_splineParms, res, fail, msg
