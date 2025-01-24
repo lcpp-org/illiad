@@ -58,7 +58,7 @@ def main():
             t[i] = np.degrees(theta)
             if t[i]>=180: #Adjusts the theta so the range is (-180,180)
                 t[i] -=360
-            p[i] = np.degrees(-phi) +360# Negative to flip the orientation to match the helical coils around HIDRA
+            p[i] = np.degrees(-phi) +360# Negative to flip the orientation to clockwise to match the helical coils around HIDRA
         
         if coiltype[n] == 'Helix':
             if float(coilpts[0][3]) < 0:    c = 'r'; firstTime=0 #Negative current is in red
@@ -105,9 +105,9 @@ def main():
         else: print('COIL-TYPE ERROR!')
         
 
-    plt.title('HIDRA Helical Coils')
-    plt.xlabel('Phi Angle Physical (0 is West end, or some periodic multiple)')
-    plt.ylabel('Theta Angle')
+    plt.title('HIDRA Magnetic Coils')
+    plt.xlabel('Computational Toroidal ($\\varphi$) Angle')#Phi Angle Physical (0 is West end, or some periodic multiple)')
+    plt.ylabel('Poloidal ($\\theta$) Angle')
 
     ax.set_xticks(np.linspace(0,360,21))
     ax.set_yticks(np.linspace(-180,180,21))

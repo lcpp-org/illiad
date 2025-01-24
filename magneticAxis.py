@@ -10,12 +10,14 @@ def calc_Magnetic_axis(folder, filenames):
     #create the plot
     fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={'projection': 'polar'})
     #ax = fig.add_subplot(111, polar=True)
-    ax.set_rlim(0, 0.1)
+    ax.set_rlim(0, 0.05)
+
     
 
     for num in filenames:
         filename = f"Poincare_{num:03}.npy"
         data = simOut.loadNumpyData(filename)
+        print(data.shape)
         Rs = []
     
 
@@ -41,18 +43,18 @@ def calc_Magnetic_axis(folder, filenames):
         r = np.sqrt(mean_x**2 + mean_y**2)
         theta = np.arctan2(mean_y,mean_x)
     
-        plt.scatter(theta, r, marker = 'o', s = 10, linewidths=0.0, label=f"{num}$^{{\\circ}}$ | r0={np.sqrt((Rmajor+mean_x)**2 + mean_y**2):.2e} | r,z = {Rmajor+mean_x:.2e},{mean_y:.1e}")
+        plt.scatter(theta, r, marker = 'X', s = 30, linewidths=0.0, label=f"{num}$^{{\\circ}}$ | $r_0$={np.sqrt((Rmajor+mean_x)**2 + mean_y**2):.2e}")
         Rs.append([np.sqrt((Rmajor+mean_x)**2 + mean_y**2), Rmajor+mean_x, mean_y])
         Rs = np.array(Rs)
         radii = Rs[:, 0]
     
-    plt.legend(loc = "lower center")
-    plt.title(f"Magnetic Axes for 5 angles, {filenames}")
+    plt.legend(loc ="lower right")
+    #plt.title(f"Magnetic Axes for 5 angles, {filenames}")
     plt.savefig(f"output/{folder}/magnetic_axes_{filenames[0]:03}")
 
     return(plt, Rs[np.argmin(radii)])
 
-calc_Magnetic_axis("1deg_1q3_10p_10t_400s", [45, 117, 189, 261, 333])
+calc_Magnetic_axis("1deg_1q3_10p_10t_400s", [45,117,189, 261, 333])
 
 
 

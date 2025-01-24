@@ -17,7 +17,7 @@ plot_XSection (comment out or not)
 
 '''
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler("Bfield_graphs/1q3_contours_6PFC_deltas_max") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+simIO = out.IOHandler("Bfield_graphs/1q3_15_highlow_max") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
@@ -29,10 +29,11 @@ b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
 
 mesh_ntheta = int(b_hidra.ntheta/2)
 mesh_dtheta = b_hidra.dtheta*2
+
 R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
 THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
 #PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-PHI   = np.array([18, 45, 54, 117, 189, 261, 333])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+PHI   = np.array([18, 45, 54, 90, 117, 126, 162, 189, 198, 234, 261, 270, 306, 333, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
 #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
@@ -190,10 +191,10 @@ def getValuesAlong0(title, data,phi_toPlot, highToLow = False, deltas = False):
 	simIO.saveFig(title)
 	plt.close()
 
-getValuesAlong0("Norm", Bnorm, PHI, False, True)
-getValuesAlong0("Radial", Br, PHI, False, True)
-getValuesAlong0("Poloidal", Bpol, PHI, False, True)
-getValuesAlong0("Toroidal", Bnorm, PHI, False, True)
+getValuesAlong0("Norm", Bnorm, PHI, True, False)
+getValuesAlong0("Radial", Br, PHI, True, False)
+getValuesAlong0("Poloidal", Bpol, PHI, True, False)
+getValuesAlong0("Toroidal", Bnorm, PHI, True, False)
 
 
 ## NORM ##
