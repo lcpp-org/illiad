@@ -13,9 +13,9 @@ def RTP_to_XYZ(p_RTP, Rmajor):
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
     r, theta, phi = p_RTP[:3]
-    
-    x = (Rmajor + r*np.cos(theta)) * np.cos(phi)
-    y = (-1) * (Rmajor + r*np.cos(theta)) * np.sin(phi)
+    temp_ = (Rmajor + r*np.cos(theta))
+    x = temp_ * np.cos(phi)
+    y = (-1) * temp_ * np.sin(phi)
     z = r * np.sin(theta)
     p_XYZ = np.array([x, y, z])
     

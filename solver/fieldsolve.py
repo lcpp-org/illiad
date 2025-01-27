@@ -13,7 +13,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'It3500_Ih6390_Iv000_0p955_hires'
+output_name = 'It000_Ih7000_Iv000_0p955'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
@@ -23,18 +23,26 @@ hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
 mesh_size = hi_res
 
 # REF. COIL CURRENTS NORMALLY RUN ON HIDRA
-##########################
-#      |[Amp]|[Amp]|[Amp]#
-# IOTA | I_T | I_H | I_V #
-# 1/3  | 486 | 900 |  00 #
-# 1/4  | 486 | 790 |  00 #
-# 1/5  | 486 | 710 |  00 #
-# 1/7  | 581 | 581 |  00 #
-##########################
+#############################
+#      | [Amp]| [Amp]| [Amp]#
+# IOTA |  I_T |  I_H |  I_V #
+# 1/3  |  486 |  900 |   00 #
+# 1/4  |  486 |  790 |   00 #
+# 1/5  |  486 |  710 |   00 #
+# 1/7  |  581 |  581 |   00 #
+# MAX. | 3500 | 7000 |   ?? #
+#############################
 # INPUT COIL CURRENTS:
-I_toro = 3500.
-I_heli = 6390.
+I_toro = 0.
+I_heli = 7000.
 I_vert = 0.
+
+# *TESTING* Multiplier applied to all currents
+# Used to model the attenuation of the fields due to the stainless-steel vacuum vessel
+att_mult = 1.0 #0.7
+I_toro *= att_mult
+I_heli *= att_mult
+I_vert *= att_mult
 
 # Multiplier applied to helical current,
 # Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field

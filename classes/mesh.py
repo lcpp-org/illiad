@@ -45,7 +45,6 @@ class Mesh:
         self.periodicity: np.int32[:]
         self.errField: np.bool
 
-
     #def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
     def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
         """ 
@@ -114,7 +113,8 @@ class Mesh:
         #return np.abs(term1 + term2)
     
         dr, dtheta, dphi = np.abs( point2 - point1 )
-        return (self.R0 + point1[0] * np.cos(point1[1]) ) * point1[0] * dr * dtheta * dphi
+        #return (self.R0 + point1[0] * np.cos(point1[1]) ) * point1[0] * dr * dtheta * dphi
+        return (self.R0 + point1[0] * np.cos(point1[1]) ) * point2[0] * dr * dtheta * dphi
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -158,6 +158,7 @@ class Mesh:
             # Cast the indices to the last element of the array
             # This is to make sure the interpolation function does not fail
             rindex_lo  = self.nr - 2
+            
         else:
             # Point is within the mesh, and we can find the indices
             # (here "lo" stands for lower bound
@@ -211,7 +212,7 @@ class Mesh:
 
             # calculate the wieght function as the volume of the point-antiNode subelement
             antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
-            
+            print(antiNode_subVolume)
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
 
@@ -227,10 +228,16 @@ class Mesh:
         global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
         if self.errField:
-            global_vecXYZ[0] += 0.0002 #0.0001414214 #0.0002
-            global_vecXYZ[1] -= 0.0002 #0.0001414214 #0.0002
+           # err_mag = np.sqrt(0.0002*0.0002 + 0.0002*0.0002)
+            err_mag = 2.828427E-4
+            #err_dir = 78. * np.pi/180
+            err_dir = 150. * np.pi/180
 
-            #global_vecXYZ[1] += 0.0002 #0.0002
+            global_vecXYZ[0] += err_mag * np.cos(err_dir)
+            global_vecXYZ[1] -= err_mag * np.sin(err_dir)
+
+            # global_vecXYZ[0] += 0.0002
+            # global_vecXYZ[1] -= 0.0002
 
         return global_vecXYZ, ph_localN
 
