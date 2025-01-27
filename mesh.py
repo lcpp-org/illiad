@@ -232,6 +232,12 @@ class Mesh:
         global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
         if self.errField:
+            '''err_mag = 2.828427E-4
+            err_dir = np.radians(150)
+
+
+            global_vecXYZ[0] += err_mag * np.cos(err_dir)
+            global_vecXYZ[1] -= err_mag * np.sin(err_dir)'''
             global_vecXYZ[0] += 0.0002
             global_vecXYZ[1] -= 0.0002
 

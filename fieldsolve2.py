@@ -12,7 +12,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'i1q3_hires_max'
+output_name = 'i1q3_hires_t'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
@@ -31,8 +31,8 @@ mesh_size = hi_res
 # 1/7  | 581 | 581 |  00 #
 ##########################
 # INPUT COIL CURRENTS:
-I_toro = 3500.
-I_heli = 6390.
+I_toro = 486.
+I_heli = 0.
 I_vert = 0.
 
 # Multiplier applied to helical current,
