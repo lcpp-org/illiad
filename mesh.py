@@ -222,7 +222,7 @@ class Mesh:
             totalVolume += antiNode_subVolume
             local_vecXYZ += node_vecXYZ * antiNode_subVolume
         #  return the sum of weighted values divided by the total
-        local_vecXYZ = local_vecXYZ / totalVolume
+        local_vecXYZ = 0.9616*local_vecXYZ / totalVolume
 
         # if the mesh is defined with periodic symmetry, we must 
         # perform a rotational transform based on which 'period' of the mesh
@@ -232,14 +232,15 @@ class Mesh:
         global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
         
         if self.errField:
-            '''err_mag = 2.828427E-4
+            err_mag = 2.828427E-4
             err_dir = np.radians(150)
 
 
             global_vecXYZ[0] += err_mag * np.cos(err_dir)
-            global_vecXYZ[1] -= err_mag * np.sin(err_dir)'''
-            global_vecXYZ[0] += 0.0002
-            global_vecXYZ[1] -= 0.0002
+            global_vecXYZ[1] -= err_mag * np.sin(err_dir)
+            
+            #global_vecXYZ[0] += 0.0002
+            #global_vecXYZ[1] -= 0.0002
 
         return global_vecXYZ, ph_localN
 
