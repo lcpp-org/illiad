@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 import class_outputHandler as out
 from mesh import *
@@ -18,10 +19,11 @@ plot_XSection (comment out or not)
 '''
 ## SET UP RUN DIRECTORY
 simIO = out.IOHandler("Bfield_graphs/1q3_test") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
+
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-Bx, By, Bz = np.load('input_files/i1q3_hires.npy')
+Bx, By, Bz = np.load('input_files/i1q3_hires_t.npy')
 mesh_prd = np.array([0, 1, 5], dtype=np.int32)
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
@@ -33,7 +35,7 @@ mesh_dtheta = b_hidra.dtheta*2
 R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
 THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
 #PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-PHI   = np.array([18,45,54,90,117,126,162,189,198,234,261,270, 306,333, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+PHI   = np.array([18,45,90,117,162,189,234,261,306,333])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
 #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
@@ -208,11 +210,80 @@ def getValuesAlong0(title, data,phi_toPlot, highToLow = False, deltas = False):
 	simIO.saveFig(title)
 	plt.close()
 
+def getValuesAtDistance(title, data, phi_toPlot):
+	
+	
+	simIO.log.info("The values for {} are given for these theta values \n {} \n ".format(title, np.degrees(THETA)))
+	allStrengths = []
+	#print(np.degrees(THETA)) # 0 is 2 degs, 5 is 22.11235955, 44 is 178.988, 50 is 203.12359551, and -1 is 360
+	for i, p in enumerate(phi_toPlot):
+		plot_data = np.transpose(data, [2,1,0])[i]
+		#print(plot_data.shape, (len(plot_data)//2)-1)
+		
+		radius = 0.1 #distance from the poloidal center outward
+		index = list(R).index(radius)
+		strength = []
+
+		for i in (plot_data): #every theta value
+			strength.append(i[index])
+
+			
+		
+		allStrengths.append(strength)
+		simIO.log.info('{}\n at {}'.format(allStrengths, p*180/np.pi))
+	
+	'''
+	dic = {}
+	for l,phi in enumerate(allStrengths):
+		#	print(l)
+		nums = []
+		for i in range(0,96,5):
+			nums.append(phi[i])
+		for k in range(101,192,5):
+			nums.append(phi[k])
+		dic[f"{np.degrees(phi_toPlot[l])}"] = np.array(nums)
+	df = pd.DataFrame(dic)
+	df.to_clipboard()
+	'''
+
+	fig = plt.figure()
+	ax = fig.add_subplot()
+	
+	plt.title("{} strengths at radius of {}".format(title.capitalize(), -1*(radius-0.19)))#uses radius to give distance inward from outer wall
+	
+	rangeof23 = []
+	for i, line in enumerate(allStrengths):
+		ax.plot(np.degrees(THETA), line, label = "{:03.1f}".format(PHI[i]*180/np.pi))
+		if PHI[i]*180/np.pi%72 == 18:
+			rangeof23.append(line[-1]+0.0023)
+	ymin,ymax = ax.get_ylim()
+	vline_positions = np.array([360, 22.5, 45, 90, 180])
+	ax.vlines(vline_positions, ymin=ymin, ymax=ymax,linestyles="dashed")
+	for x_pos, label in zip(vline_positions, ["360 (0)", "22.5", "45", "90", "180"]):
+		ax.text(x_pos, ymax, label, horizontalalignment='center', verticalalignment='bottom', fontsize=10, color='black')
+
+	ax.hlines(np.array([min(rangeof23), max(rangeof23)]), 0, 360, colors="black", linestyles="dashed", label = "23 G larger than the $\theta$=0 angle at ")
+	for y_pos, label in zip(np.array([min(rangeof23), max(rangeof23)]), [f"{min(rangeof23):0.3f}", f"{max(rangeof23):0.3f}"]):
+		ax.text(360, y_pos, label, horizontalalignment='left', verticalalignment='center', fontsize=10, color='black')
+	plt.legend()
+	#plt.xticks(np.linspace(0, 0.19, 11))
+	ax.xaxis.set_major_locator(ticker.MultipleLocator(10))  # Major ticks every 2 units
+	ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))  # Minor ticks every 0.5 units
+	ax.yaxis.set_major_locator(ticker.MultipleLocator(0.005))  # Major y-ticks every 0.5
+	ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.001))
+	
+	plt.yticks()
+	
+	plt.ylabel("Strength of field (T)")
+	plt.grid()
+	plt.show()
+	#simIO.saveFig("" + title + "at" + radius)
+	plt.close()
 #getValuesAlong0("Norm", Bnorm, PHI, True, False)
 #getValuesAlong0("Radial", Br, PHI, True, False)
 #getValuesAlong0("Poloidal", Bpol, PHI, True, False)
-getValuesAlong0("Toroidal", Btor, PHI, True, False)
-
+#getValuesAlong0("Toroidal", Btor, PHI, True, False)
+getValuesAtDistance("Toroidal", Btor, PHI)
 
 ## NORM ##
 #plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm', PHI)
