@@ -13,7 +13,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'It000_Ih7000_Iv000_0p955'
+#output_name = 'It486_Ih900_Iv000_hel1p055'
+output_name = 'FITTED_02092025_hel-0p950'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
@@ -33,13 +34,13 @@ mesh_size = hi_res
 # MAX. | 3500 | 7000 |   ?? #
 #############################
 # INPUT COIL CURRENTS:
-I_toro = 0.
-I_heli = 7000.
+I_toro = 486.
+I_heli = 900.
 I_vert = 0.
 
 # *TESTING* Multiplier applied to all currents
 # Used to model the attenuation of the fields due to the stainless-steel vacuum vessel
-att_mult = 1.0 #0.7
+att_mult = 0.943080960048148 #0.967 #0.7
 I_toro *= att_mult
 I_heli *= att_mult
 I_vert *= att_mult
@@ -47,7 +48,7 @@ I_vert *= att_mult
 # Multiplier applied to helical current,
 # Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field
 # Based on characterization of WEGA by Otte[REF] (Set to 1.0 if ideal field is desired)
-err_mult = 0.955
+err_mult = 0.950
 I_heli *= err_mult
 
 ########################
