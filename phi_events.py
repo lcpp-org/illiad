@@ -13,20 +13,21 @@ inVV.terminal = True
 
 
 
-#@nb.jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C"), Mesh.class_type.instance_type), nopython=True)
-def isphi1(t, p_XYZ, Mesh):
-	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
+#@nb.jit(nb.float64( nb.float64, nb.types.Array(nb.float64, 1, "C") ), nopython=True)
+def isphi1(t, p_XYZ):
+
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
-	#return p_RTP[2] - 1. * (np.pi/180)
+	if phi<0.: phi += 2*np.pi
+
 	return phi - 1. * (np.pi/180)
+
 isphi1.direction = 1.0
 
 #@nb.jit(nb.float64(nb.float64, nb.types.Array(nb.float64, 1, "C"), Mesh.class_type.instance_type), nopython=True)
 def isphi2(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 2. * (np.pi/180)
 	return phi - 2. * (np.pi/180)
 isphi2.direction = 1.0
@@ -35,7 +36,7 @@ isphi2.direction = 1.0
 def isphi3(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 3. * (np.pi/180)
 	return phi - 3. * (np.pi/180)
 isphi3.direction = 1.0
@@ -44,7 +45,7 @@ isphi3.direction = 1.0
 def isphi4(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 4. * (np.pi/180)
 	return phi - 4. * (np.pi/180)
 isphi4.direction = 1.0
@@ -53,7 +54,7 @@ isphi4.direction = 1.0
 def isphi5(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 5. * (np.pi/180)
 	return phi - 5. * (np.pi/180)
 isphi5.direction = 1.0
@@ -62,7 +63,7 @@ isphi5.direction = 1.0
 def isphi6(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 6. * (np.pi/180)
 	return phi - 6. * (np.pi/180)
 isphi6.direction = 1.0
@@ -71,7 +72,7 @@ isphi6.direction = 1.0
 def isphi7(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 7. * (np.pi/180)
 	return phi - 7. * (np.pi/180)
 isphi7.direction = 1.0
@@ -80,7 +81,7 @@ isphi7.direction = 1.0
 def isphi8(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 8. * (np.pi/180)
 	return phi - 8. * (np.pi/180)
 isphi8.direction = 1.0
@@ -89,7 +90,7 @@ isphi8.direction = 1.0
 def isphi9(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 9. * (np.pi/180)
 	return phi - 9. * (np.pi/180)
 isphi9.direction = 1.0
@@ -98,7 +99,7 @@ isphi9.direction = 1.0
 def isphi10(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 10. * (np.pi/180)
 	return phi - 10. * (np.pi/180)
 isphi10.direction = 1.0
@@ -107,7 +108,7 @@ isphi10.direction = 1.0
 def isphi11(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 11. * (np.pi/180)
 	return phi - 11. * (np.pi/180)
 isphi11.direction = 1.0
@@ -116,7 +117,7 @@ isphi11.direction = 1.0
 def isphi12(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 12. * (np.pi/180)
 	return phi - 12. * (np.pi/180)
 isphi12.direction = 1.0
@@ -125,7 +126,7 @@ isphi12.direction = 1.0
 def isphi13(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 13. * (np.pi/180)
 	return phi - 13. * (np.pi/180)
 isphi13.direction = 1.0
@@ -134,7 +135,7 @@ isphi13.direction = 1.0
 def isphi14(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 14. * (np.pi/180)
 	return phi - 14. * (np.pi/180)
 isphi14.direction = 1.0
@@ -143,7 +144,7 @@ isphi14.direction = 1.0
 def isphi15(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 15. * (np.pi/180)
 	return phi - 15. * (np.pi/180)
 isphi15.direction = 1.0
@@ -152,7 +153,7 @@ isphi15.direction = 1.0
 def isphi16(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 16. * (np.pi/180)
 	return phi - 16. * (np.pi/180)
 isphi16.direction = 1.0
@@ -161,7 +162,7 @@ isphi16.direction = 1.0
 def isphi17(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 17. * (np.pi/180)
 	return phi - 17. * (np.pi/180)
 isphi17.direction = 1.0
@@ -170,7 +171,7 @@ isphi17.direction = 1.0
 def isphi18(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 18. * (np.pi/180)
 	return phi - 18. * (np.pi/180)
 isphi18.direction = 1.0
@@ -179,7 +180,7 @@ isphi18.direction = 1.0
 def isphi19(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 19. * (np.pi/180)
 	return phi - 19. * (np.pi/180)
 isphi19.direction = 1.0
@@ -188,7 +189,7 @@ isphi19.direction = 1.0
 def isphi20(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 20. * (np.pi/180)
 	return phi - 20. * (np.pi/180)
 isphi20.direction = 1.0
@@ -197,7 +198,7 @@ isphi20.direction = 1.0
 def isphi21(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 21. * (np.pi/180)
 	return phi - 21. * (np.pi/180)
 isphi21.direction = 1.0
@@ -206,7 +207,7 @@ isphi21.direction = 1.0
 def isphi22(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 22. * (np.pi/180)
 	return phi - 22. * (np.pi/180)
 isphi22.direction = 1.0
@@ -215,7 +216,7 @@ isphi22.direction = 1.0
 def isphi23(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 23. * (np.pi/180)
 	return phi - 23. * (np.pi/180)
 isphi23.direction = 1.0
@@ -224,7 +225,7 @@ isphi23.direction = 1.0
 def isphi24(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 24. * (np.pi/180)
 	return phi - 24. * (np.pi/180)
 isphi24.direction = 1.0
@@ -233,7 +234,7 @@ isphi24.direction = 1.0
 def isphi25(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 25. * (np.pi/180)
 	return phi - 25. * (np.pi/180)
 isphi25.direction = 1.0
@@ -242,7 +243,7 @@ isphi25.direction = 1.0
 def isphi26(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 26. * (np.pi/180)
 	return phi - 26. * (np.pi/180)
 isphi26.direction = 1.0
@@ -251,7 +252,7 @@ isphi26.direction = 1.0
 def isphi27(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 27. * (np.pi/180)
 	return phi - 27. * (np.pi/180)
 isphi27.direction = 1.0
@@ -260,7 +261,7 @@ isphi27.direction = 1.0
 def isphi28(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 28. * (np.pi/180)
 	return phi - 28. * (np.pi/180)
 isphi28.direction = 1.0
@@ -269,7 +270,7 @@ isphi28.direction = 1.0
 def isphi29(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 29. * (np.pi/180)
 	return phi - 29. * (np.pi/180)
 isphi29.direction = 1.0
@@ -278,7 +279,7 @@ isphi29.direction = 1.0
 def isphi30(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 30. * (np.pi/180)
 	return phi - 30. * (np.pi/180)
 isphi30.direction = 1.0
@@ -287,7 +288,7 @@ isphi30.direction = 1.0
 def isphi31(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 31. * (np.pi/180)
 	return phi - 31. * (np.pi/180)
 isphi31.direction = 1.0
@@ -296,7 +297,7 @@ isphi31.direction = 1.0
 def isphi32(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 32. * (np.pi/180)
 	return phi - 32. * (np.pi/180)
 isphi32.direction = 1.0
@@ -305,7 +306,7 @@ isphi32.direction = 1.0
 def isphi33(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 33. * (np.pi/180)
 	return phi - 33. * (np.pi/180)
 isphi33.direction = 1.0
@@ -314,7 +315,7 @@ isphi33.direction = 1.0
 def isphi34(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 34. * (np.pi/180)
 	return phi - 34. * (np.pi/180)
 isphi34.direction = 1.0
@@ -323,7 +324,7 @@ isphi34.direction = 1.0
 def isphi35(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 35. * (np.pi/180)
 	return phi - 35. * (np.pi/180)
 isphi35.direction = 1.0
@@ -332,7 +333,7 @@ isphi35.direction = 1.0
 def isphi36(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 36. * (np.pi/180)
 	return phi - 36. * (np.pi/180)
 isphi36.direction = 1.0
@@ -341,7 +342,7 @@ isphi36.direction = 1.0
 def isphi37(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 37. * (np.pi/180)
 	return phi - 37. * (np.pi/180)
 isphi37.direction = 1.0
@@ -350,7 +351,7 @@ isphi37.direction = 1.0
 def isphi38(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 38. * (np.pi/180)
 	return phi - 38. * (np.pi/180)
 isphi38.direction = 1.0
@@ -359,7 +360,7 @@ isphi38.direction = 1.0
 def isphi39(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 39. * (np.pi/180)
 	return phi - 39. * (np.pi/180)
 isphi39.direction = 1.0
@@ -368,7 +369,7 @@ isphi39.direction = 1.0
 def isphi40(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 40. * (np.pi/180)
 	return phi - 40. * (np.pi/180)
 isphi40.direction = 1.0
@@ -377,7 +378,7 @@ isphi40.direction = 1.0
 def isphi41(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 41. * (np.pi/180)
 	return phi - 41. * (np.pi/180)
 isphi41.direction = 1.0
@@ -386,7 +387,7 @@ isphi41.direction = 1.0
 def isphi42(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 42. * (np.pi/180)
 	return phi - 42. * (np.pi/180)
 isphi42.direction = 1.0
@@ -395,7 +396,7 @@ isphi42.direction = 1.0
 def isphi43(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 43. * (np.pi/180)
 	return phi - 43. * (np.pi/180)
 isphi43.direction = 1.0
@@ -404,7 +405,7 @@ isphi43.direction = 1.0
 def isphi44(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 44. * (np.pi/180)
 	return phi - 44. * (np.pi/180)
 isphi44.direction = 1.0
@@ -413,7 +414,7 @@ isphi44.direction = 1.0
 def isphi45(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 45. * (np.pi/180)
 	return phi - 45. * (np.pi/180)
 isphi45.direction = 1.0
@@ -422,7 +423,7 @@ isphi45.direction = 1.0
 def isphi46(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 46. * (np.pi/180)
 	return phi - 46. * (np.pi/180)
 isphi46.direction = 1.0
@@ -431,7 +432,7 @@ isphi46.direction = 1.0
 def isphi47(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 47. * (np.pi/180)
 	return phi - 47. * (np.pi/180)
 isphi47.direction = 1.0
@@ -440,7 +441,7 @@ isphi47.direction = 1.0
 def isphi48(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 48. * (np.pi/180)
 	return phi - 48. * (np.pi/180)
 isphi48.direction = 1.0
@@ -449,7 +450,7 @@ isphi48.direction = 1.0
 def isphi49(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 49. * (np.pi/180)
 	return phi - 49. * (np.pi/180)
 isphi49.direction = 1.0
@@ -458,7 +459,7 @@ isphi49.direction = 1.0
 def isphi50(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 50. * (np.pi/180)
 	return phi - 50. * (np.pi/180)
 isphi50.direction = 1.0
@@ -467,7 +468,7 @@ isphi50.direction = 1.0
 def isphi51(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 51. * (np.pi/180)
 	return phi - 51. * (np.pi/180)
 isphi51.direction = 1.0
@@ -476,7 +477,7 @@ isphi51.direction = 1.0
 def isphi52(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 52. * (np.pi/180)
 	return phi - 52. * (np.pi/180)
 isphi52.direction = 1.0
@@ -485,7 +486,7 @@ isphi52.direction = 1.0
 def isphi53(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 53. * (np.pi/180)
 	return phi - 53. * (np.pi/180)
 isphi53.direction = 1.0
@@ -494,7 +495,7 @@ isphi53.direction = 1.0
 def isphi54(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 54. * (np.pi/180)
 	return phi - 54. * (np.pi/180)
 isphi54.direction = 1.0
@@ -503,7 +504,7 @@ isphi54.direction = 1.0
 def isphi55(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 55. * (np.pi/180)
 	return phi - 55. * (np.pi/180)
 isphi55.direction = 1.0
@@ -512,7 +513,7 @@ isphi55.direction = 1.0
 def isphi56(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 56. * (np.pi/180)
 	return phi - 56. * (np.pi/180)
 isphi56.direction = 1.0
@@ -521,7 +522,7 @@ isphi56.direction = 1.0
 def isphi57(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 57. * (np.pi/180)
 	return phi - 57. * (np.pi/180)
 isphi57.direction = 1.0
@@ -530,7 +531,7 @@ isphi57.direction = 1.0
 def isphi58(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 58. * (np.pi/180)
 	return phi - 58. * (np.pi/180)
 isphi58.direction = 1.0
@@ -539,7 +540,7 @@ isphi58.direction = 1.0
 def isphi59(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 59. * (np.pi/180)
 	return phi - 59. * (np.pi/180)
 isphi59.direction = 1.0
@@ -548,7 +549,7 @@ isphi59.direction = 1.0
 def isphi60(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 60. * (np.pi/180)
 	return phi - 60. * (np.pi/180)
 isphi60.direction = 1.0
@@ -557,7 +558,7 @@ isphi60.direction = 1.0
 def isphi61(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 61. * (np.pi/180)
 	return phi - 61. * (np.pi/180)
 isphi61.direction = 1.0
@@ -566,7 +567,7 @@ isphi61.direction = 1.0
 def isphi62(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 62. * (np.pi/180)
 	return phi - 62. * (np.pi/180)
 isphi62.direction = 1.0
@@ -575,7 +576,7 @@ isphi62.direction = 1.0
 def isphi63(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 63. * (np.pi/180)
 	return phi - 63. * (np.pi/180)
 isphi63.direction = 1.0
@@ -584,7 +585,7 @@ isphi63.direction = 1.0
 def isphi64(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 64. * (np.pi/180)
 	return phi - 64. * (np.pi/180)
 isphi64.direction = 1.0
@@ -593,7 +594,7 @@ isphi64.direction = 1.0
 def isphi65(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 65. * (np.pi/180)
 	return phi - 65. * (np.pi/180)
 isphi65.direction = 1.0
@@ -602,7 +603,7 @@ isphi65.direction = 1.0
 def isphi66(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 66. * (np.pi/180)
 	return phi - 66. * (np.pi/180)
 isphi66.direction = 1.0
@@ -611,7 +612,7 @@ isphi66.direction = 1.0
 def isphi67(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 67. * (np.pi/180)
 	return phi - 67. * (np.pi/180)
 isphi67.direction = 1.0
@@ -620,7 +621,7 @@ isphi67.direction = 1.0
 def isphi68(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 68. * (np.pi/180)
 	return phi - 68. * (np.pi/180)
 isphi68.direction = 1.0
@@ -629,7 +630,7 @@ isphi68.direction = 1.0
 def isphi69(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 69. * (np.pi/180)
 	return phi - 69. * (np.pi/180)
 isphi69.direction = 1.0
@@ -638,7 +639,7 @@ isphi69.direction = 1.0
 def isphi70(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 70. * (np.pi/180)
 	return phi - 70. * (np.pi/180)
 isphi70.direction = 1.0
@@ -647,7 +648,7 @@ isphi70.direction = 1.0
 def isphi71(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 71. * (np.pi/180)
 	return phi - 71. * (np.pi/180)
 isphi71.direction = 1.0
@@ -656,7 +657,7 @@ isphi71.direction = 1.0
 def isphi72(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 72. * (np.pi/180)
 	return phi - 72. * (np.pi/180)
 isphi72.direction = 1.0
@@ -665,7 +666,7 @@ isphi72.direction = 1.0
 def isphi73(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 73. * (np.pi/180)
 	return phi - 73. * (np.pi/180)
 isphi73.direction = 1.0
@@ -674,7 +675,7 @@ isphi73.direction = 1.0
 def isphi74(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 74. * (np.pi/180)
 	return phi - 74. * (np.pi/180)
 isphi74.direction = 1.0
@@ -683,7 +684,7 @@ isphi74.direction = 1.0
 def isphi75(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 75. * (np.pi/180)
 	return phi - 75. * (np.pi/180)
 isphi75.direction = 1.0
@@ -692,7 +693,7 @@ isphi75.direction = 1.0
 def isphi76(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 76. * (np.pi/180)
 	return phi - 76. * (np.pi/180)
 isphi76.direction = 1.0
@@ -701,7 +702,7 @@ isphi76.direction = 1.0
 def isphi77(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 77. * (np.pi/180)
 	return phi - 77. * (np.pi/180)
 isphi77.direction = 1.0
@@ -710,7 +711,7 @@ isphi77.direction = 1.0
 def isphi78(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 78. * (np.pi/180)
 	return phi - 78. * (np.pi/180)
 isphi78.direction = 1.0
@@ -719,7 +720,7 @@ isphi78.direction = 1.0
 def isphi79(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 79. * (np.pi/180)
 	return phi - 79. * (np.pi/180)
 isphi79.direction = 1.0
@@ -728,7 +729,7 @@ isphi79.direction = 1.0
 def isphi80(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 80. * (np.pi/180)
 	return phi - 80. * (np.pi/180)
 isphi80.direction = 1.0
@@ -737,7 +738,7 @@ isphi80.direction = 1.0
 def isphi81(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 81. * (np.pi/180)
 	return phi - 81. * (np.pi/180)
 isphi81.direction = 1.0
@@ -746,7 +747,7 @@ isphi81.direction = 1.0
 def isphi82(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 82. * (np.pi/180)
 	return phi - 82. * (np.pi/180)
 isphi82.direction = 1.0
@@ -755,7 +756,7 @@ isphi82.direction = 1.0
 def isphi83(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 83. * (np.pi/180)
 	return phi - 83. * (np.pi/180)
 isphi83.direction = 1.0
@@ -764,7 +765,7 @@ isphi83.direction = 1.0
 def isphi84(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 84. * (np.pi/180)
 	return phi - 84. * (np.pi/180)
 isphi84.direction = 1.0
@@ -773,7 +774,7 @@ isphi84.direction = 1.0
 def isphi85(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 85. * (np.pi/180)
 	return phi - 85. * (np.pi/180)
 isphi85.direction = 1.0
@@ -782,7 +783,7 @@ isphi85.direction = 1.0
 def isphi86(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 86. * (np.pi/180)
 	return phi - 86. * (np.pi/180)
 isphi86.direction = 1.0
@@ -791,7 +792,7 @@ isphi86.direction = 1.0
 def isphi87(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 87. * (np.pi/180)
 	return phi - 87. * (np.pi/180)
 isphi87.direction = 1.0
@@ -800,7 +801,7 @@ isphi87.direction = 1.0
 def isphi88(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 88. * (np.pi/180)
 	return phi - 88. * (np.pi/180)
 isphi88.direction = 1.0
@@ -809,7 +810,7 @@ isphi88.direction = 1.0
 def isphi89(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 89. * (np.pi/180)
 	return phi - 89. * (np.pi/180)
 isphi89.direction = 1.0
@@ -818,7 +819,7 @@ isphi89.direction = 1.0
 def isphi90(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 90. * (np.pi/180)
 	return phi - 90. * (np.pi/180)
 isphi90.direction = 1.0
@@ -827,7 +828,7 @@ isphi90.direction = 1.0
 def isphi91(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 91. * (np.pi/180)
 	return phi - 91. * (np.pi/180)
 isphi91.direction = 1.0
@@ -836,7 +837,7 @@ isphi91.direction = 1.0
 def isphi92(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 92. * (np.pi/180)
 	return phi - 92. * (np.pi/180)
 isphi92.direction = 1.0
@@ -845,7 +846,7 @@ isphi92.direction = 1.0
 def isphi93(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 93. * (np.pi/180)
 	return phi - 93. * (np.pi/180)
 isphi93.direction = 1.0
@@ -854,7 +855,7 @@ isphi93.direction = 1.0
 def isphi94(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 94. * (np.pi/180)
 	return phi - 94. * (np.pi/180)
 isphi94.direction = 1.0
@@ -863,7 +864,7 @@ isphi94.direction = 1.0
 def isphi95(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 95. * (np.pi/180)
 	return phi - 95. * (np.pi/180)
 isphi95.direction = 1.0
@@ -872,7 +873,7 @@ isphi95.direction = 1.0
 def isphi96(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 96. * (np.pi/180)
 	return phi - 96. * (np.pi/180)
 isphi96.direction = 1.0
@@ -881,7 +882,7 @@ isphi96.direction = 1.0
 def isphi97(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 97. * (np.pi/180)
 	return phi - 97. * (np.pi/180)
 isphi97.direction = 1.0
@@ -890,7 +891,7 @@ isphi97.direction = 1.0
 def isphi98(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 98. * (np.pi/180)
 	return phi - 98. * (np.pi/180)
 isphi98.direction = 1.0
@@ -899,7 +900,7 @@ isphi98.direction = 1.0
 def isphi99(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 99. * (np.pi/180)
 	return phi - 99. * (np.pi/180)
 isphi99.direction = 1.0
@@ -908,7 +909,7 @@ isphi99.direction = 1.0
 def isphi100(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 100. * (np.pi/180)
 	return phi - 100. * (np.pi/180)
 isphi100.direction = 1.0
@@ -917,7 +918,7 @@ isphi100.direction = 1.0
 def isphi101(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 101. * (np.pi/180)
 	return phi - 101. * (np.pi/180)
 isphi101.direction = 1.0
@@ -926,7 +927,7 @@ isphi101.direction = 1.0
 def isphi102(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 102. * (np.pi/180)
 	return phi - 102. * (np.pi/180)
 isphi102.direction = 1.0
@@ -935,7 +936,7 @@ isphi102.direction = 1.0
 def isphi103(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 103. * (np.pi/180)
 	return phi - 103. * (np.pi/180)
 isphi103.direction = 1.0
@@ -944,7 +945,7 @@ isphi103.direction = 1.0
 def isphi104(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 104. * (np.pi/180)
 	return phi - 104. * (np.pi/180)
 isphi104.direction = 1.0
@@ -953,7 +954,7 @@ isphi104.direction = 1.0
 def isphi105(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 105. * (np.pi/180)
 	return phi - 105. * (np.pi/180)
 isphi105.direction = 1.0
@@ -962,7 +963,7 @@ isphi105.direction = 1.0
 def isphi106(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 106. * (np.pi/180)
 	return phi - 106. * (np.pi/180)
 isphi106.direction = 1.0
@@ -971,7 +972,7 @@ isphi106.direction = 1.0
 def isphi107(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 107. * (np.pi/180)
 	return phi - 107. * (np.pi/180)
 isphi107.direction = 1.0
@@ -980,7 +981,7 @@ isphi107.direction = 1.0
 def isphi108(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 108. * (np.pi/180)
 	return phi - 108. * (np.pi/180)
 isphi108.direction = 1.0
@@ -989,7 +990,7 @@ isphi108.direction = 1.0
 def isphi109(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 109. * (np.pi/180)
 	return phi - 109. * (np.pi/180)
 isphi109.direction = 1.0
@@ -998,7 +999,7 @@ isphi109.direction = 1.0
 def isphi110(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 110. * (np.pi/180)
 	return phi - 110. * (np.pi/180)
 isphi110.direction = 1.0
@@ -1007,7 +1008,7 @@ isphi110.direction = 1.0
 def isphi111(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 111. * (np.pi/180)
 	return phi - 111. * (np.pi/180)
 isphi111.direction = 1.0
@@ -1016,7 +1017,7 @@ isphi111.direction = 1.0
 def isphi112(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 112. * (np.pi/180)
 	return phi - 112. * (np.pi/180)
 isphi112.direction = 1.0
@@ -1025,7 +1026,7 @@ isphi112.direction = 1.0
 def isphi113(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 113. * (np.pi/180)
 	return phi - 113. * (np.pi/180)
 isphi113.direction = 1.0
@@ -1034,7 +1035,7 @@ isphi113.direction = 1.0
 def isphi114(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 114. * (np.pi/180)
 	return phi - 114. * (np.pi/180)
 isphi114.direction = 1.0
@@ -1043,7 +1044,7 @@ isphi114.direction = 1.0
 def isphi115(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 115. * (np.pi/180)
 	return phi - 115. * (np.pi/180)
 isphi115.direction = 1.0
@@ -1052,7 +1053,7 @@ isphi115.direction = 1.0
 def isphi116(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 116. * (np.pi/180)
 	return phi - 116. * (np.pi/180)
 isphi116.direction = 1.0
@@ -1061,7 +1062,7 @@ isphi116.direction = 1.0
 def isphi117(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 117. * (np.pi/180)
 	return phi - 117. * (np.pi/180)
 isphi117.direction = 1.0
@@ -1070,7 +1071,7 @@ isphi117.direction = 1.0
 def isphi118(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 118. * (np.pi/180)
 	return phi - 118. * (np.pi/180)
 isphi118.direction = 1.0
@@ -1079,7 +1080,7 @@ isphi118.direction = 1.0
 def isphi119(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 119. * (np.pi/180)
 	return phi - 119. * (np.pi/180)
 isphi119.direction = 1.0
@@ -1088,7 +1089,7 @@ isphi119.direction = 1.0
 def isphi120(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 120. * (np.pi/180)
 	return phi - 120. * (np.pi/180)
 isphi120.direction = 1.0
@@ -1097,7 +1098,7 @@ isphi120.direction = 1.0
 def isphi121(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 121. * (np.pi/180)
 	return phi - 121. * (np.pi/180)
 isphi121.direction = 1.0
@@ -1106,7 +1107,7 @@ isphi121.direction = 1.0
 def isphi122(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 122. * (np.pi/180)
 	return phi - 122. * (np.pi/180)
 isphi122.direction = 1.0
@@ -1115,7 +1116,7 @@ isphi122.direction = 1.0
 def isphi123(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 123. * (np.pi/180)
 	return phi - 123. * (np.pi/180)
 isphi123.direction = 1.0
@@ -1124,7 +1125,7 @@ isphi123.direction = 1.0
 def isphi124(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 124. * (np.pi/180)
 	return phi - 124. * (np.pi/180)
 isphi124.direction = 1.0
@@ -1133,7 +1134,7 @@ isphi124.direction = 1.0
 def isphi125(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 125. * (np.pi/180)
 	return phi - 125. * (np.pi/180)
 isphi125.direction = 1.0
@@ -1142,7 +1143,7 @@ isphi125.direction = 1.0
 def isphi126(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 126. * (np.pi/180)
 	return phi - 126. * (np.pi/180)
 isphi126.direction = 1.0
@@ -1151,7 +1152,7 @@ isphi126.direction = 1.0
 def isphi127(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 127. * (np.pi/180)
 	return phi - 127. * (np.pi/180)
 isphi127.direction = 1.0
@@ -1160,7 +1161,7 @@ isphi127.direction = 1.0
 def isphi128(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 128. * (np.pi/180)
 	return phi - 128. * (np.pi/180)
 isphi128.direction = 1.0
@@ -1169,7 +1170,7 @@ isphi128.direction = 1.0
 def isphi129(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 129. * (np.pi/180)
 	return phi - 129. * (np.pi/180)
 isphi129.direction = 1.0
@@ -1178,7 +1179,7 @@ isphi129.direction = 1.0
 def isphi130(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 130. * (np.pi/180)
 	return phi - 130. * (np.pi/180)
 isphi130.direction = 1.0
@@ -1187,7 +1188,7 @@ isphi130.direction = 1.0
 def isphi131(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 131. * (np.pi/180)
 	return phi - 131. * (np.pi/180)
 isphi131.direction = 1.0
@@ -1196,7 +1197,7 @@ isphi131.direction = 1.0
 def isphi132(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 132. * (np.pi/180)
 	return phi - 132. * (np.pi/180)
 isphi132.direction = 1.0
@@ -1205,7 +1206,7 @@ isphi132.direction = 1.0
 def isphi133(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 133. * (np.pi/180)
 	return phi - 133. * (np.pi/180)
 isphi133.direction = 1.0
@@ -1214,7 +1215,7 @@ isphi133.direction = 1.0
 def isphi134(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 134. * (np.pi/180)
 	return phi - 134. * (np.pi/180)
 isphi134.direction = 1.0
@@ -1223,7 +1224,7 @@ isphi134.direction = 1.0
 def isphi135(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 135. * (np.pi/180)
 	return phi - 135. * (np.pi/180)
 isphi135.direction = 1.0
@@ -1232,7 +1233,7 @@ isphi135.direction = 1.0
 def isphi136(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 136. * (np.pi/180)
 	return phi - 136. * (np.pi/180)
 isphi136.direction = 1.0
@@ -1241,7 +1242,7 @@ isphi136.direction = 1.0
 def isphi137(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 137. * (np.pi/180)
 	return phi - 137. * (np.pi/180)
 isphi137.direction = 1.0
@@ -1250,7 +1251,7 @@ isphi137.direction = 1.0
 def isphi138(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 138. * (np.pi/180)
 	return phi - 138. * (np.pi/180)
 isphi138.direction = 1.0
@@ -1259,7 +1260,7 @@ isphi138.direction = 1.0
 def isphi139(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 139. * (np.pi/180)
 	return phi - 139. * (np.pi/180)
 isphi139.direction = 1.0
@@ -1268,7 +1269,7 @@ isphi139.direction = 1.0
 def isphi140(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 140. * (np.pi/180)
 	return phi - 140. * (np.pi/180)
 isphi140.direction = 1.0
@@ -1277,7 +1278,7 @@ isphi140.direction = 1.0
 def isphi141(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 141. * (np.pi/180)
 	return phi - 141. * (np.pi/180)
 isphi141.direction = 1.0
@@ -1286,7 +1287,7 @@ isphi141.direction = 1.0
 def isphi142(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 142. * (np.pi/180)
 	return phi - 142. * (np.pi/180)
 isphi142.direction = 1.0
@@ -1295,7 +1296,7 @@ isphi142.direction = 1.0
 def isphi143(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 143. * (np.pi/180)
 	return phi - 143. * (np.pi/180)
 isphi143.direction = 1.0
@@ -1304,7 +1305,7 @@ isphi143.direction = 1.0
 def isphi144(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 144. * (np.pi/180)
 	return phi - 144. * (np.pi/180)
 isphi144.direction = 1.0
@@ -1313,7 +1314,7 @@ isphi144.direction = 1.0
 def isphi145(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 145. * (np.pi/180)
 	return phi - 145. * (np.pi/180)
 isphi145.direction = 1.0
@@ -1322,7 +1323,7 @@ isphi145.direction = 1.0
 def isphi146(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 146. * (np.pi/180)
 	return phi - 146. * (np.pi/180)
 isphi146.direction = 1.0
@@ -1331,7 +1332,7 @@ isphi146.direction = 1.0
 def isphi147(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 147. * (np.pi/180)
 	return phi - 147. * (np.pi/180)
 isphi147.direction = 1.0
@@ -1340,7 +1341,7 @@ isphi147.direction = 1.0
 def isphi148(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 148. * (np.pi/180)
 	return phi - 148. * (np.pi/180)
 isphi148.direction = 1.0
@@ -1349,7 +1350,7 @@ isphi148.direction = 1.0
 def isphi149(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 149. * (np.pi/180)
 	return phi - 149. * (np.pi/180)
 isphi149.direction = 1.0
@@ -1358,7 +1359,7 @@ isphi149.direction = 1.0
 def isphi150(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 150. * (np.pi/180)
 	return phi - 150. * (np.pi/180)
 isphi150.direction = 1.0
@@ -1367,7 +1368,7 @@ isphi150.direction = 1.0
 def isphi151(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 151. * (np.pi/180)
 	return phi - 151. * (np.pi/180)
 isphi151.direction = 1.0
@@ -1376,7 +1377,7 @@ isphi151.direction = 1.0
 def isphi152(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 152. * (np.pi/180)
 	return phi - 152. * (np.pi/180)
 isphi152.direction = 1.0
@@ -1385,7 +1386,7 @@ isphi152.direction = 1.0
 def isphi153(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 153. * (np.pi/180)
 	return phi - 153. * (np.pi/180)
 isphi153.direction = 1.0
@@ -1394,7 +1395,7 @@ isphi153.direction = 1.0
 def isphi154(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 154. * (np.pi/180)
 	return phi - 154. * (np.pi/180)
 isphi154.direction = 1.0
@@ -1403,7 +1404,7 @@ isphi154.direction = 1.0
 def isphi155(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 155. * (np.pi/180)
 	return phi - 155. * (np.pi/180)
 isphi155.direction = 1.0
@@ -1412,7 +1413,7 @@ isphi155.direction = 1.0
 def isphi156(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 156. * (np.pi/180)
 	return phi - 156. * (np.pi/180)
 isphi156.direction = 1.0
@@ -1421,7 +1422,7 @@ isphi156.direction = 1.0
 def isphi157(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 157. * (np.pi/180)
 	return phi - 157. * (np.pi/180)
 isphi157.direction = 1.0
@@ -1430,7 +1431,7 @@ isphi157.direction = 1.0
 def isphi158(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 158. * (np.pi/180)
 	return phi - 158. * (np.pi/180)
 isphi158.direction = 1.0
@@ -1439,7 +1440,7 @@ isphi158.direction = 1.0
 def isphi159(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 159. * (np.pi/180)
 	return phi - 159. * (np.pi/180)
 isphi159.direction = 1.0
@@ -1448,7 +1449,7 @@ isphi159.direction = 1.0
 def isphi160(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 160. * (np.pi/180)
 	return phi - 160. * (np.pi/180)
 isphi160.direction = 1.0
@@ -1457,7 +1458,7 @@ isphi160.direction = 1.0
 def isphi161(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 161. * (np.pi/180)
 	return phi - 161. * (np.pi/180)
 isphi161.direction = 1.0
@@ -1466,7 +1467,7 @@ isphi161.direction = 1.0
 def isphi162(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 162. * (np.pi/180)
 	return phi - 162. * (np.pi/180)
 isphi162.direction = 1.0
@@ -1475,7 +1476,7 @@ isphi162.direction = 1.0
 def isphi163(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 163. * (np.pi/180)
 	return phi - 163. * (np.pi/180)
 isphi163.direction = 1.0
@@ -1484,7 +1485,7 @@ isphi163.direction = 1.0
 def isphi164(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 164. * (np.pi/180)
 	return phi - 164. * (np.pi/180)
 isphi164.direction = 1.0
@@ -1493,7 +1494,7 @@ isphi164.direction = 1.0
 def isphi165(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 165. * (np.pi/180)
 	return phi - 165. * (np.pi/180)
 isphi165.direction = 1.0
@@ -1502,7 +1503,7 @@ isphi165.direction = 1.0
 def isphi166(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 166. * (np.pi/180)
 	return phi - 166. * (np.pi/180)
 isphi166.direction = 1.0
@@ -1511,7 +1512,7 @@ isphi166.direction = 1.0
 def isphi167(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 167. * (np.pi/180)
 	return phi - 167. * (np.pi/180)
 isphi167.direction = 1.0
@@ -1520,7 +1521,7 @@ isphi167.direction = 1.0
 def isphi168(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 168. * (np.pi/180)
 	return phi - 168. * (np.pi/180)
 isphi168.direction = 1.0
@@ -1529,7 +1530,7 @@ isphi168.direction = 1.0
 def isphi169(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 169. * (np.pi/180)
 	return phi - 169. * (np.pi/180)
 isphi169.direction = 1.0
@@ -1538,7 +1539,7 @@ isphi169.direction = 1.0
 def isphi170(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 170. * (np.pi/180)
 	return phi - 170. * (np.pi/180)
 isphi170.direction = 1.0
@@ -1547,7 +1548,7 @@ isphi170.direction = 1.0
 def isphi171(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 171. * (np.pi/180)
 	return phi - 171. * (np.pi/180)
 isphi171.direction = 1.0
@@ -1556,7 +1557,7 @@ isphi171.direction = 1.0
 def isphi172(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 172. * (np.pi/180)
 	return phi - 172. * (np.pi/180)
 isphi172.direction = 1.0
@@ -1565,7 +1566,7 @@ isphi172.direction = 1.0
 def isphi173(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 173. * (np.pi/180)
 	return phi - 173. * (np.pi/180)
 isphi173.direction = 1.0
@@ -1574,7 +1575,7 @@ isphi173.direction = 1.0
 def isphi174(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 174. * (np.pi/180)
 	return phi - 174. * (np.pi/180)
 isphi174.direction = 1.0
@@ -1583,7 +1584,7 @@ isphi174.direction = 1.0
 def isphi175(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 175. * (np.pi/180)
 	return phi - 175. * (np.pi/180)
 isphi175.direction = 1.0
@@ -1592,7 +1593,7 @@ isphi175.direction = 1.0
 def isphi176(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 176. * (np.pi/180)
 	return phi - 176. * (np.pi/180)
 isphi176.direction = 1.0
@@ -1601,7 +1602,7 @@ isphi176.direction = 1.0
 def isphi177(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 177. * (np.pi/180)
 	return phi - 177. * (np.pi/180)
 isphi177.direction = 1.0
@@ -1610,7 +1611,7 @@ isphi177.direction = 1.0
 def isphi178(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 178. * (np.pi/180)
 	return phi - 178. * (np.pi/180)
 isphi178.direction = 1.0
@@ -1619,7 +1620,7 @@ isphi178.direction = 1.0
 def isphi179(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 179. * (np.pi/180)
 	return phi - 179. * (np.pi/180)
 isphi179.direction = 1.0
@@ -1628,7 +1629,7 @@ isphi179.direction = 1.0
 def isphi180(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 180. * (np.pi/180)
 	return phi - 180. * (np.pi/180)
 isphi180.direction = 1.0
@@ -1637,7 +1638,7 @@ isphi180.direction = 1.0
 def isphi181(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 181. * (np.pi/180)
 	return phi - 181. * (np.pi/180)
 isphi181.direction = 1.0
@@ -1646,7 +1647,7 @@ isphi181.direction = 1.0
 def isphi182(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 182. * (np.pi/180)
 	return phi - 182. * (np.pi/180)
 isphi182.direction = 1.0
@@ -1655,7 +1656,7 @@ isphi182.direction = 1.0
 def isphi183(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 183. * (np.pi/180)
 	return phi - 183. * (np.pi/180)
 isphi183.direction = 1.0
@@ -1664,7 +1665,7 @@ isphi183.direction = 1.0
 def isphi184(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 184. * (np.pi/180)
 	return phi - 184. * (np.pi/180)
 isphi184.direction = 1.0
@@ -1673,7 +1674,7 @@ isphi184.direction = 1.0
 def isphi185(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 185. * (np.pi/180)
 	return phi - 185. * (np.pi/180)
 isphi185.direction = 1.0
@@ -1682,7 +1683,7 @@ isphi185.direction = 1.0
 def isphi186(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 186. * (np.pi/180)
 	return phi - 186. * (np.pi/180)
 isphi186.direction = 1.0
@@ -1691,7 +1692,7 @@ isphi186.direction = 1.0
 def isphi187(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 187. * (np.pi/180)
 	return phi - 187. * (np.pi/180)
 isphi187.direction = 1.0
@@ -1700,7 +1701,7 @@ isphi187.direction = 1.0
 def isphi188(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 188. * (np.pi/180)
 	return phi - 188. * (np.pi/180)
 isphi188.direction = 1.0
@@ -1709,7 +1710,7 @@ isphi188.direction = 1.0
 def isphi189(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 189. * (np.pi/180)
 	return phi - 189. * (np.pi/180)
 isphi189.direction = 1.0
@@ -1718,7 +1719,7 @@ isphi189.direction = 1.0
 def isphi190(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 190. * (np.pi/180)
 	return phi - 190. * (np.pi/180)
 isphi190.direction = 1.0
@@ -1727,7 +1728,7 @@ isphi190.direction = 1.0
 def isphi191(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 191. * (np.pi/180)
 	return phi - 191. * (np.pi/180)
 isphi191.direction = 1.0
@@ -1736,7 +1737,7 @@ isphi191.direction = 1.0
 def isphi192(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 192. * (np.pi/180)
 	return phi - 192. * (np.pi/180)
 isphi192.direction = 1.0
@@ -1745,7 +1746,7 @@ isphi192.direction = 1.0
 def isphi193(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 193. * (np.pi/180)
 	return phi - 193. * (np.pi/180)
 isphi193.direction = 1.0
@@ -1754,7 +1755,7 @@ isphi193.direction = 1.0
 def isphi194(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 194. * (np.pi/180)
 	return phi - 194. * (np.pi/180)
 isphi194.direction = 1.0
@@ -1763,7 +1764,7 @@ isphi194.direction = 1.0
 def isphi195(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 195. * (np.pi/180)
 	return phi - 195. * (np.pi/180)
 isphi195.direction = 1.0
@@ -1772,7 +1773,7 @@ isphi195.direction = 1.0
 def isphi196(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 196. * (np.pi/180)
 	return phi - 196. * (np.pi/180)
 isphi196.direction = 1.0
@@ -1781,7 +1782,7 @@ isphi196.direction = 1.0
 def isphi197(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 197. * (np.pi/180)
 	return phi - 197. * (np.pi/180)
 isphi197.direction = 1.0
@@ -1790,7 +1791,7 @@ isphi197.direction = 1.0
 def isphi198(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 198. * (np.pi/180)
 	return phi - 198. * (np.pi/180)
 isphi198.direction = 1.0
@@ -1799,7 +1800,7 @@ isphi198.direction = 1.0
 def isphi199(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 199. * (np.pi/180)
 	return phi - 199. * (np.pi/180)
 isphi199.direction = 1.0
@@ -1808,7 +1809,7 @@ isphi199.direction = 1.0
 def isphi200(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 200. * (np.pi/180)
 	return phi - 200. * (np.pi/180)
 isphi200.direction = 1.0
@@ -1817,7 +1818,7 @@ isphi200.direction = 1.0
 def isphi201(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 201. * (np.pi/180)
 	return phi - 201. * (np.pi/180)
 isphi201.direction = 1.0
@@ -1826,7 +1827,7 @@ isphi201.direction = 1.0
 def isphi202(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 202. * (np.pi/180)
 	return phi - 202. * (np.pi/180)
 isphi202.direction = 1.0
@@ -1835,7 +1836,7 @@ isphi202.direction = 1.0
 def isphi203(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 203. * (np.pi/180)
 	return phi - 203. * (np.pi/180)
 isphi203.direction = 1.0
@@ -1844,7 +1845,7 @@ isphi203.direction = 1.0
 def isphi204(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 204. * (np.pi/180)
 	return phi - 204. * (np.pi/180)
 isphi204.direction = 1.0
@@ -1853,7 +1854,7 @@ isphi204.direction = 1.0
 def isphi205(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 205. * (np.pi/180)
 	return phi - 205. * (np.pi/180)
 isphi205.direction = 1.0
@@ -1862,7 +1863,7 @@ isphi205.direction = 1.0
 def isphi206(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 206. * (np.pi/180)
 	return phi - 206. * (np.pi/180)
 isphi206.direction = 1.0
@@ -1871,7 +1872,7 @@ isphi206.direction = 1.0
 def isphi207(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 207. * (np.pi/180)
 	return phi - 207. * (np.pi/180)
 isphi207.direction = 1.0
@@ -1880,7 +1881,7 @@ isphi207.direction = 1.0
 def isphi208(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 208. * (np.pi/180)
 	return phi - 208. * (np.pi/180)
 isphi208.direction = 1.0
@@ -1889,7 +1890,7 @@ isphi208.direction = 1.0
 def isphi209(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 209. * (np.pi/180)
 	return phi - 209. * (np.pi/180)
 isphi209.direction = 1.0
@@ -1898,7 +1899,7 @@ isphi209.direction = 1.0
 def isphi210(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 210. * (np.pi/180)
 	return phi - 210. * (np.pi/180)
 isphi210.direction = 1.0
@@ -1907,7 +1908,7 @@ isphi210.direction = 1.0
 def isphi211(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 211. * (np.pi/180)
 	return phi - 211. * (np.pi/180)
 isphi211.direction = 1.0
@@ -1916,7 +1917,7 @@ isphi211.direction = 1.0
 def isphi212(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 212. * (np.pi/180)
 	return phi - 212. * (np.pi/180)
 isphi212.direction = 1.0
@@ -1925,7 +1926,7 @@ isphi212.direction = 1.0
 def isphi213(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 213. * (np.pi/180)
 	return phi - 213. * (np.pi/180)
 isphi213.direction = 1.0
@@ -1934,7 +1935,7 @@ isphi213.direction = 1.0
 def isphi214(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 214. * (np.pi/180)
 	return phi - 214. * (np.pi/180)
 isphi214.direction = 1.0
@@ -1943,7 +1944,7 @@ isphi214.direction = 1.0
 def isphi215(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 215. * (np.pi/180)
 	return phi - 215. * (np.pi/180)
 isphi215.direction = 1.0
@@ -1952,7 +1953,7 @@ isphi215.direction = 1.0
 def isphi216(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 216. * (np.pi/180)
 	return phi - 216. * (np.pi/180)
 isphi216.direction = 1.0
@@ -1961,7 +1962,7 @@ isphi216.direction = 1.0
 def isphi217(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 217. * (np.pi/180)
 	return phi - 217. * (np.pi/180)
 isphi217.direction = 1.0
@@ -1970,7 +1971,7 @@ isphi217.direction = 1.0
 def isphi218(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 218. * (np.pi/180)
 	return phi - 218. * (np.pi/180)
 isphi218.direction = 1.0
@@ -1979,7 +1980,7 @@ isphi218.direction = 1.0
 def isphi219(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 219. * (np.pi/180)
 	return phi - 219. * (np.pi/180)
 isphi219.direction = 1.0
@@ -1988,7 +1989,7 @@ isphi219.direction = 1.0
 def isphi220(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 220. * (np.pi/180)
 	return phi - 220. * (np.pi/180)
 isphi220.direction = 1.0
@@ -1997,7 +1998,7 @@ isphi220.direction = 1.0
 def isphi221(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 221. * (np.pi/180)
 	return phi - 221. * (np.pi/180)
 isphi221.direction = 1.0
@@ -2006,7 +2007,7 @@ isphi221.direction = 1.0
 def isphi222(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 222. * (np.pi/180)
 	return phi - 222. * (np.pi/180)
 isphi222.direction = 1.0
@@ -2015,7 +2016,7 @@ isphi222.direction = 1.0
 def isphi223(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 223. * (np.pi/180)
 	return phi - 223. * (np.pi/180)
 isphi223.direction = 1.0
@@ -2024,7 +2025,7 @@ isphi223.direction = 1.0
 def isphi224(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 224. * (np.pi/180)
 	return phi - 224. * (np.pi/180)
 isphi224.direction = 1.0
@@ -2033,7 +2034,7 @@ isphi224.direction = 1.0
 def isphi225(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 225. * (np.pi/180)
 	return phi - 225. * (np.pi/180)
 isphi225.direction = 1.0
@@ -2042,7 +2043,7 @@ isphi225.direction = 1.0
 def isphi226(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 226. * (np.pi/180)
 	return phi - 226. * (np.pi/180)
 isphi226.direction = 1.0
@@ -2051,7 +2052,7 @@ isphi226.direction = 1.0
 def isphi227(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 227. * (np.pi/180)
 	return phi - 227. * (np.pi/180)
 isphi227.direction = 1.0
@@ -2060,7 +2061,7 @@ isphi227.direction = 1.0
 def isphi228(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 228. * (np.pi/180)
 	return phi - 228. * (np.pi/180)
 isphi228.direction = 1.0
@@ -2069,7 +2070,7 @@ isphi228.direction = 1.0
 def isphi229(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 229. * (np.pi/180)
 	return phi - 229. * (np.pi/180)
 isphi229.direction = 1.0
@@ -2078,7 +2079,7 @@ isphi229.direction = 1.0
 def isphi230(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 230. * (np.pi/180)
 	return phi - 230. * (np.pi/180)
 isphi230.direction = 1.0
@@ -2087,7 +2088,7 @@ isphi230.direction = 1.0
 def isphi231(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 231. * (np.pi/180)
 	return phi - 231. * (np.pi/180)
 isphi231.direction = 1.0
@@ -2096,7 +2097,7 @@ isphi231.direction = 1.0
 def isphi232(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 232. * (np.pi/180)
 	return phi - 232. * (np.pi/180)
 isphi232.direction = 1.0
@@ -2105,7 +2106,7 @@ isphi232.direction = 1.0
 def isphi233(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 233. * (np.pi/180)
 	return phi - 233. * (np.pi/180)
 isphi233.direction = 1.0
@@ -2114,7 +2115,7 @@ isphi233.direction = 1.0
 def isphi234(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 234. * (np.pi/180)
 	return phi - 234. * (np.pi/180)
 isphi234.direction = 1.0
@@ -2123,7 +2124,7 @@ isphi234.direction = 1.0
 def isphi235(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 235. * (np.pi/180)
 	return phi - 235. * (np.pi/180)
 isphi235.direction = 1.0
@@ -2132,7 +2133,7 @@ isphi235.direction = 1.0
 def isphi236(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 236. * (np.pi/180)
 	return phi - 236. * (np.pi/180)
 isphi236.direction = 1.0
@@ -2141,7 +2142,7 @@ isphi236.direction = 1.0
 def isphi237(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 237. * (np.pi/180)
 	return phi - 237. * (np.pi/180)
 isphi237.direction = 1.0
@@ -2150,7 +2151,7 @@ isphi237.direction = 1.0
 def isphi238(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 238. * (np.pi/180)
 	return phi - 238. * (np.pi/180)
 isphi238.direction = 1.0
@@ -2159,7 +2160,7 @@ isphi238.direction = 1.0
 def isphi239(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 239. * (np.pi/180)
 	return phi - 239. * (np.pi/180)
 isphi239.direction = 1.0
@@ -2168,7 +2169,7 @@ isphi239.direction = 1.0
 def isphi240(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 240. * (np.pi/180)
 	return phi - 240. * (np.pi/180)
 isphi240.direction = 1.0
@@ -2177,7 +2178,7 @@ isphi240.direction = 1.0
 def isphi241(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 241. * (np.pi/180)
 	return phi - 241. * (np.pi/180)
 isphi241.direction = 1.0
@@ -2186,7 +2187,7 @@ isphi241.direction = 1.0
 def isphi242(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 242. * (np.pi/180)
 	return phi - 242. * (np.pi/180)
 isphi242.direction = 1.0
@@ -2195,7 +2196,7 @@ isphi242.direction = 1.0
 def isphi243(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 243. * (np.pi/180)
 	return phi - 243. * (np.pi/180)
 isphi243.direction = 1.0
@@ -2204,7 +2205,7 @@ isphi243.direction = 1.0
 def isphi244(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 244. * (np.pi/180)
 	return phi - 244. * (np.pi/180)
 isphi244.direction = 1.0
@@ -2213,7 +2214,7 @@ isphi244.direction = 1.0
 def isphi245(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 245. * (np.pi/180)
 	return phi - 245. * (np.pi/180)
 isphi245.direction = 1.0
@@ -2222,7 +2223,7 @@ isphi245.direction = 1.0
 def isphi246(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 246. * (np.pi/180)
 	return phi - 246. * (np.pi/180)
 isphi246.direction = 1.0
@@ -2231,7 +2232,7 @@ isphi246.direction = 1.0
 def isphi247(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 247. * (np.pi/180)
 	return phi - 247. * (np.pi/180)
 isphi247.direction = 1.0
@@ -2240,7 +2241,7 @@ isphi247.direction = 1.0
 def isphi248(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 248. * (np.pi/180)
 	return phi - 248. * (np.pi/180)
 isphi248.direction = 1.0
@@ -2249,7 +2250,7 @@ isphi248.direction = 1.0
 def isphi249(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 249. * (np.pi/180)
 	return phi - 249. * (np.pi/180)
 isphi249.direction = 1.0
@@ -2258,7 +2259,7 @@ isphi249.direction = 1.0
 def isphi250(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 250. * (np.pi/180)
 	return phi - 250. * (np.pi/180)
 isphi250.direction = 1.0
@@ -2267,7 +2268,7 @@ isphi250.direction = 1.0
 def isphi251(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 251. * (np.pi/180)
 	return phi - 251. * (np.pi/180)
 isphi251.direction = 1.0
@@ -2276,7 +2277,7 @@ isphi251.direction = 1.0
 def isphi252(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 252. * (np.pi/180)
 	return phi - 252. * (np.pi/180)
 isphi252.direction = 1.0
@@ -2285,7 +2286,7 @@ isphi252.direction = 1.0
 def isphi253(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 253. * (np.pi/180)
 	return phi - 253. * (np.pi/180)
 isphi253.direction = 1.0
@@ -2294,7 +2295,7 @@ isphi253.direction = 1.0
 def isphi254(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 254. * (np.pi/180)
 	return phi - 254. * (np.pi/180)
 isphi254.direction = 1.0
@@ -2303,7 +2304,7 @@ isphi254.direction = 1.0
 def isphi255(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 255. * (np.pi/180)
 	return phi - 255. * (np.pi/180)
 isphi255.direction = 1.0
@@ -2312,7 +2313,7 @@ isphi255.direction = 1.0
 def isphi256(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 256. * (np.pi/180)
 	return phi - 256. * (np.pi/180)
 isphi256.direction = 1.0
@@ -2321,7 +2322,7 @@ isphi256.direction = 1.0
 def isphi257(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 257. * (np.pi/180)
 	return phi - 257. * (np.pi/180)
 isphi257.direction = 1.0
@@ -2330,7 +2331,7 @@ isphi257.direction = 1.0
 def isphi258(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 258. * (np.pi/180)
 	return phi - 258. * (np.pi/180)
 isphi258.direction = 1.0
@@ -2339,7 +2340,7 @@ isphi258.direction = 1.0
 def isphi259(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 259. * (np.pi/180)
 	return phi - 259. * (np.pi/180)
 isphi259.direction = 1.0
@@ -2348,7 +2349,7 @@ isphi259.direction = 1.0
 def isphi260(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 260. * (np.pi/180)
 	return phi - 260. * (np.pi/180)
 isphi260.direction = 1.0
@@ -2357,7 +2358,7 @@ isphi260.direction = 1.0
 def isphi261(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 261. * (np.pi/180)
 	return phi - 261. * (np.pi/180)
 isphi261.direction = 1.0
@@ -2366,7 +2367,7 @@ isphi261.direction = 1.0
 def isphi262(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 262. * (np.pi/180)
 	return phi - 262. * (np.pi/180)
 isphi262.direction = 1.0
@@ -2375,7 +2376,7 @@ isphi262.direction = 1.0
 def isphi263(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 263. * (np.pi/180)
 	return phi - 263. * (np.pi/180)
 isphi263.direction = 1.0
@@ -2384,7 +2385,7 @@ isphi263.direction = 1.0
 def isphi264(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 264. * (np.pi/180)
 	return phi - 264. * (np.pi/180)
 isphi264.direction = 1.0
@@ -2393,7 +2394,7 @@ isphi264.direction = 1.0
 def isphi265(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 265. * (np.pi/180)
 	return phi - 265. * (np.pi/180)
 isphi265.direction = 1.0
@@ -2402,7 +2403,7 @@ isphi265.direction = 1.0
 def isphi266(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 266. * (np.pi/180)
 	return phi - 266. * (np.pi/180)
 isphi266.direction = 1.0
@@ -2411,7 +2412,7 @@ isphi266.direction = 1.0
 def isphi267(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 267. * (np.pi/180)
 	return phi - 267. * (np.pi/180)
 isphi267.direction = 1.0
@@ -2420,7 +2421,7 @@ isphi267.direction = 1.0
 def isphi268(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 268. * (np.pi/180)
 	return phi - 268. * (np.pi/180)
 isphi268.direction = 1.0
@@ -2429,7 +2430,7 @@ isphi268.direction = 1.0
 def isphi269(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 269. * (np.pi/180)
 	return phi - 269. * (np.pi/180)
 isphi269.direction = 1.0
@@ -2438,7 +2439,7 @@ isphi269.direction = 1.0
 def isphi270(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 270. * (np.pi/180)
 	return phi - 270. * (np.pi/180)
 isphi270.direction = 1.0
@@ -2447,7 +2448,7 @@ isphi270.direction = 1.0
 def isphi271(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 271. * (np.pi/180)
 	return phi - 271. * (np.pi/180)
 isphi271.direction = 1.0
@@ -2456,7 +2457,7 @@ isphi271.direction = 1.0
 def isphi272(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 272. * (np.pi/180)
 	return phi - 272. * (np.pi/180)
 isphi272.direction = 1.0
@@ -2465,7 +2466,7 @@ isphi272.direction = 1.0
 def isphi273(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 273. * (np.pi/180)
 	return phi - 273. * (np.pi/180)
 isphi273.direction = 1.0
@@ -2474,7 +2475,7 @@ isphi273.direction = 1.0
 def isphi274(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 274. * (np.pi/180)
 	return phi - 274. * (np.pi/180)
 isphi274.direction = 1.0
@@ -2483,7 +2484,7 @@ isphi274.direction = 1.0
 def isphi275(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 275. * (np.pi/180)
 	return phi - 275. * (np.pi/180)
 isphi275.direction = 1.0
@@ -2492,7 +2493,7 @@ isphi275.direction = 1.0
 def isphi276(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 276. * (np.pi/180)
 	return phi - 276. * (np.pi/180)
 isphi276.direction = 1.0
@@ -2501,7 +2502,7 @@ isphi276.direction = 1.0
 def isphi277(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 277. * (np.pi/180)
 	return phi - 277. * (np.pi/180)
 isphi277.direction = 1.0
@@ -2510,7 +2511,7 @@ isphi277.direction = 1.0
 def isphi278(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 278. * (np.pi/180)
 	return phi - 278. * (np.pi/180)
 isphi278.direction = 1.0
@@ -2519,7 +2520,7 @@ isphi278.direction = 1.0
 def isphi279(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 279. * (np.pi/180)
 	return phi - 279. * (np.pi/180)
 isphi279.direction = 1.0
@@ -2528,7 +2529,7 @@ isphi279.direction = 1.0
 def isphi280(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 280. * (np.pi/180)
 	return phi - 280. * (np.pi/180)
 isphi280.direction = 1.0
@@ -2537,7 +2538,7 @@ isphi280.direction = 1.0
 def isphi281(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 281. * (np.pi/180)
 	return phi - 281. * (np.pi/180)
 isphi281.direction = 1.0
@@ -2546,7 +2547,7 @@ isphi281.direction = 1.0
 def isphi282(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 282. * (np.pi/180)
 	return phi - 282. * (np.pi/180)
 isphi282.direction = 1.0
@@ -2555,7 +2556,7 @@ isphi282.direction = 1.0
 def isphi283(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 283. * (np.pi/180)
 	return phi - 283. * (np.pi/180)
 isphi283.direction = 1.0
@@ -2564,7 +2565,7 @@ isphi283.direction = 1.0
 def isphi284(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 284. * (np.pi/180)
 	return phi - 284. * (np.pi/180)
 isphi284.direction = 1.0
@@ -2573,7 +2574,7 @@ isphi284.direction = 1.0
 def isphi285(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 285. * (np.pi/180)
 	return phi - 285. * (np.pi/180)
 isphi285.direction = 1.0
@@ -2582,7 +2583,7 @@ isphi285.direction = 1.0
 def isphi286(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 286. * (np.pi/180)
 	return phi - 286. * (np.pi/180)
 isphi286.direction = 1.0
@@ -2591,7 +2592,7 @@ isphi286.direction = 1.0
 def isphi287(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 287. * (np.pi/180)
 	return phi - 287. * (np.pi/180)
 isphi287.direction = 1.0
@@ -2600,7 +2601,7 @@ isphi287.direction = 1.0
 def isphi288(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 288. * (np.pi/180)
 	return phi - 288. * (np.pi/180)
 isphi288.direction = 1.0
@@ -2609,7 +2610,7 @@ isphi288.direction = 1.0
 def isphi289(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 289. * (np.pi/180)
 	return phi - 289. * (np.pi/180)
 isphi289.direction = 1.0
@@ -2618,7 +2619,7 @@ isphi289.direction = 1.0
 def isphi290(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 290. * (np.pi/180)
 	return phi - 290. * (np.pi/180)
 isphi290.direction = 1.0
@@ -2627,7 +2628,7 @@ isphi290.direction = 1.0
 def isphi291(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 291. * (np.pi/180)
 	return phi - 291. * (np.pi/180)
 isphi291.direction = 1.0
@@ -2636,7 +2637,7 @@ isphi291.direction = 1.0
 def isphi292(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 292. * (np.pi/180)
 	return phi - 292. * (np.pi/180)
 isphi292.direction = 1.0
@@ -2645,7 +2646,7 @@ isphi292.direction = 1.0
 def isphi293(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 293. * (np.pi/180)
 	return phi - 293. * (np.pi/180)
 isphi293.direction = 1.0
@@ -2654,7 +2655,7 @@ isphi293.direction = 1.0
 def isphi294(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 294. * (np.pi/180)
 	return phi - 294. * (np.pi/180)
 isphi294.direction = 1.0
@@ -2663,7 +2664,7 @@ isphi294.direction = 1.0
 def isphi295(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 295. * (np.pi/180)
 	return phi - 295. * (np.pi/180)
 isphi295.direction = 1.0
@@ -2672,7 +2673,7 @@ isphi295.direction = 1.0
 def isphi296(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 296. * (np.pi/180)
 	return phi - 296. * (np.pi/180)
 isphi296.direction = 1.0
@@ -2681,7 +2682,7 @@ isphi296.direction = 1.0
 def isphi297(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 297. * (np.pi/180)
 	return phi - 297. * (np.pi/180)
 isphi297.direction = 1.0
@@ -2690,7 +2691,7 @@ isphi297.direction = 1.0
 def isphi298(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 298. * (np.pi/180)
 	return phi - 298. * (np.pi/180)
 isphi298.direction = 1.0
@@ -2699,7 +2700,7 @@ isphi298.direction = 1.0
 def isphi299(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 299. * (np.pi/180)
 	return phi - 299. * (np.pi/180)
 isphi299.direction = 1.0
@@ -2708,7 +2709,7 @@ isphi299.direction = 1.0
 def isphi300(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 300. * (np.pi/180)
 	return phi - 300. * (np.pi/180)
 isphi300.direction = 1.0
@@ -2717,7 +2718,7 @@ isphi300.direction = 1.0
 def isphi301(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 301. * (np.pi/180)
 	return phi - 301. * (np.pi/180)
 isphi301.direction = 1.0
@@ -2726,7 +2727,7 @@ isphi301.direction = 1.0
 def isphi302(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 302. * (np.pi/180)
 	return phi - 302. * (np.pi/180)
 isphi302.direction = 1.0
@@ -2735,7 +2736,7 @@ isphi302.direction = 1.0
 def isphi303(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 303. * (np.pi/180)
 	return phi - 303. * (np.pi/180)
 isphi303.direction = 1.0
@@ -2744,7 +2745,7 @@ isphi303.direction = 1.0
 def isphi304(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 304. * (np.pi/180)
 	return phi - 304. * (np.pi/180)
 isphi304.direction = 1.0
@@ -2753,7 +2754,7 @@ isphi304.direction = 1.0
 def isphi305(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 305. * (np.pi/180)
 	return phi - 305. * (np.pi/180)
 isphi305.direction = 1.0
@@ -2762,7 +2763,7 @@ isphi305.direction = 1.0
 def isphi306(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 306. * (np.pi/180)
 	return phi - 306. * (np.pi/180)
 isphi306.direction = 1.0
@@ -2771,7 +2772,7 @@ isphi306.direction = 1.0
 def isphi307(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 307. * (np.pi/180)
 	return phi - 307. * (np.pi/180)
 isphi307.direction = 1.0
@@ -2780,7 +2781,7 @@ isphi307.direction = 1.0
 def isphi308(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 308. * (np.pi/180)
 	return phi - 308. * (np.pi/180)
 isphi308.direction = 1.0
@@ -2789,7 +2790,7 @@ isphi308.direction = 1.0
 def isphi309(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 309. * (np.pi/180)
 	return phi - 309. * (np.pi/180)
 isphi309.direction = 1.0
@@ -2798,7 +2799,7 @@ isphi309.direction = 1.0
 def isphi310(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 310. * (np.pi/180)
 	return phi - 310. * (np.pi/180)
 isphi310.direction = 1.0
@@ -2807,7 +2808,7 @@ isphi310.direction = 1.0
 def isphi311(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 311. * (np.pi/180)
 	return phi - 311. * (np.pi/180)
 isphi311.direction = 1.0
@@ -2816,7 +2817,7 @@ isphi311.direction = 1.0
 def isphi312(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 312. * (np.pi/180)
 	return phi - 312. * (np.pi/180)
 isphi312.direction = 1.0
@@ -2825,7 +2826,7 @@ isphi312.direction = 1.0
 def isphi313(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 313. * (np.pi/180)
 	return phi - 313. * (np.pi/180)
 isphi313.direction = 1.0
@@ -2834,7 +2835,7 @@ isphi313.direction = 1.0
 def isphi314(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 314. * (np.pi/180)
 	return phi - 314. * (np.pi/180)
 isphi314.direction = 1.0
@@ -2843,7 +2844,7 @@ isphi314.direction = 1.0
 def isphi315(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 315. * (np.pi/180)
 	return phi - 315. * (np.pi/180)
 isphi315.direction = 1.0
@@ -2852,7 +2853,7 @@ isphi315.direction = 1.0
 def isphi316(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 316. * (np.pi/180)
 	return phi - 316. * (np.pi/180)
 isphi316.direction = 1.0
@@ -2861,7 +2862,7 @@ isphi316.direction = 1.0
 def isphi317(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 317. * (np.pi/180)
 	return phi - 317. * (np.pi/180)
 isphi317.direction = 1.0
@@ -2870,7 +2871,7 @@ isphi317.direction = 1.0
 def isphi318(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 318. * (np.pi/180)
 	return phi - 318. * (np.pi/180)
 isphi318.direction = 1.0
@@ -2879,7 +2880,7 @@ isphi318.direction = 1.0
 def isphi319(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 319. * (np.pi/180)
 	return phi - 319. * (np.pi/180)
 isphi319.direction = 1.0
@@ -2888,7 +2889,7 @@ isphi319.direction = 1.0
 def isphi320(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 320. * (np.pi/180)
 	return phi - 320. * (np.pi/180)
 isphi320.direction = 1.0
@@ -2897,7 +2898,7 @@ isphi320.direction = 1.0
 def isphi321(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 321. * (np.pi/180)
 	return phi - 321. * (np.pi/180)
 isphi321.direction = 1.0
@@ -2906,7 +2907,7 @@ isphi321.direction = 1.0
 def isphi322(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 322. * (np.pi/180)
 	return phi - 322. * (np.pi/180)
 isphi322.direction = 1.0
@@ -2915,7 +2916,7 @@ isphi322.direction = 1.0
 def isphi323(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 323. * (np.pi/180)
 	return phi - 323. * (np.pi/180)
 isphi323.direction = 1.0
@@ -2924,7 +2925,7 @@ isphi323.direction = 1.0
 def isphi324(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 324. * (np.pi/180)
 	return phi - 324. * (np.pi/180)
 isphi324.direction = 1.0
@@ -2933,7 +2934,7 @@ isphi324.direction = 1.0
 def isphi325(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 325. * (np.pi/180)
 	return phi - 325. * (np.pi/180)
 isphi325.direction = 1.0
@@ -2942,7 +2943,7 @@ isphi325.direction = 1.0
 def isphi326(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 326. * (np.pi/180)
 	return phi - 326. * (np.pi/180)
 isphi326.direction = 1.0
@@ -2951,7 +2952,7 @@ isphi326.direction = 1.0
 def isphi327(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 327. * (np.pi/180)
 	return phi - 327. * (np.pi/180)
 isphi327.direction = 1.0
@@ -2960,7 +2961,7 @@ isphi327.direction = 1.0
 def isphi328(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 328. * (np.pi/180)
 	return phi - 328. * (np.pi/180)
 isphi328.direction = 1.0
@@ -2969,7 +2970,7 @@ isphi328.direction = 1.0
 def isphi329(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 329. * (np.pi/180)
 	return phi - 329. * (np.pi/180)
 isphi329.direction = 1.0
@@ -2978,7 +2979,7 @@ isphi329.direction = 1.0
 def isphi330(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 330. * (np.pi/180)
 	return phi - 330. * (np.pi/180)
 isphi330.direction = 1.0
@@ -2987,7 +2988,7 @@ isphi330.direction = 1.0
 def isphi331(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 331. * (np.pi/180)
 	return phi - 331. * (np.pi/180)
 isphi331.direction = 1.0
@@ -2996,7 +2997,7 @@ isphi331.direction = 1.0
 def isphi332(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 332. * (np.pi/180)
 	return phi - 332. * (np.pi/180)
 isphi332.direction = 1.0
@@ -3005,7 +3006,7 @@ isphi332.direction = 1.0
 def isphi333(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 333. * (np.pi/180)
 	return phi - 333. * (np.pi/180)
 isphi333.direction = 1.0
@@ -3014,7 +3015,7 @@ isphi333.direction = 1.0
 def isphi334(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 334. * (np.pi/180)
 	return phi - 334. * (np.pi/180)
 isphi334.direction = 1.0
@@ -3023,7 +3024,7 @@ isphi334.direction = 1.0
 def isphi335(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 335. * (np.pi/180)
 	return phi - 335. * (np.pi/180)
 isphi335.direction = 1.0
@@ -3032,7 +3033,7 @@ isphi335.direction = 1.0
 def isphi336(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 336. * (np.pi/180)
 	return phi - 336. * (np.pi/180)
 isphi336.direction = 1.0
@@ -3041,7 +3042,7 @@ isphi336.direction = 1.0
 def isphi337(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 337. * (np.pi/180)
 	return phi - 337. * (np.pi/180)
 isphi337.direction = 1.0
@@ -3050,7 +3051,7 @@ isphi337.direction = 1.0
 def isphi338(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 338. * (np.pi/180)
 	return phi - 338. * (np.pi/180)
 isphi338.direction = 1.0
@@ -3059,7 +3060,7 @@ isphi338.direction = 1.0
 def isphi339(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 339. * (np.pi/180)
 	return phi - 339. * (np.pi/180)
 isphi339.direction = 1.0
@@ -3068,7 +3069,7 @@ isphi339.direction = 1.0
 def isphi340(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 340. * (np.pi/180)
 	return phi - 340. * (np.pi/180)
 isphi340.direction = 1.0
@@ -3077,7 +3078,7 @@ isphi340.direction = 1.0
 def isphi341(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 341. * (np.pi/180)
 	return phi - 341. * (np.pi/180)
 isphi341.direction = 1.0
@@ -3086,7 +3087,7 @@ isphi341.direction = 1.0
 def isphi342(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 342. * (np.pi/180)
 	return phi - 342. * (np.pi/180)
 isphi342.direction = 1.0
@@ -3095,7 +3096,7 @@ isphi342.direction = 1.0
 def isphi343(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 343. * (np.pi/180)
 	return phi - 343. * (np.pi/180)
 isphi343.direction = 1.0
@@ -3104,7 +3105,7 @@ isphi343.direction = 1.0
 def isphi344(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 344. * (np.pi/180)
 	return phi - 344. * (np.pi/180)
 isphi344.direction = 1.0
@@ -3113,7 +3114,7 @@ isphi344.direction = 1.0
 def isphi345(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 345. * (np.pi/180)
 	return phi - 345. * (np.pi/180)
 isphi345.direction = 1.0
@@ -3122,7 +3123,7 @@ isphi345.direction = 1.0
 def isphi346(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 346. * (np.pi/180)
 	return phi - 346. * (np.pi/180)
 isphi346.direction = 1.0
@@ -3131,7 +3132,7 @@ isphi346.direction = 1.0
 def isphi347(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 347. * (np.pi/180)
 	return phi - 347. * (np.pi/180)
 isphi347.direction = 1.0
@@ -3140,7 +3141,7 @@ isphi347.direction = 1.0
 def isphi348(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 348. * (np.pi/180)
 	return phi - 348. * (np.pi/180)
 isphi348.direction = 1.0
@@ -3149,7 +3150,7 @@ isphi348.direction = 1.0
 def isphi349(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 349. * (np.pi/180)
 	return phi - 349. * (np.pi/180)
 isphi349.direction = 1.0
@@ -3158,7 +3159,7 @@ isphi349.direction = 1.0
 def isphi350(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 350. * (np.pi/180)
 	return phi - 350. * (np.pi/180)
 isphi350.direction = 1.0
@@ -3167,7 +3168,7 @@ isphi350.direction = 1.0
 def isphi351(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 351. * (np.pi/180)
 	return phi - 351. * (np.pi/180)
 isphi351.direction = 1.0
@@ -3176,7 +3177,7 @@ isphi351.direction = 1.0
 def isphi352(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 352. * (np.pi/180)
 	return phi - 352. * (np.pi/180)
 isphi352.direction = 1.0
@@ -3185,7 +3186,7 @@ isphi352.direction = 1.0
 def isphi353(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 353. * (np.pi/180)
 	return phi - 353. * (np.pi/180)
 isphi353.direction = 1.0
@@ -3194,7 +3195,7 @@ isphi353.direction = 1.0
 def isphi354(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 354. * (np.pi/180)
 	return phi - 354. * (np.pi/180)
 isphi354.direction = 1.0
@@ -3203,7 +3204,7 @@ isphi354.direction = 1.0
 def isphi355(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 355. * (np.pi/180)
 	return phi - 355. * (np.pi/180)
 isphi355.direction = 1.0
@@ -3212,7 +3213,7 @@ isphi355.direction = 1.0
 def isphi356(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 356. * (np.pi/180)
 	return phi - 356. * (np.pi/180)
 isphi356.direction = 1.0
@@ -3221,7 +3222,7 @@ isphi356.direction = 1.0
 def isphi357(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 357. * (np.pi/180)
 	return phi - 357. * (np.pi/180)
 isphi357.direction = 1.0
@@ -3230,7 +3231,7 @@ isphi357.direction = 1.0
 def isphi358(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 358. * (np.pi/180)
 	return phi - 358. * (np.pi/180)
 isphi358.direction = 1.0
@@ -3239,7 +3240,7 @@ isphi358.direction = 1.0
 def isphi359(t, p_XYZ, Mesh):
 	#p_RTP = XYZ_to_RTP(p_XYZ[:3], Mesh.R0)
 	phi = (-1) * np.arctan2(p_XYZ[1],p_XYZ[0])
-	phi = np.where(phi<0, phi+2*np.pi, phi)
+	if phi<0.: phi += 2*np.pi
 	#return p_RTP[2] - 359. * (np.pi/180)
 	return phi - 359. * (np.pi/180)
 isphi359.direction = 1.0

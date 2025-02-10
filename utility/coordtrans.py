@@ -41,14 +41,14 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
 
     # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    #if theta<0: theta += 2*np.pi
-    theta = np.where(theta<0, theta+2*np.pi, theta)
+    if theta<0: theta += 2*np.pi
+    #theta = np.where(theta<0, theta+2*np.pi, theta)
 
     phi = (-1) * np.arctan2(y,x)
     # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    #if phi<0: phi += 2*np.pi
-    phi = np.where(phi<0, phi+2*np.pi, phi)
+    if phi<0: phi += 2*np.pi
+    #phi = np.where(phi<0, phi+2*np.pi, phi)
 
     p_RTP = np.array([r, theta, phi])
 
@@ -122,8 +122,8 @@ def axisShift(rho, theta, rdel, thdel_, Rmaj=0.72):
 
     rprime = np.sqrt(xprime**2 + zprime**2)
     thetaprime = np.arctan2(zprime, xprime)
-    thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
-    
+    #thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
+    if thetaprime<=0: thetaprime += 2*np.pi
     return np.array([thetaprime, rprime])
 
 
