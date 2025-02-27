@@ -38,11 +38,11 @@ class fieldLine(Particle):
         self.mass = 0.
 
     def pushXYZ(self, t, p_XYZ, field):
-        B = np.zeros(3)
+        """Change in position of field line is the normalized field vector at its current position"""
         B, dum_ = field.interpField(p_XYZ[:3])
-        #B = field.interpField(p_XYZ)
 
         dY = B / np.sqrt(B[0]*B[0] + B[1]*B[1] + B[2]*B[2])
+
         return dY * self.direction
 
     def storePath(self):

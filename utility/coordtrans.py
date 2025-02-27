@@ -30,11 +30,12 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
     x, y, z = p_XYZ[:3]
-    x2 = x*x
-    y2 = y*y
+    #x2 = x*x
+    #y2 = y*y
+    x2plusy2 = x*x + y*y
     z2 = z*z
-    R = np.sqrt(x2 + y2)
-    r = np.sqrt( x2 + y2 + z2 + Rmajor*Rmajor - 2*Rmajor*R )
+    R = np.sqrt(x2plusy2)
+    r = np.sqrt( x2plusy2 + z2 + Rmajor*Rmajor - 2*Rmajor*R )
 
     den = R - Rmajor
     theta = np.arctan2(z,den)
@@ -42,13 +43,11 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
     # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
     if theta<0: theta += 2*np.pi
-    #theta = np.where(theta<0, theta+2*np.pi, theta)
 
-    phi = (-1) * np.arctan2(y,x)
+    phi = -np.arctan2(y,x)
     # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
     if phi<0: phi += 2*np.pi
-    #phi = np.where(phi<0, phi+2*np.pi, phi)
 
     p_RTP = np.array([r, theta, phi])
 
