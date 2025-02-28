@@ -172,17 +172,16 @@ def getValuesAlong0(data,phi_toPlot, highToLow = False):
 	
 	return df
 
-def getValuesAtDistance(title, data, phi_toPlot):
+def getValuesAtDistance(data, phi_toPlot, distOuterWall, R):
 	
-	
-	print("The values for {} are given for these theta values \n {} \n ".format(title, np.degrees(THETA)))
+	radius = round(distOuterWall % 0.19, 4)
+
 	allStrengths = []
 	#print(np.degrees(THETA)) # 0 is 2 degs, 5 is 22.11235955, 44 is 178.988, 50 is 203.12359551, and -1 is 360
 	for i, p in enumerate(phi_toPlot):
 		plot_data = np.transpose(data, [2,1,0])[i]
 		#print(plot_data.shape, (len(plot_data)//2)-1)
 		
-		radius = 0.1 #distance from the poloidal center outward
 		index = list(R).index(radius)
 		strength = []
 
@@ -191,108 +190,181 @@ def getValuesAtDistance(title, data, phi_toPlot):
 
 			
 		
-		allStrengths.append(strength)
-		print('{}\n at {}'.format(allStrengths, p*180/np.pi))
+		allStrengths.append(strength)	
+	
+	dic = {}
+	for l,phi in enumerate(allStrengths):
+		#	print(l)
+		nums = []
+		for i in phi:
+			nums.append(i)
+		dic[f"{np.degrees(phi_toPlot[l])}"] = np.array(nums)
+	df = pd.DataFrame(dic)
+	
+	return df
+	
 
-	fig = plt.figure()
-	ax = fig.add_subplot()
+
+def slopes(bigArray, rs):
+	bigList = []
+	for array in bigArray:
+		slopes_list = []
+		for i in range(len(rs)-1):
+			dr = rs[i]-rs[i+1]
+			dB = array[i]-array[i+1]
+			slopes_list.append(dB/dr)
+		bigList.append(np.array(slopes_list))
+	return np.array(bigList)
+
+rampfiles = ['i1q3_hires.npy','i1q3_hires_max.npy','i1q3_hires_noerr_mult.npy','i1q4_hires.npy']
+
+def thetas(radial, poloidal):
+	theta_values = np.arange(0, 2*np.pi, np.pi/180)
+	theta_bstrengths = ((np.cos(theta_values)*radial)**2 + (np.sin(theta_values)*poloidal)**2)**0.5
 	
-	plt.title("{} strengths at radius of {}".format(title.capitalize(), -1*(radius-0.19)))#uses radius to give distance inward from outer wall
+	slopes_list = []
+	for i in range(len(theta_bstrengths)-1):
+		dtheta = theta_values[i+1]-theta_values[i]
+		dB = theta_bstrengths[i+1]-theta_bstrengths[i]
+		slopes_list.append(dB/dtheta)
 	
-	rangeof23 = []
-	
-	for i, line in enumerate(allStrengths):
-		ax.plot(np.degrees(THETA), line, label = "{:03.1f}".format(PHI[i]*180/np.pi))
+	return np.array(theta_bstrengths), np.array(slopes_list)
+
+
+def calculateAtDistances(outerwallDist):
+
+
+	for rampfile in rampfiles[0:1]:
+		Bnorm, Br, Bpol, Btor, R, THETA, PHI = loadBs(f'input_files/{rampfile}')
 		
-		if PHI[i]*180/np.pi%72 == 18:
-			rangeof23.append(line[-1]+0.0023)
-	
-	ymin,ymax = ax.get_ylim()
-	vline_positions = np.array([360, 22.5, 45, 90, 180])
-	ax.vlines(vline_positions, ymin=ymin, ymax=ymax,linestyles="dashed")
-	for x_pos, label in zip(vline_positions, ["360 (0)", "22.5", "45", "90", "180"]):
-		ax.text(x_pos, ymax, label, horizontalalignment='center', verticalalignment='bottom', fontsize=10, color='black')
+		radDic = getValuesAtDistance(Br, PHI, outerwallDist, R)
+		polDic = getValuesAtDistance(Bpol, PHI, outerwallDist, R)
+		torDic = getValuesAtDistance(Btor, PHI, outerwallDist, R)
 
-	ax.hlines(np.array([min(rangeof23), max(rangeof23)]), 0, 360, colors="black", linestyles="dashed", label = "23 G larger than the $\theta$=0 angle at ")
-	for y_pos, label in zip(np.array([min(rangeof23), max(rangeof23)]), [f"{min(rangeof23):0.3f}", f"{max(rangeof23):0.3f}"]):
-		ax.text(360, y_pos, label, horizontalalignment='left', verticalalignment='center', fontsize=10, color='black')
-	plt.legend()
-	#plt.xticks(np.linspace(0, 0.19, 11))
-	ax.xaxis.set_major_locator(ticker.MultipleLocator(10))  # Major ticks every 2 units
-	ax.xaxis.set_minor_locator(ticker.MultipleLocator(1))  # Minor ticks every 0.5 units
-	ax.yaxis.set_major_locator(ticker.MultipleLocator(0.005))  # Major y-ticks every 0.5
-	ax.yaxis.set_minor_locator(ticker.MultipleLocator(0.001))
-	
-	plt.yticks()
-	
-	plt.ylabel("Strength of field (T)")
-	plt.grid()
-	plt.show()
-	#simIO.saveFig("" + title + "at" + radius)
-	plt.close()
+		kw15 = np.array([np.array(radDic["18.0"]), np.array(polDic["18.0"]), np.array(torDic["18.0"])])
+		spec = np.array([np.array(radDic["126.0"]), np.array(polDic["126.0"]), np.array(torDic["126.0"])])
+		nextToPFC = np.array([np.array(radDic["198.0"]), np.array(polDic["198.0"]), np.array(torDic["198.0"])])
+		hallprobe = np.array([np.array(radDic["270.0"]), np.array(polDic["270.0"]), np.array(torDic["270.0"])])
+
+		if outerwallDist > 0.19:
+			num = 44
+		else:
+			num = -1
+
+		kw15_thetas, kw15_slopes = thetas(kw15[0][num], kw15[1][num])
+		spec_thetas, spec_slopes = thetas(spec[0][num], spec[1][num])
+		nextToPFC_thetas, nextToPFC_slopes = thetas(nextToPFC[0][num], nextToPFC[1][num])
+		hallprobe_thetas, hallprobe_slopes = thetas(hallprobe[0][num], hallprobe[1][num])
 
 
-rampfiles = ['i1q3_hires_500t.npy','i1q3_hires_1000t.npy','i1q3_hires_1500t.npy','i1q3_hires_2000t.npy','i1q3_hires_2500t.npy', 'i1q3_hires_3000t.npy','i1q3_hires_3300t.npy']
-for rampfile in rampfiles:
-    Bnorm, Br, Bpol, Btor, R, THETA, PHI = loadBs(f'input_files/{rampfile}')
-    
-    radDic = getValuesAlong0(Br, PHI, True)
-    polDic = getValuesAlong0(Bpol, PHI, True)
-    torDic = getValuesAlong0(Btor, PHI, True)
-	
-    kw15 = np.array(tempDic["18.0"])
-    spec = np.array(tempDic["126.0"])
-    nextToPFC = np.array(tempDic["198.0"])
-    hallprobe = np.array(tempDic["270.0"])
+		with open("temp_storage.txt", "a+") as f:
+			f.write(f"Filename = \"{rampfile}\" \ndistFromOuterWall = {outerwallDist}\n")
+			f.write(f"kw15 = np.array({np.array2string(kw15_thetas, separator=', ')})\n")
+			f.write(f"spec = np.array({np.array2string(spec_thetas, separator=', ')})\n")
+			f.write(f"nextToPFC = np.array({np.array2string(nextToPFC_thetas, separator=', ')})\n")
+			f.write(f"hallprobe = np.array({np.array2string(hallprobe_thetas, separator=', ')})\n")
+			f.write(f"kw15_slopes = np.array({np.array2string(kw15_slopes, separator=', ')})\n")
+			f.write(f"spec_slopes = np.array({np.array2string(spec_slopes, separator=', ')})\n")
+			f.write(f"nextToPFC_slopes = np.array({np.array2string(nextToPFC_slopes, separator=', ')})\n")
+			f.write(f"hallprobe_slopes = np.array({np.array2string(hallprobe_slopes, separator=', ')})\n")
 
 
-    def slopes(array):
-        rs = np.linspace(0.38, 0, 39)
-        slopes_list = []
-        for i in range(len(rs)-1):
-            dr = rs[i]-rs[i+1]
-            dB = array[i]-array[i+1]
-            slopes_list.append(dB/dr)
-        slopes_arr = np.flip(np.array(slopes_list)) #From 0 to 0.38 slopes
-        #print()
-        return slopes_arr
+def calculateAlong0():
 
-    kw15_slopes = slopes(kw15)
-    spec_slopes = slopes(spec)
-    nextToPFC_slopes = slopes(nextToPFC)
-    hallprobe_slopes = slopes(hallprobe)
+	kw_15_centers = []
+	spec_centers = []
+	nextToPFC_centers = []
+	hallprobe_centers = []
+
+	kw_15_slopes_centers = []
+	spec_slopes_centers = []
+	nextToPFC_slopes_centers = []
+	hallprobe_slopes_centers = []
+
+	for rampfile in rampfiles:
+		Bnorm, Br, Bpol, Btor, R, THETA, PHI = loadBs(f'input_files/{rampfile}')
+		
+		
+		radDic = getValuesAlong0(Br, PHI, True)
+		polDic = getValuesAlong0(Bpol, PHI, True)
+		torDic = getValuesAlong0(Btor, PHI, True)
+		
+		kw15 = np.array([np.array(radDic["18.0"]), np.array(polDic["18.0"]), np.array(torDic["18.0"])])
+		spec = np.array([np.array(radDic["126.0"]), np.array(polDic["126.0"]), np.array(torDic["126.0"])])
+		nextToPFC = np.array([np.array(radDic["198.0"]), np.array(polDic["198.0"]), np.array(torDic["198.0"])])
+		hallprobe = np.array([np.array(radDic["270.0"]), np.array(polDic["270.0"]), np.array(torDic["270.0"])])
+		
+		rs = np.linspace(0.38, 0, 39)
+		kw15_slopes = slopes(kw15, rs)
+		spec_slopes = slopes(spec, rs)
+		nextToPFC_slopes = slopes(nextToPFC, rs)
+		hallprobe_slopes = slopes(hallprobe, rs)
+		
+		
+		with open("temp_storage.txt", "a+") as f:
+			f.write(f"Filename = {rampfile}\n")
+			f.write(f"kw15 = np.array({np.array2string(kw15, separator=', ')})\n")
+			f.write(f"spec = np.array({np.array2string(spec, separator=', ')})\n")
+			f.write(f"nextToPFC = np.array({np.array2string(nextToPFC, separator=', ')})\n")
+			f.write(f"hallprobe = np.array({np.array2string(hallprobe, separator=', ')})\n")
+			f.write(f"kw15_slopes = np.array({np.array2string(kw15_slopes, separator=', ')})\n")
+			f.write(f"spec_slopes = np.array({np.array2string(spec_slopes, separator=', ')})\n")
+			f.write(f"nextToPFC_slopes = np.array({np.array2string(nextToPFC_slopes, separator=', ')})\n")
+			f.write(f"hallprobe_slopes = np.array({np.array2string(hallprobe_slopes, separator=', ')})\n")
+
+		kw_15_centers.append(np.array([kw15[0][19], kw15[1][19], kw15[2][19]]))
+		spec_centers.append(np.array([spec[0][19], spec[1][19], spec[2][19]]))
+		nextToPFC_centers.append(np.array([nextToPFC[0][19], nextToPFC[1][19], nextToPFC[2][19]]))
+		hallprobe_centers.append(np.array([hallprobe[0][19], hallprobe[1][19], hallprobe[2][19]]))
+
+		kw_15_slopes_centers.append(np.array([kw15_slopes[0][18], kw15_slopes[1][18], kw15_slopes[2][18]]))
+		spec_slopes_centers.append(np.array([spec_slopes[0][18], spec_slopes[1][18], spec_slopes[2][18]]))
+		nextToPFC_slopes_centers.append(np.array([nextToPFC_slopes[0][18], nextToPFC_slopes[1][18], nextToPFC_slopes[2][18]]))
+		hallprobe_slopes_centers.append(np.array([hallprobe_slopes[0][18], hallprobe_slopes[1][18], hallprobe_slopes[2][18]]))
+
+	kw_15_centers = np.array(kw_15_centers)
+	spec_centers = np.array(spec_centers)
+	nextToPFC_centers = np.array(nextToPFC_centers)
+	hallprobe_centers = np.array(hallprobe_centers)
+
+	kw_15_slopes_centers = np.array(kw_15_slopes_centers)
+	spec_slopes_centers = np.array(spec_slopes_centers)
+	nextToPFC_slopes_centers = np.array(nextToPFC_slopes_centers)
+	hallprobe_slopes_centers = np.array(hallprobe_slopes_centers)
+
+	with open("temp_storage.txt", "a+") as f:
+		f.write(f"kw15_centers = np.array({np.array2string(kw_15_centers*1000, separator=', ')})\n")
+		f.write(f"spec_centers = np.array({np.array2string(spec_centers*1000, separator=', ')})\n")
+		f.write(f"nextToPFC_centers = np.array({np.array2string(nextToPFC_centers*1000, separator=', ')})\n")
+		f.write(f"hallprobe_centers = np.array({np.array2string(hallprobe_centers*1000, separator=', ')})\n")
+
+		f.write(f"kw15_slopes_centers = np.array({np.array2string(kw_15_slopes_centers*1000, separator=', ')})\n")
+		f.write(f"spec_slopes_centers = np.array({np.array2string(spec_slopes_centers*1000, separator=', ')})\n")
+		f.write(f"nextToPFC_slopes_centers = np.array({np.array2string(nextToPFC_slopes_centers*1000, separator=', ')})\n")
+		f.write(f"hallprobe_slopes_centers = np.array({np.array2string(hallprobe_slopes_centers*1000, separator=', ')})\n")
 
 
 
-    with open("temp_storage.txt", "a+") as f:
-        f.write("Poloidal, 1q3_hires\n")
-        f.write(f"kw15 = {kw15}\n")
-        f.write(f"spec = {spec}\n")
-        f.write(f"nextToPFC = {nextToPFC}\n")
-        f.write(f"hallprobe = {hallprobe}\n")
-        f.write(f"kw15_slopes = {kw15_slopes}\n")
-        f.write(f"spec_slopes = {spec_slopes}\n")
-        f.write(f"nextToPFC_slopes = {nextToPFC_slopes}\n")
-        f.write(f"hallprobe_slopes = {hallprobe_slopes}\n")
+calculateAtDistances(0.29) #has to be a multiple of 0.01
 
 
 
 
 
 
-    #print(f"15kW - .29 : {kw15[9]*10000}, .19 : {kw15[19]*10000}, .09 : {kw15[29]*10000}")
-    #print(f"Spec - .29 : {spec[9]*10000}, .19 : {spec[19]*10000}, .09 : {spec[29]*10000}")
-    #print(f"Next To PFC - .29 : {nextToPFC[9]*10000}, .19 : {nextToPFC[19]*10000}, .09 : {nextToPFC[29]*10000}")
-    #print(f"Hall Probe - .29 : {hallprobe[9]*10000}, .19 : {hallprobe[19]*10000}, .09 : {hallprobe[29]*10000}")
-    #print(f"np.array({[[kw15[9]*10000, kw15[19]*10000, kw15[29]*10000], [spec[9]*10000, spec[19]*10000, spec[29]*10000], [nextToPFC[9]*10000, nextToPFC[19]*10000, nextToPFC[29]*10000], [hallprobe[9]*10000, hallprobe[19]*10000, hallprobe[29]*10000]]})")
+#print(f"15kW - .29 : {kw15[9]*10000}, .19 : {kw15[19]*10000}, .09 : {kw15[29]*10000}")
+#print(f"Spec - .29 : {spec[9]*10000}, .19 : {spec[19]*10000}, .09 : {spec[29]*10000}")
+#print(f"Next To PFC - .29 : {nextToPFC[9]*10000}, .19 : {nextToPFC[19]*10000}, .09 : {nextToPFC[29]*10000}")
+#print(f"Hall Probe - .29 : {hallprobe[9]*10000}, .19 : {hallprobe[19]*10000}, .09 : {hallprobe[29]*10000}")
+#print(f"np.array({[[kw15[9]*10000, kw15[19]*10000, kw15[29]*10000], [spec[9]*10000, spec[19]*10000, spec[29]*10000], [nextToPFC[9]*10000, nextToPFC[19]*10000, nextToPFC[29]*10000], [hallprobe[9]*10000, hallprobe[19]*10000, hallprobe[29]*10000]]})")
 
 
-    ## NORM ##
-    #plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm', PHI)
+## NORM ##
+#plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm', PHI)
 
-    ## RADIAL ##
-    #plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial', PHI)
-    ### POLOIDAL ##
-    #plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal', PHI)
-    ### TOROIDAL ##
-    #plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal', PHI)
+## RADIAL ##
+#plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial', PHI)
+### POLOIDAL ##
+#plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal', PHI)
+### TOROIDAL ##
+#plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal', PHI)
