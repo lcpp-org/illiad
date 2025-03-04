@@ -49,13 +49,10 @@ class Mesh:
         self.att_mult = 1.0 
 
     def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
-    #def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=[False]):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
         """
-
-        #self.log.info('Loading Cartesian Vector field from file: {}'.format(file_path))
         Bx_, By_, Bz_ = np.load(file_path)
 
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
@@ -68,6 +65,7 @@ class Mesh:
             self.Bz = Bz_
             self.errField = errField
 
+            # r periodicity
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
                 self.dr = self.r_max / self.nr
@@ -76,7 +74,8 @@ class Mesh:
                 self.r_max = self.a
                 self.dr = self.r_max / (self.nr-1)
                 self.r_min = 0.
-
+            
+            # theta periodicity
             if self.periodicity[1]:
                 self.theta_max = (2*np.pi) / self.periodicity[1]
                 self.dtheta = self.theta_max / self.ntheta
@@ -85,7 +84,8 @@ class Mesh:
                 self.theta_max = (2*np.pi)
                 self.dtheta = self.theta_max / (self.ntheta-1)
                 self.theta_min = 0.
-
+            
+            # phi periodicity
             if self.periodicity[2]:
                 self.phi_max = (2*np.pi) / self.periodicity[2]
                 self.dphi = self.phi_max / self.nphi
@@ -94,13 +94,7 @@ class Mesh:
                 self.phi_max = (2*np.pi)
                 self.dphi = self.phi_max / (self.nphi-1)
                 self.phi_min = 0.
-            #self.log.info('Cartesian Vector field loaded:\n'
-            #               +'# -----------------------------------\n'
-            #              +'# Shape: {}\n.format(Bx.shape)'
-            #              +'# dr = {} m.\n'.format(self.dr)
-            #              +'# dtheta = {} deg.\n'.format(degrees(self.dtheta))
-            #              +'# dphi = {} deg.\n'.format(degrees(self.dphi))
-            #               +'# -----------------------------------\n')
+
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -132,10 +126,8 @@ class Mesh:
         ## Sanitize input (or make sure we are passing torch tensors!)
         Npts = 1 #Npts = point_XYZ.shape[0]
 
-        if Cart:
-            point_RTP = XYZ_to_RTP(point_XYZ, self.R0) #.to(device)
-        else:
-            point_RTP = point_XYZ #.to(device)
+        if Cart: point_RTP = XYZ_to_RTP(point_XYZ, self.R0) #.to(device)
+        else: point_RTP = point_XYZ #.to(device)
         
         # periodic boundarys
         r_local  = point_RTP[0]
@@ -166,17 +158,26 @@ class Mesh:
         cos_th_low = np.cos(th_low)
         cos_th_local = np.cos(th_local)
 
-        # sub-element volumes
-        A1 = (self.R0 + r_low*cos_th_low)     * r_lowr_el      * th_el    * ph_el
-        A2 = (self.R0 + r_local*cos_th_low)   * r_localinvr_el * th_el    * ph_el
-        A3 = (self.R0 + r_low*cos_th_local)   * r_lowr_el      * invth_el * ph_el
-        A4 = (self.R0 + r_local*cos_th_local) * r_localinvr_el * invth_el * ph_el
-        A5 = (self.R0 + r_low*cos_th_low)     * r_lowr_el      * th_el    * invph_el
-        A6 = (self.R0 + r_local*cos_th_low)   * r_localinvr_el * th_el    * invph_el
-        A7 = (self.R0 + r_low*cos_th_local)   * r_lowr_el      * invth_el * invph_el
-        A8 = (self.R0 + r_local*cos_th_local) * r_localinvr_el * invth_el * invph_el
-        Areas = np.array([A1, A2, A3, A4, A5, A6, A7, A8])
+        cos_th_low_r_low = r_low * cos_th_low
+        cos_th_low_r_local = r_local * cos_th_low
+        cos_th_local_r_low = r_low * cos_th_local
+        cos_th_local_r_local = r_local * cos_th_local
 
+        # sub-element volumes
+        A1 = (self.R0 + cos_th_low_r_low)     * r_lowr_el      * th_el    #* ph_el
+        A2 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* ph_el
+        A3 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* ph_el
+        A4 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* ph_el
+        A5 = (self.R0 + cos_th_low_r_low)     * r_lowr_el      * th_el    #* invph_el
+        A6 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* invph_el
+        A7 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* invph_el
+        A8 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* invph_el
+        
+        Areas = np.array([A1, A2, A3, A4, A5, A6, A7, A8])
+        Areas[:4] *= ph_el
+        Areas[4:] *= invph_el
+
+        # indices of the 8 corner nodes of the cell
         ir_hi = np.int16(rindex + 1)
         ir_lo = np.int16(rindex)
         ith_hi = np.int16(thindex)
@@ -202,19 +203,16 @@ class Mesh:
         # result is sum of B field vectors weighted with sub-element volumes
         vecXYZ = np.dot(Areas, Bvecs) / np.sum(Areas)
 
-        # if the mesh is defined with periodic symmetry, we must 
-        # perform a rotational transform based on which 'period' of the mesh
-        # the point is located
+        # if mesh is defined with periodic symmetry, we perform a rotational transform based
+        # on which 'period' of the mesh the point is located
         phi_rotation = ph_localN * self.phi_max  # angle of transform
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, phi_rotation)
     
-        # non-periodic perturbative error field applied
-        if self.errField:
+        if self.errField: # non-periodic perturbative error field applied
             vecXYZ *= self.att_mult
             vecXYZ[0] += self.err_mag * np.cos(self.err_dir)
             vecXYZ[1] -= self.err_mag * np.sin(self.err_dir)
 
-        
         return vecXYZ, ph_localN
 
 
