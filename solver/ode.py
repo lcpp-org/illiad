@@ -21,7 +21,6 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
 
     maxLength = particle.maxLife
 
-
     for event in solver_events:
         if event.__name__ == 'inVV':
             event.direction = -1.0
@@ -30,24 +29,23 @@ def solvePoincare(particle, field, solver, rtl, atl, solver_events):
         else:
             event.direction = particle.direction
 
-
-    t_startInd = perf_counter()
+    tic = perf_counter()
     fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
                             args = ([field]),
                             dense_output=False,
                             events = solver_events, 
                             method=solver, rtol=rtl, atol=atl)
-    t_stopInd = perf_counter()
-    elapsed_timeInd = t_stopInd - t_startInd
+    toc = perf_counter()
+    elapsed_timeInd = toc - tic
 
     tmax = np.max(fieldlines.t)
 
     if fieldlines.status == 0: #solver ran to max. time
-        log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
+        log.info('Success!: Particle {} of {} took {:.4f} sec.\tEnd at tmax={:.3f}'
             .format(particle.particleID,
                     particle.particleCount,
                     elapsed_timeInd,
-                    fieldlines.t_events[0]))
+                    tmax))
     elif fieldlines.status == 1: #termination event
         log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
             .format(particle.particleID,

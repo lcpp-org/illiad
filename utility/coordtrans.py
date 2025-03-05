@@ -122,8 +122,8 @@ def axisShift(rho, theta, rdel, thdel_, Rmaj=0.72):
 
     rprime = np.sqrt(xprime**2 + zprime**2)
     thetaprime = np.arctan2(zprime, xprime)
-    #thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
-    if thetaprime<=0: thetaprime += 2*np.pi
+    thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
+    #if thetaprime<=0: thetaprime += 2*np.pi
     return np.array([thetaprime, rprime])
 
 

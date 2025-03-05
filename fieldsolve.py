@@ -13,8 +13,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-#output_name = 'It486_Ih900_Iv000_hel1p055'
-output_name = 'FITTED_02092025_hel-0p950'
+output_name = 'It486_Ih900_Iv000_0p943_1p00'
+#output_name = 'FITTED_02092025_hel-0p950'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
@@ -48,7 +48,7 @@ I_vert *= att_mult
 # Multiplier applied to helical current,
 # Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field
 # Based on characterization of WEGA by Otte[REF] (Set to 1.0 if ideal field is desired)
-err_mult = 0.950
+err_mult = 1.0 #0.955
 I_heli *= err_mult
 
 ########################
@@ -117,7 +117,8 @@ def main():
     header=None,
     skiprows=3,
     index_col=None,
-    delim_whitespace=True,
+    #delim_whitespace=True,
+    sep='\s+',
     names=range(6)) #irregularly-sized rows, pad with NaN's
 
     ## PARSE COIL DATA

@@ -24,6 +24,7 @@ def plotWallHist(wallPtArray, runString, simIO):
 
     # extract theta and phi
     theta_plot = wallPtArray[1]
+    # convert to phi= +CCW (as if viewing from outside the vaccum vessel)
     phi_plot = wallPtArray[2]*(-1) + 2*np.pi
 
     # shift theta domain to -180 to 180
@@ -31,7 +32,9 @@ def plotWallHist(wallPtArray, runString, simIO):
         if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
 
     # convert to degrees
-    phi_plot_deg = (phi_plot*(180/np.pi) + 180. - 18.) % 360.
+    # shift to physical phi=0 at at the South-side split
+    a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+    phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
     theta_plot_deg = theta_plot*(180/np.pi)
 
     # define bin edges for 2d histogram
@@ -60,7 +63,7 @@ def plotWallHist(wallPtArray, runString, simIO):
     
     plt.colorbar(location='bottom', shrink=0.6)
     
-    ax.set_xlabel('Toroidal Angle, $\phi[\degree]$')
+    ax.set_xlabel('Toroidal Angle (+CCW from South-Side Split), $\phi[\degree]$')
     ax.set_xlim(0, 360)
     ax.set_xticks(np.linspace(9, 360, 40))
     ax.xaxis.set_tick_params(labelsize=6)

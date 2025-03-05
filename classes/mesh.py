@@ -49,13 +49,10 @@ class Mesh:
         self.att_mult = 1.0 
 
     def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
-    #def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=[False]):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
         """
-
-        #self.log.info('Loading Cartesian Vector field from file: {}'.format(file_path))
         Bx_, By_, Bz_ = np.load(file_path)
 
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
@@ -68,6 +65,7 @@ class Mesh:
             self.Bz = Bz_
             self.errField = errField
 
+            # r periodicity
             if self.periodicity[0]:
                 self.r_max = self.a / self.periodicity[0]
                 self.dr = self.r_max / self.nr
@@ -76,7 +74,8 @@ class Mesh:
                 self.r_max = self.a
                 self.dr = self.r_max / (self.nr-1)
                 self.r_min = 0.
-
+            
+            # theta periodicity
             if self.periodicity[1]:
                 self.theta_max = (2*np.pi) / self.periodicity[1]
                 self.dtheta = self.theta_max / self.ntheta
@@ -85,7 +84,8 @@ class Mesh:
                 self.theta_max = (2*np.pi)
                 self.dtheta = self.theta_max / (self.ntheta-1)
                 self.theta_min = 0.
-
+            
+            # phi periodicity
             if self.periodicity[2]:
                 self.phi_max = (2*np.pi) / self.periodicity[2]
                 self.dphi = self.phi_max / self.nphi
@@ -94,30 +94,7 @@ class Mesh:
                 self.phi_max = (2*np.pi)
                 self.dphi = self.phi_max / (self.nphi-1)
                 self.phi_min = 0.
-            #self.log.info('Cartesian Vector field loaded:\n'
-            #               +'# -----------------------------------\n'
-            #              +'# Shape: {}\n.format(Bx.shape)'
-            #              +'# dr = {} m.\n'.format(self.dr)
-            #              +'# dtheta = {} deg.\n'.format(degrees(self.dtheta))
-            #              +'# dphi = {} deg.\n'.format(degrees(self.dphi))
-            #               +'# -----------------------------------\n')
 
-    def subElementVolume(self, point1, point2):
-        """
-        This method takes in 2 points defined (r, theta, phi) coordinates
-        returns a scalar volume of the subelement defined these 2 diagonal points
-        """
-        #r1, theta1, phi1 = point1
-        #r2, theta2, phi2 = point2
-        #dtheta = theta2 - theta1
-        #dphi = (phi2 - phi1)
-        #term1 = self.R0 * (r2*r2 - r1*r1)/2. *         dtheta * dphi
-        #term2 =           (r2*r2*r2 - r1*r1*r1)/3. * np.sin(dtheta) * dphi
-        #return np.abs(term1 + term2)
-    
-        dr, dtheta, dphi = np.abs( point2 - point1 )
-        #return (self.R0 + point1[0] * np.cos(point1[1]) ) * point1[0] * dr * dtheta * dphi
-        return (self.R0 + point1[0] * np.cos(point1[1]) ) * point2[0] * dr * dtheta * dphi
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -126,7 +103,7 @@ class Mesh:
         convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
         convention: +phi is clockwise when viewed from above
         """
-        rotated_XYZ = np.zeros(3)
+        rotated_XYZ = np.zeros(vec_XYZ.shape)
         xFormMatrix = np.array([[ np.cos(delta_phi), -np.sin(delta_phi), 0.0],
                                 [ np.sin(delta_phi),  np.cos(delta_phi), 0.0],
                                 [               0.0,                0.0, 1.0]])
@@ -146,145 +123,136 @@ class Mesh:
         theta: dtheta -> theta_max (2pi/Nperiods)
         phi:     dphi -> phi_max   (2pi/Nperiods)
         """
-        if Cart:
-            point_RTP = XYZ_to_RTP(point_XYZ, self.R0)
-        else:
-            point_RTP = point_XYZ
+        ## Sanitize input (or make sure we are passing torch tensors!)
+        Npts = 1 #Npts = point_XYZ.shape[0]
 
-        r_local  = point_RTP[0]
-        th_localN, th_local = np.divmod(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
-        ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
-        point_RTP_local = np.array([r_local, th_local, ph_local])
-
-        if r_local >= self.r_max:
-            # determine whether point is within mesh domain
-            # Cast the indices to the last element of the array
-            # This is to make sure the interpolation function does not fail
-            rindex_lo  = self.nr - 2
-            
-        else:
-            # Point is within the mesh, and we can find the indices
-            # (here "lo" stands for lower bound
-            rindex_lo = np.floor(r_local/self.dr)
-
-        rindex_hi = rindex_lo + 1
-        thindex_hi = np.floor(th_local/self.dtheta)
-        thindex_lo = thindex_hi - 1
-        phindex_hi = np.floor(ph_local/self.dphi)
-        phindex_lo = phindex_hi - 1
-
-        # Return the indices of the 8 corner points of the cell
-        # Validation of the indices is not done here
-        nodeIndexArray = np.array(
-            [[rindex_lo,  thindex_lo, phindex_lo ], [rindex_hi, thindex_lo, phindex_lo ],
-             [rindex_lo,  thindex_hi, phindex_lo ], [rindex_hi, thindex_hi, phindex_lo ],
-             [rindex_lo,  thindex_lo, phindex_hi ], [rindex_hi, thindex_lo, phindex_hi ],
-             [rindex_lo,  thindex_hi, phindex_hi ], [rindex_hi, thindex_hi, phindex_hi ]],
-            dtype=np.int32)
-
-        # antiNodeArray will return the node indices diagonally "opposite" the node in nodeArray
-        # note that proper functioning depends on ordering of nodeIndexArray
-        antiNodeArray = np.flip(nodeIndexArray, 0)
-        totalVolume = 0.
-        node_vecXYZ = np.zeros(3)
-        local_vecXYZ = np.zeros(3)
-        global_vecXYZ = np.zeros(3)
-
-
-        # cycle through nodes, solving for the field and the weight function
-        for n, node in enumerate(nodeIndexArray):
-
-            # get node and antiNode indices
-            node_i, node_j, node_k = node
-            antiNode_i, antiNode_j, antiNode_k = antiNodeArray[n]
-            node_vecXYZ[0] = self.Bx[node_i, node_j, node_k]
-            node_vecXYZ[1] = self.By[node_i, node_j, node_k]
-            node_vecXYZ[2] = self.Bz[node_i, node_j, node_k]
-
-
-            # transform the field if the node is < dphi
-            if node_k < 0.:
-                node_vecXYZ = self.rot_vecXYZ_byPHI(node_vecXYZ, -self.phi_max)
-
-            # calculate antiNode rtp values from indices for input in to 'subElementVolume'
-            antiNode_r = antiNode_i * self.dr
-            antiNode_theta = (antiNode_j + 1) * self.dtheta
-            antiNode_phi = (antiNode_k + 1) * self.dphi
-
-            antiNode_rtp = np.array([antiNode_r, antiNode_theta, antiNode_phi])
-
-            # calculate the wieght function as the volume of the point-antiNode subelement
-            antiNode_subVolume = self.subElementVolume(point_RTP_local, antiNode_rtp)
-            #print(antiNode_subVolume)
-            totalVolume += antiNode_subVolume
-            local_vecXYZ += node_vecXYZ * antiNode_subVolume
-
-
-        #  return the sum of weighted values divided by the total
-        local_vecXYZ = local_vecXYZ / totalVolume
-
-        # if the mesh is defined with periodic symmetry, we must 
-        # perform a rotational transform based on which 'period' of the mesh
-        # the point is located
-        # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
-        phi_rotation = int(ph_localN) * self.phi_max  # angle of transform
-        global_vecXYZ = self.rot_vecXYZ_byPHI(local_vecXYZ, phi_rotation)
+        if Cart: point_RTP = XYZ_to_RTP(point_XYZ, self.R0) #.to(device)
+        else: point_RTP = point_XYZ #.to(device)
         
-        if self.errField:
-            #err_mag = np.sqrt(0.0002*0.0002 + 0.0002*0.0002)
-            #att_mult = 1.0 #0.9616 #0.9690
-            global_vecXYZ *= self.att_mult
+        # periodic boundarys
+        r_local  = point_RTP[0]
+        th_local = np.remainder(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
+        ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
 
-            #self.err_mag = 2.828427E-4 * 1.2
-            #self.err_dir = 270.* np.pi/180 #155. * np.pi/180 #for a_phi = 162 deg
+        vecXYZ = np.zeros([3,Npts], dtype=np.float64) 
+        rindex : np.int16
+        thindex : np.int16
+        phindex : np.int16
 
-            #err_dir = 220. * np.pi/180 #for a_phi = -126 deg
+        # indices and local (within cell) values
+        thindex, th_el = np.divmod(th_local, self.dtheta)
+        phindex, ph_el = np.divmod(ph_local, self.dphi)
+        rindex, r_el = np.divmod(r_local, self.dr)
+        if r_local >= self.r_max:
+            rindex = self.nr - 2
 
-            global_vecXYZ[0] += self.err_mag * np.cos(self.err_dir)
-            global_vecXYZ[1] -= self.err_mag * np.sin(self.err_dir)
+        r_low = rindex * self.dr
+        th_low = (thindex+1) * self.dtheta
 
-            # global_vecXYZ[0] += 0.0002
-            # global_vecXYZ[1] -= 0.0002
+        invr_el = self.dr - r_el
+        invth_el = self.dtheta - th_el
+        invph_el = self.dphi - ph_el
 
-        return global_vecXYZ, ph_localN
+        r_lowr_el = r_low * r_el
+        r_localinvr_el = r_local * invr_el
+        cos_th_low = np.cos(th_low)
+        cos_th_local = np.cos(th_local)
 
-    def calculate_psi(self):
-        # EITHER CALCULATE ON FULL NON-PERIODIC MESH
-        # OR CALCULATE SEPARATE PSI_IDEAL AND PSI_ERROR
+        cos_th_low_r_low = r_low * cos_th_low
+        cos_th_low_r_local = r_local * cos_th_low
+        cos_th_local_r_low = r_low * cos_th_local
+        cos_th_local_r_local = r_local * cos_th_local
 
-        #############
-        # IDEAL PSI
-        ############
-        self.PSI_ideal = np.zeros((self.nr, self.ntheta, self.nphi))
-        # CALCULATE PSI FOR EACH R=0:
-        # [i,j,k]=position indices, [x,y,z]=summation indices
-        y_pi = int( (self.ntheta-1)/2 ) # index for theta=pi ( THETA: 0 ->2pi)
-        i_zero = 0 # index for r=0
-        for j in range (0, self.ntheta-1):
-            for k in range(0, self.nphi-1):
-                # SUM (B_Z*dA) FOR EACH:
-                for x in range(0, self.nr-1): # r: 0 TO a
-                    for z in range(0, self.nphi-1): # phi: 0 TO 2PI
-                        # theta: PI = k_pi
-                        dA = (self.R0 - x*self.dr) * self.dr * self.dphi
-                        self.PSI_ideal[i_zero][j][k] += self.Bz[x][y_pi][z] * dA
+        # sub-element volumes
+        A1 = (self.R0 + cos_th_low_r_low)     * r_lowr_el      * th_el    #* ph_el
+        A2 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* ph_el
+        A3 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* ph_el
+        A4 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* ph_el
+        A5 = (self.R0 + cos_th_low_r_low)     * r_lowr_el      * th_el    #* invph_el
+        A6 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* invph_el
+        A7 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* invph_el
+        A8 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* invph_el
+        
+        Areas = np.array([A1, A2, A3, A4, A5, A6, A7, A8])
+        Areas[:4] *= ph_el
+        Areas[4:] *= invph_el
 
-        # CALCULATE PSI FOR EACH R !=0:
-        # ij,k=position indices, x,y,z=summation indices
-        for i in range(1, self.nr-1):
-            for j in range(0, self.ntheta-1):
-                y_theta = j # THETA: THETA
-                for k in range(0, self.nphi-1):
-                    # SUM (B_THETA*dA) FOR EACH:
-                    for x in range(0, i): # r: 0 TO r_position
-                        for z in range(0, self.nphi-1): # PHI: 0 TO 2PI
-                            Bpol = -self.Bx[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.cos(z*self.dphi) + self.By[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.sin(z*self.dphi) + self.Bz[x][y_theta][z]*np.cos(y_theta*self.dtheta)
-                            dA = (self.R0 + x*self.dr * np.cos(y_theta*self.dtheta)) * self.dr * self.dphi
+        # indices of the 8 corner nodes of the cell
+        ir_hi = np.int16(rindex + 1)
+        ir_lo = np.int16(rindex)
+        ith_hi = np.int16(thindex)
+        ith_lo = np.int16(thindex - 1)
+        iph_hi = np.int16(phindex)
+        iph_lo = np.int16(phindex - 1)
 
-                            self.PSI_ideal[i][j][k] += Bpol * dA
+        # indices of the 8 corner nodes of the cell
+        index_array = np.array([[ir_hi, ith_hi, iph_hi], [ir_lo, ith_hi, iph_hi],
+                    [ir_hi, ith_lo, iph_hi], [ir_lo, ith_lo, iph_hi],
+                    [ir_hi, ith_hi, iph_lo], [ir_lo, ith_hi, iph_lo],
+                    [ir_hi, ith_lo, iph_lo], [ir_lo, ith_lo, iph_lo]])
+        
+        # B field vectors at the 8 corner nodes
+        Bvecs = np.zeros((8, 3))
+        Bvecs[:, 0] = self.Bx[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
+        Bvecs[:, 1] = self.By[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
+        Bvecs[:, 2] = self.Bz[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
 
-                    # Add the psi at r=0 for total psi
-                    self.PSI_ideal[i][j][k] += self.PSI_ideal[0][j][k]
-        # END IDEAL PSI CALCULATION
+        # have to perform vector rotation if wrapping around in phi direction
+        if iph_lo < 0: Bvecs[4:] = self.rot_vecXYZ_byPHI( Bvecs[4:], -self.phi_max )
+
+        # result is sum of B field vectors weighted with sub-element volumes
+        vecXYZ = np.dot(Areas, Bvecs) / np.sum(Areas)
+
+        # if mesh is defined with periodic symmetry, we perform a rotational transform based
+        # on which 'period' of the mesh the point is located
+        phi_rotation = ph_localN * self.phi_max  # angle of transform
+        vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, phi_rotation)
+    
+        if self.errField: # non-periodic perturbative error field applied
+            vecXYZ *= self.att_mult
+            vecXYZ[0] += self.err_mag * np.cos(self.err_dir)
+            vecXYZ[1] -= self.err_mag * np.sin(self.err_dir)
+
+        return vecXYZ, ph_localN
+
+
+    # def calculate_psi(self):
+    #     # EITHER CALCULATE ON FULL NON-PERIODIC MESH
+    #     # OR CALCULATE SEPARATE PSI_IDEAL AND PSI_ERROR
+
+    #     #############
+    #     # IDEAL PSI
+    #     ############
+    #     self.PSI_ideal = np.zeros((self.nr, self.ntheta, self.nphi))
+    #     # CALCULATE PSI FOR EACH R=0:
+    #     # [i,j,k]=position indices, [x,y,z]=summation indices
+    #     y_pi = int( (self.ntheta-1)/2 ) # index for theta=pi ( THETA: 0 ->2pi)
+    #     i_zero = 0 # index for r=0
+    #     for j in range (0, self.ntheta-1):
+    #         for k in range(0, self.nphi-1):
+    #             # SUM (B_Z*dA) FOR EACH:
+    #             for x in range(0, self.nr-1): # r: 0 TO a
+    #                 for z in range(0, self.nphi-1): # phi: 0 TO 2PI
+    #                     # theta: PI = k_pi
+    #                     dA = (self.R0 - x*self.dr) * self.dr * self.dphi
+    #                     self.PSI_ideal[i_zero][j][k] += self.Bz[x][y_pi][z] * dA
+
+    #     # CALCULATE PSI FOR EACH R !=0:
+    #     # ij,k=position indices, x,y,z=summation indices
+    #     for i in range(1, self.nr-1):
+    #         for j in range(0, self.ntheta-1):
+    #             y_theta = j # THETA: THETA
+    #             for k in range(0, self.nphi-1):
+    #                 # SUM (B_THETA*dA) FOR EACH:
+    #                 for x in range(0, i): # r: 0 TO r_position
+    #                     for z in range(0, self.nphi-1): # PHI: 0 TO 2PI
+    #                         Bpol = -self.Bx[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.cos(z*self.dphi) + self.By[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.sin(z*self.dphi) + self.Bz[x][y_theta][z]*np.cos(y_theta*self.dtheta)
+    #                         dA = (self.R0 + x*self.dr * np.cos(y_theta*self.dtheta)) * self.dr * self.dphi
+
+    #                         self.PSI_ideal[i][j][k] += Bpol * dA
+
+    #                 # Add the psi at r=0 for total psi
+    #                 self.PSI_ideal[i][j][k] += self.PSI_ideal[0][j][k]
+    #     # END IDEAL PSI CALCULATION
 
 

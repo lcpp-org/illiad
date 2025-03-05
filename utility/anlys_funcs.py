@@ -111,7 +111,7 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
         else:
             pass
 
-        plt.scatter(th_f, r_f, marker='.', s=1.5, c='k', linewidths=0.0)
+        plt.scatter(th_f, r_f, marker='.', s=1.00, c='k', linewidths=0.0)
 
     if saveData:
         f_output = scatter_points

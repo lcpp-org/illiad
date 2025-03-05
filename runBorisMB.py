@@ -1,6 +1,5 @@
 ## IMPORTS
 import numpy as np
-
 from time import perf_counter
 
 import classes.class_outputHandler as out
@@ -16,27 +15,25 @@ kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
 
-
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
-INPUT_FILE_LOCATION = 'input_files/It486_Ih900_Iv000_0p955_hires.npy'
-OUTPUT_DIRECTORY_NAME = 'It486_Ih900_Iv000_0p955_21lines_rtol6_500spins'
-TAG= 'ONEPHI'
-LCFS_INDEX = 31
+INPUT_FILE_LOCATION = 'input_files/It486_Ih900_Iv000_0p943_1p00.npy'
+OUTPUT_DIRECTORY_NAME = 'I3_errField_1p00_phi288__300dubspins_rtol7e8_2'
+TAG= 'LCFS15'
+LCFS_INDEX = 15 # from Poincare output (simIO.log)
 
 NPHI = 40
 NTHETA = 60
 DELTRS = [0.010, 0.015]
-NPARTICLES_PER_EMITTER = 500
+NPARTICLES_PER_EMITTER = 200
 
 ION_TEMP = 2.0 #eV
 ION_MASS = Li_mass
 CHARGE_NUM = 1
 
 DT = 2E-7
-NSTEPS = 5E5 #5E3
-
+NSTEPS = 2E5 #5E3
 
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -62,8 +59,9 @@ simIO.log.info('\n|=============================================================
 #####################
 ## DEFINE MESH AND LOAD FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.loadCartesianField('input_files/It486_Ih900_Iv000_0p955_hires.npy', errField=True)
-simIO.log.info('Loaded field data from input_files/It486_Ih900_Iv000_0p955_hires.npy')
+b_hidra.err_mag = 3.168E-4
+b_hidra.err_dir = 268.6 * np.pi/180
+b_hidra.loadCartesianField(INPUT_FILE_LOCATION, errField=True)
 
 ## DEFINE ARRAYS FOR SEED POINT GENERATION
 phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist() # phi angles to generated shells
@@ -117,7 +115,6 @@ phi_hat_arr = np.array(phi_hat_list)
 
 
 tic = perf_counter()
-
 # calculate the 1D and 3D root mean square velocities
 v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
 #v_rms3d = np.sqrt(3*kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
@@ -164,7 +161,6 @@ for ion, v_0 in zip(ion_list, initVelXYZ_list):
     ion.initVelocity(v_0)
     ion.initOutput(DT, tmax)
 
-
 ####################################
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ####################################
@@ -175,7 +171,6 @@ wallPt_output = wallPt_output.cpu().numpy()
 
 ## PRINT MEMORY USAGE
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
-
 
 ####################
 ## PREPARE OUTPUT ##
@@ -190,7 +185,6 @@ filename = 'Wallpoints_' + cond_string+TAG
 simIO.saveNumpyData( wallPtArray, filename )
 simIO.log.info('OUTPUT DATA: {}'.format(filename))
 
-
 ## PLOTTING ##
 import plot_funcs.plotFuncs as plotFuncs
 
@@ -199,7 +193,11 @@ theta_plot = wallPtArray[1]
 for i in range(len(theta_plot)):
     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
 
-phi_plot_deg = (phi_plot*(180/np.pi) + 180. + 0.) % 360.
+# phi_plot_deg = (phi_plot*(180/np.pi) + 180. + 0.) % 360.
+# theta_plot_deg = theta_plot*(180/np.pi)
+
+a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
 ## PLOT HISTOGRAM OF WALL POINTS

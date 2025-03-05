@@ -16,15 +16,13 @@ class Particle:
         
         Particle.particleCount += 1
         self.particleID = Particle.particleCount
-        self.charge: np.float32
-        self.mass: np.float32
-        self.charge_mass_ratio: np.float32
-        self.maxLife: np.float32
+        self.charge = np.float32(0)
+        self.mass = np.float32(0)
+        self.charge_mass_ratio = np.float32(0)
+        self.maxLife = np.float32(0)
 
         self.pos0_XYZ = np.zeros(3, dtype=np.float32)
         self.vel0_XYZ = np.zeros(3, dtype=np.float32)
-        #self.pos_XYZ = np.zeros(3, dtype=np.float64)
-        #self.vel_XYZ = np.zeros(3, dtype=np.float64)
 
 
 class fieldLine(Particle):
@@ -38,11 +36,9 @@ class fieldLine(Particle):
         self.mass = 0.
 
     def pushXYZ(self, t, p_XYZ, field):
-        B = np.zeros(3)
         B, dum_ = field.interpField(p_XYZ[:3])
-        #B = field.interpField(p_XYZ)
-
         dY = B / np.sqrt(B[0]*B[0] + B[1]*B[1] + B[2]*B[2])
+
         return dY * self.direction
 
     def storePath(self):
@@ -71,8 +67,8 @@ class Ion(Particle):
     def initOutput(self, dt, tmax):
         #N = tmax // dt + 1
         #self.pos_XYZ = np.empty([int(N), 3]) #size output array
-        pass
         #self.pos_XYZ = []
+        pass
 
     def setPosition(self, index, value):
         #self.pos_XYZ[index] = np.copy(value)
@@ -81,23 +77,3 @@ class Ion(Particle):
     def setVelocity(self, index, value):
         #self.vel_XYZ[index] = np.copy(value)
         self.vel0_XYZ = np.copy(value)
-
-#    def pushXYZ(self, t, state_XYZ, Bfield):
-#        B = np.zeros(3)
-#        pos = state_XYZ[:3]
-#        vel = state_XYZ[3:]
-#
-#        B, dum_ = Bfield.interpField(pos)
-#
-#        # hard-code for MOAR SPEDE?
-#        #if Bfield.errField==True:
-#        B[0] += 0.0002
-#        B[1] += -0.0002
-#
-#        dpos_dt = vel
-#        dvel_dt = self.charge_mass_ratio * np.cross(vel, B)
-#        # concatenate expensive?
-#        #new_state = np.concatenate((dpos_dt, dvel_dt))
-#        new_state = np.array([dpos_dt[0], dpos_dt[1], dpos_dt[2], 
-#                              dvel_dt[0], dvel_dt[1], dvel_dt[2]]) 
-#        return new_state
