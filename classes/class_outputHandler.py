@@ -24,7 +24,9 @@ class IOHandler:
         print('Executing script in {}'.format(self.module_path))
 
         # Create output directories if none exist
-        self.output_dir = os.path.join(self.module_path,'output')
+        self.output_dir = os.path.join(self.module_path, '..', 'output')
+        self.output_dir = os.path.abspath(self.output_dir)
+        
         try:
             print('Creating output directory if none exists...')
             os.mkdir(self.output_dir)
@@ -129,10 +131,10 @@ class IOHandler:
         #except OSError as error:
         #    print('FILE DOES NOT EXIST!')
     
-    def saveFig(self, name):
+    def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
-        plt.savefig(name_loc, dpi=400)
+        plt.savefig(name_loc, dpi=dpi)
 
     def loadPorts_fromCSV(self, name):
         """ 

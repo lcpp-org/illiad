@@ -2,7 +2,7 @@ import numpy as np
 import logging
 from scipy.interpolate import make_smoothing_spline, spalde, splev, splrep
 
-from coordtrans import *
+from utility.coordtrans import *
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
