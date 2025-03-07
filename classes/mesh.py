@@ -153,8 +153,11 @@ class Mesh:
         invth_el = self.dtheta - th_el
         invph_el = self.dphi - ph_el
 
-        r_lowr_el = r_low * r_el
-        r_localinvr_el = r_local * invr_el
+        # r_lowr_el = r_low * r_el
+        # r_localinvr_el = r_local * invr_el
+        r_lowr_el = (r_low + r_el/2) * r_el
+        r_localinvr_el = (r_local + invr_el/2) * invr_el
+        
         cos_th_low = np.cos(th_low)
         cos_th_local = np.cos(th_local)
 
