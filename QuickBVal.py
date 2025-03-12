@@ -1,160 +1,106 @@
 ## IMPORT
 import pandas as pd
 import numpy as np
-from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
-import class_outputHandler as out
 from mesh import *
-
-'''
-Things to change include
-simIO out
-input magnetic file to be loaded
-angles for PHI
-booleans for highToLow and deltas for getValuesAlong0
-plot_XSection (comment out or not)
-
-'''
 
 
 def loadBs(filename):
-    ## DEFINE MESH AND LOAD FIELD
-    Bx, By, Bz = np.load(filename)
-    mesh_prd = np.array([0, 1, 5], dtype=np.int32)
-    b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
+	'''
+	Function to generate the B field dictionaries and returns them and the three arrays used to mesh the vessel
+	PHI controls the phi angles at which the B field is tabulated, the key for the dictionary is the phi angle and each angle has its
+	respective array of values for all of the radii and theta at that phi angle
+
+	Bnorm, Br, Bpol, Btor, R, THETA, PHI
+	'''
+	## DEFINE MESH AND LOAD FIELD
+	Bx, By, Bz = np.load(filename)
+	mesh_prd = np.array([0, 1, 5], dtype=np.int32)
+	b_hidra = Mesh(R0=0.72, a=0.19)
+	b_hidra.loadCartesianField(Bx, By, Bz, mesh_prd, errField=True)
 
 
-    mesh_ntheta = int(b_hidra.ntheta/2)
-    mesh_dtheta = b_hidra.dtheta*2
-	
-    R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
-    THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
-    #PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
-    PHI   = np.array([18,45, 54, 90, 117, 126, 162, 189, 198, 234,261, 270, 306, 333, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
+	mesh_ntheta = int(b_hidra.ntheta/2)
+	mesh_dtheta = b_hidra.dtheta*2
 
-   
-    #mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
-    mesh_size = (R.size, THETA.size, PHI.size)
-
-    rr,tt = np.meshgrid(R,THETA)
-    rb,tb,pb = np.meshgrid(R,THETA,PHI)
-
-    # CALCULATE B-COMPONENTS #
-    Br = np.zeros(mesh_size)
-    Bpol = np.zeros(mesh_size)
-    Btor = np.zeros(mesh_size)
-    Bnorm = np.zeros(mesh_size)
+	R     = np.linspace( b_hidra.r_min,       b_hidra.r_max,    int((b_hidra.nr//2)+1))
+	THETA = np.linspace( b_hidra.theta_min, b_hidra.theta_max, mesh_ntheta)
+	#PHI   = np.linspace( b_hidra.phi_min,     b_hidra.phi_max,   int(b_hidra.nphi/2))
+	PHI   = np.array([18,45, 54, 90, 117, 126, 162, 189, 198, 234,261, 270, 306, 333, 342])*(np.pi/180)#np.linspace( 9*(np.pi/180),     2*np.pi,   40)
 
 
-    for j, theta in enumerate(THETA):
-        
-        ctheta = np.cos(theta)
-        stheta = np.sin(theta)
+	#mesh_size = (b_hidra.nr, b_hidra.ntheta, b_hidra.nphi)
+	mesh_size = (R.size, THETA.size, PHI.size)
 
-        for k, phi in enumerate(PHI):
-            #print('theta, phi = {}, {}'.format(theta, phi))
-            cphi = np.cos(phi)
-            sphi = np.sin(phi)
+	rr,tt = np.meshgrid(R,THETA)
+	rb,tb,pb = np.meshgrid(R,THETA,PHI)
 
-            Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
-                            [ -stheta*cphi,  stheta*sphi, ctheta],
-                            [ -sphi, -cphi, 0]])
-
-            for i, r in enumerate(R):
-                bxyz, dum = b_hidra.interpField(np.asarray([r, theta, phi]), Cart=False)
-
-                br, bpol, btor = np.dot(Xform, bxyz)
-                #if r == 0.:
-                if i == 0:
-                    bpol = 0
-
-                Bnorm[i][j][k] = np.sqrt(bxyz[0]**2 + bxyz[1]**2 + bxyz[2]**2)
-                Br[i][j][k] = br
-                Bpol[i][j][k] = bpol
-                Btor[i][j][k] = btor
-    
-    print('Fields Calculated.')
-    return Bnorm, Br, Bpol, Btor, R, THETA, PHI
+	# CALCULATE B-COMPONENTS #
+	Br = np.zeros(mesh_size)
+	Bpol = np.zeros(mesh_size)
+	Btor = np.zeros(mesh_size)
+	Bnorm = np.zeros(mesh_size)
 
 
+	for j, theta in enumerate(THETA):
+		
+		ctheta = np.cos(theta)
+		stheta = np.sin(theta)
 
+		for k, phi in enumerate(PHI):
+			#print('theta, phi = {}, {}'.format(theta, phi))
+			cphi = np.cos(phi)
+			sphi = np.sin(phi)
 
-def plot_Xsection(title, data, filename, phi_toPlot):
-	print('Plotting ' + title + '...')
-	max_data = np.max(data)
-	min_data = np.min(data)
-	contours = np.linspace(min_data, max_data, 24)
+			Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
+							[ -stheta*cphi,  stheta*sphi, ctheta],
+							[ -sphi, -cphi, 0]])
 
-	# Adding endpoint for continuous plot through origin
-	wrped_tt = np.concatenate((tt, tt[-1:] + mesh_dtheta))#b_hidra.dtheta
-	wrped_rr = np.concatenate((rr, rr[-1:]))
+			for i, r in enumerate(R):
+				bxyz, dum = b_hidra.interpField(np.asarray([r, theta, phi]), Cart=False)
 
-	for i, p in enumerate(phi_toPlot):
-		plot_data = np.transpose(data, [2,1,0])[i]
-		loc_max = np.max(plot_data)
-		#loc_min = np.min(plot_data)
-	
-		wrp_data = np.concatenate((plot_data, plot_data[0:1, :]), axis=0)
+				br, bpol, btor = np.dot(Xform, bxyz)
+				#if r == 0.:
+				if i == 0:
+					bpol = 0
 
-		fig = plt.figure()
-		ax = fig.add_subplot(111, polar=True)
-		plt.contourf(wrped_tt.T, wrped_rr.T, wrp_data.T, contours, cmap='viridis')
+				Bnorm[i][j][k] = np.sqrt(bxyz[0]**2 + bxyz[1]**2 + bxyz[2]**2)
+				Br[i][j][k] = br
+				Bpol[i][j][k] = bpol
+				Btor[i][j][k] = btor
 
-		ax.set_rmax(b_hidra.r_max)
-		ax.set_rticks(np.arange(0.0, 0.19, 0.02))
-		ax.yaxis.set_tick_params(labelsize=5)
-		ax.grid(linewidth = 0.25, linestyle=':', c='k')
+	print('Fields Calculated.')
+	return Bnorm, Br, Bpol, Btor, R, THETA, PHI
 
-		plt.colorbar()
-		plt.title(title + r', $\phi$={:3.0f}$\degree$ Max.={:.4f}'.format(p*180/np.pi, loc_max))
-
-		#plt.savefig(filename + '_phi={:02.0f}.png'.format(p*180/np.pi),dpi=300)
-		plot_name = filename + '_phi={:02.0f}.png'.format(p*180/np.pi)
-		simIO.saveFig(plot_name)
-	plt.close()
-
-def calcMaxDifference(theta0s, xs):
-	theta0s = np.array(theta0s)
-	mostSpreadOut = 0
-	mostSpreadOutLoc = 0
-	variances = []
-	for i in range(len(theta0s[0])): #for every columne
-		column = theta0s[:, i]
-		mean = sum(column)/len(column)
-		summ = 0
-		for j in column:
-			summ += (j-mean)**2
-		variance = summ/(len(column)-1)
-		variances.append(variance)
-		if variance > mostSpreadOut:
-			mostSpreadOut = variance
-			mostSpreadOutLoc = i
-	
-	return xs[mostSpreadOutLoc], mostSpreadOut
 
 def getValuesAlong0(data,phi_toPlot, highToLow = False):
 
-	#simIO.log.info("The values for {} are given for these radii \n {} \n ".format(title, xs))
+	'''
+	Gets the values along theta equals 0 for the phi angle in question and returns them as a dictionary
+	'''
+
 	theta0s = []
-	#print(np.degrees(THETA)) # 0 is 2 degs, 5 is 22.11235955, 44 is 178.988, 50 is 203.12359551, and -1 is 360
+	
 	for i, p in enumerate(phi_toPlot):
 		plot_data = np.transpose(data, [2,1,0])[i]
+		
 		#print(plot_data.shape, (len(plot_data)//2)-1)
 		'''if np.degrees(p)%72 == 45:
 			theta0 = plot_data[5]
 			middleIndex = 50
 		else:'''
+		
 		theta0 = plot_data[-1]
-		middleIndex = 44
+
+		#print(np.degrees(THETA)) # 0 is 2 degs, 5 is 22.11235955, 44 is 178.988, 50 is 203.12359551, and -1 is 360
+
+		middleIndex = 44 
 		
 		if highToLow:
 			# for the high B to center
 			theta180 = plot_data[middleIndex][::-1]
 			theta0 = np.concatenate((theta180, theta0))
-			
 		
 		theta0s.append(theta0)
 		#simIO.log.info('{}\n at {}'.format(theta0, p*180/np.pi))
@@ -173,7 +119,9 @@ def getValuesAlong0(data,phi_toPlot, highToLow = False):
 	return df
 
 def getValuesAtDistance(data, phi_toPlot, distOuterWall, R):
-	
+	'''
+	Gets the values at a certain distance from the poloidal center (radius) for every theta value available
+	'''
 	radius = round(distOuterWall % 0.19, 4)
 
 	allStrengths = []
@@ -206,6 +154,12 @@ def getValuesAtDistance(data, phi_toPlot, distOuterWall, R):
 
 
 def slopes(bigArray, rs):
+	'''
+	Calculates the slope by taking two values and then dividing them by the difference between their locations
+	
+	the returned array has smaller length than the original array
+	'''
+
 	bigList = []
 	for array in bigArray:
 		slopes_list = []
@@ -218,21 +172,28 @@ def slopes(bigArray, rs):
 
 rampfiles = ['i1q3_hires.npy','i1q3_hires_max.npy','i1q3_hires_noerr_mult.npy','i1q4_hires.npy']
 
-def thetas(radial, poloidal):
-	theta_values = np.arange(0, 2*np.pi, np.pi/180)
-	theta_bstrengths = ((np.cos(theta_values)*radial)**2 + (np.sin(theta_values)*poloidal)**2)**0.5
+def thetas(magField1, magField2):
+	'''
+	Function to calculate the error in the plane given by the two magnetic fields
+	'''
+	errorAngle = 10
+	delta = np.radians(np.linspace(-errorAngle, errorAngle, (2*errorAngle)+1))
+
+
+	deltaB1 = magField1*(1-np.cos(delta)) + magField2*(np.sin(delta))
+	deltaB2 = magField1*(np.sin(delta)) + magField2*(1-np.cos(delta))
+
 	
-	slopes_list = []
-	for i in range(len(theta_bstrengths)-1):
-		dtheta = theta_values[i+1]-theta_values[i]
-		dB = theta_bstrengths[i+1]-theta_bstrengths[i]
-		slopes_list.append(dB/dtheta)
-	
-	return np.array(theta_bstrengths), np.array(slopes_list)
+	return delta, np.array([deltaB1, deltaB2])
 
 
-def calculateAtDistances(outerwallDist):
-
+def dBdtheta(outerwallDist, directions):
+	'''
+	This function calculates the change in magnetic field  at different angles by loading the magnetic field for that distance,
+	getting the two magnetic fields in the plane of rotation required and then using the thetas function to get the change in strength,
+	while changing the theta. 
+	'''
+	magFieldDir1, magFieldDir2 = directions
 
 	for rampfile in rampfiles[0:1]:
 		Bnorm, Br, Bpol, Btor, R, THETA, PHI = loadBs(f'input_files/{rampfile}')
@@ -251,14 +212,15 @@ def calculateAtDistances(outerwallDist):
 		else:
 			num = -1
 
-		kw15_thetas, kw15_slopes = thetas(kw15[0][num], kw15[1][num])
-		spec_thetas, spec_slopes = thetas(spec[0][num], spec[1][num])
-		nextToPFC_thetas, nextToPFC_slopes = thetas(nextToPFC[0][num], nextToPFC[1][num])
-		hallprobe_thetas, hallprobe_slopes = thetas(hallprobe[0][num], hallprobe[1][num])
+		kw15_thetas, kw15_slopes = thetas(kw15[magFieldDir1][num], kw15[magFieldDir2][num])
+		spec_thetas, spec_slopes = thetas(spec[magFieldDir1][num], spec[magFieldDir2][num])
+		nextToPFC_thetas, nextToPFC_slopes = thetas(nextToPFC[magFieldDir1][num], nextToPFC[magFieldDir2][num])
+		hallprobe_thetas, hallprobe_slopes = thetas(hallprobe[magFieldDir1][num], hallprobe[magFieldDir2][num])
 
+		dirNames = ["Radial", "Poloidal", "Toroidal"]
 
 		with open("temp_storage.txt", "a+") as f:
-			f.write(f"Filename = \"{rampfile}\" \ndistFromOuterWall = {outerwallDist}\n")
+			f.write(f"Filename = \"{rampfile}\" \ndistFromOuterWall = {outerwallDist}\ndir1 = \"{dirNames[magFieldDir1]}\"\ndir2 = \"{dirNames[magFieldDir2]}\"\n")
 			f.write(f"kw15 = np.array({np.array2string(kw15_thetas, separator=', ')})\n")
 			f.write(f"spec = np.array({np.array2string(spec_thetas, separator=', ')})\n")
 			f.write(f"nextToPFC = np.array({np.array2string(nextToPFC_thetas, separator=', ')})\n")
@@ -345,7 +307,7 @@ def calculateAlong0():
 
 
 
-calculateAtDistances(0.29) #has to be a multiple of 0.01
+dBdtheta(0.09, [0,1]) #has to be a multiple of 0.01
 
 
 

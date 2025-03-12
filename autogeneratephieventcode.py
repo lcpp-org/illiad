@@ -47,4 +47,4 @@ def create_phi_events(name, eventspacing):
             f.write("    phi_range = np.linspace(np.pi/{}., 2*np.pi, {}) \n".format(int(180/eventspacing), int(360/eventspacing)))
             f.write("    return poincare_events,phi_range \n")
 
-create_phi_events("phi_events.py", 1)
+create_phi_events("phi_events.py", 9)
