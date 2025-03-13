@@ -8,10 +8,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 
 import scipy.special as special
-from numba import jit, prange
-import numba as nb
+#from numba import jit, prange
+#import numba as nb
 
-from coordtrans import RTP_to_XYZ
+from utility.coordtrans import RTP_to_XYZ
 
 Rmaj = 0.72 #[m]
 Rmin = 0.19 #[m]
