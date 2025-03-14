@@ -160,6 +160,7 @@ cython_debug/
 #.idea/
 
 input_files/*.npy
+input_files/*.txt
 output/*
 *.o5*
 *.e5*

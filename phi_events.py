@@ -3980,3 +3980,49 @@ def eventsAndRange():
                         phi_events.isphi360] 
     phi_range = np.linspace(np.pi/180., 2*np.pi, 360) 
     return poincare_events,phi_range 
+isphi360.direction = -1.0
+
+def eventsAndRange(): 
+    poincare_events = [ phi_events.inVV, 
+                        phi_events.isphi9, 
+                        phi_events.isphi18, 
+                        phi_events.isphi27, 
+                        phi_events.isphi36, 
+                        phi_events.isphi45, 
+                        phi_events.isphi54, 
+                        phi_events.isphi63, 
+                        phi_events.isphi72, 
+                        phi_events.isphi81, 
+                        phi_events.isphi90, 
+                        phi_events.isphi99, 
+                        phi_events.isphi108, 
+                        phi_events.isphi117, 
+                        phi_events.isphi126, 
+                        phi_events.isphi135, 
+                        phi_events.isphi144, 
+                        phi_events.isphi153, 
+                        phi_events.isphi162, 
+                        phi_events.isphi171, 
+                        phi_events.isphi180, 
+                        phi_events.isphi189, 
+                        phi_events.isphi198, 
+                        phi_events.isphi207, 
+                        phi_events.isphi216, 
+                        phi_events.isphi225, 
+                        phi_events.isphi234, 
+                        phi_events.isphi243, 
+                        phi_events.isphi252, 
+                        phi_events.isphi261, 
+                        phi_events.isphi270, 
+                        phi_events.isphi279, 
+                        phi_events.isphi288, 
+                        phi_events.isphi297, 
+                        phi_events.isphi306, 
+                        phi_events.isphi315, 
+                        phi_events.isphi324, 
+                        phi_events.isphi333, 
+                        phi_events.isphi342, 
+                        phi_events.isphi351, 
+                        phi_events.isphi360] 
+    phi_range = np.linspace(np.pi/20., 2*np.pi, 40) 
+    return poincare_events,phi_range 

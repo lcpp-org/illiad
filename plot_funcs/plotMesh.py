@@ -140,7 +140,7 @@ ax = fig.add_subplot(projection='3d')
 ## PLOT VACUUM VESSEL TORUS
 vvres = 100
 # theta: poloidal angle; phi: toroidal angle
-ptheta = np.linspace(np.pi, 2*np.pi, vvres)
+ptheta = np.linspace(0, 2*np.pi, vvres)
 pphi   = np.linspace(0, 2.*np.pi, vvres)
 ptheta, pphi = np.meshgrid(ptheta, pphi)
 
@@ -162,5 +162,5 @@ plt.axis('off')
 ax.grid(False)
 plt.margins(0.05)
 
-plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
+#plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
 plt.show()
