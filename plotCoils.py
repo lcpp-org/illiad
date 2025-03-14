@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from coordtrans import XYZ_to_RTP
+from utility.coordtrans import XYZ_to_RTP
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
