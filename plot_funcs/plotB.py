@@ -4,8 +4,8 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import class.class_outputHandler as out
-from class.mesh import *
+import classes.class_outputHandler as out
+from classes.mesh import *
 
 '''
 Things to change include
