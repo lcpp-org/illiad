@@ -13,7 +13,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'It486_Ih900_Iv000_0p943_1p00'
+#output_name = 'It486_Ih900_Iv000_0p9452_1p00_2'
+output_name = 'It000_Ih790_Iv000_1p000_1p000_64bit'
 #output_name = 'FITTED_02092025_hel-0p950'
 
 ## DEFINE MESH RESOLUTION
@@ -34,22 +35,30 @@ mesh_size = hi_res
 # MAX. | 3500 | 7000 |   ?? #
 #############################
 # INPUT COIL CURRENTS:
-I_toro = 486.
-I_heli = 900.
+I_toro = 0. #486.
+I_heli = 790. #900.
 I_vert = 0.
 
-# *TESTING* Multiplier applied to all currents
-# Used to model the attenuation of the fields due to the stainless-steel vacuum vessel
-att_mult = 0.943080960048148 #0.967 #0.7
-I_toro *= att_mult
-I_heli *= att_mult
-I_vert *= att_mult
+s_toro = 1.0 #0.9452224462131228
+s_heli = 1.0 #0.955
+s_vert = 1.0
 
-# Multiplier applied to helical current,
-# Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field
-# Based on characterization of WEGA by Otte[REF] (Set to 1.0 if ideal field is desired)
-err_mult = 1.0 #0.955
-I_heli *= err_mult
+I_toro *= s_toro
+I_heli *= s_heli
+I_vert *= s_vert
+
+# # *TESTING* Multiplier applied to all currents
+# # Used to model the attenuation of the fields due to the stainless-steel vacuum vessel
+# att_mult = 0.943080960048148 #0.967 #0.7
+# I_toro *= att_mult
+# I_heli *= att_mult
+# I_vert *= att_mult
+
+# # Multiplier applied to helical current,
+# # Used in conjunction with Cartesian error field to reproduce HIDRA's actual B-field
+# # Based on characterization of WEGA by Otte[REF] (Set to 1.0 if ideal field is desired)
+# err_mult = 1.0 #0.955
+# I_heli *= err_mult
 
 ########################
 ## END OF USER INPUTS ##
@@ -61,7 +70,7 @@ def biotsavart_mesh(mesh, filament, current, Npoints):
     of current, returns Cartesian Field Vectors"""
 
     Rv = torch.zeros(mesh.shape).to(device)
-    B = torch.zeros(mesh.shape).to(device)
+    B = torch.zeros(mesh.shape, dtype=torch.float64, device=device)#.to(device)
 
     for i in range(Npoints):
         P1 = filament[:,i-1]
@@ -196,7 +205,7 @@ def main():
     xyz_mesh = torch.stack([xx, yy, zz]).to(device)
 
     # Loop through coils, summing each one's contribution to get total field
-    Bxyz = torch.zeros(( 3, nr, ntheta, nphi )).to(device)
+    Bxyz = torch.zeros(( 3, nr, ntheta, nphi ), dtype=torch.float64, device=device) #.to(device)
     Bxyz = loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns)
 
 
