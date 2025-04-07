@@ -1,30 +1,23 @@
 import numpy as np
-#from math import degrees, sin, cos, floor
 import os as os
 from utility.coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
-import logging
 
 
 class Mesh:
     """
-    Class to store the mesh data, properties, and interpolation methods
-    
-    r, theta, and phi are the 1D arrays with the grid points
-    
-    r: minor radius coordinate, measured from the geometrical center of the poloidal cross section
-    theta: poloidal angle [0,2pi)
-    phi: toroidal angle [0,2pi)
-    
-    Rmaj: major radius of the tokamak
-    Rmin: minor radius of the tokamak
-    
-    dr: grid spacing in the r direction
-    dtheta: grid spacing in the theta direction
-    dphi: grid spacing in the phi direction
+    ## Class to store the mesh data, properties, and interpolation methods
+    ### r, theta, and phi: 1D arrays with the grid points
+    * r:  minor radius, measured from the major radius $R_0$
+    * theta:  poloidal angle [0,2pi)
+    * phi:    toroidal angle [0,2pi)
+    #### Rmaj:   major radius of the tokamak
+    #### Rmin:   minor radius of the tokamak
+    #### dr: grid spacing in the r direction
+    #### dtheta: grid spacing in the theta direction
+    #### dphi:   grid spacing in the phi direction
     """
 
-    def __init__(self, R0=0.0, a=0.0):
-        #self.log = logging.getLogger()
+    def __init__(self, R0=0.72, a=0.19):
         self.R0 = R0
         self.a = a
         self.dr = 0.0
@@ -46,9 +39,12 @@ class Mesh:
         self.errField: np.bool
         self.err_mag = 2.828427E-4 * 1.2
         self.err_dir = 270.* np.pi/180
+        self.cos_err_dir = np.cos(self.err_dir)
+        self.sin_err_dir = np.sin(self.err_dir)   
+
         self.att_mult = 1.0 
 
-    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
+    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
@@ -60,9 +56,10 @@ class Mesh:
         else:
             self.nr, self.ntheta, self.nphi = Bx_.shape
             self.periodicity = period_
-            self.Bx = Bx_
-            self.By = By_
-            self.Bz = Bz_
+            self.att_mult = att_mult
+            self.Bx = Bx_ * att_mult
+            self.By = By_ * att_mult
+            self.Bz = Bz_ * att_mult
             self.errField = errField
 
             # r periodicity
@@ -95,6 +92,27 @@ class Mesh:
                 self.dphi = self.phi_max / (self.nphi-1)
                 self.phi_min = 0.
 
+    def addFieldPerturbation(self, file_path, att_mult=1.0):
+        """ 
+        This function adds a vector field from a file to an existing vector field.
+        The array sizes must match the existing mesh dimensions and periodicity is assumed the same
+        """
+        Bx_, By_, Bz_ = np.load(file_path)
+
+        if Bx_.shape != self.Bx.shape or By_.shape != self.By.shape or Bz_.shape != self.Bz.shape:
+            print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
+        else:
+            self.Bx += (Bx_ * att_mult)
+            self.By += (By_ * att_mult)
+            self.Bz += (Bz_ * att_mult)
+
+    def set_nonPer_errField(self, err_mag, err_dir):
+        """This function sets the magnitude and direction (measured from the phi_c=0, i.e. 18degrees CW from the South Split)
+          of the non-periodic error field. It also calculates the cosine and sine of the error direction for efficiency in the interpolation function"""
+        self.err_mag = err_mag
+        self.err_dir = err_dir
+        self.cos_err_dir = np.cos(err_dir)
+        self.sin_err_dir = np.sin(err_dir)
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -153,8 +171,6 @@ class Mesh:
         invth_el = self.dtheta - th_el
         invph_el = self.dphi - ph_el
 
-        # r_lowr_el = r_low * r_el
-        # r_localinvr_el = r_local * invr_el
         r_lowr_el = (r_low + r_el/2) * r_el
         r_localinvr_el = (r_local + invr_el/2) * invr_el
         
@@ -181,18 +197,18 @@ class Mesh:
         Areas[4:] *= invph_el
 
         # indices of the 8 corner nodes of the cell
-        ir_hi = np.int16(rindex + 1)
-        ir_lo = np.int16(rindex)
-        ith_hi = np.int16(thindex)
-        ith_lo = np.int16(thindex - 1)
-        iph_hi = np.int16(phindex)
-        iph_lo = np.int16(phindex - 1)
+        ir_hi = rindex + 1
+        ir_lo = rindex
+        ith_hi = thindex
+        ith_lo = thindex - 1
+        iph_hi = phindex
+        iph_lo = phindex - 1
 
         # indices of the 8 corner nodes of the cell
         index_array = np.array([[ir_hi, ith_hi, iph_hi], [ir_lo, ith_hi, iph_hi],
                     [ir_hi, ith_lo, iph_hi], [ir_lo, ith_lo, iph_hi],
                     [ir_hi, ith_hi, iph_lo], [ir_lo, ith_hi, iph_lo],
-                    [ir_hi, ith_lo, iph_lo], [ir_lo, ith_lo, iph_lo]])
+                    [ir_hi, ith_lo, iph_lo], [ir_lo, ith_lo, iph_lo]], dtype=np.int16)
         
         # B field vectors at the 8 corner nodes
         Bvecs = np.zeros((8, 3))
@@ -212,50 +228,8 @@ class Mesh:
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, phi_rotation)
     
         if self.errField: # non-periodic perturbative error field applied
-            vecXYZ *= self.att_mult
-            vecXYZ[0] += self.err_mag * np.cos(self.err_dir)
-            vecXYZ[1] -= self.err_mag * np.sin(self.err_dir)
+            #vecXYZ *= self.att_mult
+            vecXYZ[0] += self.err_mag * self.cos_err_dir
+            vecXYZ[1] -= self.err_mag * self.sin_err_dir
 
         return vecXYZ, ph_localN
-
-
-    # def calculate_psi(self):
-    #     # EITHER CALCULATE ON FULL NON-PERIODIC MESH
-    #     # OR CALCULATE SEPARATE PSI_IDEAL AND PSI_ERROR
-
-    #     #############
-    #     # IDEAL PSI
-    #     ############
-    #     self.PSI_ideal = np.zeros((self.nr, self.ntheta, self.nphi))
-    #     # CALCULATE PSI FOR EACH R=0:
-    #     # [i,j,k]=position indices, [x,y,z]=summation indices
-    #     y_pi = int( (self.ntheta-1)/2 ) # index for theta=pi ( THETA: 0 ->2pi)
-    #     i_zero = 0 # index for r=0
-    #     for j in range (0, self.ntheta-1):
-    #         for k in range(0, self.nphi-1):
-    #             # SUM (B_Z*dA) FOR EACH:
-    #             for x in range(0, self.nr-1): # r: 0 TO a
-    #                 for z in range(0, self.nphi-1): # phi: 0 TO 2PI
-    #                     # theta: PI = k_pi
-    #                     dA = (self.R0 - x*self.dr) * self.dr * self.dphi
-    #                     self.PSI_ideal[i_zero][j][k] += self.Bz[x][y_pi][z] * dA
-
-    #     # CALCULATE PSI FOR EACH R !=0:
-    #     # ij,k=position indices, x,y,z=summation indices
-    #     for i in range(1, self.nr-1):
-    #         for j in range(0, self.ntheta-1):
-    #             y_theta = j # THETA: THETA
-    #             for k in range(0, self.nphi-1):
-    #                 # SUM (B_THETA*dA) FOR EACH:
-    #                 for x in range(0, i): # r: 0 TO r_position
-    #                     for z in range(0, self.nphi-1): # PHI: 0 TO 2PI
-    #                         Bpol = -self.Bx[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.cos(z*self.dphi) + self.By[x][y_theta][z]*np.sin(y_theta*self.dtheta)*np.sin(z*self.dphi) + self.Bz[x][y_theta][z]*np.cos(y_theta*self.dtheta)
-    #                         dA = (self.R0 + x*self.dr * np.cos(y_theta*self.dtheta)) * self.dr * self.dphi
-
-    #                         self.PSI_ideal[i][j][k] += Bpol * dA
-
-    #                 # Add the psi at r=0 for total psi
-    #                 self.PSI_ideal[i][j][k] += self.PSI_ideal[0][j][k]
-    #     # END IDEAL PSI CALCULATION
-
-

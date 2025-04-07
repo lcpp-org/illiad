@@ -18,29 +18,45 @@ He_mass = 4.002602 #amu
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
-INPUT_FILE_LOCATION = 'input_files/It486_Ih900_Iv000_0p943_1p00.npy'
-OUTPUT_DIRECTORY_NAME = 'I3_errField_1p00_phi288__300dubspins_rtol7e8_2'
-TAG= 'LCFS15'
-LCFS_INDEX = 15 # from Poincare output (simIO.log)
+#INPUT_FILE_LOCATION = 'input_files/It486_Ih900_Iv000_0p943_1p00.npy'
+FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_TOR = 0.9448
+FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+#FIELD_FILE_HEL = 'input_files/It000_Ih790_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+ERRFIELD_MAG = 1.5654e-4 #[Tesla]
+ERRFIELD_DIR_DEG = 271.5 #[degrees]
 
-NPHI = 40
-NTHETA = 60
-DELTRS = [0.010, 0.015]
-NPARTICLES_PER_EMITTER = 200
+
+
+OUTPUT_DIRECTORY_NAME = 'Iota3_1500spins_atole-8_reversedHelicalCurrent'
+TAG= 'LCFS11_negativeHelical'
+LCFS_INDEX = 11 # from Poincare output (simIO.log)
+
+NPHI = 180
+NTHETA = 40
+DELTRS = [0.015, 0.020]
+NPARTICLES_PER_EMITTER = 400
 
 ION_TEMP = 2.0 #eV
 ION_MASS = Li_mass
 CHARGE_NUM = 1
 
 DT = 2E-7
-NSTEPS = 2E5 #5E3
+NSTEPS = 1E5 #2E5 #5E3
 
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
 simIO.log.info('\n|==========================================================================|'
-              +'\n| LOADED FIELD DATA FROM: {}'.format(INPUT_FILE_LOCATION)
+              +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(FIELD_FILE_TOR)
+              +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_TOR)
+              +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(FIELD_FILE_HEL)
+              +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_HEL)
+              +'\n| LOADED ERRFIELD MAG: {}'.format(ERRFIELD_MAG)
+              +'\n| LOADED ERRFIELD DIR: {}'.format(ERRFIELD_DIR_DEG)
+              +'\n|--------------------------------------------------------------------------|'
               +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(LCFS_INDEX)
               +'\n| ION TEMPERATURE: {} eV'.format(ION_TEMP)
               +'\n| ION MASS: {} amu'.format(ION_MASS)
@@ -58,10 +74,20 @@ simIO.log.info('\n|=============================================================
 ## RUN SIMULATION: ##
 #####################
 ## DEFINE MESH AND LOAD FIELD
+#b_hidra = Mesh(R0=0.72, a=0.19)
+#b_hidra.err_mag = 3.168E-4
+#b_hidra.err_dir = 268.6 * np.pi/180
+#b_hidra.loadCartesianField(INPUT_FILE_LOCATION, errField=True)
+
+
+## DEFINE MESH AND LOAD FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.err_mag = 3.168E-4
-b_hidra.err_dir = 268.6 * np.pi/180
-b_hidra.loadCartesianField(INPUT_FILE_LOCATION, errField=True)
+b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
+b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
+b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
+
+
+
 
 ## DEFINE ARRAYS FOR SEED POINT GENERATION
 phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist() # phi angles to generated shells
@@ -188,15 +214,18 @@ simIO.log.info('OUTPUT DATA: {}'.format(filename))
 ## PLOTTING ##
 import plot_funcs.plotFuncs as plotFuncs
 
-phi_plot = wallPtArray[2]*(-1) + 2*np.pi
+# flip phi for the perspective outside the vacuum vessel
+phi_plot = (-1)*wallPtArray[2] + 2*np.pi
+
+
 theta_plot = wallPtArray[1]
-for i in range(len(theta_plot)):
-    if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+# shift so that the outer midplane (theta=0) is centered in the plot
+theta_plot[theta_plot>np.pi] -= 2*np.pi
 
 # phi_plot_deg = (phi_plot*(180/np.pi) + 180. + 0.) % 360.
 # theta_plot_deg = theta_plot*(180/np.pi)
 
-a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+a_phi = 162. #-18. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 

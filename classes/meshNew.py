@@ -49,8 +49,15 @@ class Mesh:
         self.Bz: np.float64[:][:][:]
         self.periodicity: np.int32[:]
         self.errField: np.bool
+        ## Align with new mesh.py 
+        self.err_mag = 2.828427E-4 * 1.2
+        self.err_dir = 270.* np.pi/180
+        self.cos_err_dir = np.cos(self.err_dir)
+        self.sin_err_dir = np.sin(self.err_dir)   
 
-    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False):
+        self.att_mult = 1.0 
+
+    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
     #def loadCartesianField(self, Bx_: np.ndarray, By_: np.ndarray, Bz_: np.ndarray, period_ = np.array([0, 1, 5]), errField=False):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
@@ -65,9 +72,9 @@ class Mesh:
         else:
             self.nr, self.ntheta, self.nphi = Bx_.shape
             self.periodicity = period_
-            self.Bx = torch.tensor(Bx_, dtype=torch.float64).to(device)
-            self.By = torch.tensor(By_, dtype=torch.float64).to(device)
-            self.Bz = torch.tensor(Bz_, dtype=torch.float64).to(device)
+            self.Bx = torch.tensor(Bx_ * att_mult, dtype=torch.float64).to(device)
+            self.By = torch.tensor(By_ * att_mult, dtype=torch.float64).to(device)
+            self.Bz = torch.tensor(Bz_ * att_mult, dtype=torch.float64).to(device)
 
             self.errField = errField
 
@@ -102,13 +109,34 @@ class Mesh:
             self.dr = torch.tensor(self.dr, dtype=torch.float64).to(device)
             self.dtheta = torch.tensor(self.dtheta, dtype=torch.float64).to(device)
             self.dphi = torch.tensor(self.dphi, dtype=torch.float64).to(device)
-            #self.log.info('Cartesian Vector field loaded:\n'
-            #               +'# -----------------------------------\n'
-            #              +'# Shape: {}\n.format(Bx.shape)'
-            #              +'# dr = {} m.\n'.format(self.dr)
-            #              +'# dtheta = {} deg.\n'.format(degrees(self.dtheta))
-            #              +'# dphi = {} deg.\n'.format(degrees(self.dphi))
-            #               +'# -----------------------------------\n')
+            # align with new mesh.py
+            self.err_mag = torch.tensor(self.err_mag, dtype=torch.float64).to(device)
+            self.cos_err_dir = torch.tensor(self.cos_err_dir, dtype=torch.float64).to(device)
+            self.sin_err_dir = torch.tensor(self.sin_err_dir, dtype=torch.float64).to(device)
+
+
+    # Align with new mesh.py
+    def addFieldPerturbation(self, file_path, att_mult=1.0):
+        """ 
+        This function adds a vector field from a file to an existing vector field.
+        The array sizes must match the existing mesh dimensions and periodicity is assumed the same
+        """
+        Bx_, By_, Bz_ = np.load(file_path)
+
+        if Bx_.shape != self.Bx.shape or By_.shape != self.By.shape or Bz_.shape != self.Bz.shape:
+            print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
+        else:
+            self.Bx += torch.tensor((Bx_ * att_mult), dtype=torch.float64).to(device)
+            self.By += torch.tensor((By_ * att_mult), dtype=torch.float64).to(device)
+            self.Bz += torch.tensor((Bz_ * att_mult), dtype=torch.float64).to(device)
+
+    def set_nonPer_errField(self, err_mag, err_dir):
+        """This function sets the magnitude and direction (measured from the phi_c=0, i.e. 18degrees CW from the South Split)
+          of the non-periodic error field. It also calculates the cosine and sine of the error direction for efficiency in the interpolation function"""
+        self.err_mag = err_mag
+        self.err_dir = err_dir
+        self.cos_err_dir = np.cos(err_dir)
+        self.sin_err_dir = np.sin(err_dir)
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         #print(f'{vec_XYZ=}')
@@ -235,8 +263,10 @@ class Mesh:
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, -phi_rotation)
 
         if self.errField:
-            vecXYZ[0] += 0.0002
-            vecXYZ[1] -= 0.0002
+            #vecXYZ[0] += 0.0002
+            #vecXYZ[1] -= 0.0002
+            vecXYZ[0] += self.err_mag * self.cos_err_dir
+            vecXYZ[1] -= self.err_mag * self.sin_err_dir
 
         return vecXYZ
 

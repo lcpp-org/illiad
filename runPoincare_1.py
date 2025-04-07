@@ -1,3 +1,6 @@
+####------------------------------------------------------####
+#### GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD ####
+####------------------------------------------------------####
 import os
 import numpy as np
 
@@ -6,47 +9,86 @@ from classes.mesh import Mesh
 from utility.anlys_funcs import identifyLCFS
 from solver.poincare_gen import Gen_Poincare
 
+#---------------#
+# DEFINE FIELDS #
+#---------------#
+FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_TOR = 0.9448
+FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+#FIELD_FILE_HEL = 'input_files/It000_Ih790_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+ERRFIELD_MAG = 1.5654e-4 #[Tesla]
+ERRFIELD_DIR_DEG = 271.5 #[degrees]
+
+#---------------------------#
+# DEFINE INITIAL CONDITIONS #
+#---------------------------#
+IC_PHI_DEG = 324. #324. #72. #0. #108. #72.
+IC_THETA_DEG = 180.
+START_RAD = 0.130
+END_RAD = 0.020
+NLINES = 12 + 11 + 22 # + 44
+SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
+
+#-------------------#
+# SOLVER ARGUMENTS #
+#-------------------#
+"""
+# NTHREADS:
+##  N > 0: use N threads
+##  N = 0: use all available threads
+##  N < 0: use all but the last N threads
+# DOUBLE_LINE:
+##  True: run each fieldline in both directions from the init pos 
+##        !ONLY USE WHEN (NTHREADS > NLINES)!
+##  False: run each fieldline in +B direction from the init pos
+"""
+SOLVER = 'LSODA'
+RTOL = 2.49e-12
+ATOL = 2.49e-9
+NTHREADS = 31 #-1
+DOUBLE_LINE = False
+
+#-------------------------#
+# DEFINE OUTPUT DIRECTORY #
+#-------------------------#
+OUTPUT_DIR = "AcceptedIota3_200spins_atole-9"
+
+
 def main():
 
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
-    simIO = out.IOHandler("Iota1q3_Fit1_Hel1p00_89at72deg_600DUB_rtol2p49e12_atol2p49e9") 
+    simIO = out.IOHandler(OUTPUT_DIR) 
     simIO.startLog()
 
     ## DEFINE MESH AND LOAD FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.err_mag = 3.168E-4 
-    b_hidra.err_dir = 268.6 * np.pi/180
-    #b_hidra.loadCartesianField('input_files/It486_Ih900_Iv000_0p943_0p955.npy', errField=True)
-    b_hidra.loadCartesianField('input_files/It486_Ih900_Iv000_0p943_1p00.npy', errField=True)
+    b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
+    b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
+    b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
 
-    ## SET UP INITIAL POSITIONS IN RTP COORDS
-    NLINES = 12 + 11 + 22 + 44
-    IC_RAD = np.array(np.linspace( 0.130, 0.020, NLINES)) # 0.130, 0.010
-    IC_THETA = np.pi 
-    IC_PHI = 72 * np.pi/180.
+    ## SET UP INIT CONDS
+    ic_rad = np.array(np.linspace( START_RAD, END_RAD, NLINES))
+    ic_theta = IC_THETA_DEG * np.pi/180.
+    ic_phi = IC_PHI_DEG * np.pi/180.
+    init_conds_rtp = np.array([[R, ic_theta, ic_phi] for R in ic_rad])
 
-    ##CREATE INITIAL CONDITIONS ARRAY IN (IN RTP)
-    ICs_RTP = np.array([[R, IC_THETA, IC_PHI] for R in IC_RAD])
+    ## GENERATE POINCARE PLOTS
+    NTHREADS = 31 #os.cpu_count() - 1
+    # if NTHREADS <= 0:
+    #     NTHREADS = os.cpu_count() + NTHREADS
+    # else:
+    #     NTHREADS = NTHREADS
+    
+    solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
+    tMax = Gen_Poincare(init_conds_rtp, SPINS, b_hidra, simIO, 'Poincare', *solver_args)[0]
 
-    ## SET UP MAX LENGTH OF FIELD LINE TO INTEGRATE (1 SPIN=2*pi*R0)
-    SPINS = 600
-
-    ## SOLVER PARAMETERS
-    SOLVER = 'LSODA'
-    RTOL = 2.49e-12 #1.49e-8
-    ATOL = 2.49e-9
-    THREADS = os.cpu_count() - 1
-    DOUBLE_LINE = True
-
-    ## RUN POINCARE MAP
-    tMax, Poincare_output, wallPt_output = Gen_Poincare(ICs_RTP, SPINS, b_hidra, simIO, 'Poincare',  
-                                                        SOLVER, RTOL, ATOL, THREADS, DOUBLE_LINE)
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_index = identifyLCFS(LCFStype='inner', iconds=IC_RAD, t_maxs=tMax, outputHandler=simIO)
-   
+    identifyLCFS(LCFStype='inner', iconds=ic_rad, t_maxs=tMax, outputHandler=simIO)
+
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
-
 if __name__ == '__main__':
+
     main()
