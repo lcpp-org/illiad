@@ -52,7 +52,6 @@ class IOHandler:
         except OSError as error:
             print(error)
 
-
     def startLog(self):
         # Creates a logger instance and configures the logging opions, handlers, formatting, etc.        
         self.log = logging.getLogger("Poincare")
@@ -106,13 +105,19 @@ class IOHandler:
         # create runStats file
         # create output file?
 
-
-    def createSubDir(self, name):
-        self.sub_dir = os.path.join(self.plot_dir, name)
-        try:
-            os.mkdir(self.sub_dir)
-        except OSError as error:
-            pass#print('Run Directory already exists!')
+    def createSubDir(self, name, plots=True, data=True):
+        sub_dir1 = os.path.join(self.plot_dir, name)
+        sub_dir2 = os.path.join(self.data_dir, name)
+        if plots:
+            try:
+                os.mkdir(sub_dir1)
+            except OSError as error:
+                pass #print('Plot subDirectory already exists!')
+        if data:
+            try:
+                os.mkdir(sub_dir2)
+            except OSError as error:
+                pass #print('Data subDirectory already exists!')
 
     def saveNumpyData(self, data, name):
         # method to store a numpy array in the \data sub-directory
@@ -120,9 +125,12 @@ class IOHandler:
         #self.log.info(f'saving numpy file: "{name_loc}"')
         np.save(name_loc, data)
 
-    def loadNumpyData(self, name):
+    def loadNumpyData(self, name, subdir=None):
         # method to load a numpy array from the \data sub-directory
-        name_loc = os.path.join( self.data_dir, name)
+        if subdir:
+            name_loc = os.path.join( self.data_dir, subdir, name)
+        else:
+            name_loc = os.path.join( self.data_dir, name)
         self.log.info('loading numpy file: "{}"'.format(name_loc))
 
         return np.load(name_loc)
@@ -130,7 +138,7 @@ class IOHandler:
         #    return np.load(name_loc)
         #except OSError as error:
         #    print('FILE DOES NOT EXIST!')
-    
+
     def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
