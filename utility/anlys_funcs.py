@@ -1,4 +1,5 @@
 
+#if __name__ == '__main__':
 import logging
 from time import perf_counter
 from tqdm import tqdm, trange
@@ -14,11 +15,8 @@ from functools import partial
 import concurrent.futures as cf
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#device = torch.device('cpu')
-
 
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ, axisShift
-
 import phi_events
 
 
@@ -27,6 +25,11 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
         to input it directly, or determine it as the outermost confined surface, 
         or the confined surface innward from the first unconfined surface. """
     
+    if outputHandler == None:
+        outputHandler = logging.getLogger()
+    else:
+        outputHandler.log = outputHandler
+
     LCFStypes = ['inner', 'outer', 'input']
     if LCFStype not in LCFStypes:
         raise ValueError("Invalid LCFS type. Expected one of: %s" % LCFStypes)
@@ -39,8 +42,12 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
         # Assuming surfaces are ordered from 'out' to 'in':
         ## This returns the LCFS 'inside' ALL open flux surfaces
         maxTime = np.max(t_maxs)
+
         openSurface_ind = [i for i, t in enumerate(t_maxs) if t != maxTime] # Get indices of open flux surfaces
-        LCFS_index = max(openSurface_ind) + 1
+        if openSurface_ind:
+            LCFS_index = max(openSurface_ind) + 1
+        else:
+            LCFS_index = 1
 
         plt.figure()
         plt.plot(iconds, t_maxs, '-o', c='k')
@@ -59,7 +66,7 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
         maxTime = np.max(t_maxs)
         LCFS_index = t_maxs.index(maxTime)
 
-        outputHandler.log.info('LCFS_index={}'.format(LCFS_index))
+        outputHandler.info('LCFS_index={}'.format(LCFS_index))
         
         plt.figure()
         plt.plot(iconds, t_maxs, '-o', c='k')
@@ -98,25 +105,14 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
         t_pts = Pdata[i][n]
         point_total = max(0, len(t_pts)-1)
 
-        r_f = np.zeros(point_total)
-        th_f = np.zeros(point_total)
-        ph_f = np.zeros(point_total)
-
         for j in range(point_total):
-            r_f[j], th_f[j], ph_f[j] = XYZ_to_RTP(t_pts[j][:3], rmajor)
+            scatter_points[i][1][j], scatter_points[i][0][j], dum = XYZ_to_RTP(t_pts[j][:3], rmajor)
 
-        if saveData:
-            scatter_points[i][0][:th_f.size] = th_f
-            scatter_points[i][1][:r_f.size] = r_f
-        else:
-            pass
-
-        plt.scatter(th_f, r_f, marker='.', s=1.00, c='k', linewidths=0.0)
+        plt.scatter(scatter_points[i][0][:point_total], scatter_points[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
 
     if saveData:
-        f_output = scatter_points
         fname = anlys_name + '_{:03.0f}'.format(degrees(phi_))
-        outputHandler.saveNumpyData(f_output, fname)
+        outputHandler.saveNumpyData(scatter_points, fname)
     else:
         pass 
 
@@ -127,7 +123,7 @@ def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLo
     phi_phys = (phi_ + (198 * np.pi/180.)) % (2*np.pi)  
     plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys*180/np.pi, phi_*180/np.pi), loc='left')
     plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_*180/np.pi)
-    outputHandler.saveFig(plot_name, dpi=300)
+    outputHandler.saveFig(plot_name, dpi=250)
     plt.close()
 
     return '\tPHI: {}'.format(phi_*(180/np.pi))
@@ -156,7 +152,6 @@ def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
     log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(tot_elapsed_time))
 
     return boris_output_
-
 
 
 ## TESTNG!!!
@@ -356,92 +351,3 @@ def boris_solver(ion, dt, tmax, Bfield):
 
 
 
-def find_Axis(theta_vals, r_vals, field):
-    """Function to find the geometric center of a set of points in r, theta coordinates"""
-    theta_size = theta_vals.size
-    ## CONVERT TO 2D XZ COORDINATES
-    x_in = np.empty(theta_size)
-    y_in = np.empty(theta_size)
-    z_in = np.empty(theta_size)
-    for i, theta, in enumerate(theta_vals):
-        x_in[i], y_in[i], z_in[i] = RTP_to_XYZ(np.array([r_vals[i], theta, 0.]), field.R0)
-
-    ## FIND THE AXIS BY AVERAGING THE POSITIONS
-    x_avg = np.average(x_in)
-    y_avg = 0.0
-    z_avg = np.average(z_in)
-
-    axis_xyz = np.array([x_avg, y_avg, z_avg])
-    axis_rtp = XYZ_to_RTP(axis_xyz, field.R0)
-
-    return axis_rtp
-
-
-
-def find_subsets(theta_r_pts, mag_axis, field, BINS=30):
-    """Function to find contiguous subsets of points in theta-r space"""
-    test_flag = False
-    # make a histogram of the point density vs theta
-    hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=BINS, range=(0., 2*np.pi))
-    dtheta_bin = bin_edges[1] - bin_edges[0]
-
-    # find how many contiguous sets of adjacents bins there are
-    non_empty_bins = np.where(hist > 0)[0]
-    contiguous_sets = np.split(non_empty_bins, np.where(np.diff(non_empty_bins) != 1)[0]+1)
-    # if the first and last bins are non-empty, then the first and last sets of bins are contiguous
-    if hist[0] > 0 and hist[-1] > 0 and len(contiguous_sets) > 1:
-        contiguous_sets[0] = np.concatenate((contiguous_sets[-1], contiguous_sets[0]))
-        contiguous_sets.pop()
-        test_flag = True
-    num_sets = len(contiguous_sets)
-
-    subsetData = []
-    subsetCenters = np.zeros([num_sets, 2])
-    # loop throught each contiguous subset
-    for i, contiguous_set in enumerate(contiguous_sets):
-        thisSet_tr = []
-        # calculate bin bounds
-        lowerBound = contiguous_set*dtheta_bin
-        upperBound = lowerBound + dtheta_bin
-        # append data within each bin belonging to the subset
-        for lo, hi in zip(lowerBound, upperBound):
-            thisSet_tr += [point for point in theta_r_pts if lo <= point[0] < hi]
-        thisSet_tr = np.array(thisSet_tr)
-
-        # sort the subset by theta
-        thisSet_tr = thisSet_tr[np.argsort(thisSet_tr[:, 0])]
-
-        # TESTING, ONLY CONSIDER 3 SUBSETS!
-        # only split if there are between 3 and 5 subsets, treat rest as 1 set
-        if num_sets > 2 and num_sets < 4:
-            subsetCenters[i][:] = find_Axis(thisSet_tr.T[0], thisSet_tr.T[1], field)[:2]
-            # shift the data to be relative to the center of the subset
-            thisSetLocAxis = np.array([axisShift(r, theta, *subsetCenters[i][:2]) for theta, r in thisSet_tr])
-            thisSetLocAxis = thisSetLocAxis[np.argsort(thisSetLocAxis[:, 0])]
-            subsetData += [thisSetLocAxis]
-        # if there is only 1 subset, or lots(noisy data), then keep the original magnetic axis
-        else:
-            subsetCenters[i][:] = mag_axis[:2]
-            thisSetLocAxis = thisSet_tr
-            subsetData = [theta_r_pts]
-
-    return subsetData, subsetCenters, hist, bin_edges, test_flag
-
-
-
-# append and spline data
-from scipy.interpolate import make_smoothing_spline, spalde, splev, splrep
-def spline_Data(theta_pts, rad_pts):
-    # Copy data to both ends for pseudo-periodicity (smooth spline endpoints)
-    th_size = len(theta_pts)
-    append_length = int(th_size/2)
-    th_A = theta_pts[append_length:-1] - 2*np.pi
-    th_B = theta_pts[1:append_length] + 2*np.pi
-    theta_spl = np.concatenate((th_A, theta_pts, th_B))
-    rad_A = rad_pts[append_length:-1]
-    rad_B = rad_pts[1:append_length]
-    rad_spl = np.concatenate((rad_A, rad_pts, rad_B))
-    # spline parameters
-    fSurface_splineParms, res, fail, msg = splrep(theta_spl, rad_spl, k=3, s=1e-5, per=False, full_output=1, quiet=1)
-
-    return fSurface_splineParms, res, fail, msg

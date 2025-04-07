@@ -7,7 +7,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 ## TRANSFORM TO CARTESIAN COORDINATES
 #@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "A"), nb.float64), nopython=True)
-def RTP_to_XYZ(p_RTP, Rmajor):
+def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     # Function to take in a point defined in r-theta-phi coordinates
     # And return a point in Cartesian coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
@@ -24,7 +24,7 @@ def RTP_to_XYZ(p_RTP, Rmajor):
 
 ## TRANSFORM TO TOROIDAL COORDINATES
 ###@nb.jit(nb.types.Array(nb.float64, 1, "C")(nb.types.Array(nb.float64, 1, "C"), nb.float64), nopython=True)
-def XYZ_to_RTP(p_XYZ, Rmajor):
+def XYZ_to_RTP(p_XYZ, Rmajor=0.72):
     # Function to take in a point defined in Cartesian coordinates
     # And return a point in r-theta-phi coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
@@ -53,7 +53,7 @@ def XYZ_to_RTP(p_XYZ, Rmajor):
 
     return p_RTP
 
-def XYZ_to_RTP2(p_XYZ, Rmajor):
+def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     # Function to take in a point defined in Cartesian coordinates
     # And return a point in r-theta-phi coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
@@ -72,7 +72,7 @@ def XYZ_to_RTP2(p_XYZ, Rmajor):
     den = R - Rmajor
     theta = torch.arctan2(z,den) # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    p_RTP.T[1] = torch.where(theta<0, theta + 2*torch.pi, theta)
+    p_RTP.T[1] = torch.where(theta < 0, theta + 2*torch.pi, theta)
     #p_RTP.T[1] = theta
 
     phi = (-1) * torch.arctan2(y,x) # arctan2 returns radians from (-pi to +pi)
@@ -112,18 +112,20 @@ def RTP_XYZ_JAC(p_rtp, vec_xyz):
     
     return np.dot(Xform, vec_xyz)
 
-# TRANSFORM FROM THETA,R ABOUT (GEOMETRIC AXIS)
-# TO (MAGNETIC AXIS): THETA=PI, R=0.0187M
-def axisShift(rho, theta, rdel, thdel_, Rmaj=0.72): 
 
-    xprime = rho*np.cos(theta) - rdel*np.cos(thdel_)
-    zprime = rho*np.sin(theta) - rdel*np.sin(thdel_)
+def axisShift(rho, theta, rdel, thdel): 
+    """ Transform from theta,r about (geometric axis) to (magnetic axis) """
+    
+    xprime = rho*np.cos(theta) - rdel*np.cos(thdel)
+    zprime = rho*np.sin(theta) - rdel*np.sin(thdel)
 
     rprime = np.sqrt(xprime**2 + zprime**2)
     thetaprime = np.arctan2(zprime, xprime)
+    #thetaprime[thetaprime <= 0] += 2 * np.pi
     thetaprime = np.where(thetaprime<=0, thetaprime + 2*np.pi, thetaprime)
-    #if thetaprime<=0: thetaprime += 2*np.pi
+
     return np.array([thetaprime, rprime])
+
 
 
 
