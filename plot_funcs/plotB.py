@@ -1,11 +1,21 @@
 ## IMPORT
-#import pandas as pd
+import pandas as pd
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import class.class_outputHandler as out
-from class.mesh import *
+import classes.class_outputHandler as out
+from classes.mesh import *
+
+'''
+Things to change include
+simIO out
+input magnetic file to be loaded
+angles for PHI
+booleans for highToLow and deltas for getValuesAlong0
+plot_XSection (comment out or not)
+
+'''
 
 ## SET UP RUN DIRECTORY
 simIO = out.IOHandler("HIDRA_1q4_TorchTest2") #DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -102,14 +112,17 @@ def plot_Xsection(title, data, filename, phi_toPlot):
 		simIO.saveFig(plot_name)
 	plt.close()
 
+
 ## NORM ##
-plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('B-field magnitude of HIDRA', Bnorm, 'Bnorm', PHI)
+
 ## RADIAL ##
-plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('RADIAL B-field magnitude of HIDRA', Br, 'Bradial', PHI)
 ### POLOIDAL ##
-plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('POLOIDAL B-field magnitude of HIDRA', Bpol, 'Bpoloidal', PHI)
 ### TOROIDAL ##
-plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal_HIDRA_i3ERR_hires', PHI)
+#plot_Xsection('TOROIDAL B-field magnitude of HIDRA', Btor, 'Btoroidal', PHI)
+
 
 """
 ## WALL PLOTS
