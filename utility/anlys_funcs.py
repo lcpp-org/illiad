@@ -24,11 +24,6 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
     """Function returns the index of the Last-Closed Flux Surface, with the option
         to input it directly, or determine it as the outermost confined surface, 
         or the confined surface innward from the first unconfined surface. """
-    
-    if outputHandler == None:
-        outputHandler = logging.getLogger()
-    else:
-        outputHandler.log = outputHandler
 
     LCFStypes = ['inner', 'outer', 'input']
     if LCFStype not in LCFStypes:
@@ -66,7 +61,7 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
         maxTime = np.max(t_maxs)
         LCFS_index = t_maxs.index(maxTime)
 
-        outputHandler.info('LCFS_index={}'.format(LCFS_index))
+        outputHandler.log.info('LCFS_index={}'.format(LCFS_index))
         
         plt.figure()
         plt.plot(iconds, t_maxs, '-o', c='k')
