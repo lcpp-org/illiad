@@ -1,4 +1,3 @@
-
 import logging
 import classes.class_outputHandler as out
 
@@ -13,6 +12,7 @@ from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 from utility.anlys_funcs import identifyLCFS #, find_Axis, find_subsets, spline_Data,
 np.set_printoptions(threshold=np.inf)
 
+
 def main():
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
@@ -24,47 +24,37 @@ def main():
     b_hidra.loadCartesianField(FIELD_FILE_TOR, errField=True, att_mult=FIELD_SCALE_TOR)
     b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
     b_hidra.set_nonPer_errField(FIELD_ERR_MAG, FIELD_ERR_DIR)
-    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT) 
+    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
-    ## LOOP THROUGH PHI ANGLES
+    # DEFINE THETAS FOR SPLINE GENERATION
     dtheta = 2*np.pi/NTHETA
     THETA_GENs = np.linspace(dtheta, 2*np.pi, NTHETA)
 
-
+    ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
-
-        if PLOT_ALL:
-            fig = plt.figure()
-            gs = gridspec.GridSpec(2, 2, width_ratios=[2, 1])
-
-            ax4 = fig.add_subplot(gs[:,0], polar=True) #projection='3d')
-            ax1 = fig.add_subplot(gs[0,1], polar=False)
-            ax2 = fig.add_subplot(gs[1,1], polar=False)
-
         ## LOAD POINCARE DATA
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
         flux_surfaces = simIO.loadNumpyData(filename)
+
+        # Initialize plotting
+        if PLOT_ALL: ax1, ax2, ax4 = init_plotting()
 
         ## FIND THE MAGNETIC AXIS FROM SMALLEST FLUX SURFACE (ASSUMED LAST FLUX SURFACE IN SET)
         th_small, r_small = flux_surfaces[-1]
         r_small = r_small[~np.isnan(r_small)]
         th_small = th_small[~np.isnan(th_small)]
         th_size = th_small.size
-
         mag_axis = find_Axis(th_small, r_small, b_hidra)
         mag_axis_rev = np.copy(mag_axis)
         mag_axis_rev[1] = mag_axis_rev[1] + np.pi
 
-        # Declare big arrays to store data over surfaces and phi angles
+        # DECLARE BIG ARRAYS TO STORE DATA OVER SURFACES AND PHI ANGLES
         NSURFACE = len(flux_surfaces)
-
         if phi_index == 0: #if PHI_GEN_DEG == PHI_GENs[0]:
             tot_flux_array = np.zeros([NSURFACE, len(PHI_GENs)])
             total_flux_norm = np.zeros([NSURFACE, len(PHI_GENs)])
-
             flat_point_meshes = np.full([NSURFACE, len(PHI_GENs), NTHETA*MAX_SUBSETS, 2], np.nan)
             centers_array = np.zeros([NSURFACE, len(PHI_GENs), MAX_SUBSETS, 2])
-            
             plotData_list = [ [0]*NSURFACE for _ in range(len(PHI_GENs)) ]
 
         ## LOOP THROUGH FLUX SURFACES TO FIND SUBSETS (ISLAND) AND THE SET OF SMALLEST ISLANDS
@@ -73,7 +63,6 @@ def main():
 
         ## (2ND) LOOP THROUGH FLUX SURFACES TO SHIFT DATA AND SPLINE FIT
         Fluxes = []
-        #total_flux_norm = np.zeros(NSURFACE) 
         for surf_index in range(lcfs_index, NSURFACE):
 
             # DECLARE A WHOLE BUNCH OF EMPTY ARRAYS
@@ -134,33 +123,22 @@ def main():
                 ## SPLINE FIT #
                 fSurface_splineParms, res, fail, msg = spline_Data(theta_toSpline, rad_toSpline, smoothing=SMOOTH_FCTR)
                 if fail: simIO.log.info( '\tSurface #{}, fail: {}\n\tmsg: {}'.format(surf_index, bool(fail), msg) )
-                else:    simIO.log.info('\tSurface #{}, res: {:.4e}'.format(surf_index, res))
+                else:    pass #simIO.log.info('\tSurface #{}, res: {:.4e}'.format(surf_index, res))
 
                 ## INTEGRATE AMOUNT OF TOROIDAL FIELD BOUNDED BY FLUX SURFACE [Tesla*m^2]
                 this_flux= None
                 if FLUX_CALC_FLAG:
                     this_flux = integrate_flux( fSurface_splineParms, current_center,
                                                 PHI_GEN_DEG*np.pi/180, b_hidra,
-                                                #del_r=0.0001, del_theta=0.01) # del_r=0.0005, del_theta=0.005)
-                                                del_r=INTGRTE_DR, del_theta=INTGRTE_DTHTA) # del_r=0.0005, del_theta=0.005)
+                                                del_r=INTGRTE_DR, del_theta=INTGRTE_DTHTA)
                     sub_flux += [this_flux] # append flux to list of subset fluxes
 
-
-
-
                 # CREATE A SET OF REGULARLY-SPACED POINTS EVALUATED ON THE SPLINE FIT
-                # @$%$%YW%^Y# $^Y#$%^$%TYRESFGDXC
                 #current_theta_gens = (THETA_GENs + subCenters_geo[subset_index][0]) % (2*np.pi)
                 current_theta_gens = (THETA_GENs + current_center[1]) % (2*np.pi)
-                # simIO.log.info('current center: {:.2f}deg, {:.3f}m'.format(current_center[1]*180/np.pi, current_center[0]))
-                # simIO.log.info(f'{current_theta_gens=}')
-
                 radpoints_tr_LocAxis[subset_index] = splev(current_theta_gens, fSurface_splineParms)
-                #radpoints_tr_LocAxis[subset_index] = splev(THETA_GENs, fSurface_splineParms)
 
                 for th_index, theta in enumerate(current_theta_gens):
-                #for th_index, theta in enumerate(THETA_GENs):
-
                     ## Shift r, theta back relative to overall magnetic axis
                     if N_subsets > 1:
                         shift_r = current_center[0]
@@ -174,8 +152,7 @@ def main():
 
                     ## Shift r, theta back relative to geometric axis
                     points_tr_GeoAxis[subset_index][th_index] = axisShift(radpoints_tr_MagAxis[subset_index][th_index], theta_evals_MagAxis[subset_index][th_index], *mag_axis_rev[:2])
-                    
-                # END SUBSET LOOP
+            ##### END SUBSET LOOP
 
             ## DANGER, BETTER DATA STRUCTURES NEEDED!!! ##
             total_npts = num_subsets[surf_index]*NTHETA
@@ -187,8 +164,7 @@ def main():
 
             ## PLOTTING EACH FLUX SURFACE AT EACH PHI ANGLE
             if PLOT_ALL:
-                # filter out wild fits
-                # if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): 
+                # filter out wild fits: if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): 
                 # plot the data points
                 ax1.scatter(points_tr_MagAxis.T[0]*180./np.pi, points_tr_MagAxis.T[1], color='k', s=0.15, linewidths=0.0) # mag-axis point
                 # plot the spline fit
@@ -197,8 +173,7 @@ def main():
                 # plot the histogram
                 if num_subsets[surf_index] > 1:
                    ax2.bar(bin_edges[surf_index][:-1]*180./np.pi, hist[surf_index], width=np.diff(bin_edges[surf_index])*180./np.pi, align='edge', edgecolor='k', linewidth=0.1)
-
-            ## END OF SURFACE LOOP
+        ###### END OF SURFACE LOOP
 
         # PRINTING FLUXES AS OUTPUT:
         if FLUX_CALC_FLAG:
@@ -208,14 +183,12 @@ def main():
                 tot_flux_array[this_surf_index][phi_index] = np.sum(flux, axis=-1)
                 lcfs_flux = tot_flux_array[lcfs_index][phi_index] 
                 total_flux_norm[this_surf_index][phi_index] =np.copy( max((1 - (tot_flux_array[this_surf_index][phi_index]/lcfs_flux)), 0.) )
-                #simIO.log.info('Surface {:d}: {:.2e}({:.4f})'.format(this_surf_index, tot_flux_array[this_surf_index][phi_index], total_flux_norm[this_surf_index][phi_index]))
+                simIO.log.info('Surface {:d}: {:.2e}({:.4f})'.format(this_surf_index, tot_flux_array[this_surf_index][phi_index], total_flux_norm[this_surf_index][phi_index]))
 
         # FORMATTING DATA TO SAVE AS NUMPY ARRAY
         for surf_index in range(lcfs_index, NSURFACE):
-
             plot_tr_points = plotData_list[phi_index][surf_index]
             NOW_NPTS = plot_tr_points.shape[0]
-            #simIO.log.info('NOW_NPTS: {}'.format(NOW_NPTS))
 
             plot_thetas = plot_tr_points.T[0]
             plot_radii = plot_tr_points.T[1]
@@ -233,27 +206,8 @@ def main():
                 if PLOT_ALL: ax4.scatter(plot_thetas, plot_radii, s=0.3, linewidths=0.0)
 
         # FORMAT AND SAVE PLOTS
-        if PLOT_ALL:
-            num_islandSurfaces= np.where(num_subsets == 3)[0].size
-            ax1.set_ylim(0, 0.19)
-            ax1.set_xticks(np.arange(0, 361, 45))
-            ax1.tick_params(axis='both', which='major', labelsize=6)
-            ax1.grid(linewidth = 0.25, linestyle=':', c='k')
-            #ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0, fontsize='xx-small', ncols=2)
-            
-            # set the axis labels font to be very small
-            ax2.set_xticks(np.arange(0, 361, 45))
-            ax2.tick_params(axis='both', which='major', labelsize=6)
-            ax2.grid(linewidth = 0.25, linestyle=':', c='k')
-
-            ax4.set_title('Flux Surfaces {} @ phi={}\nIsland surfaces detected:{}'.format(surf_index, PHI_GEN_DEG, num_islandSurfaces), fontsize=8)
-            ax4.set_rlim(0, 0.19)
-            ax4.tick_params(axis='both', which='major', labelsize=6)
-            ax4.grid(linewidth = 0.25, linestyle='--', c='grey')
-            simIO.saveFig(ANLYS_SUBDIR+'/Flux_at_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=400)
-            plt.close()
-
-        # END OF PHI LOOP
+        if PLOT_ALL: finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, simIO)
+    ##### END OF PHI LOOP
 
     ## OUTPUT ANALYSIS
     ##################
@@ -271,6 +225,14 @@ def main():
         total_flux_norm = np.minimum(total_flux_norm, 1.0)
 
 
+        filename_fluxes = ANLYS_SUBDIR + '/CalculatedFLuxes.npy'
+        filename_fluxNorms = ANLYS_SUBDIR + '/CalculatedFLuxes-normalized.npy'
+        simIO.saveNumpyData(tot_flux_array, filename_fluxes)
+        simIO.saveNumpyData(total_flux_norm, filename_fluxNorms)
+
+
+
+
         # HAVE A BIG ARRAY OF FLUXES, NOW PLOT THEM
         fig_post = plt.figure()
 
@@ -280,7 +242,7 @@ def main():
             axUP.plot(tot_flux_array[:,i]*10_000, label='{:d}'.format(int(PHI_GENs[i])), linewidth=0.25)
         axUP.set_ylim(0, 1.1*10_000*np.max(tot_flux_array))
         axUP.grid(which='both', linestyle=':', linewidth=0.25)
-        axUP.legend(loc='lower left', fontsize='xx-small',ncols=3)
+        axUP.legend(loc='upper right', fontsize=4,ncols=3)
 
         # PLOT THE SURFACE PARAMETER: 1 - FLUX/FLUX_LCFS
         axDOWN = fig_post.add_subplot(212, title='Surface Parameter $|\psi_n| = 1-\\frac{ \\psi_{\\phi,n} }{ \psi_{\\phi,LCFS} }$ at each surface', xlabel='Surface index n', ylabel='$|\psi_n|$')
@@ -288,7 +250,7 @@ def main():
                 axDOWN.plot(total_flux_norm.T[i], label='{:d}'.format(int(PHI_GENs[i])), linewidth=0.25)
         axDOWN.set_ylim(0, 1.1)
         axDOWN.grid(which='both', linestyle=':', linewidth=0.25)
-        axDOWN.legend(loc='upper left', fontsize='xx-small', ncols=3)
+        axDOWN.legend(loc='upper left', fontsize=4, ncols=3)
 
         # SAVE THE FIGURE
         simIO.saveFig(ANLYS_SUBDIR+'/Flux_v_Surface.png', dpi=300)
@@ -303,7 +265,6 @@ def main():
         simIO.saveNumpyData(flat_point_meshes[surf_index], filename_pt_mesh)
     
 ## END main()
-
 
 def find_Axis(theta_vals, r_vals, field):
     """Function to find the geometric center of a set of points in r, theta coordinates"""
@@ -324,7 +285,6 @@ def find_Axis(theta_vals, r_vals, field):
     axis_rtp = XYZ_to_RTP(axis_xyz, field.R0)
 
     return axis_rtp
-
 
 def find_subsets(theta_r_pts, mag_axis, field, BINS=30):
     """Function to find contiguous subsets of points in theta-r space"""
@@ -376,7 +336,6 @@ def find_subsets(theta_r_pts, mag_axis, field, BINS=30):
 
     return subsetData, subsetCenters, hist, bin_edges, wrapped_flag
 
-
 def shift_the_subcenters(surf_index, smallest_island_index, subsetCenters, num_subsets, wrap_flag):
     """Function performs tests to see if there is a misalignment of subset centers between the smallest island set and the current island set.
     If so, it returns the appropriate r and theta values to shift the data set to be relative to the smallest island subcenters """
@@ -401,11 +360,10 @@ def shift_the_subcenters(surf_index, smallest_island_index, subsetCenters, num_s
                 shifted_data[subset_index] = axisShift(smallest_subset_centers[subset_index-1][0], smallest_subset_centers[subset_index-1][1],
                                                      this_subset_centers[subset_index][0], this_subset_centers[subset_index][1])
 
-
     return shifted_data, shift_flag
 
-
 def spline_Data(theta_pts, rad_pts, smoothing=1e-5):
+    """Function to create a smoothing spline fit of the data points."""
     # Copy data to both ends for pseudo-periodicity (smooth spline endpoints) 
     # Unsure why this seems to work better than setting "per=True" in splrep
     th_size = len(theta_pts)
@@ -420,55 +378,46 @@ def spline_Data(theta_pts, rad_pts, smoothing=1e-5):
     rad_spl = np.concatenate((rad_A, rad_pts, rad_B))
 
     # spline parameters
-    fSurface_splineParms, res, fail, msg = splrep(theta_spl, rad_spl, k=3, s=smoothing, per=False, full_output=1, quiet=1)
-
-    return fSurface_splineParms, res, fail, msg
-
-
+    return splrep(theta_spl, rad_spl, k=3, s=smoothing, per=False, full_output=1, quiet=1)
 
 def integrate_flux(spline_parms, spline_axis, phi, field, del_r=0.001, del_theta=0.001):
     """ Integrate the total toroidal flux contained within the given spline define relative to the given center
      SET delta_theta, delta_r for integration, (calculate N, M)    
      RETURN a scalar value of toroidal flux for the (sub)set """
-    
-    sphi = np.sin(phi)
-    cphi = np.cos(phi)
-    delrdeltheta = del_r * del_theta
 
     # First, calculate the toroidal flux at the local center (not geo center!)
     r0, theta0 = spline_axis
-    b0_xyz = field.interpField(np.array([r0, theta0, phi]), Cart=False)[0]
-    b0_tor = -b0_xyz[0]*sphi - b0_xyz[1]*cphi
-    PSI_0 = np.pi *del_r**2 * b0_tor
 
-    PSI = 0.0
+    ## USE SCIPY INTEGRATION METHODS
+    ## B_tor(r, theta)
+    ## a= 0.
+    ## b= 2*np.pi
+    ## gfun = lambda y: 0.
+    ## hfun = lambda y: r_surf(theta)
+    # INTEGRATION HELPER FUNCTIONS
+    def B_tor(r, theta, phi, field):
+        """Function to calculate the toroidal field at a given point in space"""
+        geo_point = np.array([r+r0, theta+theta0, phi])
+        if geo_point[0] < 0.0:
+            geo_point[0] *= -1.
+            geo_point[1] += np.pi
 
-    # Loop through each differential area and add the differential flux to the total
-    M = int( (2*np.pi)//del_theta )
-    for m in range(1,M):
-        r_surf = splev((m-0.5)*del_theta, spline_parms)
-        N = int( r_surf//del_r )
-        theta = (m-0.5)*del_theta
-        for n in range(2,N):
-            r = (n-0.5)*del_r
-            geo_point = np.array([r+r0, theta+theta0, phi])
-            # remember to input geometric r's and theta's
-            bxyz = field.interpField(geo_point, Cart=False)[0]
-            btor = -bxyz[0]*sphi - bxyz[1]*cphi
+        bxyz = field.interpField(geo_point, Cart=False)[0]
+        sphi = np.sin(phi)
+        cphi = np.cos(phi)
+        btor = -bxyz[0]*sphi - bxyz[1]*cphi
+        return btor * r
 
-            PSI += btor * r #* delrdeltheta #del_r * del_theta
+    def gfun(theta):
+        """Function to calculate the lower radial bound of the integration"""
+        return 0.0 #r0
 
-    PSI *= delrdeltheta
+    def hfun(theta):
+        """Function to calculate the upper radial bound of the integration"""
+        return splev(theta, spline_parms)# + r0
 
-    PSI += PSI_0
-
-    # B_tor(r, theta)
-    # a= 0.
-    # b= 2*np.pi
-    # gfun = lambda y: 0.
-    # hfun = lambda y: r_surf(theta)
-
-    # result, abserr = dblquad(B_tor, 0., 2*np.pi, gfun, hfun, epsabs=1.49e-08, epsrel=1.49e-08)
+    ## INTEGRATE TOROIDAL FLUX
+    PSI, abserr = dblquad(B_tor, 0., 2*np.pi, gfun, hfun, args=(phi, field), epsabs=1e-05, epsrel=1e-03)
 
 
     return float(PSI)
@@ -527,14 +476,46 @@ def first_surface_loop(flux_surfaces, mag_axis, b_hidra, start_index, end_index)
 
     return smallest_island_index, num_subsets, subsetData, subsetCenters, hist_data
 
+# PLOTTING FUNCTIONS
+def init_plotting():
+    fig = plt.figure()
+    gs = gridspec.GridSpec(2, 2, width_ratios=[2, 1])
+
+    ax4 = fig.add_subplot(gs[:,0], polar=True) #projection='3d')
+    ax1 = fig.add_subplot(gs[0,1], polar=False)
+    ax2 = fig.add_subplot(gs[1,1], polar=False)
+    return ax1, ax2, ax4
+
+def finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, simIO):
+    num_islandSurfaces= np.where(num_subsets == 3)[0].size
+    ax1.set_ylim(0, 0.19)
+    ax1.set_xticks(np.arange(0, 361, 45))
+    ax1.tick_params(axis='both', which='major', labelsize=6)
+    ax1.grid(linewidth = 0.25, linestyle=':', c='k')
+    #ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0, fontsize='xx-small', ncols=2)
+    
+    # set the axis labels font to be very small
+    ax2.set_xticks(np.arange(0, 361, 45))
+    ax2.tick_params(axis='both', which='major', labelsize=6)
+    ax2.grid(linewidth = 0.25, linestyle=':', c='k')
+
+    ax4.set_title('Flux Surfaces {} @ phi={}\nIsland surfaces detected:{}'.format(surf_index, PHI_GEN_DEG, num_islandSurfaces), fontsize=8)
+    ax4.set_rlim(0, 0.19)
+    ax4.tick_params(axis='both', which='major', labelsize=6)
+    ax4.grid(linewidth = 0.25, linestyle='--', c='grey')
+    simIO.saveFig(ANLYS_SUBDIR+'/Flux_at_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=400)
+    plt.close()
 
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
     #ANLYS_DIR = "Mar14FIT_89at360_2000sing_1p49e12_2p49e9"
-    ANLYS_DIR = "Iota3_1500spins_atole-8_reversedHelicalCurrent"
-    ANLYS_SUBDIR = 'ALIGNED_3x60x180mesh_toMagAxis_forReal'
 
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = 'LCFS22_3x180x60mesh_FluxTest4-NEW4_epsabs1e-5_epsrel=1e-3'
+
+    #ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
+    #ANLYS_SUBDIR = 'LCFS18_3x60x60mesh_s5e-6'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
@@ -545,18 +526,18 @@ if __name__ == '__main__':
     FIELD_ERR_DIR = np.radians(272.)
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 8
+    LCFS_INPUT = 22
 
     ## DEFINE ANGLES TO EVALUATE AND PLOT
     NPHI = 180
-    NTHETA = 180
+    NTHETA = 60
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
     SMOOTH_FCTR = 5e-6
 
     ## FLUX INTEGRATION PARAMETERS
-    FLUX_CALC_FLAG = False
+    FLUX_CALC_FLAG = True
     INTGRTE_DR = 0.0015 #meter
     INTGRTE_DTHTA = 0.1 #rad
 
