@@ -28,7 +28,7 @@ IC_THETA_DEG = 180.
 START_RAD = 0.130
 END_RAD = 0.020
 NLINES = 12 + 11 + 22 # + 44
-SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
+SPINS = 100 # max length, SPIN = 2pi*R0 [meters]
 
 #-------------------#
 # SOLVER ARGUMENTS #
@@ -45,7 +45,7 @@ SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
 """
 SOLVER = 'LSODA'
 RTOL = 2.49e-12
-ATOL = 2.49e-9
+ATOL = 2.49e-8
 NTHREADS = 31 #-1
 DOUBLE_LINE = False
 
@@ -53,6 +53,7 @@ DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
 #-------------------------#
 OUTPUT_DIR = "AcceptedIota3_200spins_atole-9"
+OUTPUT_DIR = "DELETEME"
 
 
 def main():
