@@ -150,7 +150,8 @@ def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
 
 
 ## TESTNG!!!
-def boris_solver2(ions, dt, tmax, Bfield):
+#def boris_solver2(ions, dt, tmax, Bfield):
+def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax
        using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4)"""
     log = logging.getLogger()
@@ -165,6 +166,7 @@ def boris_solver2(ions, dt, tmax, Bfield):
     tvec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
     svec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
     #v_k = torch.zeros([Nparticles, 3]).to(device)
+    vminus = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
     vprime = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
     vplus = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
     wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
@@ -190,16 +192,27 @@ def boris_solver2(ions, dt, tmax, Bfield):
     ## NEED v_n-1/2 TO START
     ##################
     # Get field at every particle location
+    if Efield:
+        Evec = (Efield.interpField(pos_k) * qdt2m).T
+    else:
+        Evec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
+
+    #tvec = (Bfield.interpField(pos_k) * qdt2m).T
     tvec = (Bfield.interpField(pos_k) * qdt2m).T
     tmag = torch.linalg.norm(tvec, axis=-1)
 
-    vprime = v_k + torch.linalg.cross(v_k, tvec)#, axis=1) #dim=1?
+    vminus = v_k + Evec
+
+    #vprime = v_k + torch.linalg.cross(v_k, tvec)#, axis=1) #dim=1?
+    vprime = vminus + torch.linalg.cross(vminus, tvec)#, axis=1) #dim=1?
 
     svec = 2*tvec / ( 1 + (tmag*tmag)[:,None] )# svec given by (4-4, Eq13)
 
-    vplus = v_k - torch.linalg.cross(vprime, svec) / 2 #, axis=1) / 2 # stepping back a 1/2 step!
+    #vplus = v_k - torch.linalg.cross(vprime, svec) / 2 #, axis=1) / 2 # stepping back a 1/2 step!
+    vplus = vminus - torch.linalg.cross(vprime, svec) / 2 #, axis=1) / 2 # stepping back a 1/2 step!
 
-    v_k = vplus #.detach().clone()#?NECESSARY?
+    #v_k = vplus #.detach().clone()#?NECESSARY?
+    v_k = vplus + Evec #.detach().clone()#?NECESSARY?
 
     #calculate r (of rtp) for particles
     x2 = pos_k.T[0] * pos_k.T[0]
@@ -216,18 +229,27 @@ def boris_solver2(ions, dt, tmax, Bfield):
     with logging_redirect_tqdm(loggers=[log]):
         pbar = tqdm(range(Nsteps-1), ncols= 100, mininterval=1.0)
         for k in pbar:
+            if Efield:
+                Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T #tvec given by (4-4, Eq11)
+            else:
+                pass
             tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T #tvec given by (4-4, Eq11)
             tmag[running]  = torch.linalg.norm(tvec[running], axis=-1)
             #tmag2[running] = tmag2[running][0] * tmag2[running][0] + tmag2[running][1] * tmag2[running][1] + tmag2[running][2] * tmag2[running][2]
 
-            vprime[running]  = v_k[running]  + torch.linalg.cross(v_k[running], tvec[running])#, axis=1)# vminus is incremented (4-4, Eq10), get vprime
+            vminus[running] = v_k[running] + Evec[running]
+
+            #vprime[running]  = v_k[running]  + torch.linalg.cross(v_k[running], tvec[running])#, axis=1)# vminus is incremented (4-4, Eq10), get vprime
+            vprime[running]  = vminus[running]  + torch.linalg.cross(vminus[running], tvec[running])#, axis=1)# vminus is incremented (4-4, Eq10), get vprime
 
             svec[running]  = 2*tvec[running]  / ( 1 + (tmag[running]*tmag[running])[:,None] )# svec given by (4-4, Eq13)
             #svec[running]  = 2*tvec[running]  / ( 1 + tmag2[running][:,None] )# svec given by (4-4, Eq13)
 
-            vplus[running]  = v_k[running]  + torch.linalg.cross(vprime[running], svec[running])#, axis=1)# from vminus, vprime, svec (4-4, Eq12), get vplus 
+            #vplus[running]  = v_k[running]  + torch.linalg.cross(vprime[running], svec[running])#, axis=1)# from vminus, vprime, svec (4-4, Eq12), get vplus 
+            vplus[running]  = vminus[running]  + torch.linalg.cross(vprime[running], svec[running])#, axis=1)# from vminus, vprime, svec (4-4, Eq12), get vplus 
 
-            v_k[running]  = vplus[running] #.detach().clone() #?NECESSARY?
+            #v_k[running]  = vplus[running] #.detach().clone() #?NECESSARY?
+            v_k[running]  = vplus[running] + Evec[running] #.detach().clone() #?NECESSARY?
 
             pos_k[running]  = pos_k[running]  + v_k[running] * dt
 
