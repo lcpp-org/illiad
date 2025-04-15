@@ -101,16 +101,28 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
 
 
 
-def RTP_XYZ_JAC(p_rtp, vec_xyz):
+def RTP_XYZ_JAC(p_rtp, vec_xyz, form='xyz2rtp'):
     ctheta = np.cos(p_rtp[1])
     stheta = np.sin(p_rtp[1])
     cphi = np.cos(p_rtp[2])
     sphi = np.sin(p_rtp[2])
-    Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
-                     [-stheta*cphi,  stheta*sphi, ctheta],
-                     [       -sphi,        -cphi,     0]])
+
+
+    if form == 'rtp2xyz':
+        XformTranspose = np.array([[ctheta*cphi, -stheta*cphi, -sphi],
+                                  [-ctheta*sphi,  stheta*sphi, -cphi],
+                                  [      stheta,       ctheta,     0]])
+
+        return np.dot(XformTranspose, vec_xyz)
     
-    return np.dot(Xform, vec_xyz)
+    elif form == 'xyz2rtp':
+        Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
+                         [-stheta*cphi,  stheta*sphi, ctheta],
+                         [       -sphi,        -cphi,     0]])
+
+        return np.dot(Xform, vec_xyz)
+    else:
+        raise ValueError("form must be 'rtp2xyz' or 'xyz2rtp'")
 
 
 def axisShift(rho, theta, rdel, thdel): 
