@@ -130,7 +130,7 @@ def main():
                 if FLUX_CALC_FLAG:
                     this_flux = integrate_flux( fSurface_splineParms, current_center,
                                                 PHI_GEN_DEG*np.pi/180, b_hidra,
-                                                del_r=INTGRTE_DR, del_theta=INTGRTE_DTHTA)
+                                                integrate_epsabs=INTEGRATE_EPSABS, integrate_epsrel=INTEGRATE_EPSREL)
                     sub_flux += [this_flux] # append flux to list of subset fluxes
 
                 # CREATE A SET OF REGULARLY-SPACED POINTS EVALUATED ON THE SPLINE FIT
@@ -209,8 +209,7 @@ def main():
         if PLOT_ALL: finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, simIO)
     ##### END OF PHI LOOP
 
-    ## OUTPUT ANALYSIS
-    ##################
+    ## OUTPUT FLUXES
     if FLUX_CALC_FLAG:
         # Set fluxes outside of LCFS to be equal to the LCFS flux
         tot_flux_array[:lcfs_index][:] = tot_flux_array[lcfs_index][:]
@@ -229,8 +228,6 @@ def main():
         filename_fluxNorms = ANLYS_SUBDIR + '/CalculatedFLuxes-normalized.npy'
         simIO.saveNumpyData(tot_flux_array, filename_fluxes)
         simIO.saveNumpyData(total_flux_norm, filename_fluxNorms)
-
-
 
 
         # HAVE A BIG ARRAY OF FLUXES, NOW PLOT THEM
@@ -380,7 +377,7 @@ def spline_Data(theta_pts, rad_pts, smoothing=1e-5):
     # spline parameters
     return splrep(theta_spl, rad_spl, k=3, s=smoothing, per=False, full_output=1, quiet=1)
 
-def integrate_flux(spline_parms, spline_axis, phi, field, del_r=0.001, del_theta=0.001):
+def integrate_flux(spline_parms, spline_axis, phi, field, integrate_epsabs=1e-5, integrate_epsrel=1e-3):
     """ Integrate the total toroidal flux contained within the given spline define relative to the given center
      SET delta_theta, delta_r for integration, (calculate N, M)    
      RETURN a scalar value of toroidal flux for the (sub)set """
@@ -408,16 +405,16 @@ def integrate_flux(spline_parms, spline_axis, phi, field, del_r=0.001, del_theta
         btor = -bxyz[0]*sphi - bxyz[1]*cphi
         return btor * r
 
+    # (these should probably just be lambda funtions)
     def gfun(theta):
         """Function to calculate the lower radial bound of the integration"""
         return 0.0 #r0
-
     def hfun(theta):
         """Function to calculate the upper radial bound of the integration"""
         return splev(theta, spline_parms)# + r0
 
     ## INTEGRATE TOROIDAL FLUX
-    PSI, abserr = dblquad(B_tor, 0., 2*np.pi, gfun, hfun, args=(phi, field), epsabs=1e-05, epsrel=1e-03)
+    PSI, abserr = dblquad(B_tor, 0., 2*np.pi, gfun, hfun, args=(phi, field), epsabs=integrate_epsabs, epsrel=integrate_epsrel)
 
 
     return float(PSI)
@@ -511,35 +508,38 @@ if __name__ == '__main__':
     ## RUN DIRECTORY AND SUBDIRECTORY
     #ANLYS_DIR = "Mar14FIT_89at360_2000sing_1p49e12_2p49e9"
 
-    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS22_3x180x60mesh_FluxTest4-NEW4_epsabs1e-5_epsrel=1e-3'
+    # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
 
-    #ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
-    #ANLYS_SUBDIR = 'LCFS18_3x60x60mesh_s5e-6'
+    ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_SCALE_TOR = 0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+    FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
     FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
     FIELD_ERR_DIR = np.radians(272.)
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 22
+    LCFS_INPUT = 18
 
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 180
+    NPHI = 360
     NTHETA = 60
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
-    SMOOTH_FCTR = 5e-6
+    SMOOTH_FCTR = 7.5e-6
 
     ## FLUX INTEGRATION PARAMETERS
     FLUX_CALC_FLAG = True
-    INTGRTE_DR = 0.0015 #meter
-    INTGRTE_DTHTA = 0.1 #rad
+
+    INTEGRATE_EPSABS=1e-5 #1e-5
+    INTEGRATE_EPSREL=4.49e-3 #1e-3
+    # INTGRTE_DR = 0.0015 #meter
+    # INTGRTE_DTHTA = 0.1 #rad
 
 
     ## PLOTTING FLAG
