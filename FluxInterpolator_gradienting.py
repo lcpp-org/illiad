@@ -177,24 +177,34 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
+
     # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
 
-    ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
+    # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
+    # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
+
+    # ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p965"
+    # ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
+
+    ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p945"
+    ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_SCALE_TOR = 0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
+    FIELD_SCALE_HEL = -0.945 * FIELD_SCALE_TOR
     FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
     FIELD_ERR_DIR = np.radians(272.)
+
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 18
+    LCFS_INPUT = 30
+
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 360
+    NPHI = 40
     NTHETA = 60
+
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI) # = np.array([18])
     MAX_SUBSETS = 3
 

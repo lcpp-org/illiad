@@ -40,14 +40,14 @@ def main():
     axis_array = simIO.loadNumpyData(filename_center)
 
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
-    filtered_flux_array = flux_norm_array[:, 26] #6, 13, 19, 20, 22, 24,26
-    # plot filtered_flux_array with matplotlib
-    # fig, ax = plt.subplots()
-    # ax.plot(np.arange(N_surfaces), filtered_flux_array)
-    # ax.set_xlabel('Surface Index')
-    # ax.set_ylabel('Flux')
-    # ax.set_title('Filtered Flux Array')
-    # plt.show()
+    filtered_flux_array = flux_norm_array[:, 25] #6, 13, 19, 20, 22, 24,26
+    ## DEBUG plot filtered_flux_array with matplotlib
+    fig, ax = plt.subplots()
+    ax.plot(np.arange(N_surfaces), filtered_flux_array)
+    ax.set_xlabel('Surface Index')
+    ax.set_ylabel('Flux')
+    ax.set_title('Filtered Flux Array')
+    plt.show()
 
     # Test both linear and parabolic profiles
     linear_flux_array = filtered_flux_array
@@ -180,26 +180,31 @@ if __name__ == '__main__':
     # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
 
-    ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
+    # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
+    # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
+
+    # ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p965"
+    # ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
+
+    ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p945"
+    ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_SCALE_TOR = 0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
+    #FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
+    FIELD_SCALE_HEL = -0.945 * FIELD_SCALE_TOR
     FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
     FIELD_ERR_DIR = np.radians(272.)
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 18
+    LCFS_INPUT = 31
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 360
+    NPHI = 40
     NTHETA = 60
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
-    #PHI_GENs = np.array([18])
     MAX_SUBSETS = 3
-
 
     main()
