@@ -8,7 +8,12 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, filename):
+import torch
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+#def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, filename):
+def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, filename, genNormals=False, Efield=None):
     outputHandler.createSubDir(filename)
     r_in = r_in[~np.isnan(r_in)]
     th_in = th_in[~np.isnan(th_in)]
@@ -27,7 +32,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     y_in = np.empty(th_size)
     z_in = np.empty(th_size)
     for i, theta, in enumerate(th_in):
-        x_in[i], y_in[i], z_in[i] = RTP_to_XYZ(np.array([r_in[i], theta, 0.]), field.R0)
+        x_in[i], y_in[i], z_in[i] = RTP_to_XYZ(np.array([r_in[i], theta, 0.]), Bfield.R0)
 
     x_avg = (np.max(x_in) + np.min(x_in))/2
     y_avg = 0
@@ -37,7 +42,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     # shift origin of r, theta coordinates from geometric center to magnetic axis
     # then sort points on theta
     magCenterCoords = np.empty((th_size, 2))
-    RTP_delta = XYZ_to_RTP(XYZ_delta, field.R0)
+    RTP_delta = XYZ_to_RTP(XYZ_delta, Bfield.R0)
     RTP_delta_rev = np.copy(RTP_delta)
     RTP_delta_rev[1] = RTP_delta_rev[1] + np.pi
 
@@ -79,7 +84,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     plt.scatter(th_in, r_in, s=1) # geo-axis points
     plt.scatter(theta_spl, rad_spl, s=1) # mag-axis points
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
-    ax.set_rmax(field.a)
+    ax.set_rmax(Bfield.a)
     ax.set_rticks(np.arange(0.0, 0.19, 0.02))
     ax.yaxis.set_tick_params(labelsize=5)
     ax.grid(linewidth = 0.25, linestyle=':', c='k')
@@ -93,10 +98,15 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
-    output_ind_geo = np.zeros((Ntheta, 2))
+    #output_ind_geo = np.zeros((Ntheta, 2))
+    output_ind_geo = np.zeros((Ntheta, 3))
     output_ind     = np.zeros((Ntheta, 3))
     output_ind_XYZ = np.zeros((Ntheta, 3))
+    output_ind_normal = np.zeros((Ntheta, 3))
+    plot_norm_rtp = np.zeros((Ntheta, 3))
     outData = []
+    outNormals = []
+    tensor_ind_XYZ = torch.zeros((Ntheta, 3), dtype=torch.float32, device=device)
 
     for dr in drList:
         for i, theta in enumerate(theta_evals):
@@ -105,18 +115,38 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
             seedPt = seedPts_0[i] + adj_dr
             
             # shift back to geometric axis
-            output_ind_geo[i] = axisShift(seedPt, theta, *RTP_delta_rev[:2])
-            output_ind_geo[i][1] = min(field.a, output_ind_geo[i][1])
-
+            output_ind_geo[i][:2] = axisShift(seedPt, theta, *RTP_delta_rev[:2])
+            output_ind_geo[i][1] = min(Bfield.a, output_ind_geo[i][1])
+            output_ind_geo[i][2] = phi # keep phi constant for all points in this shell
             # convert rtp vector to xyz
             output_ind[i] = np.array([output_ind_geo[i][1], output_ind_geo[i][0], phi])
-            output_ind_XYZ[i] = RTP_to_XYZ(output_ind[i], field.R0)
+            output_ind_XYZ[i] = RTP_to_XYZ(output_ind[i], Bfield.R0)
+            output_ind_XYZ[i] = RTP_to_XYZ(output_ind[i], Bfield.R0)
+            tensor_ind_XYZ[i] = torch.tensor(output_ind_XYZ[i], dtype=torch.float32, device=device)
+
+            # HERE WE CAN GENERATE UNIT VECTOR NORMALS
+            if genNormals:
+                output_ind_normal[i] = Efield.interpField(tensor_ind_XYZ[i], Cart=True).cpu().numpy()
+                output_ind_normal[i] /= np.linalg.norm(output_ind_normal[i]) # normalize the vector
+
         
         plt.plot(output_ind_geo[:,0], output_ind_geo[:,1], '--o', linewidth=0.25, markersize=0.50)
+
         
         outData.extend(np.copy(output_ind_XYZ))
+        if genNormals:
+            outNormals.extend(np.copy(output_ind_normal))
 
-    ax.set_rmax(field.a)
+    ## Plot the surface normals
+    if genNormals:
+        for i in range(len(output_ind_normal)):
+            plot_norm_rtp[i] = RTP_XYZ_JAC(output_ind_geo[i], output_ind_normal[i], form='xyz2rtp')
+            #norm_r, norm_theta, norm_phi = RTP_XYZ_JAC(output_ind_geo[i], output_ind_normal[i], form='xyz2rtp')
+            #norm_r, norm_theta, norm_phi = XYZ_to_RTP(output_ind_XYZ[i], Bfield.R0)
+            #ax.quiver(norm_theta, norm_r, output_ind_normal[i][0], output_ind_normal[i][1], color='red', scale=10, width=0.001)
+        plt.quiver(output_ind_geo[:,0], output_ind_geo[:,1], plot_norm_rtp[:,0], plot_norm_rtp[:,1],  color='red', scale=20, width=0.002, angles='uv')
+
+    ax.set_rmax(Bfield.a)
     ax.set_rticks(np.arange(0.0, 0.19, 0.02))
     ax.yaxis.set_tick_params(labelsize=5)
     ax.grid(linewidth = 0.25, linestyle=':', c='k')
@@ -129,5 +159,8 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, field, outputHandler, f
     outArray = np.asarray(outData)
     outputHandler.saveNumpyData(outArray, filename)
 
-
-    return outArray
+    if genNormals:
+        outNormalsArray = np.asarray(outNormals)
+        return outArray, outNormalsArray
+    else:
+        return outArray
