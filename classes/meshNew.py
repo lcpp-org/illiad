@@ -177,8 +177,10 @@ class Mesh:
         #print(f'{point_XYZ.shape=}')
         
         Npts = torch.int64
-        Npts = point_XYZ.shape[0]
-
+        if len(point_XYZ.shape) < 2:
+            Npts = 1
+        else:
+            Npts = point_XYZ.shape[0]
 
         if Cart:
             point_RTP = XYZ_to_RTP2(point_XYZ, self.R0).to(device)
@@ -243,14 +245,21 @@ class Mesh:
         Bvec6 = torch.stack([ self.Bx[ir_lo, ith_hi, iph_lo], self.By[ir_lo, ith_hi, iph_lo], self.Bz[ir_lo, ith_hi, iph_lo] ], dim = 0)
         Bvec7 = torch.stack([ self.Bx[ir_hi, ith_lo, iph_lo], self.By[ir_hi, ith_lo, iph_lo], self.Bz[ir_hi, ith_lo, iph_lo] ], dim = 0)
         Bvec8 = torch.stack([ self.Bx[ir_lo, ith_lo, iph_lo], self.By[ir_lo, ith_lo, iph_lo], self.Bz[ir_lo, ith_lo, iph_lo] ], dim = 0)
-
         # have to perform vector rotation if wrapping around in phi direction
-        toRotate = torch.where( iph_lo < 0)[0]
-        if len(toRotate) > 0:
-            Bvec5[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec5[:,toRotate], self.phi_max )
-            Bvec6[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec6[:,toRotate], self.phi_max )
-            Bvec7[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec7[:,toRotate], self.phi_max )
-            Bvec8[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec8[:,toRotate], self.phi_max )
+
+        if Npts > 1:
+            toRotate = torch.where( iph_hi >= self.nphi)[0]
+            if len(toRotate) > 0:
+                Bvec5[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec5[:,toRotate], self.phi_max )
+                Bvec6[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec6[:,toRotate], self.phi_max )
+                Bvec7[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec7[:,toRotate], self.phi_max )
+                Bvec8[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec8[:,toRotate], self.phi_max )
+        else:
+            if iph_hi >= self.nphi:
+                Bvec5 = self.rot_vecXYZ_byPHI( Bvec5, self.phi_max )
+                Bvec6 = self.rot_vecXYZ_byPHI( Bvec6, self.phi_max )
+                Bvec7 = self.rot_vecXYZ_byPHI( Bvec7, self.phi_max )
+                Bvec8 = self.rot_vecXYZ_byPHI( Bvec8, self.phi_max )
 
         # sum of vectors, weighted by 'anti-node' volume
         vecXYZ = (Bvec1*A1 + Bvec2*A2 + Bvec3*A3 + Bvec4*A4 + Bvec5*A5 + Bvec6*A6 + Bvec7*A7 + Bvec8*A8) / (A1+A2+A3+A4+A5+A6+A7+A8)
@@ -263,8 +272,6 @@ class Mesh:
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, -phi_rotation)
 
         if self.errField:
-            #vecXYZ[0] += 0.0002
-            #vecXYZ[1] -= 0.0002
             vecXYZ[0] += self.err_mag * self.cos_err_dir
             vecXYZ[1] -= self.err_mag * self.sin_err_dir
 
@@ -277,9 +284,9 @@ def XYZ_to_RTP2(p_XYZ, Rmajor):
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
     p_XYZ = torch.tensor(p_XYZ).to(device)
+    #p_XYZ = p_XYZ.clone().detach().to(device)
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
     x, y, z = p_XYZ.T
-    #print(f'xyz_to_rto: {x=}')
     x2 = x*x
     y2 = y*y
     z2 = z*z
