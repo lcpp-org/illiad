@@ -152,144 +152,107 @@ def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
 ## TESTNG!!!
 #def boris_solver2(ions, dt, tmax, Bfield):
 def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
-    """Function to take in a particle and field object and solves the particle path until termination even or tmax
-       using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4)"""
+    """
+    Function to take in a particle and field object and solves the particle path until termination event or tmax
+    using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
+
+    Parameters:
+    ions (list): List of ion objects containing initial conditions and properties.
+    dt (float): Time step for the solver.
+    tmax (float): Maximum simulation time.
+    Bfield (object): Magnetic field object providing field interpolation methods.
+    Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
+
+    Returns:
+    tuple: Wall intersection points and final positions of particles.
+    """
     log = logging.getLogger()
-    log.info( 'Start ICs: {}-{}'.format(ions[0].particleID, ions[-1].particleID) )
+    log.info('Start ICs: {}-{}'.format(ions[0].particleID, ions[-1].particleID))
     t_startInd = perf_counter()
 
-    Nparticles = torch.int
-    Nsteps = torch.int
     Nparticles = len(ions)
     Nsteps = int((tmax // dt) + 1)
 
-    tvec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    svec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    #v_k = torch.zeros([Nparticles, 3]).to(device)
-    vminus = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    vprime = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    vplus = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
-    tmag = torch.zeros(Nparticles, dtype=torch.float64).to(device)
-    #tmag2 = torch.zeros(Nparticles, dtype=torch.float64).to(device)
+    with torch.no_grad():
+        tvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
+        wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
+        wallVelocities = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
 
-    r_k = torch.zeros(Nparticles, dtype=torch.float64).to(device)
+        qdt2m = torch.tensor([ion.charge_mass_ratio * dt / 2 for ion in ions], dtype=torch.float64, device=device)
+        v_k = torch.tensor([ion.vel0_XYZ for ion in ions], dtype=torch.float64, device=device)
 
-    ## BIG ARRAY #!#!#!#!#!#
-    #histories = torch.zeros([Nsteps, Nparticles, 3], dtype=torch.float64).to(device)
+        [ion.setPosition(0, ion.pos0_XYZ) for ion in ions]
+        pos_k = torch.tensor([ion.pos0_XYZ for ion in ions], dtype=torch.float64, device=device)
 
-    # Need particle parms: qdt2m, v0, p0
-    qdt2m = torch.asarray( [ion.charge_mass_ratio*dt/2 for ion in ions] ).to(device)
+        # NEED v_n-1/2 TO START
+        if Efield:
+            Evec = (Efield.interpField(pos_k) * qdt2m).T
+        else:
+            Evec = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
 
-    # Initialize particle states
-    v_k = np.asarray([ ion.vel0_XYZ for ion in ions ])
-    v_k = torch.tensor(v_k, dtype=torch.float64).to(device)
+        tvec = (Bfield.interpField(pos_k) * qdt2m).T
+        tmag = torch.linalg.norm(tvec, axis=-1)
 
-    [ion.setPosition(0, ion.pos0_XYZ) for ion in ions]
-    pos_k = np.asarray( [ion.pos0_XYZ for ion in ions])
-    pos_k = torch.tensor(pos_k, dtype=torch.float64).to(device)
+        vminus = v_k + Evec
+        vprime = vminus + torch.linalg.cross(vminus, tvec)
+        svec = 2 * tvec / (1 + (tmag * tmag)[:, None])
+        vplus = vminus - torch.linalg.cross(vprime, svec) / 2
+        v_k = vplus + Evec
 
-    ## NEED v_n-1/2 TO START
-    ##################
-    # Get field at every particle location
-    if Efield:
-        Evec = (Efield.interpField(pos_k) * qdt2m).T
-    else:
-        Evec = torch.zeros([Nparticles, 3], dtype=torch.float64).to(device)
+        x2 = pos_k.T[0] * pos_k.T[0]
+        y2 = pos_k.T[1] * pos_k.T[1]
+        z2 = pos_k.T[2] * pos_k.T[2]
+        r_k = torch.sqrt(x2 + y2 + z2 + Bfield.R0 * Bfield.R0
+                          - 2 * Bfield.R0 * torch.sqrt(x2 + y2))
 
-    #tvec = (Bfield.interpField(pos_k) * qdt2m).T
-    tvec = (Bfield.interpField(pos_k) * qdt2m).T
-    tmag = torch.linalg.norm(tvec, axis=-1)
+        running = torch.arange(0, Nparticles, 1, dtype=torch.int, device=device)
+        Nrunning = Nparticles
 
-    vminus = v_k + Evec
+        log.info('START STEPPING...')
+        logging.basicConfig(level=logging.INFO)
+        with logging_redirect_tqdm(loggers=[log]):
+            pbar = tqdm(range(Nsteps - 1), ncols=100, mininterval=1.0)
+            for k in pbar:
+                if Efield:
+                    Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
+                tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
+                tmag[running] = torch.linalg.norm(tvec[running], axis=-1)
 
-    #vprime = v_k + torch.linalg.cross(v_k, tvec)#, axis=1) #dim=1?
-    vprime = vminus + torch.linalg.cross(vminus, tvec)#, axis=1) #dim=1?
+                vminus[running] = v_k[running] + Evec[running]
+                vprime[running] = vminus[running] + torch.linalg.cross(vminus[running], tvec[running])
+                svec[running] = 2 * tvec[running] / (1 + (tmag[running] * tmag[running])[:, None])
+                vplus[running] = vminus[running] + torch.linalg.cross(vprime[running], svec[running])
+                v_k[running] = vplus[running] + Evec[running]
 
-    svec = 2*tvec / ( 1 + (tmag*tmag)[:,None] )# svec given by (4-4, Eq13)
+                pos_k[running] = pos_k[running] + v_k[running] * dt
 
-    #vplus = v_k - torch.linalg.cross(vprime, svec) / 2 #, axis=1) / 2 # stepping back a 1/2 step!
-    vplus = vminus - torch.linalg.cross(vprime, svec) / 2 #, axis=1) / 2 # stepping back a 1/2 step!
+                x2[running] = pos_k[running].T[0]**2
+                y2[running] = pos_k[running].T[1]**2
+                z2[running] = pos_k[running].T[2]**2
+                r_k[running] = torch.sqrt(x2[running] + y2[running] + z2[running] + Bfield.R0 * Bfield.R0
+                                           - 2 * Bfield.R0 * torch.sqrt(x2[running] + y2[running]))
 
-    #v_k = vplus #.detach().clone()#?NECESSARY?
-    v_k = vplus + Evec #.detach().clone()#?NECESSARY?
+                running = torch.where(r_k < Bfield.a)[0]
+                Nrunning = running.size(0)
 
-    #calculate r (of rtp) for particles
-    x2 = pos_k.T[0] * pos_k.T[0]
-    y2 = pos_k.T[1] * pos_k.T[1]
-    z2 = pos_k.T[2] * pos_k.T[2]
-    r_k = torch.sqrt( x2 + y2 + z2 + Bfield.R0*Bfield.R0 - 2*Bfield.R0*torch.sqrt(x2 + y2) ) #calculate r (of rtp) for particles
+                pbar.set_postfix({'#Particles running': Nrunning}, refresh=False)
 
-    running = torch.arange(0, Nparticles, 1, dtype=torch.int).to(device)
-    Nrunning = running.size(dim=0)
-    ## STEPPING THROUGH DTs
-    log.info( 'START STEPPING...')
-    
-    logging.basicConfig(level=logging.INFO)
-    with logging_redirect_tqdm(loggers=[log]):
-        pbar = tqdm(range(Nsteps-1), ncols= 100, mininterval=1.0)
-        for k in pbar:
-            if Efield:
-                Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T #tvec given by (4-4, Eq11)
-            else:
-                pass
-            tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T #tvec given by (4-4, Eq11)
-            tmag[running]  = torch.linalg.norm(tvec[running], axis=-1)
-            #tmag2[running] = tmag2[running][0] * tmag2[running][0] + tmag2[running][1] * tmag2[running][1] + tmag2[running][2] * tmag2[running][2]
-
-            vminus[running] = v_k[running] + Evec[running]
-
-            #vprime[running]  = v_k[running]  + torch.linalg.cross(v_k[running], tvec[running])#, axis=1)# vminus is incremented (4-4, Eq10), get vprime
-            vprime[running]  = vminus[running]  + torch.linalg.cross(vminus[running], tvec[running])#, axis=1)# vminus is incremented (4-4, Eq10), get vprime
-
-            svec[running]  = 2*tvec[running]  / ( 1 + (tmag[running]*tmag[running])[:,None] )# svec given by (4-4, Eq13)
-            #svec[running]  = 2*tvec[running]  / ( 1 + tmag2[running][:,None] )# svec given by (4-4, Eq13)
-
-            #vplus[running]  = v_k[running]  + torch.linalg.cross(vprime[running], svec[running])#, axis=1)# from vminus, vprime, svec (4-4, Eq12), get vplus 
-            vplus[running]  = vminus[running]  + torch.linalg.cross(vprime[running], svec[running])#, axis=1)# from vminus, vprime, svec (4-4, Eq12), get vplus 
-
-            #v_k[running]  = vplus[running] #.detach().clone() #?NECESSARY?
-            v_k[running]  = vplus[running] + Evec[running] #.detach().clone() #?NECESSARY?
-
-            pos_k[running]  = pos_k[running]  + v_k[running] * dt
-
-            ### HISTORY OFF!! ===> SPEED!!!  #!#!#!#!#!#
-            #[ ion.setPosition(k+1, pos_k[ndex][:3]) for ndex, ion in enumerate(ions) ]
-            #histories[k] = pos_k
-
-            #calculate r (of rtp) for particles
-            x2[running] = pos_k[running].T[0]# * pos_k.T[0,running]
-            y2[running] = pos_k[running].T[1]# * pos_k.T[1,running]
-            z2[running] = pos_k[running].T[2]# * pos_k.T[2,running]
-            x2[running] = x2[running]*x2[running]
-            y2[running] = y2[running]*y2[running]
-            z2[running] = z2[running]*z2[running]
-
-            r_k[running] = torch.sqrt( x2[running] + y2[running] + z2[running] + Bfield.R0*Bfield.R0 - 2*Bfield.R0*torch.sqrt(x2[running] + y2[running]) ) #calculate r (of rtp) for particles
-
-            # remove terminated particles from running list
-            running = torch.where(r_k<Bfield.a)
-            Nrunning = running[0].size(dim=0)
-
-            # update progress bar
-            pbar.set_postfix({'#Particles running': Nrunning})
-
-    # POSTPONE THIS UNTIL AFTER LOOP COMPLETION
-    #find indices of particles that have intersected the vacuum vessel
-    terminated = torch.where(r_k>=Bfield.a)
-    # update list of wall intersection points
-    wallPts[terminated] = pos_k[terminated]
-
+        terminated = torch.where(r_k >= Bfield.a)[0]
+        wallPts[terminated] = pos_k[terminated]
+        wallVelocities[terminated] = v_k[terminated]
 
     t_stopInd = perf_counter()
-
     elapsed_timeInd = t_stopInd - t_startInd
     min_, sec_ = divmod(elapsed_timeInd, 60)
     hr_, min_ = divmod(min_, 60)
 
-    log.info( 'ELAPSED TIME({} Particles): {:02.0f}H:{:02.0f}M:{:02.3f}S'.format(Nparticles, hr_, min_, sec_) )
+    log.info(
+        'ELAPSED TIME({} Particles): {:02.0f}H:{:02.0f}M:{:02.3f}S'.format(
+            Nparticles, hr_, min_, sec_
+        )
+    )
 
-    return wallPts, pos_k
+    return wallPts, pos_k, wallVelocities
 
 def boris_solver(ion, dt, tmax, Bfield):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax

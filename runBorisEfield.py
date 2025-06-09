@@ -21,36 +21,35 @@ He_mass = 4.002602 #amu
 FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
 FIELD_SCALE_TOR = 0.9448
 FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
-ERRFIELD_MAG = 1.5654e-4 #[Tesla]
-ERRFIELD_DIR_DEG = 271.5 #[degrees]
+FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
-#FIELD_FILE_ELECTRIC = None
-FIELD_SCALE_ELECTRIC = 100.0 # SCALE BY PEAK PLASMA POTENTIAL [VOLTS]
+# SCALE BY PEAK PLASMA POTENTIAL
+FIELD_SCALE_ELECTRIC = 60.0 # [VOLTS]
+#FIELD_FILE_ELECTRIC = 'input_files/Efield_accepted_linear.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear.npy'
+OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+# FIELD_FILE_ELECTRIC = 'input_files/Efield_changeto_linear.npy'
+# OUTPUT_DIRECTORY_NAME = "ChangeToIota3_1500spins_atole-9"
 
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_accepted_parabolic.npy'
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_accepted_linear.npy'
-#OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+LCFS_INDEX = 61 #61 # from Poincare output (simIO.log)
 
-#FIELD_FILE_ELECTRIC = 'input_files/Efield_changeto_parabolic.npy'
-FIELD_FILE_ELECTRIC = 'input_files/Efield_changeto_linear.npy'
-OUTPUT_DIRECTORY_NAME = "ChangeToIota3_1500spins_atole-9"
-
-TAG= 'Efield-linear100_quartrDTtest_perf'
-#LCFS_INDEX = 22 # from Poincare output (simIO.log)
-LCFS_INDEX = 61 # from Poincare output (simIO.log)
-
-NPHI = 180
-NTHETA = 60
-DELTRS = [0.000]#, 0.005]
+NPHI = 180 #180
+NTHETA = 90 #45
+DELTRS = [0.000]
 NPARTICLES_PER_EMITTER = 200
 
-ION_TEMP = 2.0 #eV
+ION_TEMP = 2.0 #eV 
 ION_MASS = Li_mass
-CHARGE_NUM = 1
+CHARGE_NUM = 3
 
-DT = 5E-8 #1E-7 #2E-7
-NSTEPS = 4E4 #2E4 #1E4 #5 #2E5 #5E3
+DT = 5e-9 #5E-8 #1E-7 #2E-7
+NSTEPS = 100E3 #2E4 #1E4 #5 #2E5 #5E3
+
+#TAG= 'Efield-linear180_LCFS37_180Nphi_1e-8DT_25e3NT_Z3_10eV_NEWV0s-2'
+TAG= 'LCFS61_60V_Li_2eV_Z3_lots_5e9DT_100e3NSTEPS'
+
 
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -90,13 +89,13 @@ b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
 
 if FIELD_FILE_ELECTRIC:
     e_hidra = Mesh(R0=0.72, a=0.19)
-    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]), att_mult=FIELD_SCALE_ELECTRIC, errField=False )
+    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
+                                att_mult=FIELD_SCALE_ELECTRIC, errField=False )
 else:
     e_hidra = None
 
 ## DEFINE ARRAYS FOR SEED POINT GENERATION
 phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist() # phi angles to generated shells
-#phiGen_arr = np.array([360], dtype=int).tolist() # phi angles to generated shells
 theta_arr = np.linspace(0, 2*np.pi*(1 - 1/NTHETA), NTHETA) # theta angles to generated sh
 
 ## DEFINE STRING (FOR FILE NAME)
@@ -107,9 +106,7 @@ cond_string = dr_String + 'mm_{}eV_LCFS{}_'.format(int(ION_TEMP), int(LCFS_INDEX
 # INSTANTIATE LISTS (FASTER THAN APPENDING TO NUMPY ARRAYS?)
 seed_subset = []
 seed_list = []
-r_hat_list = []
-theta_hat_list = []
-phi_hat_list = []
+normals_list = []
 initVel_list = []
 ## GENERATE SEED POINTS
 simIO.log.info('GENERATING SEED POINTS:\n')
@@ -117,58 +114,74 @@ for phi_gen_deg in phiGen_arr:
     filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
     th_in, r_in = simIO.loadNumpyData(filename)[LCFS_INDEX]
 
-    phi_gen = phi_gen_deg*(np.pi/180)
-    seed_subset = generateSeedShells(DELTRS, NTHETA, r_in, th_in, phi_gen,
-        b_hidra, simIO, 'IonSeedPts_{}mm'.format(dr_String))
+    phi_gen = phi_gen_deg*np.pi/180
+    seed_subset, normals = generateSeedShells(DELTRS, NTHETA, r_in, th_in, phi_gen,
+        b_hidra, simIO, 'IonSeedPts_{}mm'.format(dr_String), genNormals=True, Efield=e_hidra)
+
     seed_list.extend(seed_subset)
-
-    # CONSIDER MOVING THIS TO FUNCTION generateSeedShells(), MAKE USE OF DERIVATIVE/(GRADIENT) RO FIND PERPENDICULAR UNIT VECTORS
-    for dr in DELTRS:
-        for theta_gen in theta_arr:
-            # GENERATE UNIT VECTORS FOR PARTICLE VELOCITIES (THESE ARE NOT PERPENDICULAR TO FLUX SURFACES!)
-            r_hats = np.array([cos(theta_gen)*cos(phi_gen), -cos(theta_gen)*sin(phi_gen), sin(theta_gen)])  #xyz vectors in the +radial direction
-            theta_hats = np.array([-sin(theta_gen)*cos(phi_gen), sin(theta_gen)*sin(phi_gen), cos(theta_gen)])  #xyz vectors in the +theta direction
-            iphi_hats = np.array([-sin(phi_gen), -cos(phi_gen), 0.])  #xyz vectors in the +phi direction 
-
-            r_hat_list.append(r_hats)
-            theta_hat_list.append(theta_hats)
-            phi_hat_list.append(iphi_hats)
+    normals_list.extend(normals)
 
 simIO.log.info('FINISHED LOADING NUMPY DATA & GENERATING INIT. POSITIONS\n')
 
 ## CONVERT LISTS TO ARRAYS
-N_emitters = len(r_hat_list)
-r_phat_arr = np.array(r_hat_list)
-theta_hat_arr = np.array(theta_hat_list)
-phi_hat_arr = np.array(phi_hat_list)
+N_emitters = len(DELTRS) * NTHETA * NPHI
+N_particles = NPARTICLES_PER_EMITTER * N_emitters
+
+# Calculate the 1D and 3D root mean square velocities
+v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
+v_rms3d = np.sqrt(3*kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
+
+# GENERATE NORMAL DISTRIBUTION OF SPEEDS
+initSpeeds = np.random.normal(0, v_rms3d, N_particles)
+
+# GENERATE RANDOM UNIT VECTORS, UNIFORMLY DISTRIBUTED IN A HEMISPHERE, POLE AT +Z
+z = np.random.uniform(0, 1, N_particles)
+phi = np.random.uniform(0, 2 * np.pi, N_particles)
+r = np.sqrt(1 - z**2)
+x = r * np.cos(phi)
+y = r * np.sin(phi)
+initVel_array = np.stack([x, y, z], axis=1) # shape (N, 3)
+
+# APPLY INIT SPEEDS TO THE RANDOM UNIT VECTORS
+initVel_array *= initSpeeds[:, None]
+
+# ROTATE TO ALIGN POLE WITH NORMAL VECTOR
+def align_z_to_vector(v):
+    z_axis = np.array([0, 0, 1])
+    #v = v / np.linalg.norm(v)
+    if np.allclose(v, z_axis):
+        return np.eye(3)
+    if np.allclose(v, -z_axis):
+        # 180 degree rotation around any perpendicular axis
+        return np.array([[-1,  0,  0],
+                         [ 0, -1,  0],
+                         [ 0,  0,  1]])
+    axis = np.cross(z_axis, v)
+    axis /= np.linalg.norm(axis)
+    angle = np.arccos(np.dot(z_axis, v))
+    K = np.array([[0, -axis[2], axis[1]],
+                  [axis[2], 0, -axis[0]],
+                  [-axis[1], axis[0], 0]])
+    R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * K @ K
+    return R
+
+for i,normal in enumerate(normals_list):
+    Rotater = align_z_to_vector(normal)
+    initVel_array[::NPARTICLES_PER_EMITTER] = initVel_array[::NPARTICLES_PER_EMITTER] @ Rotater.T
 
 tic = perf_counter()
-# calculate the 1D and 3D root mean square velocities
-v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
-#v_rms3d = np.sqrt(3*kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
-
-# initialize velocity vectors of a maxwell-boltzmann energy distribution
-initVel_list = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 3) )
-initVel_list[:,0] = np.random.normal(0, v_rms1d, NPARTICLES_PER_EMITTER*N_emitters)
-initVel_list[:,1] = np.random.normal(0, v_rms1d, NPARTICLES_PER_EMITTER*N_emitters)
-initVel_list[:,2] = np.random.normal(0, v_rms1d, NPARTICLES_PER_EMITTER*N_emitters)
-initVel_list[:,0] = np.abs(initVel_list[:,0]) # ensure that it is pointed radially outward
-
 tmax = DT*NSTEPS
-initVelXYZ_list = np.zeros(initVel_list.shape)
 initVelPos = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 6))
 ion_list = []
+
 for i in range(NPARTICLES_PER_EMITTER):
     # chunking
     starti = i*N_emitters
     stopi = (i+1)*N_emitters
-    # create list of velocities in xyz coordinates
-    initVelXYZ_list[starti:stopi] = (initVel_list[starti:stopi,0][:,None] * r_phat_arr + 
-                                     initVel_list[starti:stopi,1][:,None] * theta_hat_arr + 
-                                     initVel_list[starti:stopi,2][:,None] * phi_hat_arr)
 
     # setting velocities in array as chunks
-    initVelPos[starti:stopi, 0:3] = initVelXYZ_list[starti:stopi]
+    #initVelPos[starti:stopi, 0:3] = initVelXYZ_list[starti:stopi]
+    initVelPos[starti:stopi, 0:3] = initVel_array[starti:stopi]
     # set positions, repeating in array as chunks
     initVelPos[starti:stopi, 3:6] = np.array(seed_list)
     # instantiating ions in a list
@@ -176,7 +189,8 @@ for i in range(NPARTICLES_PER_EMITTER):
 
 toc = perf_counter()
 simIO.log.info('Velocities generated in {}sec'.format(toc-tic))
-simIO.log.info('initVelXYZ_list shape={}'.format(initVelXYZ_list.shape) )
+simIO.log.info('initVel_array shape={}'.format(initVel_array.shape) )
+
 
 #using simIO, save the initial velocities and positions as one array
 filename = 'initVelPos_' + cond_string+TAG
@@ -184,7 +198,7 @@ simIO.saveNumpyData(initVelPos, filename)
 simIO.log.info('OUTPUT DATA: {}'.format(filename))
 
 ## SET INITIAL STATES AND OUTPUT(?necessary?)
-for ion, v_0 in zip(ion_list, initVelXYZ_list):
+for ion, v_0 in zip(ion_list, initVel_array):
     ion.initVelocity(v_0)
     ion.initOutput(DT, tmax)
 
@@ -192,11 +206,21 @@ for ion, v_0 in zip(ion_list, initVelXYZ_list):
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ####################################
 # It returns the wall intersection points and their indices.
-wallPt_output, index_wallPts = boris_solver2(ion_list, DT, tmax, b_hidra, e_hidra)
+wallPt_output, index_wallPts, velocity_output = boris_solver2(ion_list, DT, tmax, b_hidra, e_hidra)
 wallPt_output = wallPt_output.cpu().numpy()
+velocity_output = velocity_output.cpu().numpy()
+
+speed_output = np.linalg.norm(velocity_output, axis=1)
+#convert speed to energy in eV
+energy_output = 0.5 * ION_MASS * kg_per_amu * speed_output**2 / kboltz
+
+
 ## PRINT MEMORY USAGE
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
+## PRINT ENERGY STATS
+simIO.log.info('ENERGY OUTPUT: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV'.format(
+    np.min(energy_output), np.max(energy_output), np.mean(energy_output)))
 ####################
 ## PREPARE OUTPUT ##
 ####################
@@ -225,11 +249,16 @@ phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
 ## PLOT HISTOGRAM OF WALL POINTS
-plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO)
+plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
+
 ## PLOT DISCRETE WALL POINTS
-plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, cond_string+TAG, simIO)
+plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
+## PLOT DISCRETE WALL POINTS with color
+plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output,
+                          runString=cond_string+TAG+'_color', simIO=simIO)
+
 ## *3D* WALL PLOT)
-#plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, cond_string+TAG, simIO)
+#plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')
