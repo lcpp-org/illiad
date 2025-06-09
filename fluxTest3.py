@@ -21,17 +21,18 @@ def main():
 
     ## DEFINE MESH AND LOAD FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(FIELD_FILE_TOR, errField=True, att_mult=FIELD_SCALE_TOR)
+    b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
     b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-    b_hidra.set_nonPer_errField(FIELD_ERR_MAG, FIELD_ERR_DIR)
+    b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
     lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     # DEFINE THETAS FOR SPLINE GENERATION
-    dtheta = 2*np.pi/NTHETA
-    THETA_GENs = np.linspace(dtheta, 2*np.pi, NTHETA)
+    THETA_GENs = np.linspace(2*np.pi/NTHETA, 2*np.pi, NTHETA)
+
 
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
+
         ## LOAD POINCARE DATA
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
         flux_surfaces = simIO.loadNumpyData(filename)
@@ -40,11 +41,7 @@ def main():
         if PLOT_ALL: ax1, ax2, ax4 = init_plotting()
 
         ## FIND THE MAGNETIC AXIS FROM SMALLEST FLUX SURFACE (ASSUMED LAST FLUX SURFACE IN SET)
-        th_small, r_small = flux_surfaces[-1]
-        r_small = r_small[~np.isnan(r_small)]
-        th_small = th_small[~np.isnan(th_small)]
-        th_size = th_small.size
-        mag_axis = find_Axis(th_small, r_small, b_hidra)
+        mag_axis = find_Axis(*flux_surfaces[-1], b_hidra)
         mag_axis_rev = np.copy(mag_axis)
         mag_axis_rev[1] = mag_axis_rev[1] + np.pi
 
@@ -57,10 +54,17 @@ def main():
             centers_array = np.zeros([NSURFACE, len(PHI_GENs), MAX_SUBSETS, 2])
             plotData_list = [ [0]*NSURFACE for _ in range(len(PHI_GENs)) ]
 
+            valid_surfs = np.ones(NSURFACE, dtype=bool) # keep track of valid surfaces
+            valid_surfs[:lcfs_index] = False # set all surfaces before LCFS to be invalid
+
+
+
+
         ## LOOP THROUGH FLUX SURFACES TO FIND SUBSETS (ISLAND) AND THE SET OF SMALLEST ISLANDS
         smallest_island_index, num_subsets, subsetData, subsetCenters, hist_output = first_surface_loop(flux_surfaces, mag_axis, b_hidra, lcfs_index, NSURFACE)
         hist, bin_edges, wrap_flag = hist_output
         print('num_subsets: {}'.format(num_subsets))
+
         ## (2ND) LOOP THROUGH FLUX SURFACES TO SHIFT DATA AND SPLINE FIT
         Fluxes = []
         for surf_index in range(lcfs_index, NSURFACE):
@@ -68,12 +72,12 @@ def main():
             # DECLARE A WHOLE BUNCH OF EMPTY ARRAYS
             N_subsets = num_subsets[surf_index]
             radpoints_tr_LocAxis = np.zeros([N_subsets, NTHETA])
-            radpoints_tr_MagAxis = np.zeros([N_subsets, NTHETA])
+            radpoints_tr_MagAxis = np.zeros([N_subsets, NTHETA]) 
             theta_evals_MagAxis  = np.zeros([N_subsets, NTHETA])
             points_tr_GeoAxis    = np.zeros([N_subsets, NTHETA, 2])
             subCenters_geo       = np.zeros([N_subsets, 2])
             subCenters_Shift     = np.zeros([N_subsets, 2])
-    
+
             ## GET R, THETA FOR FLUX SURFACE
             th_in, r_in = flux_surfaces[surf_index]
             r_in = r_in[~np.isnan(r_in)]
@@ -95,7 +99,7 @@ def main():
             shiftint = 0
             if N_subsets > 1: subCenters_Shift, shiftint = shift_the_subcenters(surf_index, smallest_island_index, subsetCenters, num_subsets, wrap_flag[surf_index] )
 
-            ## LOOP THROUGH SUBSETS TO SPLINE< CALCULATE FLUX AND AND CREATE REGULARLY-SPACED POINTS
+            ## LOOP THROUGH SUBSETS TO SPLINE, CALCULATE FLUX, AND CREATE REGULARLY-SPACED POINTS
             sub_flux = []
             for subset_index in range(N_subsets):
 
@@ -122,7 +126,10 @@ def main():
 
                 ## SPLINE FIT #
                 fSurface_splineParms, res, fail, msg = spline_Data(theta_toSpline, rad_toSpline, smoothing=SMOOTH_FCTR)
-                if fail: simIO.log.info( '\tSurface #{}, fail: {}\n\tmsg: {}'.format(surf_index, bool(fail), msg) )
+                if fail:
+                    valid_surfs[surf_index] = False # not a valid surface for interpolation
+                    simIO.log.info( '\tSurface #{} NOT A VALID SURFACE!!!'.format(surf_index) )
+                    simIO.log.info( '\tSurface #{}, fail: {}\n\tmsg: {}'.format(surf_index, bool(fail), msg) )
                 else:    pass #simIO.log.info('\tSurface #{}, res: {:.4e}'.format(surf_index, res))
 
                 ## INTEGRATE AMOUNT OF TOROIDAL FIELD BOUNDED BY FLUX SURFACE [Tesla*m^2]
@@ -154,6 +161,7 @@ def main():
                     points_tr_GeoAxis[subset_index][th_index] = axisShift(radpoints_tr_MagAxis[subset_index][th_index], theta_evals_MagAxis[subset_index][th_index], *mag_axis_rev[:2])
             ##### END SUBSET LOOP
 
+
             ## DANGER, BETTER DATA STRUCTURES NEEDED!!! ##
             total_npts = num_subsets[surf_index]*NTHETA
             plotData_list[phi_index][surf_index] = points_tr_GeoAxis.reshape((total_npts, 2), order='C', copy=True)
@@ -162,18 +170,28 @@ def main():
             #Fluxes.append(sub_flux)
             Fluxes += [sub_flux]
 
+            # move here, before subCenters_geo gets wiped
+            centers_array[surf_index][phi_index] = subCenters_geo
+            #print('centers_array[surf_index][phi_index]: {}'.format(centers_array[surf_index][phi_index]))
+
+            if np.any(radpoints_tr_MagAxis >= 0.19) or np.any(radpoints_tr_MagAxis < 0.0):
+                valid_surfs[surf_index] = False # not a valid surface for interpolation
+                simIO.log.info( '\tSurface #{} NOT A VALID SURFACE!!!'.format(surf_index) )
+
             ## PLOTTING EACH FLUX SURFACE AT EACH PHI ANGLE
             if PLOT_ALL:
                 # filter out wild fits: if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): 
                 # plot the data points
-                ax1.scatter(points_tr_MagAxis.T[0]*180./np.pi, points_tr_MagAxis.T[1], color='k', s=0.15, linewidths=0.0) # mag-axis point
+                ax1.scatter(points_tr_MagAxis.T[0]*180./np.pi, points_tr_MagAxis.T[1], color='k', s=0.10, linewidths=0.0) # mag-axis point
                 # plot the spline fit
                 for i in range(0, num_subsets[surf_index]):
-                    ax1.scatter(theta_evals_MagAxis[i]*180./np.pi, radpoints_tr_MagAxis[i], s=0.15, linewidths=0.0)
+                    ax1.scatter(theta_evals_MagAxis[i]*180./np.pi, radpoints_tr_MagAxis[i], s=0.3, linewidths=0.05)
                 # plot the histogram
                 if num_subsets[surf_index] > 1:
                    ax2.bar(bin_edges[surf_index][:-1]*180./np.pi, hist[surf_index], width=np.diff(bin_edges[surf_index])*180./np.pi, align='edge', edgecolor='k', linewidth=0.1)
         ###### END OF SURFACE LOOP
+
+
 
         # PRINTING FLUXES AS OUTPUT:
         if FLUX_CALC_FLAG:
@@ -183,7 +201,7 @@ def main():
                 tot_flux_array[this_surf_index][phi_index] = np.sum(flux, axis=-1)
                 lcfs_flux = tot_flux_array[lcfs_index][phi_index] 
                 total_flux_norm[this_surf_index][phi_index] =np.copy( max((1 - (tot_flux_array[this_surf_index][phi_index]/lcfs_flux)), 0.) )
-                simIO.log.info('Surface {:d}: {:.2e}({:.4f})'.format(this_surf_index, tot_flux_array[this_surf_index][phi_index], total_flux_norm[this_surf_index][phi_index]))
+                ##simIO.log.info('Surface {:d}: {:.2e}({:.4f})'.format(this_surf_index, tot_flux_array[this_surf_index][phi_index], total_flux_norm[this_surf_index][phi_index]))
 
         # FORMATTING DATA TO SAVE AS NUMPY ARRAY
         for surf_index in range(lcfs_index, NSURFACE):
@@ -202,14 +220,18 @@ def main():
                 # if surf_index < 63 and surf_index < 50:
                 #     simIO.log.info('flat_point_meshes[surf_index][phi_index][:]: {}'.format(flat_point_meshes[surf_index][phi_index][:]))
 
-                centers_array[surf_index][phi_index] = subCenters_geo   #new array shape, center for each subset    #[0] # only one center for each surface
+                #centers_array[surf_index][phi_index] = subCenters_geo   #new array shape, center for each subset    #[0] # only one center for each surface
                 if PLOT_ALL: ax4.scatter(plot_thetas, plot_radii, s=0.3, linewidths=0.0)
 
         # FORMAT AND SAVE PLOTS
         if PLOT_ALL: finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, simIO)
     ##### END OF PHI LOOP
 
+
+
+    ################
     ## OUTPUT FLUXES
+    ################
     if FLUX_CALC_FLAG:
         # Set fluxes outside of LCFS to be equal to the LCFS flux
         tot_flux_array[:lcfs_index][:] = tot_flux_array[lcfs_index][:]
@@ -227,6 +249,10 @@ def main():
         filename_fluxNorms = ANLYS_SUBDIR + '/CalculatedFLuxes-normalized.npy'
         simIO.saveNumpyData(tot_flux_array, filename_fluxes)
         simIO.saveNumpyData(total_flux_norm, filename_fluxNorms)
+
+        filename_validSurfaces = ANLYS_SUBDIR + '/ValidSurfaces.npy'
+        simIO.saveNumpyData(valid_surfs, filename_validSurfaces)
+
 
         # HAVE A BIG ARRAY OF FLUXES, NOW PLOT THEM
         fig_post = plt.figure()
@@ -264,6 +290,9 @@ def main():
 
 def find_Axis(theta_vals, r_vals, field):
     """Function to find the geometric center of a set of points in r, theta coordinates"""
+    r_vals = r_vals[~np.isnan(r_vals)]
+    theta_vals = theta_vals[~np.isnan(theta_vals)]
+
     theta_size = theta_vals.size
     ## CONVERT TO 2D XZ COORDINATES
     x_in = np.empty(theta_size)
@@ -469,6 +498,11 @@ def first_surface_loop(flux_surfaces, mag_axis, b_hidra, start_index, end_index)
 
     return smallest_island_index, num_subsets, subsetData, subsetCenters, hist_data
 
+def second_suface_loop(flux_surfaces, mag_axis, b_hidra, lcfs_index, NSURFACE, PHI_GEN_DEG, simIO):
+    """Function to loop through flux surfaces and find subsets, centers, and spline fits"""
+    pass
+
+
 # PLOTTING FUNCTIONS
 def init_plotting():
     fig = plt.figure()
@@ -501,40 +535,32 @@ def finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, simIO
 
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
+
     ## RUN DIRECTORY AND SUBDIRECTORY
-
-    # ANLYS_DIR = "Mar14FIT_89at360_2000sing_1p49e12_2p49e9"
-
-
-    # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
 
-    #ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p965"
-    ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p945"
-    ANLYS_SUBDIR = 'LCFS29_3x40x60mesh_smooth1e-6'
-
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_TOR = 0.9452
+    FIELD_SCALE_TOR = 0.9448 #0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    #FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
-    FIELD_SCALE_HEL = -0.945 * FIELD_SCALE_TOR
-    FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
-    FIELD_ERR_DIR = np.radians(272.)
+    FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+    ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+    ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 29
+    LCFS_INPUT = 22 #29?
 
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 40
-    NTHETA = 60
+    NPHI = 360
+    NTHETA = 360
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
-    SMOOTH_FCTR = 1e-6 #5e-6 #7.5e-6
+    SMOOTH_FCTR = 7.5e-6 #7.5e-6 #baseline 1e-6
 
     ## FLUX INTEGRATION PARAMETERS
     FLUX_CALC_FLAG = True

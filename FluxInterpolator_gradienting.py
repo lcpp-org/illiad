@@ -19,14 +19,14 @@ def main():
 
     ## DEFINE MESH AND LOAD FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(FIELD_FILE_TOR, errField=True, att_mult=FIELD_SCALE_TOR)
+    b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
     b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-    b_hidra.set_nonPer_errField(FIELD_ERR_MAG, FIELD_ERR_DIR)
+    b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
+    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     # load numpy data using simIO method: big_grid_linear, big_grid_parabolic
     big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear.npy')
-    big_grid_parabolic = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_parabolic.npy')
-    print(f'{big_grid_linear.shape=}, {big_grid_parabolic.shape=}')
+    print(f'{big_grid_linear.shape=}')#, {big_grid_parabolic.shape=}')
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
@@ -35,13 +35,8 @@ def main():
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
 
 
-
-
-
     # GRADIENT CALCULATION: remember to divide by Jacobian determinant gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
     big_flux_Lingrad = np.gradient(big_grid_linear, PHI_GENs, THETAS, RADS)#, [grid_rad, grid_theta])
-    # print(f'{big_flux_Lingrad[0] .shape=}')
-    # print(f'{grid_rad.shape=}')
 
     big_flux_Lingrad_radial = -big_flux_Lingrad[2]  # E = -grad[V]
     big_flux_Lingrad_poloidal =np.zeros_like(big_flux_Lingrad[1])
@@ -49,40 +44,16 @@ def main():
     big_flux_Lingrad_toroidal = -big_flux_Lingrad[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
     big_flux_Lingrad_magnitude = np.sqrt(big_flux_Lingrad_radial**2 + big_flux_Lingrad_poloidal**2 + big_flux_Lingrad_toroidal**2)
 
-
-    # GRADIENT CALCULATION: remember to divide by Jacobian determinant
-    big_flux_Pargrad = np.gradient(big_grid_parabolic, PHI_GENs, THETAS, RADS)#, [grid_rad, grid_theta])
-
-    big_flux_Pargrad_radial = -big_flux_Pargrad[2]  # E = -grad[V]
-    big_flux_Pargrad_poloidal = np.zeros_like(big_flux_Pargrad[1])
-    big_flux_Pargrad_poloidal[:,:,1:] =  -big_flux_Pargrad[1][:,:,1:] / grid_rad[:,1:]
-    big_flux_Pargrad_toroidal = -big_flux_Pargrad[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
-    big_flux_Pargrad_magnitude = np.sqrt(big_flux_Pargrad_radial**2 + big_flux_Pargrad_poloidal**2 + big_flux_Pargrad_toroidal**2)
-
-
-
     # RESHAPE THE ARRAYS TO MATCH THE DIMNENSIONS OF INPUT BFIELDS
-    reshaped_big_grid_linear_r = np.transpose(big_flux_Pargrad_radial, (2, 1, 0))
-    reshaped_big_grid_linear_pol = np.transpose(big_flux_Pargrad_poloidal, (2, 1, 0))
-    reshaped_big_grid_linear_tor = np.transpose(big_flux_Pargrad_toroidal, (2, 1, 0))
+    reshaped_big_grid_linear_r = np.transpose(big_flux_Lingrad_radial, (2, 1, 0))
+    reshaped_big_grid_linear_pol = np.transpose(big_flux_Lingrad_poloidal, (2, 1, 0))
+    reshaped_big_grid_linear_tor = np.transpose(big_flux_Lingrad_toroidal, (2, 1, 0))
     Efield_rtpArray_linear = np.array([reshaped_big_grid_linear_r, reshaped_big_grid_linear_pol, reshaped_big_grid_linear_tor])
     print(f'{Efield_rtpArray_linear.shape=}')
     # save the array using simIO method
     simIO.saveNumpyData(Efield_rtpArray_linear, ANLYS_SUBDIR + '/Efield_rtpArray_linear.npy')
 
-    reshaped_big_grid_parabolic_r = np.transpose(big_flux_Lingrad_radial, (2, 1, 0))
-    reshaped_big_grid_parabolic_pol = np.transpose(big_flux_Lingrad_poloidal, (2, 1, 0))
-    reshaped_big_grid_parabolic_tor = np.transpose(big_flux_Lingrad_toroidal, (2, 1, 0))
-    Efield_rtpArray_parabolic = np.array([reshaped_big_grid_parabolic_r, reshaped_big_grid_parabolic_pol, reshaped_big_grid_parabolic_tor])
-    
-    # save the array using simIO method
-    simIO.saveNumpyData(Efield_rtpArray_parabolic, ANLYS_SUBDIR + '/Efield_rtpArray_parabolic.npy')
-
-
-    
     Efield_xyzArray_linear = np.zeros_like(Efield_rtpArray_linear)
-    Efield_xyzArray_parabolic = np.zeros_like(Efield_rtpArray_parabolic)
-    print(f'{Efield_rtpArray_parabolic.shape=}')
 
     #xform_phi, xform_theta, xform_rad = np.meshgrid(PHI_GENs, THETAS, RADS, indexing='ij')
     xform_rad, xform_theta, xform_phi= np.meshgrid(RADS, THETAS, PHI_GENs, indexing='ij')
@@ -92,45 +63,25 @@ def main():
     Ex_linear = np.zeros(flattened_shape)
     Ey_linear = np.zeros(flattened_shape)
     Ez_linear = np.zeros(flattened_shape)
-    Ex_parabolic = np.zeros(flattened_shape)
-    Ey_parabolic = np.zeros(flattened_shape)
-    Ez_parabolic = np.zeros(flattened_shape)
-
-    for i, (rad, theta, phi, EradLin, EthetaLin, EphiLin, EradPar, EthetaPar, EphiPar) in enumerate(zip(xform_rad.flatten(), xform_theta.flatten(), xform_phi.flatten(),
-                                                                      reshaped_big_grid_linear_r.flatten(), reshaped_big_grid_linear_pol.flatten(), reshaped_big_grid_linear_tor.flatten(),
-                                                                      reshaped_big_grid_parabolic_r.flatten(), reshaped_big_grid_parabolic_pol.flatten(), reshaped_big_grid_parabolic_tor.flatten())):
+    for i, (rad, theta, phi, EradLin, EthetaLin, EphiLin) in enumerate(zip(xform_rad.flatten(), xform_theta.flatten(), xform_phi.flatten(),
+                                                                      reshaped_big_grid_linear_r.flatten(), reshaped_big_grid_linear_pol.flatten(), reshaped_big_grid_linear_tor.flatten())):
         ErtpLin = np.array([EradLin, EthetaLin, EphiLin])
-        ErtpPar = np.array([EradPar, EthetaPar, EphiPar])
-        #print(f'{ErtpLin=}, {ErtpPar=}')
         p_RTP = np.array([rad, theta, np.radians(phi)])
         #print(f'{p_RTP=}')
 
         Ex_linear[i], Ey_linear[i], Ez_linear[i] = RTP_XYZ_JAC(p_RTP, ErtpLin, form='rtp2xyz')
-        Ex_parabolic[i], Ey_parabolic[i], Ez_parabolic[i] = RTP_XYZ_JAC(p_RTP, ErtpPar, form='rtp2xyz')
 
 
     print(f'{Ex_linear.max()=}, {Ex_linear.min()=}, {Ey_linear.max()=}, {Ey_linear.min()=}, {Ez_linear.max()=}, {Ez_linear.min()=}')
-    print(f'{Ex_parabolic.max()=}, {Ex_parabolic.min()=}, {Ey_parabolic.max()=}, {Ey_parabolic.min()=}, {Ez_parabolic.max()=}, {Ez_parabolic.min()=}')
     # reshape the arrays to match the dimensions of input Bfields
 
     Efield_xyzArray_linear[0] = Ex_linear.reshape(Efield_xyzArray_linear[0].shape)
     Efield_xyzArray_linear[1] = Ey_linear.reshape(Efield_xyzArray_linear[1].shape)
     Efield_xyzArray_linear[2] = Ez_linear.reshape(Efield_xyzArray_linear[2].shape)
-    Efield_xyzArray_parabolic[0] = Ex_parabolic.reshape(Efield_xyzArray_parabolic[0].shape)
-    Efield_xyzArray_parabolic[1] = Ey_parabolic.reshape(Efield_xyzArray_parabolic[1].shape)
-    Efield_xyzArray_parabolic[2] = Ez_parabolic.reshape(Efield_xyzArray_parabolic[2].shape)
-
     print(f'{Efield_xyzArray_linear.shape=}')
-    #print(f'{Efield_xyzArray_parabolic}')
 
     ## SAVE THE ARRAYS
     simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/Efield_xyzArray_linear.npy')
-    simIO.saveNumpyData(Efield_xyzArray_parabolic, ANLYS_SUBDIR + '/Efield_xyzArray_parabolic.npy')
-
-    plot_Efield_XArray_parabolic = np.transpose(Efield_xyzArray_parabolic[0], (2, 1, 0))
-    plot_Efield_YArray_parabolic = np.transpose(Efield_xyzArray_parabolic[1], (2, 1, 0))
-    plot_Efield_ZArray_parabolic = np.transpose(Efield_xyzArray_parabolic[2], (2, 1, 0))
-
 
     ## LOOP THROUGH PHI ANGLES forplotting
     colortest = 'seismic'
@@ -140,18 +91,6 @@ def main():
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_radial[phi_index], 'LinearFluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_poloidal[phi_index], 'LinearFluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_toroidal[phi_index], 'LinearFluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
-
-        #output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_parabolic[phi_index], 'ParabolicFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Pargrad_magnitude[phi_index], 'ParabolicFluxGradMagnitude', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 200.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Pargrad_radial[phi_index], 'ParabolicFluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Pargrad_poloidal[phi_index], 'ParabolicFluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Pargrad_toroidal[phi_index], 'ParabolicFluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
-
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, plot_Efield_XArray_parabolic[phi_index], 'ParabolicFluxGradX', ANLYS_SUBDIR, simIO, colortest, -200., 200)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, plot_Efield_YArray_parabolic[phi_index], 'ParabolicFluxGradY', ANLYS_SUBDIR, simIO, colortest, -200., 200)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, plot_Efield_ZArray_parabolic[phi_index], 'ParabolicFluxGradZ', ANLYS_SUBDIR, simIO, colortest, -200., 200)
-
-
 
 
 def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
@@ -172,7 +111,6 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
     output_handler.log.info('Saved figure: ' + subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)))
     #plt.show()
     plt.close("All")
-    #gc.collect()
 
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
@@ -180,30 +118,29 @@ if __name__ == '__main__':
 
     # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
-
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
 
-    # ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p965"
-    # ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
-
-    ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p945"
-    ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_baseline'
+    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_5e6'
+    #ANLYS_SUBDIR = 'LCFS22_3x18x360mesh_SMOOTHER_7p5e6'
+    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_TOR = 0.9452
+    FIELD_SCALE_TOR = 0.9448 #0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_HEL = -0.945 * FIELD_SCALE_TOR
-    FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
-    FIELD_ERR_DIR = np.radians(272.)
+    FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+    ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+    ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 30
+    LCFS_INPUT = 22 #30?
 
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 40
-    NTHETA = 60
+    NPHI = 360
+    NTHETA = 360
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI) # = np.array([18])
     MAX_SUBSETS = 3

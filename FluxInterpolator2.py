@@ -17,9 +17,9 @@ def main():
 
     ## DEFINE MESH AND LOAD FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(FIELD_FILE_TOR, errField=True, att_mult=FIELD_SCALE_TOR)
+    b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
     b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-    b_hidra.set_nonPer_errField(FIELD_ERR_MAG, FIELD_ERR_DIR)
+    b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
     lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
@@ -31,53 +31,57 @@ def main():
     flux_array = simIO.loadNumpyData(flux_name)
     flux_norm_name = filepath + 'CalculatedFLuxes-normalized.npy'
     flux_norm_array = simIO.loadNumpyData(flux_norm_name)
-
     N_surfaces, N_phis = flux_array.shape
     print(f'{N_surfaces=}, {N_phis=}')
+
+    # LOAD VALID SURFACE DATA
+    validSurf_name = filepath + 'ValidSurfaces.npy'
+    valid_surface = simIO.loadNumpyData(validSurf_name)
+    valid_surface[[38,46,58]] = True # manually set some surfaces to valid
+
+    #valid_surface[lcfs_index:] = True # manually set some surfaces to valid
+    #valid_surface[[25,28,68,71]] = False # manually set some surfaces to valid
 
     # Load Magnetic Axis point:
     filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(N_surfaces-1)
     axis_array = simIO.loadNumpyData(filename_center)
+    filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(39)
+    island_axis_array = simIO.loadNumpyData(filename_center_island)
 
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
-    filtered_flux_array = flux_norm_array[:, 25] #6, 13, 19, 20, 22, 24,26
-    ## DEBUG plot filtered_flux_array with matplotlib
-    fig, ax = plt.subplots()
-    ax.plot(np.arange(N_surfaces), filtered_flux_array)
-    ax.set_xlabel('Surface Index')
-    ax.set_ylabel('Flux')
-    ax.set_title('Filtered Flux Array')
-    plt.show()
+    linear_flux_array = flux_norm_array[:, 14] #6, 13, 19, 20, 22, 24,26
 
-    # Test both linear and parabolic profiles
-    linear_flux_array = filtered_flux_array
-    parabolic_flux_array = filtered_flux_array*( 2- filtered_flux_array)
+    ## DEBUG plot filtered_flux_array with matplotlib
+    # # # fig, ax = plt.subplots()
+    # # # ax.plot(np.arange(N_surfaces), filtered_flux_array)
+    # # # ax.set_xlabel('Surface Index')
+    # # # ax.set_ylabel('Flux')
+    # # # ax.set_title('Filtered Flux Array')
+    # # # plt.show()
 
     # Create a meshgrid for the interpolation
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
-
     big_grid_linear = np.zeros([len(PHI_GENs), len(THETAS), len(RADS)])
-    big_grid_parabolic = np.zeros([len(PHI_GENs), len(THETAS), len(RADS)])   
 
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
-        # axis point
-        points = np.zeros([1,2])
+        # axes points
+        points = np.zeros([4,2])
         points[0] = axis_array[phi_index][0]
-
-        linear_values = np.array([1.0])
-        parabolic_values = np.array([1.0])
+        print(f'Central axis point: {axis_array[phi_index][0]}')
+        points[1:] = island_axis_array[phi_index]
+        print(f'Island axis points: {points[1]}, {points[2]}, {points[3]}')
+        # linear values for the axes points
+        linear_values = np.ones([4])
 
         ## LOAD SCATTER POINTS (POINCARE DATA)
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
         flux_surfaces = simIO.loadNumpyData(filename)
 
-       
         ## LOOP THROUGH SURFACES
         for surface_index in range(lcfs_index, N_surfaces):
-
-            if surface_index == 39:
-                pass
+            if valid_surface[surface_index] == False:
+                print(f'Skipping surface {surface_index} (not valid)')
             else:
                 # ## LOAD SCATTER POINTS (SPLINED VALUES)
                 # filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(surface_index))
@@ -100,26 +104,12 @@ def main():
 
                 # concatenate to big array of points
                 these_points = np.array([thetas, rads]).T
-                #print(f'{these_points.shape=}')
                 points = np.concatenate((points, these_points))
 
                 these_lin_values = np.full(N_pts, linear_flux_array[surface_index])
-                these_par_values = np.full(N_pts, parabolic_flux_array[surface_index])
                 linear_values = np.concatenate((linear_values, these_lin_values))
-                parabolic_values = np.concatenate((parabolic_values, these_par_values))
 
-                these_points_2 = these_points
-                these_points_2.T[0] += 2*np.pi
-                points = np.concatenate((points, these_points_2))
-
-                these_lin_values_2 = these_lin_values
-                linear_values = np.concatenate((linear_values, these_lin_values_2))
-                these_par_values_2 = these_par_values
-                parabolic_values = np.concatenate((parabolic_values, these_par_values_2))
-
-        grid_linear = griddata(points, linear_values, (grid_theta, grid_rad), method='linear', fill_value=0.0)
-        grid_parabolic = griddata(points, parabolic_values, (grid_theta, grid_rad), method='linear', fill_value=0.0)
-
+        grid_linear = griddata(points, linear_values, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
 
         ## HACKY SOLUTIONS HERE!!!
         # averaging out for theta=2pi
@@ -130,32 +120,18 @@ def main():
         fred3[fred3==0] = fred4[fred3==0]
         grid_linear.T[1] = fred3
         grid_linear.T[0] = grid_linear.T[1]
-        ## HACKY SOLUTIONS HERE!!!
-        # averaging out for theta=2pi
-        grid_parabolic[-1] = (grid_parabolic[-2] + grid_parabolic[0]) / 2
-        # copying values out for r=0.0
-        fred5 = grid_parabolic.T[1]
-        fred6 = grid_parabolic.T[2]
-        fred5[fred5==0] = fred6[fred5==0]
-        grid_parabolic.T[1] = fred5
-        grid_parabolic.T[0] = grid_parabolic.T[1]
 
-
-        #print(f'{grid_linear.shape=}')
         # Add to big mesh array (3D)
         big_grid_linear[phi_index] = grid_linear
-        big_grid_parabolic[phi_index] = grid_parabolic
+
     #### END OF LOOP THROUGH PHI ANGLES ####
 
     # save numpy data using simIO method: big_grid_linear, big_grid_parabolic
     simIO.saveNumpyData(big_grid_linear, ANLYS_SUBDIR + '/big_grid_linear.npy')
-    simIO.saveNumpyData(big_grid_parabolic, ANLYS_SUBDIR + '/big_grid_parabolic.npy')
-
 
     ## LOOP THROUGH PHI ANGLES forplotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_parabolic[phi_index], 'ParabolicFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
 
 
 def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
@@ -177,32 +153,28 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
-    # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_baseline'
+    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_5e6'
+    #ANLYS_SUBDIR = 'LCFS22_3x18x360mesh_SMOOTHER_7p5e6'
+    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
 
-    # ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p965"
-    # ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
-
-    ANLYS_DIR = "AcceptedIota3_1500spins_scaleHel-0p945"
-    ANLYS_SUBDIR = 'LCFS31_3x40x60mesh_Production1'
-
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_TOR = 0.9452
+    FIELD_SCALE_TOR = 0.9448 #0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    #FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
-    FIELD_SCALE_HEL = -0.945 * FIELD_SCALE_TOR
-    FIELD_ERR_MAG = 1.5939e-4 #3.168e-4
-    FIELD_ERR_DIR = np.radians(272.)
+    FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+    ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+    ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 31
+    LCFS_INPUT = 22
     ## DEFINE ANGLES TO EVALUATE AND PLOT
-    NPHI = 40
-    NTHETA = 60
+    NPHI = 360
+    NTHETA = 360
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
