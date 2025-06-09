@@ -18,6 +18,7 @@ He_mass = 4.002602 #amu
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
+# TOROIDAL AND HELICAL MAGNETIC FIELDS
 FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
 FIELD_SCALE_TOR = 0.9448
 FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
@@ -25,32 +26,34 @@ FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
 ERRFIELD_MAG = 1.5654e-4 # [Tesla]
 ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
-# SCALE BY PEAK PLASMA POTENTIAL
-FIELD_SCALE_ELECTRIC = 60.0 # [VOLTS]
-#FIELD_FILE_ELECTRIC = 'input_files/Efield_accepted_linear.npy'
+# ELECTRIC FIELD
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear.npy'
-OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_changeto_linear.npy'
-# OUTPUT_DIRECTORY_NAME = "ChangeToIota3_1500spins_atole-9"
 
-LCFS_INDEX = 61 #61 # from Poincare output (simIO.log)
-
-NPHI = 180 #180
-NTHETA = 90 #45
-DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 200
-
-ION_TEMP = 2.0 #eV 
+# ION PROPERTIES
+ION_TEMP = 0.5 #eV 
 ION_MASS = Li_mass
 CHARGE_NUM = 3
 
-DT = 5e-9 #5E-8 #1E-7 #2E-7
+# INITIAL CONDITIONS
+LCFS_INDEX = 61 #37 # from Poincare output (simIO.log)
+NPHI = 180
+NTHETA = 45 #90
+DELTRS = [0.000]
+NPARTICLES_PER_EMITTER = 500
+
+# SIMULATION PARAMETERS
+DT = 1e-8 #5E-8 #1E-7 #2E-7
 NSTEPS = 100E3 #2E4 #1E4 #5 #2E5 #5E3
 
-#TAG= 'Efield-linear180_LCFS37_180Nphi_1e-8DT_25e3NT_Z3_10eV_NEWV0s-2'
-TAG= 'LCFS61_60V_Li_2eV_Z3_lots_5e9DT_100e3NSTEPS'
+# UNIQUE OUTPUT TAG
+TAG= '60V_Li_0p5eV_Z3_4milParticle_100kSteps'
+OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
+#####################
+## RUN SIMULATION: ##
+#####################
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
@@ -78,9 +81,6 @@ simIO.log.info('\n|=============================================================
               +'\n| TOTAL TIME: {:.6f} sec'.format(DT*NSTEPS)
               +'\n|==========================================================================|\n\n\n')
 
-#####################
-## RUN SIMULATION: ##
-#####################
 ## DEFINE MESH AND LOAD FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
