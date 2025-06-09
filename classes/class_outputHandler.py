@@ -128,16 +128,14 @@ class IOHandler:
     def loadNumpyData(self, name, subdir=None):
         # method to load a numpy array from the \data sub-directory
         if subdir:
-            name_loc = os.path.join( self.data_dir, subdir, name)
+            name_loc = os.path.join(self.data_dir, subdir, name)
         else:
-            name_loc = os.path.join( self.data_dir, name)
-        self.log.info('loading numpy file: "{}"'.format(name_loc))
+            name_loc = os.path.join(self.data_dir, name)
+        # Use carriage return to update log message in-place in the console
+        print(f'\rloading numpy file: "{name_loc}"...', end='', flush=True)
+        #self.log.info('loading numpy file: "{}"'.format(name_loc))
 
         return np.load(name_loc)
-        #try:
-        #    return np.load(name_loc)
-        #except OSError as error:
-        #    print('FILE DOES NOT EXIST!')
 
     def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory

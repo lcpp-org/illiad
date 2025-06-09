@@ -140,4 +140,22 @@ def axisShift(rho, theta, rdel, thdel):
 
 
 
-
+# helper function to align the z-axis to a given vector
+def align_z_to_vector(v):
+    z_axis = np.array([0, 0, 1])
+    #v = v / np.linalg.norm(v)
+    if np.allclose(v, z_axis):
+        return np.eye(3)
+    if np.allclose(v, -z_axis):
+        # 180 degree rotation around any perpendicular axis
+        return np.array([[-1,  0,  0],
+                         [ 0, -1,  0],
+                         [ 0,  0,  1]])
+    axis = np.cross(z_axis, v)
+    axis /= np.linalg.norm(axis)
+    angle = np.arccos(np.dot(z_axis, v))
+    K = np.array([[0, -axis[2], axis[1]],
+                  [axis[2], 0, -axis[0]],
+                  [-axis[1], axis[0], 0]])
+    R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * K @ K
+    return R

@@ -179,10 +179,10 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         wallVelocities = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
 
         qdt2m = torch.tensor([ion.charge_mass_ratio * dt / 2 for ion in ions], dtype=torch.float64, device=device)
-        v_k = torch.tensor([ion.vel0_XYZ for ion in ions], dtype=torch.float64, device=device)
+        v_k = torch.tensor(np.array([ion.vel0_XYZ for ion in ions]), dtype=torch.float64, device=device)
 
         [ion.setPosition(0, ion.pos0_XYZ) for ion in ions]
-        pos_k = torch.tensor([ion.pos0_XYZ for ion in ions], dtype=torch.float64, device=device)
+        pos_k = torch.tensor(np.array([ion.pos0_XYZ for ion in ions]), dtype=torch.float64, device=device)
 
         # NEED v_n-1/2 TO START
         if Efield:

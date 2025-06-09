@@ -187,7 +187,7 @@ class Mesh:
         else:
             point_RTP = point_XYZ.to(device)
 
-        point_RTP = point_RTP.T
+        point_RTP = point_RTP.permute(*torch.arange(point_RTP.ndim - 1, -1, -1)) #= point_RTP.T throws a warning
 
         r_local  = point_RTP[0]
 
@@ -283,26 +283,26 @@ def XYZ_to_RTP2(p_XYZ, Rmajor):
     # And return a point in r-theta-phi coordinates
     # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
     # convention: +phi is clockwise when viewed from above
-    p_XYZ = torch.tensor(p_XYZ).to(device)
-    #p_XYZ = p_XYZ.clone().detach().to(device)
+    #p_XYZ = torch.tensor(p_XYZ).to(device)
+    p_XYZ = p_XYZ.clone().detach().to(device)
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
-    x, y, z = p_XYZ.T
+    x, y, z = p_XYZ.permute(*torch.arange(p_XYZ.ndim - 1, -1, -1)) #= p_XYZ.T throws a warning
     x2 = x*x
     y2 = y*y
     z2 = z*z
     R = torch.sqrt(x2 + y2)
 
-    p_RTP.T[0] = torch.sqrt( x2 + y2 + z2 + Rmajor*Rmajor - 2*Rmajor*R )
+    p_RTP[..., 0] =  torch.sqrt(x2 + y2 + z2 + Rmajor * Rmajor - 2 * Rmajor * R)
 
     den = R - Rmajor
     theta = torch.arctan2(z,den) # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    p_RTP.T[1] = torch.where(theta<0, theta + 2*torch.pi, theta)
+    p_RTP[..., 1] = torch.where(theta<0, theta + 2*torch.pi, theta)
     #p_RTP.T[1] = theta
 
     phi = (-1) * torch.arctan2(y,x) # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    p_RTP.T[2] = torch.where(phi<0, phi + 2*torch.pi, phi)
+    p_RTP[..., 2] = torch.where(phi<0, phi + 2*torch.pi, phi)
     #p_RTP.T[2] = phi
 
     return p_RTP
