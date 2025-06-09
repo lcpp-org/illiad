@@ -80,7 +80,7 @@ def plotWallHist(wallPtArray, runString, simIO):
     plt.close()
 
 
-def plotWallPoints(phi_plot_deg, theta_plot_deg, runString, simIO):
+def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, runString='default', simIO=None):
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
     plt.rcParams.update({'figure.autolayout':True})
@@ -89,7 +89,15 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, runString, simIO):
     plotPorts(ax, simIO)
 
     # plot wall event locations
-    plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
+    #plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
+    # plot wall event locations
+    if color_data is not None:
+
+        sc = plt.scatter(phi_plot_deg, theta_plot_deg, linewidths=0.0, s=0.05, c=color_data, cmap='viridis', vmin=0., vmax=2*np.mean(color_data))
+        plt.colorbar(sc, ax=ax, label='Color Data', shrink=0.6)
+    else:
+        plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
+
     ax.grid(linewidth = 0.25, linestyle=':', c='grey')
 
     ax.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$')
@@ -106,7 +114,7 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, runString, simIO):
     ax.set_title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString )
 
     plotname = 'Wallpoints_BorisPts_' + runString +  '.png'
-    simIO.saveFig(plotname)
+    simIO.saveFig(plotname, dpi=700)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 

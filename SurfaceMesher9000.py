@@ -74,6 +74,7 @@ def main():
         phis = np.full_like(rads, (phi+phi_comp_to_phys)*np.pi/180)
         xs, ys, zs = RTP_to_XYZ(np.array([rads, thetas, phis]))
 
+        #scaling output (issue with GMSH?)
         #xs *= 100.
         #ys *= 100.
         #zs *= 100.
