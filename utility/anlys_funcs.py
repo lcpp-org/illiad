@@ -149,23 +149,25 @@ def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
     return boris_output_
 
 
-## TESTNG!!!
-#def boris_solver2(ions, dt, tmax, Bfield):
 def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
     """
     Function to take in a particle and field object and solves the particle path until termination event or tmax
     using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
 
     Parameters:
-    ions (list): List of ion objects containing initial conditions and properties.
-    dt (float): Time step for the solver.
-    tmax (float): Maximum simulation time.
-    Bfield (object): Magnetic field object providing field interpolation methods.
-    Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
+        ions (list): List of ion objects containing initial conditions and properties.
+        dt (float): Time step for the solver.
+        tmax (float): Maximum simulation time.
+        Bfield (object): Magnetic field object providing field interpolation methods.
+        Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
 
     Returns:
-    tuple: Wall intersection points and final positions of particles.
+        wallPts (torch.Tensor): Positions where particles terminate (e.g., hit the wall).
+        pos_k (torch.Tensor): Final positions of all particles.
+        wallVelocities (torch.Tensor): Velocities of particles at termination.
+        maxStep (torch.Tensor): Step index at which each particle terminated.
     """
+    
     log = logging.getLogger()
     log.info('Start ICs: {}-{}'.format(ions[0].particleID, ions[-1].particleID))
     t_startInd = perf_counter()
