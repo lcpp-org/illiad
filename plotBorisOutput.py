@@ -19,23 +19,23 @@ He_mass = 4.002602 #amu
 ## SET SIMULATION INPUTS: ##
 ############################
 # ION PROPERTIES
-ION_TEMP = 2.0 #eV 
+ION_TEMP = 1.0 #eV 
 ION_MASS = Li_mass
-CHARGE_NUM = 3
+CHARGE_NUM = 1
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 #61 #37 # from Poincare output (simIO.log)
-NPHI = 60
-NTHETA = 60 #90
+LCFS_INDEX = 37 # from Poincare output (simIO.log)
+NPHI = 120
+NTHETA = 90 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 300 #300
+NPARTICLES_PER_EMITTER = 400 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8 #5E-8 #1E-7 #2E-7
 NSTEPS = 40E3 #2E4 #1E4 #5 #2E5 #5E3
 
 # UNIQUE OUTPUT TAG
-TAG= '120V_Li_Z3_ALMOST'
+TAG= '60V_Li_Z1_ALMOST'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -94,7 +94,7 @@ simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.
 ##############
 import plot_funcs.plotFuncs as plotFuncs
 
-TAG= '120V_Li_Z3_LOADED'
+TAG= '60V_Li_Z1_LOADED'
 
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
@@ -106,29 +106,29 @@ phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
 
-# ## PLOT HISTOGRAM OF WALL POINTS
-# plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
+## PLOT HISTOGRAM OF WALL POINTS
+plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
 
 ## *3D* WALL PLOT)
 plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 
-# ## PLOT DISCRETE WALL POINTS
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
-# ## PLOT DISCRETE WALL POINTS with Energy Colorscale
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
-#                           runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
-# ## PLOT DISCRETE WALL POINTS with Angle Colorscale
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
-#                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
+## PLOT DISCRETE WALL POINTS
+plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
+## PLOT DISCRETE WALL POINTS with Energy Colorscale
+plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
+                          runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
+## PLOT DISCRETE WALL POINTS with Angle Colorscale
+plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
+                          runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 
-# ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIEN PROFILE & ION TEMPERATURE
-# plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # PLOT FINAL ENERGY DISTRIBUTION
-# plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # Plot # of perticles running over time
-# plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, tmax, DT, runString=cond_string+TAG, simIO=simIO)
+## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIEN PROFILE & ION TEMPERATURE
+plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
+# PLOT FINAL ENERGY DISTRIBUTION
+plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
+# Plot # of perticles running over time
+plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, tmax, DT, runString=cond_string+TAG, simIO=simIO)
 
 
 

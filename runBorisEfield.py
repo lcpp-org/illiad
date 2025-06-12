@@ -27,27 +27,28 @@ ERRFIELD_MAG = 1.5654e-4 # [Tesla]
 ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
-FIELD_SCALE_ELECTRIC = 120.0 # [Volts]
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear.npy'
 
 # ION PROPERTIES
-ION_TEMP = 2.0 #eV 
+ION_TEMP = 1.0 #eV 
 ION_MASS = Li_mass
-CHARGE_NUM = 3
+CHARGE_NUM = 1
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 #61 #37 # from Poincare output (simIO.log)
-NPHI = 60
-NTHETA = 60 #90
+LCFS_INDEX = 61 # from Poincare output (simIO.log)
+NPHI = 120
+NTHETA = 90 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 300 #300
+NPARTICLES_PER_EMITTER = 400 #300
 
 # SIMULATION PARAMETERS
-DT = 1e-8 #5E-8 #1E-7 #2E-7
-NSTEPS = 40E3 #2E4 #1E4 #5 #2E5 #5E3
+DT = 1e-8
+TMAX = 0.001
+NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '120V_Li_Z3_ALMOST'
+TAG= '60V_Li_Z1_ALMOST'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -58,7 +59,7 @@ OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-simIO.log.info('\n|===================================================================================|'
+simIO.log.info('\n|=======================================================================================|'
               +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(FIELD_FILE_TOR)
               +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_TOR)
               +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(FIELD_FILE_HEL)
@@ -67,19 +68,19 @@ simIO.log.info('\n|=============================================================
               +'\n| LOADED ERRFIELD DIR: {}'.format(ERRFIELD_DIR_DEG)
               +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(FIELD_FILE_ELECTRIC)
               +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_ELECTRIC)
-              +'\n|-----------------------------------------------------------------------------------|'
+              +'\n|---------------------------------------------------------------------------------------|'
               +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(LCFS_INDEX)
               +'\n| ION TEMPERATURE: {} eV'.format(ION_TEMP)
               +'\n| ION MASS: {} amu'.format(ION_MASS)
               +'\n| ION CHARGE: {}'.format(CHARGE_NUM)
-              +'\n|-----------------------------------------------------------------------------------|'
+              +'\n|---------------------------------------------------------------------------------------|'
               +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format( len(DELTRS)*NPHI*NTHETA, NPARTICLES_PER_EMITTER )
-              +'\n| TOTAL PARTICLES: {}'.format( len(DELTRS)*NPHI*NTHETA*NPARTICLES_PER_EMITTER )
-              +'\n|-----------------------------------------------------------------------------------|'
+              +'\n|  --> TOTAL PARTICLES: {}'.format( len(DELTRS)*NPHI*NTHETA*NPARTICLES_PER_EMITTER )
+              +'\n|---------------------------------------------------------------------------------------|'
               +'\n| TIME STEP: {} sec'.format(DT)
-              +'\n| # OF TIME STEPS: {}'.format(NSTEPS)
-              +'\n| TOTAL TIME: {:.6f} sec'.format(DT*NSTEPS)
-              +'\n|===================================================================================|\n\n\n')
+              +'\n| TOTAL TIME: {:.6f} sec'.format(TMAX)
+              +'\n|  --> # OF TIME STEPS: {}'.format(NSTEPS)
+              +'\n|=======================================================================================|\n\n\n')
 
 ## DEFINE STRING (FOR FILE NAME)
 delimiter = '-'
@@ -158,7 +159,7 @@ for i,normal in enumerate(normals_list):
     initVel_array[::NPARTICLES_PER_EMITTER] = initVel_array[::NPARTICLES_PER_EMITTER] @ Rotater.T
 
 tic = perf_counter()
-tmax = DT*NSTEPS
+
 initVelPos = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 6))
 ion_list = []
 
@@ -173,7 +174,7 @@ for i in range(NPARTICLES_PER_EMITTER):
     # set positions, repeating in array as chunks
     initVelPos[starti:stopi, 3:6] = np.array(seed_list)
     # instantiating ions in a list
-    ion_list += [Ion(seed_pt, ION_MASS, CHARGE_NUM, tmax) for seed_pt in seed_list]
+    ion_list += [Ion(seed_pt, ION_MASS, CHARGE_NUM, TMAX) for seed_pt in seed_list]
 
 toc = perf_counter()
 simIO.log.info('Velocities generated in {}sec'.format(toc-tic))
@@ -187,7 +188,7 @@ simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 ## SET INITIAL STATES AND OUTPUT(?necessary?)
 for ion, v_0 in zip(ion_list, initVel_array):
     ion.initVelocity(v_0)
-    ion.initOutput(DT, tmax)
+    ion.initOutput(DT, TMAX)
 
 
 
@@ -195,7 +196,7 @@ for ion, v_0 in zip(ion_list, initVel_array):
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ####################################
 # It returns the wall intersection points and their indices.
-wallPt_output, index_wallPts, velocity_output, max_timeStep = boris_solver2(ion_list, DT, tmax, b_hidra, e_hidra)
+wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
 
@@ -281,7 +282,7 @@ plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+T
 # PLOT FINAL ENERGY DISTRIBUTION
 plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # Plot # of perticles running over time
-plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, tmax, DT, runString=cond_string+TAG, simIO=simIO)
+plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
 
 

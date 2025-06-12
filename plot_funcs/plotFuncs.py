@@ -188,8 +188,8 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     plotname = 'WallHist3D_' + runString + '.png'
     simIO.saveFig(plotname)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
-    #plt.close()
-    plt.show()
+    plt.close()
+    #plt.show()
 
 def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     ## SOME PHYSICAL CONSTANTS
