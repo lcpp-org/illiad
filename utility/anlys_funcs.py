@@ -174,10 +174,11 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
     Nsteps = int((tmax // dt) + 1)
 
     with torch.no_grad():
-        tvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
         wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
         wallVelocities = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
+        maxStep = torch.zeros(Nparticles, dtype=torch.int, device=device)
 
+        tvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
         qdt2m = torch.tensor([ion.charge_mass_ratio * dt / 2 for ion in ions], dtype=torch.float64, device=device)
         v_k = torch.tensor(np.array([ion.vel0_XYZ for ion in ions]), dtype=torch.float64, device=device)
 
@@ -211,7 +212,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         log.info('START STEPPING...')
         logging.basicConfig(level=logging.INFO)
         with logging_redirect_tqdm(loggers=[log]):
-            pbar = tqdm(range(Nsteps - 1), ncols=100, mininterval=1.0)
+            pbar = tqdm(range(1, Nsteps), ncols=100, mininterval=1.0)
             for k in pbar:
                 if Efield:
                     Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
@@ -233,6 +234,8 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
                                            - 2 * Bfield.R0 * torch.sqrt(x2[running] + y2[running]))
 
                 running = torch.where(r_k < Bfield.a)[0]
+
+                maxStep[running] = k # +1?
                 Nrunning = running.size(0)
 
                 pbar.set_postfix({'#Particles running': Nrunning}, refresh=False)
@@ -252,7 +255,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         )
     )
 
-    return wallPts, pos_k, wallVelocities
+    return wallPts, pos_k, wallVelocities, maxStep
 
 def boris_solver(ion, dt, tmax, Bfield):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax

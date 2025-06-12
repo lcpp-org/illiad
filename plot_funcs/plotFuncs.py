@@ -80,7 +80,7 @@ def plotWallHist(wallPtArray, runString, simIO):
     plt.close()
 
 
-def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, runString='default', simIO=None):
+def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
     plt.rcParams.update({'figure.autolayout':True})
@@ -92,9 +92,15 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, runString='def
     #plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
     # plot wall event locations
     if color_data is not None:
+        if colorRange is None:
+            sc = plt.scatter(phi_plot_deg, theta_plot_deg, linewidths=0.0, s=0.05, c=color_data, cmap='viridis', vmin=0., vmax=2*np.mean(color_data))
+        else:
+            sc = plt.scatter(phi_plot_deg, theta_plot_deg, linewidths=0.0, s=0.05, c=color_data, cmap='viridis', vmin=colorRange[0], vmax=colorRange[1])
+        if colorLabel is None:    
+            plt.colorbar(sc, ax=ax, label='Color Data', shrink=0.6)
+        else:
+            plt.colorbar(sc, ax=ax, label=colorLabel, shrink=0.6)
 
-        sc = plt.scatter(phi_plot_deg, theta_plot_deg, linewidths=0.0, s=0.05, c=color_data, cmap='viridis', vmin=0., vmax=2*np.mean(color_data))
-        plt.colorbar(sc, ax=ax, label='Color Data', shrink=0.6)
     else:
         plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
 
@@ -121,13 +127,18 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, runString='def
 
 def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     #log = logging.getLogger()
-    simIO.log.info('Attempting 3D plot...')
+    #simIO.log.info('Attempting 3D plot...')
+    ntheta = int(360*1 + 1)
+    nphi = int(360*2 + 1)
 
     fig = plt.figure()
-    ax2 = fig.add_subplot(projection='3d', computed_zorder=True)
+    #ax2 = fig.add_subplot(projection='3d', computed_zorder=True)
+    ax2 = fig.add_subplot(projection='3d')
     ## PLOT VACUUM VESSEL TORUS
-    ptheta = np.linspace(-np.pi, np.pi, 181)
-    pphi = np.linspace(0, 2.*np.pi, 181)
+    ptheta = np.linspace(-np.pi, np.pi, ntheta)
+    #pphi = np.linspace(0, 2.*np.pi, nphi)
+    pphi = np.linspace(0, np.pi, int(np.ceil(nphi/2)) ) # only plot half the torus, since it is symmetric
+
     ptheta, pphi = np.meshgrid(ptheta, pphi)
 
     px = (b_hidra.R0 + b_hidra.a*np.cos(ptheta)) * np.cos(pphi)
@@ -135,17 +146,20 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     pz = b_hidra.a * np.sin(ptheta)
 
     ## CREATE HISTOGRAM 2
-    phi_edges = np.linspace(0, 360, 181)
-    theta_edges = np.linspace(-180, 180, 181)
-    H_2, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=False)
+    phi_edges = np.linspace(0, 360, nphi)
+    theta_edges = np.linspace(-180, 180, ntheta)
+    H_2, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=True) #density=False
 
     ## Set up histogram output as colormap data
     color_dimension = H_2
-    minn = 1E-8
+    minn = 1E-6 #1E-8
     maxx = 1E-3
-    norm = colors.LogNorm()
-    my_cmap = copy.copy(colormaps['Blues'])
+    norm = colors.LogNorm(vmin=minn, vmax=maxx)
+
+    #my_cmap = copy.copy(colormaps['Blues'])
+    my_cmap = copy.copy(colormaps['bone'])
     my_cmap.set_bad(my_cmap(0))
+
     m = plt.cm.ScalarMappable(norm=norm, cmap=my_cmap)
     m.set_array([])
     fcolors = m.to_rgba(color_dimension)
@@ -157,15 +171,117 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
                      edgecolor='grey', linewidth=0.1,
                      alpha=1.0, shade=False)
 
-    ax2.set_xlim3d(-1, 1)
-    ax2.set_ylim3d(-1, 1)
-    ax2.set_zlim3d(-0.7, 0.7)
-    ax2._axis3don = False
-    ax2.elev -= 12
-    ax2.azim += 10
+    # set a camera projection with 24mm focal length
+    my_fov = 85 # degrees
+    focal_length = 1 / np.tan(np.radians(my_fov) / 2)
+    ax2.set_proj_type('persp', focal_length=focal_length)
+
+    ax2.set_xlim3d(0.52,  0.93)
+    ax2.set_ylim3d(-0.03,  0.03)
+    ax2.set_zlim3d(-0.20, 0.16)
+    ax2.set_axis_off()
+    ax2.elev = 1
+    ax2.azim = -87
+    #ax2.dist = -5
     plt.title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString)
 
     plotname = 'WallHist3D_' + runString + '.png'
     simIO.saveFig(plotname)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    #plt.close()
+    plt.show()
+
+def plotInitEnergies(init_file, mass, runString='default', simIO=None):
+    ## SOME PHYSICAL CONSTANTS
+    kg_per_amu = 1.66054E-27
+    kboltz = 1.602E-19 # Joules/eV
+
+    init_conds = simIO.loadNumpyData(init_file)
+    v0s = init_conds[:,0:3].T
+
+    ## calculate initial energies in eV
+    E0s = 0.5 * mass * kg_per_amu * (v0s[0]**2 + v0s[1]**2 + v0s[2]**2) / kboltz #eV
+
+    ## create a 1d histogram of initial energies using numpy hist
+    dist, bin_edges= np.histogram(E0s, bins=500, density=False)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    startfit_i = np.where(dist == np.max(dist))[0][0]
+    stopfit_i = np.where(dist < 1)[0][0]
+    simIO.log.info('Fitting initial energy distribution from index {} to {}.'.format(startfit_i, stopfit_i))
+
+    lnE = np.log(dist)
+    slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+
+    Te_calc = -1/slope
+    print(f'Calculated Ion Temperature: {Te_calc} eV')
+    plt.figure()
+
+    #plt.plot(bin_centers, lnE)
+    #plt.plot(bin_centers[startfit_i:stopfit_i], fit, '--k', linewidth=3)
+    plt.hist(E0s, bins=500, density=False)#histtype='step',
+    plt.xlabel('Initial Energy (eV)')
+    plt.ylabel('Number of Particles')
+    plt.xlim(0, Te_calc*4) # limit x-axis to 5 times the calculated temperature
+    #plt.yscale('log')
+    plt.title('Initial Energy Distribution, $T_{{calc}}$ = {:.2f} eV'.format(Te_calc))
+
+    plotname = 'E0_Dist_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
+    Efs = energy_array
+
+    ## create a 1d histogram of initial energies using numpy hist
+    dist, bin_edges= np.histogram(Efs, bins=500, density=False)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    startfit_i = np.where(dist == np.max(dist))[0][0]
+    stopfit_i = np.where(dist < 1)[0][0]
+
+    lnE = np.log(dist)
+    slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+
+    Te_calc = -1/slope
+    print(f'Calculated Ion Temperature: {Te_calc} eV')
+    plt.figure()
+
+    #plt.plot(bin_centers, lnE)
+    #plt.plot(bin_centers[startfit_i:stopfit_i], fit, '--k', linewidth=3)
+    plt.hist(Efs, bins=500, density=False)#histtype='step',
+    plt.xlabel('Deposition Energy (eV)')
+    plt.ylabel('Number of Particles')
+    #plt.yscale('log')
+    plt.xlim(0, Te_calc*4)
+    plt.title('Final Energy Distribution, $T_{{calc}}$ = {:.2f} eV'.format(Te_calc))
+
+    plotname = 'Ef_Dist_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+
+def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
+    # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
+
+    # Calculate the number of particles running over time
+    time_steps = np.arange(0, tmax, dt)
+    maxTime_array = maxN_array * dt
+    particles_running = np.array([np.sum(maxTime_array > t) for t in time_steps])
+    pct_running = 100 * particles_running / tot_particles
+    # Plot the number of particles running over time
+    plt.figure(figsize=(10, 6))
+    plt.plot(time_steps, pct_running, label='Particles Running')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Percent of Particles')
+    plt.title('Particles Running Over Time')
+    #plt.legend()
+    plt.grid(True)
+
+    plotname = 'IonsVtime_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    #plt.savefig(simIO.outputDir + '/ParticlesRunningOverTime_' + cond_string + TAG + '.png')
     plt.close()
