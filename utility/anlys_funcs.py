@@ -155,17 +155,15 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
     using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
 
     Parameters:
-        ions (list): List of ion objects containing initial conditions and properties.
-        dt (float): Time step for the solver.
-        tmax (float): Maximum simulation time.
-        Bfield (object): Magnetic field object providing field interpolation methods.
-        Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
-
+        -ions (list): List of ion objects containing initial conditions and properties.
+        -dt (float): Time step for the solver.
+        -tmax (float): Maximum simulation time.
+        -Bfield (object): Magnetic field object providing field interpolation methods.
+        -Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
     Returns:
-        wallPts (torch.Tensor): Positions where particles terminate (e.g., hit the wall).
-        pos_k (torch.Tensor): Final positions of all particles.
-        wallVelocities (torch.Tensor): Velocities of particles at termination.
-        maxStep (torch.Tensor): Step index at which each particle terminated.
+        -wallPts (torch.Tensor): XYZ Positions where particles terminate (e.g., hit the wall), shape (Nparticles, 3).
+        -wallVelocities (torch.Tensor): Velocities of particles at termination, shape (Nparticles, 3).
+        -maxStep (torch.Tensor): Step index at which each particle terminated, shape (Nparticles,).
     """
     
     log = logging.getLogger()
@@ -214,7 +212,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         log.info('START STEPPING...')
         logging.basicConfig(level=logging.INFO)
         with logging_redirect_tqdm(loggers=[log]):
-            pbar = tqdm(range(1, Nsteps), ncols=100, mininterval=1.0)
+            pbar = tqdm(range(1, Nsteps), ncols=100, mininterval=2.0)
             for k in pbar:
                 if Efield:
                     Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
@@ -257,7 +255,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         )
     )
 
-    return wallPts, pos_k, wallVelocities, maxStep
+    return wallPts, wallVelocities, maxStep
 
 def boris_solver(ion, dt, tmax, Bfield):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax
