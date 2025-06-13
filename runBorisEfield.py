@@ -27,28 +27,29 @@ ERRFIELD_MAG = 1.5654e-4 # [Tesla]
 ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
-FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
-FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
+FIELD_SCALE_ELECTRIC = 500.0 # [Volts]
+
 
 # ION PROPERTIES
-ION_TEMP = 1.0 #eV 
-ION_MASS = Li_mass
-CHARGE_NUM = 1
+ION_TEMP = 10.0 #eV 
+ION_MASS = Li_mass #amu
+CHARGE_NUM = 1 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 61 # from Poincare output (simIO.log)
+LCFS_INDEX = 37 # from Poincare output (simIO.log)
 NPHI = 120
 NTHETA = 90 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 400 #300
+NPARTICLES_PER_EMITTER = 200 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8
-TMAX = 0.001
+TMAX = 0.0004
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Li_Z1_ALMOST'
+TAG= '500V_Li_Z1_ALMOST_newEfield2'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
