@@ -132,7 +132,7 @@ class IOHandler:
         else:
             name_loc = os.path.join(self.data_dir, name)
         # Use carriage return to update log message in-place in the console
-        print(f'\rloading numpy file: "{name_loc}"...', end='', flush=True)
+        print(f'\rloading numpy file: {name_loc}...\n', end='', flush=True)
         #self.log.info('loading numpy file: "{}"'.format(name_loc))
 
         return np.load(name_loc)

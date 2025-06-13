@@ -8,6 +8,7 @@ from utility.coordtrans import *
 from utility.anlys_funcs import *
 from utility.point_generators import generateSeedShells
 from classes.particle import *
+import plot_funcs.plotFuncs as plotFuncs
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
@@ -15,27 +16,45 @@ kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
 
+
+
+
+
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
+# TOROIDAL AND HELICAL MAGNETIC FIELDS
+FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_TOR = 0.9448
+FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+ERRFIELD_DIR_DEG = 271.5 # [degrees]
+
+# ELECTRIC FIELD
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
+
+
 # ION PROPERTIES
-ION_TEMP = 1.0 #eV 
-ION_MASS = Li_mass
-CHARGE_NUM = 1
+ION_TEMP = 15.0 #eV 
+ION_MASS = Li_mass #amu
+CHARGE_NUM = 3 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
+LCFS_INDEX = 61#37 # from Poincare output (simIO.log)
 NPHI = 120
-NTHETA = 90 #90
+NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 400 #300
+NPARTICLES_PER_EMITTER = 500 #300
 
 # SIMULATION PARAMETERS
-DT = 1e-8 #5E-8 #1E-7 #2E-7
-NSTEPS = 40E3 #2E4 #1E4 #5 #2E5 #5E3
+DT = 1e-8
+TMAX = 0.001
+NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Li_Z1_ALMOST'
+TAG= '60V_Li_Z3_PROD_02'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -92,9 +111,9 @@ simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.
 ##############
 ## PLOTTING ##
 ##############
-import plot_funcs.plotFuncs as plotFuncs
 
-TAG= '60V_Li_Z1_LOADED'
+
+TAG = TAG +'_LOAD'
 
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
@@ -108,7 +127,6 @@ theta_plot_deg = theta_plot*(180/np.pi)
 
 ## PLOT HISTOGRAM OF WALL POINTS
 plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-
 ## *3D* WALL PLOT)
 plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
@@ -130,7 +148,8 @@ plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, 
 # Plot # of perticles running over time
 plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, tmax, DT, runString=cond_string+TAG, simIO=simIO)
 
-
+# PLOT DEPOSITION ANGLE DISTRIBUTION
+plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')

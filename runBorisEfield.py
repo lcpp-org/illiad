@@ -8,6 +8,7 @@ from utility.coordtrans import *
 from utility.anlys_funcs import *
 from utility.point_generators import generateSeedShells
 from classes.particle import *
+import plot_funcs.plotFuncs as plotFuncs
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
@@ -28,29 +29,30 @@ ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
 FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
-FIELD_SCALE_ELECTRIC = 500.0 # [Volts]
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 
 # ION PROPERTIES
-ION_TEMP = 10.0 #eV 
+ION_TEMP = 15.0 #eV 
 ION_MASS = Li_mass #amu
-CHARGE_NUM = 1 # Z
+CHARGE_NUM = 3 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
+LCFS_INDEX = 61#37 # from Poincare output (simIO.log)
 NPHI = 120
-NTHETA = 90 #90
+NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 200 #300
+NPARTICLES_PER_EMITTER = 500 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8
-TMAX = 0.0004
+TMAX = 0.001
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '500V_Li_Z1_ALMOST_newEfield2'
+TAG= '60V_Li_Z3_PROD_02'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+
 
 
 #####################
@@ -134,15 +136,6 @@ simIO.log.info('FINISHED LOADING NUMPY DATA & GENERATING INIT. POSITIONS\n')
 ##########################
 ## VELOCITY GENERATION: ##
 ##########################
-# Calculate the 1D and 3D root mean square velocities
-v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
-v_rms3d = np.sqrt(3*kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
-
-# GENERATE NORMAL DISTRIBUTION OF SPEEDS
-#initSpeeds = np.random.normal(0, v_rms3d, N_particles)
-initSpeeds = v_rms1d * np.sqrt(np.random.chisquare(df=3, size=N_particles))
-
-
 # GENERATE RANDOM UNIT VECTORS, UNIFORMLY DISTRIBUTED IN A HEMISPHERE, POLE AT +Z
 r = np.random.uniform(0, 1, N_particles)
 z = np.sqrt(1 - r**2)
@@ -150,6 +143,11 @@ phi = np.random.uniform(0, 2 * np.pi, N_particles)
 x = r * np.cos(phi)
 y = r * np.sin(phi)
 initVel_array = np.stack([x, y, z], axis=1) # shape (N, 3)
+
+# GENERATE NORMAL DISTRIBUTION OF SPEEDS
+# Calculate the root mean square velocities
+v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
+initSpeeds = v_rms1d * np.sqrt(np.random.chisquare(df=3, size=N_particles))
 
 # APPLY INIT SPEEDS TO THE RANDOM UNIT VECTORS
 initVel_array *= initSpeeds[:, None]
@@ -163,16 +161,12 @@ tic = perf_counter()
 
 initVelPos = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 6))
 ion_list = []
-
 for i in range(NPARTICLES_PER_EMITTER):
     # chunking
     starti = i*N_emitters
     stopi = (i+1)*N_emitters
-
-    # setting velocities in array as chunks
-    #initVelPos[starti:stopi, 0:3] = initVelXYZ_list[starti:stopi]
+    # setting velocities nad positions  in array as chunks
     initVelPos[starti:stopi, 0:3] = initVel_array[starti:stopi]
-    # set positions, repeating in array as chunks
     initVelPos[starti:stopi, 3:6] = np.array(seed_list)
     # instantiating ions in a list
     ion_list += [Ion(seed_pt, ION_MASS, CHARGE_NUM, TMAX) for seed_pt in seed_list]
@@ -181,7 +175,7 @@ toc = perf_counter()
 simIO.log.info('Velocities generated in {}sec'.format(toc-tic))
 simIO.log.info('initVel_array shape={}'.format(initVel_array.shape) )
 
-#using simIO, save the initial velocities and positions as one array
+## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
 IC_filename = 'initVelPos_' + cond_string+TAG
 simIO.saveNumpyData(initVelPos, IC_filename)
 simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
@@ -193,9 +187,9 @@ for ion, v_0 in zip(ion_list, initVel_array):
 
 
 
-####################################
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## RUN BORIS SOLVER FOR PARTICLES ##
-####################################
+##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 # It returns the wall intersection points and their indices.
 wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
@@ -226,17 +220,9 @@ simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV
 wallPtArray = np.asarray( [XYZ_to_RTP(wall_point, b_hidra.R0) for wall_point in wallPt_output] ).T
 outputArray = np.vstack((wallPtArray, velocity_output.T, max_timeStep[None, :]))
 
-## SAVE WALL POINTS
-filename = 'Wallpt_OUTPUT_' + cond_string+TAG
-simIO.saveNumpyData(outputArray, filename)
-simIO.log.info('OUTPUT RESULT DATA: {}'.format(filename))
-
-
 ## CALCULATE ANGLE FROM NORMAL
 unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
 radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
-# simIO.log.info('unit_vec_xyz shape: {}'.format(unit_vec_xyz.shape))
-# simIO.log.info('radial_vec_xyz shape: {}'.format(radial_vec_xyz.shape))
 deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
 deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
 
@@ -247,24 +233,28 @@ toc = perf_counter()
 simIO.log.info('Output sent to cpu and converted to rtp in {}sec'.format(toc-tic))
 
 
+## SAVE WALL POINTS AND VELOCITIES
+filename = 'Wallpt_OUTPUT_' + cond_string+TAG
+simIO.saveNumpyData(outputArray, filename)
+simIO.log.info('OUTPUT RESULT DATA: {}'.format(filename))
+
 
 ##############
 ## PLOTTING ##
 ##############
-import plot_funcs.plotFuncs as plotFuncs
 
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
 theta_plot = wallPtArray[1]
 theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
-a_phi = -18. #-18. # degrees, phi_comp is 18 CW from south-side split
+a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
 ## PLOT HISTOGRAM OF WALL POINTS
 plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-## *3D* WALL PLOT)
+## PLOT *3D* HISTOGRAM
 plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 
@@ -278,14 +268,15 @@ plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_ang
                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 
-## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIEN PROFILE & ION TEMPERATURE
+## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
 plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # PLOT FINAL ENERGY DISTRIBUTION
 plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # Plot # of perticles running over time
 plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
-
+# PLOT DEPOSITION ANGLE DISTRIBUTION
+plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')

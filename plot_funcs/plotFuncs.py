@@ -6,6 +6,17 @@ import logging
 from utility.coordtrans import RTP_to_XYZ
 #import class_outputHandler as out
 
+# UIUC branding color palette
+UIUC = {
+    'il_blue': '#13294B',
+    'il_orange': '#FF5F05',
+    'il_storm': '#707372',
+    'il_stormdark1': '#4A4C4B',
+    'il_stormdark2': '#252525',
+    'il_stormlight1': '#8D8F8E',
+    }
+
+
 ## PORT PLOTTING CONVENIENCE FUNCTION
 def plotPorts(ax_, simIO):
     #simIO = logging.getLogger()
@@ -17,6 +28,7 @@ def plotPorts(ax_, simIO):
         port_plot = patches.Ellipse((port[0], port[1]), port[2], port[3],
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
+
 
 
 def plotWallHist(wallPtArray, runString, simIO):
@@ -152,13 +164,14 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
 
     ## Set up histogram output as colormap data
     color_dimension = H_2
-    minn = 1E-6 #1E-8
-    maxx = 1E-3
+    minn = 3E-7#6 #1E-8
+    maxx = 3E-3
     norm = colors.LogNorm(vmin=minn, vmax=maxx)
 
     #my_cmap = copy.copy(colormaps['Blues'])
-    my_cmap = copy.copy(colormaps['bone'])
-    my_cmap.set_bad(my_cmap(0))
+    #my_cmap = copy.copy(colormaps['bone'])
+    my_cmap = copy.copy(plt.get_cmap('Greys_r'))
+    my_cmap.set_bad(my_cmap(32))
 
     m = plt.cm.ScalarMappable(norm=norm, cmap=my_cmap)
     m.set_array([])
@@ -168,28 +181,29 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     ax2.plot_surface(px, py, pz, rstride=1, cstride=1,
                      vmin=minn, vmax=maxx,
                      facecolors=fcolors,
-                     edgecolor='grey', linewidth=0.1,
+                     edgecolor='grey', linewidth=0.05,
                      alpha=1.0, shade=False)
 
-    # set a camera projection with 24mm focal length
+    # set a camera projection with prescribed FOV
     my_fov = 85 # degrees
     focal_length = 1 / np.tan(np.radians(my_fov) / 2)
     ax2.set_proj_type('persp', focal_length=focal_length)
 
-    ax2.set_xlim3d(0.52,  0.93)
+    ax2.set_xlim3d(0.53,  0.94)
     ax2.set_ylim3d(-0.03,  0.03)
     ax2.set_zlim3d(-0.20, 0.16)
     ax2.set_axis_off()
-    ax2.elev = 1
-    ax2.azim = -87
-    #ax2.dist = -5
+    ax2.elev = 2
+    ax2.azim = -86
+
     plt.title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString)
 
     plotname = 'WallHist3D_' + runString + '.png'
-    simIO.saveFig(plotname)
+    simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
     #plt.show()
+
 
 def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     ## SOME PHYSICAL CONSTANTS
@@ -206,58 +220,89 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     dist, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    startfit_i = np.where(dist == np.max(dist))[0][0]
+    startfit_i = np.where(dist == np.max(dist))[0][0] + 70 # start fitting 25 bins after the maximum for a better slope fit
     stopfit_i = np.where(dist < 1)[0][0]
-    simIO.log.info('Fitting initial energy distribution from index {} to {}.'.format(startfit_i, stopfit_i))
+ 
+    lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
 
-    lnE = np.log(dist)
-    slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+    if stopfit_i > startfit_i:
+        slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+    else:
+        slope, intercept = np.polyfit(bin_centers, lnE, 1)
 
     Te_calc = -1/slope
-    print(f'Calculated Ion Temperature: {Te_calc} eV')
-    plt.figure()
 
-    #plt.plot(bin_centers, lnE)
-    #plt.plot(bin_centers[startfit_i:stopfit_i], fit, '--k', linewidth=3)
-    plt.hist(E0s, bins=500, density=False)#histtype='step',
+    plt.figure()
+    plt.grid(which='both', zorder=0)
+    plt.hist(E0s, bins=500, density=False, color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], zorder=2)  # histtype='step',
     plt.xlabel('Initial Energy (eV)')
     plt.ylabel('Number of Particles')
-    plt.xlim(0, Te_calc*4) # limit x-axis to 5 times the calculated temperature
+    plt.xlim(0, min(Te_calc*4,5000)) # limit x-axis to 5 times the calculated temperature
     #plt.yscale('log')
-    plt.title('Initial Energy Distribution, $T_{{calc}}$ = {:.2f} eV'.format(Te_calc))
+    
+    plt.title('Initial Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
 
     plotname = 'E0_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
-    Efs = energy_array
 
+def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     ## create a 1d histogram of initial energies using numpy hist
-    dist, bin_edges= np.histogram(Efs, bins=500, density=False)
+    dist, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     startfit_i = np.where(dist == np.max(dist))[0][0]
-    stopfit_i = np.where(dist < 1)[0][0]
+    # find the first index where dist is less than 1
+     # if there are no values less than 1, we stop at the end of the distribution    
+    if np.any(dist < 1):
+        stopfit_i = np.where(dist < 1)[0][0]
+    else:
+        stopfit_i = len(dist) - 1
 
-    lnE = np.log(dist)
-    slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+    # take log of only positive values to avoid log(0)
+    lnE = np.log(dist, out=np.zeros_like(dist, dtype=np.float64), where=(dist > 0))  
+
+    if stopfit_i > startfit_i:
+        slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+    else:
+        slope, intercept = np.polyfit(bin_centers, lnE, 1)
 
     Te_calc = -1/slope
-    print(f'Calculated Ion Temperature: {Te_calc} eV')
-    plt.figure()
 
-    #plt.plot(bin_centers, lnE)
-    #plt.plot(bin_centers[startfit_i:stopfit_i], fit, '--k', linewidth=3)
-    plt.hist(Efs, bins=500, density=False)#histtype='step',
+    plt.figure()
+    plt.grid(which='both', zorder=0)
+    plt.hist(energy_array, bins=500, range=(0., 4000.), density=False, color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], linewidth=0.3, zorder=2)
     plt.xlabel('Deposition Energy (eV)')
     plt.ylabel('Number of Particles')
+    if not np.isnan(Te_calc) and not np.isinf(Te_calc):
+        plt.xlim(0, Te_calc*4)
+    else:
+        plt.xlim(0, 4000)
     #plt.yscale('log')
-    plt.xlim(0, Te_calc*4)
-    plt.title('Final Energy Distribution, $T_{{calc}}$ = {:.2f} eV'.format(Te_calc))
+
+    plt.title('Final Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
 
     plotname = 'Ef_Dist_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+
+def plotDepoAngles(angle_array, runString='default', simIO=None):
+
+    plt.figure()
+
+    plt.hist(angle_array, bins=90, density=False)#histtype='step',
+
+    plt.xlabel('Deposition Angle (degrees from normal)')
+    plt.ylabel('Number of Particles')
+    plt.xlim(0, 90)
+    plt.grid(which='both')
+    plt.title('Ion Angle Distribution (degrees from normal)')
+
+    plotname = 'Angle_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -266,19 +311,31 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
 def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
 
-    # Calculate the number of particles running over time
+    # Calculate the number of particles running over time (efficiently)
     time_steps = np.arange(0, tmax, dt)
     maxTime_array = maxN_array * dt
-    particles_running = np.array([np.sum(maxTime_array > t) for t in time_steps])
+    # Sort maxTime_array once
+    sorted_maxTime = np.sort(maxTime_array)
+    # Use searchsorted to find how many particles have maxTime > t for each t
+    particles_running = len(maxTime_array) - np.searchsorted(sorted_maxTime, time_steps, side='right')
     pct_running = 100 * particles_running / tot_particles
+    pct_running += 100 - pct_running[0]
     # Plot the number of particles running over time
     plt.figure(figsize=(10, 6))
     plt.plot(time_steps, pct_running, label='Particles Running')
     plt.xlabel('Time (s)')
     plt.ylabel('Percent of Particles')
     plt.title('Particles Running Over Time')
+    # Set major ticks every 0.0001 and minor ticks every 0.00005 on the x-axis
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(plt.MultipleLocator(0.0001))
+    ax.xaxis.set_minor_locator(plt.MultipleLocator(0.00005))
+    ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
+    # Set minor tick gridlines to be dashed and smaller width
+    ax.grid(which='minor', linestyle=':', linewidth=0.5)
+    ax.grid(which='major', linestyle='-', linewidth=1)
+    ax.set_xlim(0, tmax)
     #plt.legend()
-    plt.grid(True)
 
     plotname = 'IonsVtime_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
