@@ -18,4 +18,4 @@
 module load python/3.11.11
 export PYTHONPATH=${HOME}/scratch/mypython3:${PYTHONPATH}
 
-python3 runBorisEfield2.py
+python3 runBorisEfield4.py
