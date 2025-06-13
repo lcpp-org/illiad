@@ -5,7 +5,8 @@ import classes.class_outputHandler as out
 import numpy as np
 from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
-import gc
+#import gc
+import time
 
 from classes.mesh import *
 from utility.anlys_funcs import identifyLCFS
@@ -25,23 +26,51 @@ def main():
     lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     # load numpy data using simIO method: big_grid_linear, big_grid_parabolic
-    big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear.npy')
+    big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear2.npy')
     print(f'{big_grid_linear.shape=}')#, {big_grid_parabolic.shape=}')
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
     THETAS = np.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta)
-    #grid_phi, grid_theta, grid_rad = np.meshgrid(PHI_GENs, THETAS, RADS, indexing='ij')
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
 
-
     # GRADIENT CALCULATION: remember to divide by Jacobian determinant gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
-    big_flux_Lingrad = np.gradient(big_grid_linear, PHI_GENs, THETAS, RADS)#, [grid_rad, grid_theta])
+    big_flux_Lingrad = np.gradient(big_grid_linear, PHI_GENs, THETAS, RADS, edge_order=2)#, [grid_rad, grid_theta])
 
     big_flux_Lingrad_radial = -big_flux_Lingrad[2]  # E = -grad[V]
     big_flux_Lingrad_poloidal =np.zeros_like(big_flux_Lingrad[1])
     big_flux_Lingrad_poloidal[:,:,1:] = -big_flux_Lingrad[1][:,:,1:] / grid_rad[:,1:]
     big_flux_Lingrad_toroidal = -big_flux_Lingrad[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
+
+    print(f'{big_flux_Lingrad_radial.shape=}')
+    # Load LCFS file:
+    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(lcfs_index+1))
+    lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
+    
+    # set all points outside the LCFS to zero
+    for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
+        lcfs_points = lcfs_points_full[phi_index]
+        # keep only 1st subset of points (360 points)
+        lcfs_points= lcfs_points[:360].T
+        print(f'{phi_index=}')
+
+        for theta_index, this_theta in enumerate(THETAS):
+            # find the index of the value in lcfs_points[0] closest to this_theta
+            lcfs_theta_index = np.argmin(np.abs(lcfs_points[0] - this_theta))
+
+            for r_index, radius in enumerate(RADS):
+                lcfs_rad = lcfs_points[1][lcfs_theta_index]
+                #lcfs_theta = lcfs_points[0][lcfs_theta_index]
+                #print(f'Checking point at theta={this_theta}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
+
+                if radius > lcfs_rad+0.004:
+                    big_flux_Lingrad_radial[phi_index][theta_index][r_index] = 0.0
+                    big_flux_Lingrad_poloidal[phi_index][theta_index][r_index] = 0.0
+                    big_flux_Lingrad_toroidal[phi_index][theta_index][r_index] = 0.0
+                    #print(f'Setting point at theta={THETAS[theta_index]}, r={RADS[r_index]} to zero (outside LCFS)')
+
+
+
     big_flux_Lingrad_magnitude = np.sqrt(big_flux_Lingrad_radial**2 + big_flux_Lingrad_poloidal**2 + big_flux_Lingrad_toroidal**2)
 
     # RESHAPE THE ARRAYS TO MATCH THE DIMNENSIONS OF INPUT BFIELDS
@@ -54,8 +83,6 @@ def main():
     simIO.saveNumpyData(Efield_rtpArray_linear, ANLYS_SUBDIR + '/Efield_rtpArray_linear.npy')
 
     Efield_xyzArray_linear = np.zeros_like(Efield_rtpArray_linear)
-
-    #xform_phi, xform_theta, xform_rad = np.meshgrid(PHI_GENs, THETAS, RADS, indexing='ij')
     xform_rad, xform_theta, xform_phi= np.meshgrid(RADS, THETAS, PHI_GENs, indexing='ij')
     print(f'{xform_rad.shape=}')
 
@@ -67,18 +94,14 @@ def main():
                                                                       reshaped_big_grid_linear_r.flatten(), reshaped_big_grid_linear_pol.flatten(), reshaped_big_grid_linear_tor.flatten())):
         ErtpLin = np.array([EradLin, EthetaLin, EphiLin])
         p_RTP = np.array([rad, theta, np.radians(phi)])
-        #print(f'{p_RTP=}')
-
         Ex_linear[i], Ey_linear[i], Ez_linear[i] = RTP_XYZ_JAC(p_RTP, ErtpLin, form='rtp2xyz')
-
-
     print(f'{Ex_linear.max()=}, {Ex_linear.min()=}, {Ey_linear.max()=}, {Ey_linear.min()=}, {Ez_linear.max()=}, {Ez_linear.min()=}')
+    
     # reshape the arrays to match the dimensions of input Bfields
-
     Efield_xyzArray_linear[0] = Ex_linear.reshape(Efield_xyzArray_linear[0].shape)
     Efield_xyzArray_linear[1] = Ey_linear.reshape(Efield_xyzArray_linear[1].shape)
     Efield_xyzArray_linear[2] = Ez_linear.reshape(Efield_xyzArray_linear[2].shape)
-    print(f'{Efield_xyzArray_linear.shape=}')
+    #print(f'{Efield_xyzArray_linear.shape=}')
 
     ## SAVE THE ARRAYS
     simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/Efield_xyzArray_linear.npy')
@@ -122,9 +145,6 @@ if __name__ == '__main__':
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
 
     ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_baseline'
-    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_5e6'
-    #ANLYS_SUBDIR = 'LCFS22_3x18x360mesh_SMOOTHER_7p5e6'
     ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     ## DEFINE FIELDS

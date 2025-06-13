@@ -37,16 +37,18 @@ def main():
     # LOAD VALID SURFACE DATA
     validSurf_name = filepath + 'ValidSurfaces.npy'
     valid_surface = simIO.loadNumpyData(validSurf_name)
-    valid_surface[[38,46,58]] = True # manually set some surfaces to valid
-
-    #valid_surface[lcfs_index:] = True # manually set some surfaces to valid
-    #valid_surface[[25,28,68,71]] = False # manually set some surfaces to valid
+    #valid_surface[[38,46,58]] = True # manually set some surfaces to valid
+    valid_surface[[38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58]] = True # manually set some surfaces to valid
 
     # Load Magnetic Axis point:
     filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(N_surfaces-1)
     axis_array = simIO.loadNumpyData(filename_center)
     filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(39)
     island_axis_array = simIO.loadNumpyData(filename_center_island)
+
+    # Load LCFS file:
+    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(lcfs_index+1))
+    lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
 
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
     linear_flux_array = flux_norm_array[:, 14] #6, 13, 19, 20, 22, 24,26
@@ -77,7 +79,16 @@ def main():
         ## LOAD SCATTER POINTS (POINCARE DATA)
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
         flux_surfaces = simIO.loadNumpyData(filename)
+        ## GET LCFS POINTS
+        #print(f'{lcfs_points_full.shape=}')
+        lcfs_points = lcfs_points_full[phi_index].T
+        # # make a polar plot of the LCFS points
+        # plt.figure()
+        # plt.polar(lcfs_points[0], lcfs_points[1], 'o', markersize=1, label='LCFS Points')
+        # plt.show()
 
+        #print(f'LCFS points: {lcfs_points.shape=}, {lcfs_points[0]=}, {lcfs_points[1]=}')
+        #print(f'{b_hidra.ntheta=}')
         ## LOOP THROUGH SURFACES
         for surface_index in range(lcfs_index, N_surfaces):
             if valid_surface[surface_index] == False:
@@ -121,15 +132,32 @@ def main():
         grid_linear.T[1] = fred3
         grid_linear.T[0] = grid_linear.T[1]
 
+        # set all points outside the LCFS to zero
+        #grid_linear[theta_index][r_index]
+        for theta_index, this_theta in enumerate(THETAS):
+            # find the index of the value in lcfs_points[0] closest to this_theta
+            lcfs_theta_index = np.argmin(np.abs(lcfs_points[0] - this_theta))
+            # get the corresponding radius from lcfs_points[1]
+
+            for r_index, radius in enumerate(RADS):
+                lcfs_rad = lcfs_points[1][lcfs_theta_index]
+                lcfs_theta = lcfs_points[0][lcfs_theta_index]
+                #print(f'Checking point at theta={THETAS[theta_index]}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
+                if radius > lcfs_rad+0.0005:
+                    grid_linear[theta_index][r_index] = 0.0
+                    #print(f'Setting point at theta={THETAS[theta_index]}, r={RADS[r_index]} to zero (outside LCFS)')
+
+
+
         # Add to big mesh array (3D)
         big_grid_linear[phi_index] = grid_linear
 
     #### END OF LOOP THROUGH PHI ANGLES ####
 
-    # save numpy data using simIO method: big_grid_linear, big_grid_parabolic
-    simIO.saveNumpyData(big_grid_linear, ANLYS_SUBDIR + '/big_grid_linear.npy')
+    # save numpy data using simIO method
+    simIO.saveNumpyData(big_grid_linear, ANLYS_SUBDIR + '/big_grid_linear2.npy')
 
-    ## LOOP THROUGH PHI ANGLES forplotting
+    ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
 
@@ -140,9 +168,7 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
 
     c = ax.pcolormesh(grid_theta, grid_rad, data, shading='auto', cmap=colormap, vmin=plotmin, vmax=plotmax)
 
-    #ax.set_rmax(b_hidra.a)
     ax.set_rmax(0.19)
-    #ax.set_rticks(np.arange(0.0, b_hidra.a, 0.02))
     ax.set_rticks(np.arange(0.0, 0.19, 0.02))
     fig.colorbar(c, ax=ax, label='Flux')
 
@@ -154,9 +180,6 @@ if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
     ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_baseline'
-    #ANLYS_SUBDIR = 'LCFS22_3x18x60mesh_SMOOTHER_5e6'
-    #ANLYS_SUBDIR = 'LCFS22_3x18x360mesh_SMOOTHER_7p5e6'
     ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
