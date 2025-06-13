@@ -237,6 +237,9 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
 
                 maxStep[running] = k # +1?
                 Nrunning = running.size(0)
+                if Nrunning == 0:
+                    log.info('All particles terminated at step {}'.format(k))
+                    break
 
                 pbar.set_postfix({'#Particles running': Nrunning}, refresh=False)
 
