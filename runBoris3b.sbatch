@@ -4,7 +4,7 @@
 #SBATCH --nodes=1                           # Number of nodes to request
 #SBATCH --ntasks-per-node=64                # Number of cpus per node
 #SBATCH --job-name=Boris3                   # Name of batch job
-#SBATCH --partition=eng-research-gpu        # Partition (queue)
+#SBATCH --partition=secondary               # Partition (queue)
 #SBATCH --gpus-per-node=1                   # Avoid getting emails from IT
 #SBATCH --output=Boris3.o%j                 # Name of batch job output file
 #SBATCH --error=Boris3.e%j                  # Name of batch job error file

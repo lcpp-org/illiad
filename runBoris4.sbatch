@@ -3,11 +3,11 @@
 #SBATCH --time=04:00:00                     # Job run time (hh:mm:ss)
 #SBATCH --nodes=1                           # Number of nodes to request
 #SBATCH --ntasks-per-node=64                # Number of cpus per node
-#SBATCH --job-name=Boris2                   # Name of batch job
+#SBATCH --job-name=Boris4                   # Name of batch job
 #SBATCH --partition=eng-research-gpu        # Partition (queue)
 #SBATCH --gpus-per-node=1                   # Avoid getting emails from IT
-#SBATCH --output=Boris2.o%j                 # Name of batch job output file
-#SBATCH --error=Boris2.e%j                  # Name of batch job error file
+#SBATCH --output=Boris4.o%j                 # Name of batch job output file
+#SBATCH --error=Boris4.e%j                  # Name of batch job error file
 #SBATCH --mail-user=spgula2@illinois.edu    # Send email notifications
 #SBATCH --mail-type=BEGIN,END               # Type of email notification to send
 #SBATCH --account=dcurreli-npre-eng         # Who is your handler?
