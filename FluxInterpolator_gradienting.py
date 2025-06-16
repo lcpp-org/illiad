@@ -104,7 +104,7 @@ def main():
     #print(f'{Efield_xyzArray_linear.shape=}')
 
     ## SAVE THE ARRAYS
-    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/Efield_xyzArray_linear.npy')
+    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/Efield_SOFE2.npy')
 
     ## LOOP THROUGH PHI ANGLES forplotting
     colortest = 'seismic'
@@ -129,23 +129,21 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
     #ax.set_xticklabels([])
     ax.set_yticklabels([])
     fig.colorbar(c, ax=ax, label='Flux')
-
+    plt.grid(True, which='both', linewidth=0.5, color='grey')
     output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=250)
     output_handler.log.info('Saved figure: ' + subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)))
     #plt.show()
     plt.close("All")
 
 if __name__ == '__main__':
-    #### DEFINE ANALYSIS PARAMETERS ####
+     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    #ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
+    ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_SOFE1'
 
-    # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    # ANLYS_SUBDIR = 'LCFS22_3x360x60mesh_PRODUCTION2'
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
-
-    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
@@ -156,13 +154,12 @@ if __name__ == '__main__':
     ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 22 #30?
-
+    LCFS_INPUT = 33 #25 #22
     ## DEFINE ANGLES TO EVALUATE AND PLOT
     NPHI = 360
     NTHETA = 360
 
-    PHI_GENs = np.linspace(360//NPHI, 360, NPHI) # = np.array([18])
+    PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
 
     main()

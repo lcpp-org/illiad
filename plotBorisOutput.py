@@ -18,8 +18,6 @@ He_mass = 4.002602 #amu
 
 
 
-
-
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
@@ -33,6 +31,7 @@ ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
 FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 
@@ -42,19 +41,20 @@ ION_MASS = Li_mass #amu
 CHARGE_NUM = 3 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 61#37 # from Poincare output (simIO.log)
-NPHI = 120
+LCFS_INDEX = 37 # from Poincare output (simIO.log)
+NPHI = 60
 NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 500 #300
+NPARTICLES_PER_EMITTER = 200 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8
-TMAX = 0.001
+TMAX = 0.00033
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Li_Z3_PROD_02'
+TAG= '60V_Li_Z3_newE'
+TAG= 'PlotTEst1'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -108,26 +108,21 @@ simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.
     np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
 
 
-##############
-## PLOTTING ##
-##############
-
-
-TAG = TAG +'_LOAD'
-
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
 theta_plot = wallPtArray[1]
 theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
-a_phi = -18. #-18. # degrees, phi_comp is 18 CW from south-side split
+a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
-
+##############
+## PLOTTING ##
+##############
 ## PLOT HISTOGRAM OF WALL POINTS
 plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-## *3D* WALL PLOT)
+## PLOT *3D* HISTOGRAM
 plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 
@@ -141,15 +136,25 @@ plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_ang
                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 
-## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIEN PROFILE & ION TEMPERATURE
+## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
 plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # PLOT FINAL ENERGY DISTRIBUTION
 plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # Plot # of perticles running over time
-plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, tmax, DT, runString=cond_string+TAG, simIO=simIO)
+plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
 # PLOT DEPOSITION ANGLE DISTRIBUTION
 plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
+
+
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+                            colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                            runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+                            colorLabel='Ion Deposition Energy (eV)', myColormap='viridis',
+                            runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')

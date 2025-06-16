@@ -293,19 +293,102 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
 def plotDepoAngles(angle_array, runString='default', simIO=None):
 
     plt.figure()
-
-    plt.hist(angle_array, bins=90, density=False)#histtype='step',
+    plt.grid(which='both', zorder=0)
+    plt.hist(angle_array, bins=90, density=False, color=UIUC['il_blue'], edgecolor=UIUC['il_orange'], linewidth=0.3, zorder=2)
 
     plt.xlabel('Deposition Angle (degrees from normal)')
     plt.ylabel('Number of Particles')
     plt.xlim(0, 90)
-    plt.grid(which='both')
+
     plt.title('Ion Angle Distribution (degrees from normal)')
 
     plotname = 'Angle_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
+
+def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
+    plt.rcParams.update({'font.size': 6})
+    plt.rcParams.update({'figure.autolayout':True})
+
+    tot_scale = 0.8
+
+    width_left = 5/6 * tot_scale #fig_height / aspect_left
+    width_right = 1/6 * tot_scale  # or choose a different one
+    h_buffer = 0.01  # horizontal buffer between left and right plots
+
+    # Total width for the figure
+    total_width = (width_left + width_right)
+    left_start = (1 - total_width) / 2
+    bottom_start = (1 - total_width) * 2 / 3
+    right_start = left_start + width_left + h_buffer
+
+    fig = plt.figure(figsize=(24, 4))
+
+    axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
+    axWall.set_aspect(0.2)  # height/width
+
+    axDist = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
+    plotPorts(axWall, simIO)
+
+    if colorRange is None:
+        colorRange = np.array([0, 3*np.mean(data)])  # default color range if not provided
+        axDist.set_xlim(colorRange)
+    else:
+        axDist.set_xlim(colorRange)
+        nxticks = 5
+        lower_xtick = colorRange[0] + (colorRange[1] - colorRange[0]) / (nxticks+1)
+        upper_xtick = colorRange[1] - (colorRange[1] - colorRange[0]) / (nxticks+1)
+        axDist.set_xticks(np.linspace(lower_xtick, upper_xtick, nxticks))
+
+    sc = axWall.scatter(phi_plot_deg, theta_plot_deg, linewidths=0.0, s=0.05, c=data, cmap=myColormap, vmin=colorRange[0], vmax=colorRange[1])
+    norm = colors.Normalize(vmin=colorRange[0], vmax=colorRange[1])
+
+
+    axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
+
+    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
+    axWall.set_xlim(0, 360)
+    axWall.set_xticks(np.linspace(9, 351, 39))
+    axWall.xaxis.set_tick_params(labelsize=10)
+
+    axWall.set_ylabel('Poloidal Location', fontsize=14)
+    axWall.set_ylim(-180, 180)
+    axWall.set_yticks(np.linspace(-90, 90, 3))
+    axWall.set_yticklabels(['Bottom', 'Outer\nMidplane', 'Top'])
+    axWall.yaxis.set_tick_params(labelsize=12)
+
+    n, bins, patches = axDist.hist(data, bins=90, range=colorRange, density=False, linewidth=0.3, zorder=2)
+    # Color each bar
+    cmap = cm.get_cmap(myColormap)
+    for bin_left, patch in zip(bins[:-1], patches):
+        color = cmap(norm(bin_left))  # or use bin center: (bin_left + bin_right)/2
+        patch.set_facecolor(color)
+
+
+    axDist.grid(which='both', zorder=0)
+
+    axDist.set_xlabel(colorLabel, fontsize=12)
+    # axDist.set_xlim(colorRange)
+    # nxticks = 5
+    # lower_xtick = colorRange[0] + (colorRange[1] - colorRange[0]) / (nxticks+1)
+    # upper_xtick = colorRange[1] - (colorRange[1] - colorRange[0]) / (nxticks+1)
+    # axDist.set_xticks(np.linspace(lower_xtick, upper_xtick, nxticks))
+
+    axDist.xaxis.set_tick_params(labelsize=10)
+
+    axDist.set_yticklabels([])
+    axDist.yaxis.set_tick_params(color='white')
+
+
+    # Remove all padding between subplots
+    plt.subplots_adjust(wspace=0) #, hspace=0)
+    plotname = 'Wallpoints_BorisPts_' + runString +  '.png'
+    simIO.saveFig(plotname, dpi=400)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+
 
 
 def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):

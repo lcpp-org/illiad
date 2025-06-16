@@ -22,9 +22,6 @@ def main():
     b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
     lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
-    RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
-    THETAS = np.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta)
-
     ## LOAD FLUX DATA
     filepath = ANLYS_SUBDIR  + '/'
     flux_name = filepath + 'CalculatedFLuxes.npy'
@@ -37,8 +34,7 @@ def main():
     # LOAD VALID SURFACE DATA
     validSurf_name = filepath + 'ValidSurfaces.npy'
     valid_surface = simIO.loadNumpyData(validSurf_name)
-    #valid_surface[[38,46,58]] = True # manually set some surfaces to valid
-    valid_surface[[38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58]] = True # manually set some surfaces to valid
+    valid_surface[lcfs_index:] = True # manually set some surfaces to valid
 
     # Load Magnetic Axis point:
     filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(N_surfaces-1)
@@ -49,82 +45,81 @@ def main():
     # Load LCFS file:
     lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(lcfs_index+1))
     lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
-
+    print(f'{lcfs_points_full.shape=}')
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
-    linear_flux_array = flux_norm_array[:, 14] #6, 13, 19, 20, 22, 24,26
+    linear_flux_array = flux_norm_array[:, 20]
+    # find the indices where valid_surface is True
+    valid_indices = np.where(valid_surface)[0]
 
     ## DEBUG plot filtered_flux_array with matplotlib
-    # # # fig, ax = plt.subplots()
-    # # # ax.plot(np.arange(N_surfaces), filtered_flux_array)
-    # # # ax.set_xlabel('Surface Index')
-    # # # ax.set_ylabel('Flux')
-    # # # ax.set_title('Filtered Flux Array')
-    # # # plt.show()
+    fig, ax = plt.subplots()
+    ax.plot(valid_indices, linear_flux_array[valid_indices])
+    ax.set_xlabel('Surface Index')
+    ax.set_ylabel('Flux')
+    ax.set_title('Filtered Flux Array')
+    plt.show()
 
     # Create a meshgrid for the interpolation
+    RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
+    THETAS = np.linspace(0, b_hidra.theta_max, b_hidra.ntheta+1) #add theta=0 for proper interpolation
+
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
-    big_grid_linear = np.zeros([len(PHI_GENs), len(THETAS), len(RADS)])
+    big_grid_linear = np.zeros([len(PHI_GENs), len(THETAS)-1, len(RADS)])
 
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         # axes points
         points = np.zeros([4,2])
         points[0] = axis_array[phi_index][0]
-        print(f'Central axis point: {axis_array[phi_index][0]}')
         points[1:] = island_axis_array[phi_index]
-        print(f'Island axis points: {points[1]}, {points[2]}, {points[3]}')
-        # linear values for the axes points
-        linear_values = np.ones([4])
 
+        print(f'Central axis point: {axis_array[phi_index][0]}')
+        print(f'Island axis points: {points[1]}, {points[2]}, {points[3]}')
+        
+        # linear values for the axes points
+        flux_norm = np.ones([4])
+    
         ## LOAD SCATTER POINTS (POINCARE DATA)
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
         flux_surfaces = simIO.loadNumpyData(filename)
+
         ## GET LCFS POINTS
-        #print(f'{lcfs_points_full.shape=}')
-        lcfs_points = lcfs_points_full[phi_index].T
+        lcfs_points = lcfs_points_full[phi_index][:NPHI].T# LCFS IS ONLY 1 SUBSET OF POINTS
+        #print(f'LCFS points: {lcfs_points.shape=}, {lcfs_points[0]=}, {lcfs_points[1]=}')
+
         # # make a polar plot of the LCFS points
         # plt.figure()
         # plt.polar(lcfs_points[0], lcfs_points[1], 'o', markersize=1, label='LCFS Points')
         # plt.show()
 
-        #print(f'LCFS points: {lcfs_points.shape=}, {lcfs_points[0]=}, {lcfs_points[1]=}')
-        #print(f'{b_hidra.ntheta=}')
         ## LOOP THROUGH SURFACES
         for surface_index in range(lcfs_index, N_surfaces):
             if valid_surface[surface_index] == False:
                 print(f'Skipping surface {surface_index} (not valid)')
             else:
-                # ## LOAD SCATTER POINTS (SPLINED VALUES)
-                # filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(surface_index))
-                # flux_surfaces = simIO.loadNumpyData(filename)[phi_index].T
-                # #print(f'{flux_surfaces.shape=}')
-                # thetas = flux_surfaces[0]
-                # rads = flux_surfaces[1]
-                # thetas = thetas[~np.isnan(thetas)]
-                # rads = rads[~np.isnan(rads)]
-                # N_pts = len(thetas)
-                # #print(f'{N_pts=}')
-
                 ### GET VALUES
                 thetas = flux_surfaces[surface_index][0]
                 rads = flux_surfaces[surface_index][1]
                 # filter NaNs
                 thetas = thetas[~np.isnan(thetas)]
                 rads = rads[~np.isnan(rads)]
+
+                thetas = np.concatenate((thetas,thetas+np.pi*2,thetas-np.pi*2))
+                rads = np.concatenate((rads,rads,rads))
                 N_pts = len(thetas)
 
                 # concatenate to big array of points
                 these_points = np.array([thetas, rads]).T
                 points = np.concatenate((points, these_points))
 
-                these_lin_values = np.full(N_pts, linear_flux_array[surface_index])
-                linear_values = np.concatenate((linear_values, these_lin_values))
+                these_flux_norms = np.full(N_pts, linear_flux_array[surface_index])
+                flux_norm = np.concatenate((flux_norm, these_flux_norms))
 
-        grid_linear = griddata(points, linear_values, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
+        #grid_linear = griddata(points, flux_norm, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
+        grid_linear = griddata(points, flux_norm, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
+        #print(f'{grid_linear.shape=}')
 
         ## HACKY SOLUTIONS HERE!!!
-        # averaging out for theta=2pi
-        grid_linear[-1] = (grid_linear[-2] + grid_linear[0]) / 2
         # copying values out for r=0.0
         fred3 = grid_linear.T[1]
         fred4 = grid_linear.T[2]
@@ -133,54 +128,64 @@ def main():
         grid_linear.T[0] = grid_linear.T[1]
 
         # set all points outside the LCFS to zero
-        #grid_linear[theta_index][r_index]
         for theta_index, this_theta in enumerate(THETAS):
+
             # find the index of the value in lcfs_points[0] closest to this_theta
-            lcfs_theta_index = np.argmin(np.abs(lcfs_points[0] - this_theta))
-            # get the corresponding radius from lcfs_points[1]
+            mintheta1 = np.abs(lcfs_points[0] - this_theta)
+            mintheta2 = np.abs(lcfs_points[0] - this_theta + 2*np.pi)
+            # calculate the minimum of the two
+            mintheta3 = np.fmin(mintheta1, mintheta2)
+            #print(f'{mintheta1.shape=}\n{mintheta2.shape=}\n{mintheta3.shape=}')
+            lcfs_theta_index = np.argmin(mintheta3)
+            #print(f'LCFS theta index for {this_theta} is {lcfs_theta_index} (theta={lcfs_points[0][lcfs_theta_index]})')
+            lcfs_rad = lcfs_points[1][lcfs_theta_index]
+            #lcfs_theta = lcfs_points[0][lcfs_theta_index]
+            #print(f'Checking point at theta={THETAS[theta_index]}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
 
-            for r_index, radius in enumerate(RADS):
-                lcfs_rad = lcfs_points[1][lcfs_theta_index]
-                lcfs_theta = lcfs_points[0][lcfs_theta_index]
-                #print(f'Checking point at theta={THETAS[theta_index]}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
-                if radius > lcfs_rad+0.0005:
-                    grid_linear[theta_index][r_index] = 0.0
-                    #print(f'Setting point at theta={THETAS[theta_index]}, r={RADS[r_index]} to zero (outside LCFS)')
-
-
+            # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
+            mask = RADS > (lcfs_rad + 0.001) # add buffer to avoid numerical issues
+            grid_linear[theta_index][mask] = 0.0
+            #print(f'Setting points at theta={THETAS[theta_index]}, r={RADS[mask]} to zero (outside LCFS)')
 
         # Add to big mesh array (3D)
-        big_grid_linear[phi_index] = grid_linear
+        big_grid_linear[phi_index] = grid_linear[1:]  # skip the first row (theta=0) to match the shape of the b_hidra mesh
 
     #### END OF LOOP THROUGH PHI ANGLES ####
 
     # save numpy data using simIO method
-    simIO.saveNumpyData(big_grid_linear, ANLYS_SUBDIR + '/big_grid_linear2.npy')
+    simIO.saveNumpyData(big_grid_linear, ANLYS_SUBDIR + '/big_grid_linear.npy')
 
     ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'Blues', 0.0, 1.0)
 
-
-def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
+def output_phi_plots(phi_deg, mesh_theta, mesh_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
     fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
     ax.set_title(name + '\n$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format((phi_deg+198.)%360., phi_deg), loc='left')
+    plot_data = np.vstack((data[-1], data))
+    c = ax.pcolormesh(mesh_theta, mesh_rad, plot_data, shading='gouraud', cmap=colormap, vmin=plotmin, vmax=plotmax)
 
-    c = ax.pcolormesh(grid_theta, grid_rad, data, shading='auto', cmap=colormap, vmin=plotmin, vmax=plotmax)
-
+    #ax.set_ylim(0, 0.19)
+    #ax.set_xlim(0, 2*np.pi)
     ax.set_rmax(0.19)
-    ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+    #ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+    ax.set_rticks([])
+    #plt.grid(True, which='both', linewidth=0.2, color='grey')
+    plt.grid(False)
     fig.colorbar(c, ax=ax, label='Flux')
 
     output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
+    #plt.show()
     plt.close()
+
 
 
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
     ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
+    #ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
+    ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_SOFE1'
 
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
@@ -194,7 +199,7 @@ if __name__ == '__main__':
     ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 22
+    LCFS_INPUT = 33 #25 #22
     ## DEFINE ANGLES TO EVALUATE AND PLOT
     NPHI = 360
     NTHETA = 360

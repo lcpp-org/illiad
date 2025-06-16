@@ -314,7 +314,7 @@ def find_Axis(theta_vals, r_vals, field):
 def find_subsets(theta_r_pts, mag_axis, field, BINS=30):
     """Function to find contiguous subsets of points in theta-r space"""
     wrapped_flag = False
-    rmax = np.max(theta_r_pts.T[1])
+    #rmax = np.max(theta_r_pts.T[1])
     # make a histogram of the point density vs theta
     hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=BINS, range=(0., 2*np.pi))
     dtheta_bin = bin_edges[1] - bin_edges[0]
@@ -479,7 +479,7 @@ def first_surface_loop(flux_surfaces, mag_axis, b_hidra, start_index, end_index)
         points_tr_MagAxis = points_tr_MagAxis[np.argsort(points_tr_MagAxis[:, 0])]
 
         # find subsets of the data, and their local centers, data returned as theta, r relative to local center
-        subsetData[surf_index], subsetCenters[surf_index], hist[surf_index], bin_edges[surf_index], wrap_flag[surf_index] = find_subsets(points_tr_MagAxis, mag_axis, b_hidra, BINS=100)
+        subsetData[surf_index], subsetCenters[surf_index], hist[surf_index], bin_edges[surf_index], wrap_flag[surf_index] = find_subsets(points_tr_MagAxis, mag_axis, b_hidra, BINS=120)
         num_subsets[surf_index] = len(subsetData[surf_index])
 
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
 
     ## RUN DIRECTORY AND SUBDIRECTORY
     ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
+    ANLYS_SUBDIR = 'LCFS23_3x360x360mesh_SOFE2'
 
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
@@ -552,7 +552,7 @@ if __name__ == '__main__':
     ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 22 #29?
+    LCFS_INPUT = 23 #22 #29?
 
     ## DEFINE ANGLES TO EVALUATE AND PLOT
     NPHI = 360
@@ -560,13 +560,13 @@ if __name__ == '__main__':
 
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
-    SMOOTH_FCTR = 7.5e-6 #7.5e-6 #baseline 1e-6
+    SMOOTH_FCTR = 8.0e-6 #7.5e-6 #baseline 1e-6
 
     ## FLUX INTEGRATION PARAMETERS
     FLUX_CALC_FLAG = True
 
-    INTEGRATE_EPSABS=1.49e-5 #1e-5 #1e-5
-    INTEGRATE_EPSREL=4.49e-3 #1e-3
+    INTEGRATE_EPSABS=1e-5 #1.49e-5
+    INTEGRATE_EPSREL=1e-3 #4.49e-3
 
     ## PLOTTING FLAG
     PLOT_ALL = True
