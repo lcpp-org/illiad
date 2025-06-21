@@ -32,6 +32,7 @@ def main():
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
     THETAS = np.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta)
+    #THETAS = np.linspace(0, b_hidra.theta_max, b_hidra.ntheta+1)
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
 
     # GRADIENT CALCULATION: remember to divide by Jacobian determinant gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
@@ -56,17 +57,32 @@ def main():
 
         for theta_index, this_theta in enumerate(THETAS):
             # find the index of the value in lcfs_points[0] closest to this_theta
-            lcfs_theta_index = np.argmin(np.abs(lcfs_points[0] - this_theta))
+            #lcfs_theta_index = np.argmin(np.abs(lcfs_points[0] - this_theta))
+            # find the index of the value in lcfs_points[0] closest to this_theta
+            mintheta1 = np.abs(lcfs_points[0] - this_theta)
+            mintheta2 = np.abs(lcfs_points[0] - this_theta + 2*np.pi)
+            # calculate the minimum of the two
+            mintheta3 = np.fmin(mintheta1, mintheta2)
+            #print(f'{mintheta1.shape=}\n{mintheta2.shape=}\n{mintheta3.shape=}')
+            lcfs_theta_index = np.argmin(mintheta3)
+            #print(f'LCFS theta index for {this_theta} is {lcfs_theta_index} (theta={lcfs_points[0][lcfs_theta_index]})')
+            lcfs_rad = lcfs_points[1][lcfs_theta_index]
 
-            for r_index, radius in enumerate(RADS):
-                lcfs_rad = lcfs_points[1][lcfs_theta_index]
-                #lcfs_theta = lcfs_points[0][lcfs_theta_index]
-                #print(f'Checking point at theta={this_theta}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
+            # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
+            mask = RADS > (lcfs_rad + 0.001) # add buffer to avoid numerical issues
+            #grid_linear[theta_index][mask] = 0.0
+            big_flux_Lingrad_radial[phi_index][theta_index][mask] = 0.0
+            big_flux_Lingrad_poloidal[phi_index][theta_index][mask] = 0.0
+            big_flux_Lingrad_toroidal[phi_index][theta_index][mask] = 0.0
+            # for r_index, radius in enumerate(RADS):
+            #     lcfs_rad = lcfs_points[1][lcfs_theta_index]
+            #     #lcfs_theta = lcfs_points[0][lcfs_theta_index]
+            #     #print(f'Checking point at theta={this_theta}, r={radius}\nagainst LCFS theta={lcfs_theta}, r={lcfs_rad}')
 
-                if radius > lcfs_rad+0.004:
-                    big_flux_Lingrad_radial[phi_index][theta_index][r_index] = 0.0
-                    big_flux_Lingrad_poloidal[phi_index][theta_index][r_index] = 0.0
-                    big_flux_Lingrad_toroidal[phi_index][theta_index][r_index] = 0.0
+            #     if radius > lcfs_rad+0.004:
+            #         big_flux_Lingrad_radial[phi_index][theta_index][r_index] = 0.0
+            #         big_flux_Lingrad_poloidal[phi_index][theta_index][r_index] = 0.0
+            #         big_flux_Lingrad_toroidal[phi_index][theta_index][r_index] = 0.0
                     #print(f'Setting point at theta={THETAS[theta_index]}, r={RADS[r_index]} to zero (outside LCFS)')
 
 
@@ -107,29 +123,36 @@ def main():
     simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/Efield_SOFE2.npy')
 
     ## LOOP THROUGH PHI ANGLES forplotting
-    colortest = 'seismic'
+    colortest = 'afmhot_r'
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         #output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_magnitude[phi_index], 'LinearFluxGradMagnitude', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 200.0)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_magnitude[phi_index], 'LinearFluxGradMagnitude', ANLYS_SUBDIR, simIO, colortest, 0.0, 200.0)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_radial[phi_index], 'LinearFluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_poloidal[phi_index], 'LinearFluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_toroidal[phi_index], 'LinearFluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
 
 
-def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
+def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_handler, colormap='infernp', plotmin=None, plotmax=None):
     fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
-    c = ax.pcolormesh(grid_theta, grid_rad, data, shading='auto', cmap=colormap, vmin=plotmin, vmax=plotmax)
+    #c = ax.pcolormesh(grid_theta, grid_rad, data, shading='auto', cmap=colormap, vmin=plotmin, vmax=plotmax)
+    data = np.vstack((data[-1], data))
+    grid_rad = np.vstack((grid_rad[-1], grid_rad))
+    grid_theta = np.vstack((grid_theta[-1], grid_theta))
+    grid_theta[0] = 0
+
+    c = ax.pcolormesh(grid_theta, grid_rad, data, shading='gouraud', cmap=colormap, vmin=plotmin, vmax=plotmax)
 
     ax.set_title(name + '\n$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format((phi_deg+198.)%360., phi_deg), loc='left')
-    #ax.set_rmax(b_hidra.a)
     ax.set_rmax(0.19)
-    #ax.set_rticks(np.arange(0.0, b_hidra.a, 0.02))
-    ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+    #ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+    ax.set_rticks([])
     # set the r-labels to an empty list
     #ax.set_xticklabels([])
     ax.set_yticklabels([])
     fig.colorbar(c, ax=ax, label='Flux')
-    plt.grid(True, which='both', linewidth=0.5, color='grey')
+    #plt.grid(True, which='both', linewidth=0.5, color='grey')
+    plt.grid(False)
+
     output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=250)
     output_handler.log.info('Saved figure: ' + subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)))
     #plt.show()
@@ -138,7 +161,7 @@ def output_phi_plots(phi_deg, grid_theta, grid_rad, data, name, subdir, output_h
 if __name__ == '__main__':
      #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
-    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9_older"
     #ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
     ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_SOFE1'
 

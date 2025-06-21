@@ -3,7 +3,7 @@ from matplotlib import patches, colors, cm, colormaps
 import copy
 import numpy as np
 import logging
-from utility.coordtrans import RTP_to_XYZ
+from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP2
 #import class_outputHandler as out
 
 # UIUC branding color palette
@@ -40,8 +40,9 @@ def plotWallHist(wallPtArray, runString, simIO):
     phi_plot = wallPtArray[2]*(-1) + 2*np.pi
 
     # shift theta domain to -180 to 180
-    for i in range(len(theta_plot)):
-        if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+    # for i in range(len(theta_plot)):
+    #     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
     # convert to degrees
     # shift to physical phi=0 at at the South-side split
@@ -164,14 +165,14 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
 
     ## Set up histogram output as colormap data
     color_dimension = H_2
-    minn = 3E-7#6 #1E-8
+    minn = 2.5E-7 #3E-7 #6 #1E-8
     maxx = 3E-3
     norm = colors.LogNorm(vmin=minn, vmax=maxx)
 
     #my_cmap = copy.copy(colormaps['Blues'])
     #my_cmap = copy.copy(colormaps['bone'])
     my_cmap = copy.copy(plt.get_cmap('Greys_r'))
-    my_cmap.set_bad(my_cmap(32))
+    my_cmap.set_bad(my_cmap(39)) #33
 
     m = plt.cm.ScalarMappable(norm=norm, cmap=my_cmap)
     m.set_array([])
@@ -189,12 +190,13 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     focal_length = 1 / np.tan(np.radians(my_fov) / 2)
     ax2.set_proj_type('persp', focal_length=focal_length)
 
-    ax2.set_xlim3d(0.53,  0.94)
+    #ax2.set_xlim3d(0.53,  0.94)
+    ax2.set_xlim3d(-0.94, -0.53)
     ax2.set_ylim3d(-0.03,  0.03)
     ax2.set_zlim3d(-0.20, 0.16)
     ax2.set_axis_off()
-    ax2.elev = 2
-    ax2.azim = -86
+    ax2.elev = 2 #2
+    ax2.azim = -94
 
     plt.title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString)
 
@@ -307,6 +309,7 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
+
 def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
     plt.rcParams.update({'font.size': 6})
     plt.rcParams.update({'figure.autolayout':True})
@@ -389,8 +392,6 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
     plt.close()
 
 
-
-
 def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
 
@@ -425,3 +426,203 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     #plt.savefig(simIO.outputDir + '/ParticlesRunningOverTime_' + cond_string + TAG + '.png')
     plt.close()
+
+
+def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
+    simIO.log.info('Plotting Combined Histogram...')
+
+    ## CREATE HISTOGRAM
+    # extract theta and phi
+    theta_plot = wallPtArray[1]
+    # convert to phi= +CCW (as if viewing from outside the vaccum vessel)
+    phi_plot = wallPtArray[2]*(-1) + 2*np.pi
+
+    # shift theta domain to -180 to 180
+    # for i in range(len(theta_plot)):
+    #     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
+
+    # convert to degrees
+    # shift to physical phi=0 at at the South-side split
+    a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+    phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
+    theta_plot_deg = theta_plot*(180/np.pi)
+
+    # define bin edges for 2d histogram
+    phi_edges = np.linspace(0, 360, 361)
+    theta_edges = np.linspace(-180, 180, 181)
+
+    H, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=True)
+    H = H.T # histogram reverse axes for some reason; transpose
+
+
+    ## CREATE %PARTICLES V TIME
+    # calculate the number of particles running over time (efficiently)
+    time_steps = np.arange(0, tmax, dt)
+    maxTime_array = maxN_array * dt
+    # sort maxTime_array once
+    sorted_maxTime = np.sort(maxTime_array)
+    # use searchsorted to find how many particles have maxTime > t for each t
+    particles_running = len(maxTime_array) - np.searchsorted(sorted_maxTime, time_steps, side='right')
+    pct_running = 100 * particles_running / tot_particles
+    pct_running += 100 - pct_running[0]
+
+
+    ## PLOT HISTOGRAM
+    plt.rcParams.update({'font.size': 8})
+    plt.rcParams.update({'figure.autolayout':True})
+
+    tot_scale = 0.8
+    width_left = 5/6 * tot_scale #fig_height / aspect_left
+    width_right = 1/6 * tot_scale  # or choose a different one
+    h_buffer = 0.01  # horizontal buffer between left and right plots
+
+    # Total width for the figure
+    total_width = (width_left + width_right)
+    left_start = (1 - total_width) / 2
+    bottom_start = (1 - total_width) * 2 / 3
+    right_start = left_start + width_left + h_buffer
+
+    fig = plt.figure(figsize=(24, 4))
+    axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
+    axWall.set_aspect(0.2)  # height/width
+    plotPorts(axWall, simIO)
+    # axRight = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
+
+    axWall.imshow( H, interpolation='nearest', origin='lower',
+                extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
+                cmap='Blues', norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
+                aspect=0.2 )
+    
+    # axWall.colorbar(location='bottom', shrink=0.6)
+    axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
+    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
+    axWall.set_xlim(0, 360)
+    axWall.set_xticks(np.linspace(9, 351, 39))
+    axWall.xaxis.set_tick_params(labelsize=10)
+
+    axWall.set_ylabel('Poloidal Location', fontsize=14)
+    axWall.set_ylim(-180, 180)
+    axWall.set_yticks(np.linspace(-90, 90, 3))
+    axWall.set_yticklabels(['Bottom', 'Outer\nMidplane', 'Top'])
+    axWall.yaxis.set_tick_params(labelsize=12)
+
+
+    ## PLOT %PARTICLES V TIME
+    axRight = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
+    # Convert time_steps from seconds to milliseconds for plotting
+    axRight.plot(time_steps*1000, pct_running, 'k')#, label='Particles Running')
+    #axRight.plot(time_steps, pct_running, 'k')#, label='Particles Running')
+
+    axRight.set_xlabel('Simulation Time (ms)', fontsize=12)
+    ## Set major ticks every 0.0001 and minor ticks every 0.00005 on the x-axis
+    axRight.set_xticks(np.linspace(0.0, 1.0, 11))
+    #axRight.set_xticks(np.linspace(0.0, 0.001, 11))
+    axRight.set_xlim(0, 1.0)
+    axRight.xaxis.set_tick_params(labelsize=10)
+
+    axRight.set_ylabel('% of Particles Running', fontsize=12)
+
+    axRight.set_yticks(np.linspace(10, 100, 10))
+    axRight.yaxis.set_label_position("right")
+    axRight.yaxis.tick_right()
+    axRight.set_ylim(0, 100)
+    #axRight.yaxis.set_tick_params(color='white')
+
+    # Set minor tick gridlines to be dashed and smaller width
+    axRight.grid(which='minor', linestyle=':', linewidth=0.5)
+    axRight.grid(which='major', linestyle='-', linewidth=1)
+
+    plotname = 'CombinedHistogram_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=400)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+
+def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
+    print('ion_traces shape:', ion_traces.shape)
+
+    ntheta = int(360*1 + 1)
+    nphi = int(360*2 + 1)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title('Ion Traces')
+
+
+    ## PLOT VACUUM VESSEL TORUS
+    nphi = ntheta = 180
+    #ptheta = np.linspace(-np.pi, np.pi, ntheta)
+    ptheta = np.linspace(-np.pi, 0, int(np.ceil(ntheta/2)) )
+    
+    pphi = np.linspace(0, 2.*np.pi, nphi)
+    #pphi = np.linspace(0, np.pi, int(np.ceil(nphi/2)) ) # only plot half the torus, since it is symmetric
+
+    ptheta, pphi = np.meshgrid(ptheta, pphi)
+    px = (b_hidra.R0 + b_hidra.a*np.cos(ptheta)) * np.cos(pphi)
+    py = (b_hidra.R0 + b_hidra.a*np.cos(ptheta)) * np.sin(pphi)
+    pz = b_hidra.a * np.sin(ptheta)
+
+    ax.plot_surface(px, py, pz, rstride=9, cstride=9,
+                     facecolor='lightgrey',
+                     edgecolor='k', linewidth=0.1,
+                     alpha=1.0, shade=True, zorder=1)
+
+    for i in range(ion_traces.shape[1]):  # Loop over particles
+        this_ion = ion_traces[:, i, :]
+        # filter rows containing all zeros
+        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
+    
+        this_X = this_ion[:,0] #ion_traces[:, i, 0]
+        this_Y = this_ion[:,1] #ion_traces[:, i, 1]
+        this_Z = this_ion[:,2] #ion_traces[:, i, 2]
+
+        #ax.plot(ion_traces[:, i, 0], ion_traces[:, i, 1], ion_traces[:, i, 2])
+        skip_indices = [0,1,3,5,6,7,8,10]
+        if i not in skip_indices:
+            ax.plot(this_X, this_Y, this_Z, linewidth=0.5, zorder=5)
+
+    ax.set_xlim([-0.61, 0.61])#[-1, 1])
+    ax.set_ylim([-0.61, 0.61])#[-1, 1])
+    ax.set_zlim([-0.61, 0.61])#[-1, 1])
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_axis_off()  # Remove bounding box and grid
+
+    plotname = 'IonTraces_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=600)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+
+
+def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
+    print('ion_traces shape:', ion_traces.shape)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='polar')
+    ax.set_title('Ion Traces')
+
+    for i in range(ion_traces.shape[1]):  # Loop over particles
+        this_ion = ion_traces[:, i, :]
+        # filter rows containing all zeros
+        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
+    
+        this_ion_rtp = XYZ_to_RTP2(this_ion, b_hidra.R0).cpu().numpy()
+        this_r = this_ion_rtp[:,0] #ion_traces[:, i, 0]
+        this_theta = this_ion_rtp[:,1] #ion_traces[:, i, 1]
+
+        skip_indices = [0,1,3,5,6,7,8,10]
+        if i not in skip_indices:
+            ax.plot(this_theta, this_r, linewidth=0.5, zorder=5)
+
+    ax.set_rlim([0., b_hidra.a])#[-1, 1])
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # ax.set_axis_off()  # Remove bounding box and grid
+
+    plotname = 'IonTracesPoin_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=600)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+    #plt.show()
