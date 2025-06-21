@@ -131,9 +131,8 @@ class IOHandler:
             name_loc = os.path.join(self.data_dir, subdir, name)
         else:
             name_loc = os.path.join(self.data_dir, name)
-        # Use carriage return to update log message in-place in the console
-        print(f'\rloading numpy file: {name_loc}...\n', end='', flush=True)
-        #self.log.info('loading numpy file: "{}"'.format(name_loc))
+
+        self.log.info('loading numpy file: "{}"'.format(name_loc))
 
         return np.load(name_loc)
 
@@ -160,3 +159,15 @@ class IOHandler:
         p_width =  np.degrees(np.arcsin(p_dia/p_rmaj)) # calculate width in degrees
 
         return np.array([p_phi, p_theta, p_width, p_height])
+    
+    def loadCSV(self, name):
+        """ 
+        Method to load arbitrary data from a CSV file.
+        Returns a numpy array with the data.
+        """
+        name_loc = name #os.path.join('self.module_path', name)
+        data = np.loadtxt(name_loc, delimiter=',', skiprows=0)#, usecols=[2,3,4,5,6])
+        
+        self.log.info('Loading {} from file: "{}"'.format(data[0,:], name_loc))
+
+        return data[1:,:]  # return data without header
