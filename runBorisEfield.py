@@ -8,6 +8,7 @@ from utility.coordtrans import *
 from utility.anlys_funcs import *
 from utility.point_generators import generateSeedShells
 from classes.particle import *
+
 import plot_funcs.plotFuncs as plotFuncs
 
 ## SOME PHYSICAL CONSTANTS
@@ -35,7 +36,7 @@ FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 
 # ION PROPERTIES
-ION_TEMP = 15.0 #eV 
+ION_TEMP = 2.0 #eV 
 ION_MASS = Li_mass #amu
 CHARGE_NUM = 1 # Z
 
@@ -44,15 +45,15 @@ LCFS_INDEX = 37 # from Poincare output (simIO.log)
 NPHI = 60
 NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 200 #300
+NPARTICLES_PER_EMITTER = 15 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8
-TMAX = 0.0005
+TMAX = 0.0006
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Z1_PlotTest_newestE'
+TAG= '60V_Z1_TraceTest'
 #TAG= 'PlotTest_newestE'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
@@ -193,8 +194,10 @@ for ion, v_0 in zip(ion_list, initVel_array):
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
 # It returns the wall intersection points and their indices.
-wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
+#wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
+wallPt_output, velocity_output, max_timeStep, ion_traces = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra, particle_tracker_list)
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
 
@@ -207,6 +210,25 @@ tic = perf_counter()
 wallPt_output = wallPt_output.cpu().numpy()
 velocity_output = velocity_output.cpu().numpy()
 max_timeStep = max_timeStep.cpu().numpy()
+ion_traces = ion_traces.cpu().numpy()
+
+
+
+## SAVE WALL POINTS AND VELOCITIES
+filenameTrac = 'Ion_traces_' + cond_string+TAG
+simIO.saveNumpyData(ion_traces, filenameTrac)
+simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
+
+# # make a 3d plot of ion_traces paths, ion_traces[timestep, particle, x,y,z]
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.mplot3d import Axes3D
+
+
+
+
+
+
+
 
 # filter out rows containing all zeros
 wallPt_output = wallPt_output[~np.all(wallPt_output == 0, axis=1)]
@@ -250,43 +272,46 @@ a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
-##############
-## PLOTTING ##
-##############
-## PLOT HISTOGRAM OF WALL POINTS
-plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-## PLOT *3D* HISTOGRAM
-plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
+# ##############
+# ## PLOTTING ##
+# ##############
+
+plotFuncs.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+
+# ## PLOT HISTOGRAM OF WALL POINTS
+# plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
+# ## PLOT *3D* HISTOGRAM
+# plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 
-## PLOT DISCRETE WALL POINTS
-plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
-## PLOT DISCRETE WALL POINTS with Energy Colorscale
-plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
-                          runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
-## PLOT DISCRETE WALL POINTS with Angle Colorscale
-plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
-                          runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
+# ## PLOT DISCRETE WALL POINTS
+# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
+# ## PLOT DISCRETE WALL POINTS with Energy Colorscale
+# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
+#                           runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
+# ## PLOT DISCRETE WALL POINTS with Angle Colorscale
+# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
+#                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 
-## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# PLOT FINAL ENERGY DISTRIBUTION
-plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# Plot # of perticles running over time
-plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
+# ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
+# plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
+# # PLOT FINAL ENERGY DISTRIBUTION
+# plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
+# # Plot # of perticles running over time
+# plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
-# PLOT DEPOSITION ANGLE DISTRIBUTION
-plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
+# # PLOT DEPOSITION ANGLE DISTRIBUTION
+# plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
 
-plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
-                            colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-                            runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+#                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+#                             runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
 
-plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
-                            colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-                            runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+#                             colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+#                             runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
 
 
 ## END RUN ##
