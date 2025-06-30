@@ -183,3 +183,60 @@ class IOHandler:
         else:
             np.savetxt(name_loc, data, delimiter=',')
         self.log.info(f'Saved data to CSV file: "{name_loc}"')
+
+def borisBoilerplate(self):
+    # List of all possible input parameters to check if user has set them
+    possible_input_parameters = [
+        "FIELD_FILE_TOR",
+        "FIELD_SCALE_TOR",
+        "FIELD_FILE_HEL",
+        "FIELD_SCALE_HEL",
+        "ERRFIELD_MAG",
+        "ERRFIELD_DIR_DEG",
+        "FIELD_FILE_ELECTRIC",
+        "FIELD_SCALE_ELECTRIC",
+        "LCFS_INDEX",
+        "ION_TEMP",
+        "ION_MASS",
+        "CHARGE_NUM",
+        "DELTRS",
+        "NPHI",
+        "NTHETA",
+        "NPARTICLES_PER_EMITTER",
+        "DT",
+        "TMAX",
+        "NSTEPS"
+    ]
+
+    # Build a dictionary of parameter values or '*DEFAULT*'
+    param_values = {}
+    for param in possible_input_parameters:
+        param_values[param] = globals().get(param, '*DEFAULT*')
+
+    self.log.info('\n|=======================================================================================|'
+                  +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_TOR"])
+                  +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_TOR"])
+                  +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_HEL"])
+                  +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_HEL"])
+                  +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
+                  +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
+                  +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
+                  +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_ELECTRIC"])
+                  +'\n|---------------------------------------------------------------------------------------|'
+                  +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(param_values["LCFS_INDEX"])
+                  +'\n| ION TEMPERATURE: {} eV'.format(param_values["ION_TEMP"])
+                  +'\n| ION MASS: {} amu'.format(param_values["ION_MASS"])
+                  +'\n| ION CHARGE: {}'.format(param_values["CHARGE_NUM"])
+                  +'\n|---------------------------------------------------------------------------------------|'
+                  +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format(
+                        len(param_values["DELTRS"]) if param_values["DELTRS"] != '*DEFAULT*' else '*DEFAULT*',
+                        param_values["NPARTICLES_PER_EMITTER"])
+                  +'\n|  --> TOTAL PARTICLES: {}'.format(
+                        (len(param_values["DELTRS"]) * param_values["NPHI"] * param_values["NTHETA"] * param_values["NPARTICLES_PER_EMITTER"])
+                        if all(param_values[x] != '*DEFAULT*' for x in ["DELTRS", "NPHI", "NTHETA", "NPARTICLES_PER_EMITTER"])
+                        else '*DEFAULT*')
+                  +'\n|---------------------------------------------------------------------------------------|'
+                  +'\n| TIME STEP: {} sec'.format(param_values["DT"])
+                  +'\n| TOTAL TIME: {:.6f} sec'.format(param_values["TMAX"] if param_values["TMAX"] != '*DEFAULT*' else 0)
+                  +'\n|  --> # OF TIME STEPS: {}'.format(param_values["NSTEPS"])
+                  +'\n|=======================================================================================|\n\n\n')
