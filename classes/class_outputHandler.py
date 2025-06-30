@@ -163,11 +163,23 @@ class IOHandler:
     def loadCSV(self, name):
         """ 
         Method to load arbitrary data from a CSV file.
-        Returns a numpy array with the data.
+        Logs the header and returns a numpy array with the data.
         """
-        name_loc = name #os.path.join('self.module_path', name)
-        data = np.loadtxt(name_loc, delimiter=',', skiprows=0)#, usecols=[2,3,4,5,6])
-        
-        self.log.info('Loading {} from file: "{}"'.format(data[0,:], name_loc))
-
-        return data[1:,:]  # return data without header
+        name_loc = name
+        with open(name_loc, 'r') as f:
+            header = f.readline().strip()
+        self.log.info(f'Loading [{header}] from CSV file: "{name_loc}"')
+        data = np.loadtxt(name_loc, delimiter=',', skiprows=1)
+        return data
+    
+    def saveCSV(self, data, name, header=None):
+        """ 
+        Method to save data to a CSV file.
+        If header is provided, it will be written as the first line.
+        """
+        name_loc = os.path.join(self.data_dir, name)
+        if header:
+            np.savetxt(name_loc, data, delimiter=',', header=header, comments='')
+        else:
+            np.savetxt(name_loc, data, delimiter=',')
+        self.log.info(f'Saved data to CSV file: "{name_loc}"')
