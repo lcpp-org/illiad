@@ -184,59 +184,78 @@ class IOHandler:
             np.savetxt(name_loc, data, delimiter=',')
         self.log.info(f'Saved data to CSV file: "{name_loc}"')
 
-def borisBoilerplate(self):
-    # List of all possible input parameters to check if user has set them
-    possible_input_parameters = [
-        "FIELD_FILE_TOR",
-        "FIELD_SCALE_TOR",
-        "FIELD_FILE_HEL",
-        "FIELD_SCALE_HEL",
-        "ERRFIELD_MAG",
-        "ERRFIELD_DIR_DEG",
-        "FIELD_FILE_ELECTRIC",
-        "FIELD_SCALE_ELECTRIC",
-        "LCFS_INDEX",
-        "ION_TEMP",
-        "ION_MASS",
-        "CHARGE_NUM",
-        "DELTRS",
-        "NPHI",
-        "NTHETA",
-        "NPARTICLES_PER_EMITTER",
-        "DT",
-        "TMAX",
-        "NSTEPS"
-    ]
+    def borisBoilerplate(self, param_dict=None):
+        """
+        Logs the values of a predefined set of simulation input parameters, indicating whether each was set or is using a default value.
+        Useful for recording the configuration of a simulation run for reproducibility and debugging.
 
-    # Build a dictionary of parameter values or '*DEFAULT*'
-    param_values = {}
-    for param in possible_input_parameters:
-        param_values[param] = globals().get(param, '*DEFAULT*')
-
-    self.log.info('\n|=======================================================================================|'
-                  +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_TOR"])
-                  +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_TOR"])
-                  +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_HEL"])
-                  +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_HEL"])
-                  +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
-                  +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
-                  +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
-                  +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_ELECTRIC"])
-                  +'\n|---------------------------------------------------------------------------------------|'
-                  +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(param_values["LCFS_INDEX"])
-                  +'\n| ION TEMPERATURE: {} eV'.format(param_values["ION_TEMP"])
-                  +'\n| ION MASS: {} amu'.format(param_values["ION_MASS"])
-                  +'\n| ION CHARGE: {}'.format(param_values["CHARGE_NUM"])
-                  +'\n|---------------------------------------------------------------------------------------|'
-                  +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format(
-                        len(param_values["DELTRS"]) if param_values["DELTRS"] != '*DEFAULT*' else '*DEFAULT*',
-                        param_values["NPARTICLES_PER_EMITTER"])
-                  +'\n|  --> TOTAL PARTICLES: {}'.format(
-                        (len(param_values["DELTRS"]) * param_values["NPHI"] * param_values["NTHETA"] * param_values["NPARTICLES_PER_EMITTER"])
-                        if all(param_values[x] != '*DEFAULT*' for x in ["DELTRS", "NPHI", "NTHETA", "NPARTICLES_PER_EMITTER"])
-                        else '*DEFAULT*')
-                  +'\n|---------------------------------------------------------------------------------------|'
-                  +'\n| TIME STEP: {} sec'.format(param_values["DT"])
-                  +'\n| TOTAL TIME: {:.6f} sec'.format(param_values["TMAX"] if param_values["TMAX"] != '*DEFAULT*' else 0)
-                  +'\n|  --> # OF TIME STEPS: {}'.format(param_values["NSTEPS"])
-                  +'\n|=======================================================================================|\n\n\n')
+        This method checks for parameter values first in the provided param_dict (e.g., globals() or locals() from the caller),
+        then as instance attributes of the IOHandler object, and if not found, attempts to retrieve them from global variables.
+        If none is found, '*DEFAULT*' is used.
+        """
+        # List of all possible input parameters to check if user has set them
+        possible_input_parameters = [
+            "FIELD_FILE_TOR",
+            "TOROIDAL_CURRENT",
+            "FIELD_SCALE_TOR",
+            "FIELD_FILE_HEL",
+            "HELICAL_CURRENT",
+            "FIELD_SCALE_HEL",
+            "ERRFIELD_MAG",
+            "ERRFIELD_DIR_DEG",
+            "FIELD_FILE_ELECTRIC",
+            "FIELD_SCALE_ELECTRIC",
+            "LCFS_INDEX",
+            "ION_TEMP",
+            "ION_MASS",
+            "CHARGE_NUM",
+            "DELTRS",
+            "NPHI",
+            "NTHETA",
+            "NPARTICLES_PER_EMITTER",
+            "DT",
+            "TMAX",
+            "NSTEPS"
+        ]
+    
+        # Build a dictionary of parameter values or '*DEFAULT*'
+        param_values = {}
+        for param in possible_input_parameters:
+            if param_dict is not None and param in param_dict:
+                param_values[param] = param_dict[param]
+            elif hasattr(self, param):
+                param_values[param] = getattr(self, param)
+            elif param in globals():
+                param_values[param] = globals()[param]
+            else:
+                param_values[param] = '*DEFAULT*'
+    
+        self.log.info('\n|=======================================================================================|'
+                      +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_TOR"])
+                      +'\n| LOADED TOROIDAL COIL CURRENT: {}'.format(param_values["TOROIDAL_CURRENT"])
+                      +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_TOR"])
+                      +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_HEL"])
+                      +'\n| LOADED HELICAL COIL CURRENT: {}'.format(param_values["HELICAL_CURRENT"])
+                      +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_HEL"])
+                      +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
+                      +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
+                      +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
+                      +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_ELECTRIC"])
+                      +'\n|---------------------------------------------------------------------------------------|'
+                      +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(param_values["LCFS_INDEX"])
+                      +'\n| ION TEMPERATURE: {} eV'.format(param_values["ION_TEMP"])
+                      +'\n| ION MASS: {} amu'.format(param_values["ION_MASS"])
+                      +'\n| ION CHARGE: {}'.format(param_values["CHARGE_NUM"])
+                      +'\n|---------------------------------------------------------------------------------------|'
+                      +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format(
+                            len(param_values["DELTRS"]) if param_values["DELTRS"] != '*DEFAULT*' else '*DEFAULT*',
+                            param_values["NPARTICLES_PER_EMITTER"])
+                      +'\n|  --> TOTAL PARTICLES: {}'.format(
+                            (len(param_values["DELTRS"]) * param_values["NPHI"] * param_values["NTHETA"] * param_values["NPARTICLES_PER_EMITTER"])
+                            if all(param_values[x] != '*DEFAULT*' for x in ["DELTRS", "NPHI", "NTHETA", "NPARTICLES_PER_EMITTER"])
+                            else '*DEFAULT*')
+                      +'\n|---------------------------------------------------------------------------------------|'
+                      +'\n| TIME STEP: {} sec'.format(param_values["DT"])
+                      +'\n| TOTAL TIME: {:.6f} sec'.format(param_values["TMAX"] if param_values["TMAX"] != '*DEFAULT*' else 0)
+                      +'\n|  --> # OF TIME STEPS: {}'.format(param_values["NSTEPS"])
+                      +'\n|=======================================================================================|\n\n\n')
