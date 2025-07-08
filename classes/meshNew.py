@@ -49,7 +49,7 @@ class Mesh:
         self.Bz: np.float64[:][:][:]
         self.periodicity: np.int32[:]
         self.errField: np.bool
-        ## Align with new mesh.py 
+
         self.err_mag = 0.0 #1.5654e-4 # [Tesla]
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
         self.cos_err_dir = 1.0 #np.cos(self.err_dir)
@@ -78,7 +78,7 @@ class Mesh:
             elif isinstance(att_mult, float):
                 att_mult = att_mult
             else:
-                print("ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
+                print(f"{self}: ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
                 att_mult = 1.0
 
             total_mult = att_mult * coilCurrent
@@ -128,7 +128,7 @@ class Mesh:
 
 
     # Align with new mesh.py
-    def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_poloidal'):
+    def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_helical'):
         """ 
         This function adds a vector field from a file to an existing vector field.
         The array sizes must match the existing mesh dimensions and periodicity is assumed the same
@@ -138,17 +138,17 @@ class Mesh:
         if Bx_.shape != self.Bx.shape or By_.shape != self.By.shape or Bz_.shape != self.Bz.shape:
             print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
         else:
-                        # check the attenuation multiplier
+            # check the attenuation multiplier
             if att_mult =='default_toroidal':
                 att_mult = 0.9448
-            elif att_mult =='default_poloidal':
+            elif att_mult =='default_helical':
                 att_mult = -0.955 * 0.9448
-            elif att_mult =='default_poloidal_rev':
+            elif att_mult =='default_helical_rev':
                 att_mult = 0.955 * 0.9448
             elif isinstance(att_mult, float):
                 att_mult = att_mult
             else:
-                print("ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
+                print(f"{self}: ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
                 att_mult = 1.0
 
             total_mult = att_mult * coilCurrent
@@ -246,6 +246,10 @@ class Mesh:
 
         r_lowr_el = r_low * r_el
         r_localinvr_el = r_local * invr_el
+        # above replaced with below in mesh.py to fix failing interp at r=0
+        #r_lowr_el = (r_low + r_el/2) * r_el
+        #r_localinvr_el = (r_local + invr_el/2) * invr_el
+
         # sub-element volumes
         A1 = (self.R0 + r_low*torch.cos(th_low))     * r_lowr_el      * th_el    * ph_el
         A2 = (self.R0 + r_local*torch.cos(th_low))   * r_localinvr_el * th_el    * ph_el

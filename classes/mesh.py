@@ -38,14 +38,20 @@ class Mesh:
         self.value: np.float64[:][:][:]
         self.periodicity: np.int32[:]
         self.errField: np.bool
-        self.err_mag = 2.828427E-4 * 1.2
-        self.err_dir = 270.* np.pi/180
-        self.cos_err_dir = np.cos(self.err_dir)
-        self.sin_err_dir = np.sin(self.err_dir)   
+        # self.err_mag = 2.828427E-4 * 1.2
+        # self.err_dir = 270.* np.pi/180
+        # self.cos_err_dir = np.cos(self.err_dir)
+        # self.sin_err_dir = np.sin(self.err_dir)   
+        self.err_mag = 0.0 #1.5654e-4 # [Tesla]
+        self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
+        self.cos_err_dir = 1.0 #np.cos(self.err_dir)
+        self.sin_err_dir = 0.0 #np.sin(self.err_dir)   
 
         self.att_mult = 1.0 
+        self.att_mult = 1.0 
 
-    def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
+    #def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
+    def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period_ = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
@@ -59,12 +65,26 @@ class Mesh:
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
             print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
         else:
+            # check the attenuation multiplier
+            if att_mult =='default_toroidal':
+                att_mult = 0.9448
+            elif att_mult =='default_poloidal':
+                att_mult = -0.955 * 0.9448
+            elif att_mult =='default_poloidal_rev':
+                att_mult = 0.955 * 0.9448
+            elif isinstance(att_mult, float):
+                att_mult = att_mult
+            else:
+                print(f"{self}: ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
+                att_mult = 1.0
+
+            total_mult = att_mult * coilCurrent
             self.nr, self.ntheta, self.nphi = Bx_.shape
             self.periodicity = period_
-            self.att_mult = att_mult
-            self.Bx = Bx_ * att_mult
-            self.By = By_ * att_mult
-            self.Bz = Bz_ * att_mult
+            #self.att_mult = att_mult
+            self.Bx = Bx_ * total_mult
+            self.By = By_ * total_mult
+            self.Bz = Bz_ * total_mult
             self.errField = errField
 
             # r periodicity
@@ -96,8 +116,10 @@ class Mesh:
                 self.phi_max = (2*np.pi)
                 self.dphi = self.phi_max / (self.nphi-1)
                 self.phi_min = 0.
+                
 
-    def addFieldPerturbation(self, file_path, att_mult=1.0):
+    #def addFieldPerturbation(self, file_path, att_mult=1.0):
+    def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_helical'):
         """ 
         This function adds a vector field from a file to an existing vector field.
         The array sizes must match the existing mesh dimensions and periodicity is assumed the same
@@ -107,11 +129,26 @@ class Mesh:
         if Bx_.shape != self.Bx.shape or By_.shape != self.By.shape or Bz_.shape != self.Bz.shape:
             print("INPUT ARRAY DIMENSIONS DO NOT MATCH!!")
         else:
-            self.Bx += (Bx_ * att_mult)
-            self.By += (By_ * att_mult)
-            self.Bz += (Bz_ * att_mult)
+            # check the attenuation multiplier
+            if att_mult =='default_toroidal':
+                att_mult = 0.9448
+            elif att_mult =='default_helical':
+                att_mult = -0.955 * 0.9448
+            elif att_mult =='default_helical_rev':
+                att_mult = 0.955 * 0.9448
+            elif isinstance(att_mult, float):
+                att_mult = att_mult
+            else:
+                print(f"{self}: ATT_MULT IS NOT A FLOAT OR DEFAULT VALUE!!")
+                att_mult = 1.0
 
-    def set_nonPer_errField(self, err_mag, err_dir):
+            total_mult = att_mult * coilCurrent
+
+            self.Bx += (Bx_ * total_mult)
+            self.By += (By_ * total_mult)
+            self.Bz += (Bz_ * total_mult)
+
+    def set_nonPer_errField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
         """This function sets the magnitude and direction (measured from the phi_c=0, i.e. 18degrees CW from the South Split)
           of the non-periodic error field. It also calculates the cosine and sine of the error direction for efficiency in the interpolation function"""
         self.err_mag = err_mag

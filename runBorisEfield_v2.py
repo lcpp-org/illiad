@@ -22,8 +22,8 @@ He_mass = 4.002602 #amu
 ############################
 
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
-TOROIDAL_CURRENT = 486. #[Amps]
-HELICAL_CURRENT = 900. #[Amps]
+TOROIDAL_CURRENT = 0.486 #[kA]
+HELICAL_CURRENT = 0.900 #[kA]
 
 # ELECTRIC FIELD
 FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
@@ -47,7 +47,7 @@ TMAX = 0.0006
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Z1_TraceTest'
+TAG= '60V_Z1_postSOFE_UPDATES'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -59,7 +59,7 @@ OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-simIO.borisBoilerplate()
+simIO.borisBoilerplate(globals())
 
 ## DEFINE STRING (FOR FILE NAME)
 delimiter = '-'
@@ -70,12 +70,13 @@ cond_string = dr_String + 'mm_{}eV_LCFS{}_'.format(int(ION_TEMP), int(LCFS_INDEX
 N_emitters = len(DELTRS) * NTHETA * NPHI
 N_particles = NPARTICLES_PER_EMITTER * N_emitters
 
-## DEFINE MESH AND LOAD FIELD
+## DEFINE MESH AND LOAD MAGNETIC FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult='default_toroidal')
 b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult='default_helical')
 b_hidra.set_nonPer_errField()
 
+## DEFINE MESH AND LOAD ELECTRIC FIELD
 e_hidra = Mesh(R0=0.72, a=0.19)
 e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
                                 att_mult=FIELD_SCALE_ELECTRIC)
