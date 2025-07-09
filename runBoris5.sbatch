@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --time=04:00:00                     # Job run time (hh:mm:ss)
+#SBATCH --time=03:00:00                     # Job run time (hh:mm:ss)
 #SBATCH --nodes=1                           # Number of nodes to request
 #SBATCH --ntasks-per-node=64                # Number of cpus per node
 #SBATCH --job-name=Boris5                   # Name of batch job

@@ -28,7 +28,7 @@ ERRFIELD_MAG = 1.5654e-4 # [Tesla]
 ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
-FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 
@@ -38,7 +38,7 @@ ION_MASS = Li_mass #amu
 CHARGE_NUM = 3 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 61#37 # from Poincare output (simIO.log)
+LCFS_INDEX = 37 #61
 NPHI = 120
 NTHETA = 72 #90
 DELTRS = [0.000]
@@ -50,7 +50,7 @@ TMAX = 0.001
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Li_Z3_SOFE25'
+TAG= '60V_Li_Z3_SOFE25-2'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -238,11 +238,6 @@ filename = 'Wallpt_OUTPUT_' + cond_string+TAG
 simIO.saveNumpyData(outputArray, filename)
 simIO.log.info('OUTPUT RESULT DATA: {}'.format(filename))
 
-
-##############
-## PLOTTING ##
-##############
-
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
 theta_plot = wallPtArray[1]
@@ -252,6 +247,9 @@ a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
+##############
+## PLOTTING ##
+##############
 ## PLOT HISTOGRAM OF WALL POINTS
 plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
 ## PLOT *3D* HISTOGRAM
@@ -277,6 +275,16 @@ plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=c
 
 # PLOT DEPOSITION ANGLE DISTRIBUTION
 plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
+
+
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+                            colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                            runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+                            colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                            runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')
