@@ -149,7 +149,7 @@ def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
     return boris_output_
 
 
-def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
+def boris_solver2(ions, dt, tmax, Bfield, Efield=None, trace_IDs=[]):
     """
     Function to take in a particle and field object and solves the particle path until termination event or tmax
     using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
@@ -160,6 +160,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         -tmax (float): Maximum simulation time.
         -Bfield (object): Magnetic field object providing field interpolation methods.
         -Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
+        -track_ID (list, optional): List of particle IDs to track. Defaults to [10, 20].
     Returns:
         -wallPts (torch.Tensor): XYZ Positions where particles terminate (e.g., hit the wall), shape (Nparticles, 3).
         -wallVelocities (torch.Tensor): Velocities of particles at termination, shape (Nparticles, 3).
@@ -172,6 +173,8 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
 
     Nparticles = len(ions)
     Nsteps = int((tmax // dt) + 1)
+    #trace_output = torch.zeros([len(trace_IDs), Nsteps+1, 3], dtype=torch.float64, device=device)
+    trace_output = torch.zeros([Nsteps+1, len(trace_IDs), 3], dtype=torch.float64, device=device)
 
     with torch.no_grad():
         wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
@@ -209,6 +212,9 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         running = torch.arange(0, Nparticles, 1, dtype=torch.int, device=device)
         Nrunning = Nparticles
 
+        # ADD SELECTED PARTICLE TRACING
+        trace_output[0] = pos_k[trace_IDs]
+
         log.info('START STEPPING...')
         logging.basicConfig(level=logging.INFO)
         with logging_redirect_tqdm(loggers=[log]):
@@ -226,6 +232,9 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
                 v_k[running] = vplus[running] + Evec[running]
 
                 pos_k[running] = pos_k[running] + v_k[running] * dt
+
+                # ADD SELECTED PARTICLE TRACING
+                trace_output[k] = pos_k[trace_IDs]
 
                 x2[running] = pos_k[running].T[0]**2
                 y2[running] = pos_k[running].T[1]**2
@@ -258,7 +267,7 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None):
         )
     )
 
-    return wallPts, wallVelocities, maxStep
+    return wallPts, wallVelocities, maxStep, trace_output
 
 def boris_solver(ion, dt, tmax, Bfield):
     """Function to take in a particle and field object and solves the particle path until termination even or tmax

@@ -20,20 +20,14 @@ He_mass = 4.002602 #amu
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
+
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
-FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_TOR = 0.9448
-FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
-ERRFIELD_MAG = 1.5654e-4 # [Tesla]
-ERRFIELD_DIR_DEG = 271.5 # [degrees]
+TOROIDAL_CURRENT = 0.486 #[kA]
+HELICAL_CURRENT = 0.900 #[kA]
 
 # ELECTRIC FIELD
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
 FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
-
 
 # ION PROPERTIES
 ION_TEMP = 2.0 #eV 
@@ -53,8 +47,7 @@ TMAX = 0.0006
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Z1_TraceTest'
-#TAG= 'PlotTest_newestE'
+TAG= '60V_Z1_postSOFE_UPDATES'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 
 
@@ -66,28 +59,7 @@ OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-simIO.log.info('\n|=======================================================================================|'
-              +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(FIELD_FILE_TOR)
-              +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_TOR)
-              +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(FIELD_FILE_HEL)
-              +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_HEL)
-              +'\n| LOADED ERRFIELD MAG: {}'.format(ERRFIELD_MAG)
-              +'\n| LOADED ERRFIELD DIR: {}'.format(ERRFIELD_DIR_DEG)
-              +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(FIELD_FILE_ELECTRIC)
-              +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_ELECTRIC)
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(LCFS_INDEX)
-              +'\n| ION TEMPERATURE: {} eV'.format(ION_TEMP)
-              +'\n| ION MASS: {} amu'.format(ION_MASS)
-              +'\n| ION CHARGE: {}'.format(CHARGE_NUM)
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format( len(DELTRS)*NPHI*NTHETA, NPARTICLES_PER_EMITTER )
-              +'\n|  --> TOTAL PARTICLES: {}'.format( len(DELTRS)*NPHI*NTHETA*NPARTICLES_PER_EMITTER )
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| TIME STEP: {} sec'.format(DT)
-              +'\n| TOTAL TIME: {:.6f} sec'.format(TMAX)
-              +'\n|  --> # OF TIME STEPS: {}'.format(NSTEPS)
-              +'\n|=======================================================================================|\n\n\n')
+simIO.borisBoilerplate(globals())
 
 ## DEFINE STRING (FOR FILE NAME)
 delimiter = '-'
@@ -98,18 +70,16 @@ cond_string = dr_String + 'mm_{}eV_LCFS{}_'.format(int(ION_TEMP), int(LCFS_INDEX
 N_emitters = len(DELTRS) * NTHETA * NPHI
 N_particles = NPARTICLES_PER_EMITTER * N_emitters
 
-## DEFINE MESH AND LOAD FIELD
+## DEFINE MESH AND LOAD MAGNETIC FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
-b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
-if FIELD_FILE_ELECTRIC:
-    e_hidra = Mesh(R0=0.72, a=0.19)
-    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                att_mult=FIELD_SCALE_ELECTRIC, errField=False )
-else:
-    e_hidra = None
+b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult='default_toroidal')
+b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult='default_helical')
+b_hidra.set_nonPer_errField()
 
+## DEFINE MESH AND LOAD ELECTRIC FIELD
+e_hidra = Mesh(R0=0.72, a=0.19)
+e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
+                                att_mult=FIELD_SCALE_ELECTRIC)
 
 
 ##########################
@@ -213,20 +183,10 @@ max_timeStep = max_timeStep.cpu().numpy()
 ion_traces = ion_traces.cpu().numpy()
 
 
-
 ## SAVE WALL POINTS AND VELOCITIES
 filenameTrac = 'Ion_traces_' + cond_string+TAG
 simIO.saveNumpyData(ion_traces, filenameTrac)
 simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
-
-# # make a 3d plot of ion_traces paths, ion_traces[timestep, particle, x,y,z]
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.mplot3d import Axes3D
-
-
-
-
-
 
 
 
