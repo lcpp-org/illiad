@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 import classes.class_outputHandler as out
 from classes.mesh import Mesh
+from classes.poincare import Poincare
 from utility.anlys_funcs import identifyLCFS
 from solver.poincare_gen import Gen_Poincare
 
@@ -19,8 +20,8 @@ FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
 #FIELD_FILE_HEL = 'input_files/It000_Ih790_Iv000_1p000_1p000_64bit.npy'
 
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
-TOROIDAL_CURRENT = 0.486 * 2 #[kA]
-HELICAL_CURRENT = 0.790 * 2  #[kA]
+TOROIDAL_CURRENT = 0.486 #[kA]
+HELICAL_CURRENT = 0.790  #[kA]
 
 #---------------------------#
 # DEFINE INITIAL CONDITIONS #
@@ -32,7 +33,7 @@ IC_THETA_DEG = 180.
 START_RADIUS = 0.140
 END_RADIUS = 0.020
 NLINES = 13 + 12 #+ 24 #+ 48
-SPINS = 250 # max length, SPIN = 2pi*R0 [meters]
+SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
 
 #-------------------#
 # SOLVER ARGUMENTS #
@@ -57,7 +58,7 @@ DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
 #-------------------------#
 #OUTPUT_DIR = "AcceptedIota4_1300spins_atole-8_halfTheLines"
-OUTPUT_DIR = "ChangetoIota4_200spins_25Lines_TESTX2"
+OUTPUT_DIR = "ChangetoIota4_200spins_25Lines_newClass2"
 
 def main():
     """Main function to set up the mesh, load magnetic field data, and generate Poincare plots."""
@@ -80,7 +81,10 @@ def main():
 
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
-    tMax = Gen_Poincare(init_conds_rtp, SPINS, b_hidra, simIO, 'Poincare', *solver_args)[0]
+    # tMax = Gen_Poincare(init_conds_rtp, SPINS, b_hidra, simIO, 'Poincare', *solver_args)[0]
+    PCare = Poincare(simIO, *solver_args)
+    PCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
+    tMax = PCare.generate()[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
     identifyLCFS(LCFStype='inner', iconds=ic_rad, t_maxs=tMax, outputHandler=simIO)

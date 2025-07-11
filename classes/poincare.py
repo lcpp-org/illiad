@@ -1,59 +1,79 @@
 import numpy as np
-#from math import degrees
+from scipy.integrate import solve_ivp
+from math import degrees
+
 from functools import partial
 import concurrent.futures as cf
 from time import perf_counter
+import matplotlib.pyplot as plt
 
-#import phi_events
 from phi_events import *
-from utility.anlys_funcs import Output_Poincare
-from solver.ode import solvePoincare
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
-from classes.particle import *
-
-#def Gen_Poincare(field_, fieldlines, outputHandler, anlys_name, solvr, rtl_, atl_, workers=40, saveData=True):
-def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LSODA', rtl_=1e-6, atl_=1e-16, workers=6, double_line=False, saveData=True):
-    outputHandler.createSubDir(anlys_name)
-    
-    ## CONVERT TO XYZ COORDS
-    NLINES = len(ic_rtp_arr)
-    ICs_XYZ = np.zeros(shape=(NLINES, 3))
-    for i in range(NLINES):
-        ICs_XYZ[i] = RTP_to_XYZ(ic_rtp_arr[i], field_.R0)
-
-    # NICELY-FORMATTED BOILERPLATE
-    outputHandler.log.info("+----------------+-------------------------+")
-    outputHandler.log.info("| Parameter      | Value                   |")
-    outputHandler.log.info("+----------------+-------------------------+")
-    outputHandler.log.info(f"| SOLVER         | {solvr:<23} |")
-    outputHandler.log.info(f"| RTOL           | {rtl_:<23} |")
-    outputHandler.log.info(f"| ATOL           | {atl_:<23} |")
-    outputHandler.log.info(f"| THREADS        | {workers:<23} |")
-    outputHandler.log.info("+----------------+-------------------------+")
-    outputHandler.log.info(f"| NLINES         | {NLINES:<23} |")
-    outputHandler.log.info(f"| SPINS          | {spins:<23} |")
-    outputHandler.log.info("| Initial Conditions (RTP):                |")
-    for ic in ic_rtp_arr:
-        outputHandler.log.info(f"|     {str(ic):<23}   |")
-    outputHandler.log.info("+----------------+-------------------------+")
+from classes.particle import fieldLine
 
 
-    ## GENERATE POINCARE DATA
-    length = (2*np.pi * field_.R0) * spins
-    fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
+class Poincare():
+    """Class to handle Poincare analysis of magnetic field lines.
+    This class initializes with the output handler and solver parameters, sets initial conditions,
+    and runs the solver in parallel for each particle. It also handles post-processing of the solver output.
+    Methods:
+        __init__(): Initialize the Poincare class with the given solver parameters.
+        set_conditions(): Set the field and initial conditions for the Poincare analysis.
+        parallel_solver(): Wrapper to run the solver in parallel
+        single_solver(): Run the solver for a single particle.
+        post_solver(): Process the solver output to extract path lengths and Poincare data.
+        generate(): Generate the Poincare analysis by running the solver and processing the output.
+        
+    """
+    def __init__(self, outputHandler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
+        """
+        Initialize the Poincare class with the given parameters.
+        """
+        self.IO = outputHandler
+        self.anlys_name = anlys_name
+        self.solver = solvr
+        self.r_tol = r_tol
+        self.a_tol = a_tol
+        self.workers = workers
+        self.double_line = double_line
 
-    ## SOLVER SETUP
-    Nlines = Particle.particleCount
+        self.IO.createSubDir(anlys_name)
+        self.IO.log.info("+----------------+-------------------------+")
+        self.IO.log.info("| Parameter      | Value                   |")
+        self.IO.log.info("+----------------+-------------------------+")
+        self.IO.log.info(f"| SOLVER         | {self.solver:<23} |")
+        self.IO.log.info(f"| RTOL           | {self.r_tol:<23} |")
+        self.IO.log.info(f"| ATOL           | {self.a_tol:<23} |")
+        self.IO.log.info(f"| THREADS        | {self.workers:<23} |")
+        self.IO.log.info("+----------------+-------------------------+")
 
-    if double_line:
-        # Add fieldlines in opposite direction
-        fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
 
-    ## EVENT LIST (avert your eyes)
-    #plot_angles = np.linspace( np.pi/20., 2*np.pi, 40)
-    plot_angles = np.linspace( np.pi/180., 2*np.pi, 360)
+    def set_conditions(self, ic_rtp_arr, spins, field, events=None):
+        """
+        Set the initial conditions for the Poincare analysis.
+        Parameters:
+            ic_rtp_arr (np.ndarray): Array of initial conditions in RTP format.
+            spins (int): Number of spins for the field lines.
+            field (Mesh): The magnetic field mesh object.
+            events (list, optional): List of events to be used in the solver. If None, default events are used.
+        """
 
-    """poincare_events = [ inVV,
+        self.nlines = len(ic_rtp_arr)
+        self.spins = spins
+        self.field = field
+
+        ## CONVERT TO XYZ COORDS
+        ICs_XYZ = np.zeros(shape=(self.nlines, 3))
+        for i in range(self.nlines):
+            ICs_XYZ[i] = RTP_to_XYZ(ic_rtp_arr[i], self.field.R0)
+        length = (2*np.pi * self.field.R0) * spins
+
+        self.fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
+        if self.double_line: 
+            self.fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
+
+
+        """poincare_events = [ inVV,
                         isphi9,
                         isphi18,
                         isphi27,
@@ -94,8 +114,7 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
                         isphi342,
                         isphi351,
                         isphi360]"""
-
-    poincare_events = [ inVV, 
+        poincare_events = [ inVV, 
                         isphi1, 
                         isphi2, 
                         isphi3, 
@@ -458,60 +477,200 @@ def Gen_Poincare(ic_rtp_arr, spins, field_, outputHandler, anlys_name, solvr='LS
                         isphi360] 
 
 
-    ## SOLVER
-    length = fieldlines[0].maxLife
-    solvePoincare_x = partial(solvePoincare, field=field_, solver=solvr, rtl= rtl_, atl=atl_, solver_events=poincare_events)
+        if events is None:
+            self.events = poincare_events
+            #plot_angles = np.linspace( np.pi/20., 2*np.pi, 40)
+            self.plot_angles = np.linspace( np.pi/180., 2*np.pi, 360)
+        else:
+            self.events = events
 
-    ## PARALLELIZATION WITH CONCURRENT FUTURES 'MAP' OVER EACH PARTICLE
-    outputHandler.log.info('Begin running {} ICs for max. {} spins...'.format(Nlines, int(length/(2*np.pi * field_.R0))))
-    t_start = perf_counter()
-    with cf.ProcessPoolExecutor(max_workers=workers) as executor:
-        solver_output = executor.map(solvePoincare_x, fieldlines)
-    t_stop = perf_counter()
-    tot_elapsed_time = t_stop - t_start
-    outputHandler.log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(tot_elapsed_time))
-
-    ## PARSE OUTPUT INTO LISTS
-    pathLength_=[]
-    Poincare_output_ = []
-    wall_output_ = []
-
-    for pLngth, out in solver_output:
-        pathLength_ += [pLngth]
-        Poincare_output_ += [out[1:]]
-        if out[0].any():
-            wall_output_ += [XYZ_to_RTP(out[0][0], field_.R0)]
-
-    if double_line:
-        # Combine the positive and negative fieldlines into one
-        pathLength_ = [pathLength_[i]+pathLength_[i+NLINES] for i in range(0,NLINES)]
-        for line_index in range(0,NLINES):
-            for event_index in range(len(Poincare_output_[line_index])):
-                arr_a = Poincare_output_[line_index][event_index]
-                arr_b = Poincare_output_[line_index+NLINES][event_index]
-                if arr_a.any() and arr_b.any():
-                    Poincare_output_[line_index][event_index] = np.vstack((arr_a, arr_b))
-        Poincare_output_ = Poincare_output_[:NLINES]
+        self.IO.log.info("+----------------+-------------------------+")
+        self.IO.log.info(f"| NLINES         | {self.nlines:<23} |")
+        self.IO.log.info(f"| SPINS          | {self.spins:<23} |")
+        self.IO.log.info("| Initial Conditions (RTP):                |")
+        for ic in ic_rtp_arr:
+            self.IO.log.info(f"|     {str(ic):<23}   |")
+        self.IO.log.info("+----------------+-------------------------+")
 
 
-    ## POST-SOLVER OUTPUT
-    ####################
-    import matplotlib.pyplot as plt
-    plt.rcParams.update({'font.size': 10})
-    plt.rcParams.update({'figure.autolayout':True})
+    def parallel_solver(self):
+        """Run the solver in parallel for each particle.
+        This method uses a process pool to handle multiple particles simultaneously.
+        Returns:
+            solver_output (list): A list of tuples containing the maximum time and event data for each particle.
+        """
 
-    outputHandler.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
-    plot_workers = min(workers, 16)
-    # LOOPING OVER EACH PHI ANGLE
-    iter_in = enumerate(plot_angles)
-    Output_Poincare_x = partial(Output_Poincare, field_=field_, Pdata=Poincare_output_,
-                                 anlys_name=anlys_name, outputHandler=outputHandler, saveData=saveData)
-    with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
-        outs = executor.map(Output_Poincare_x, iter_in)
-    
-    # EXECUTE GENERATOR
-    for out in outs:
-        outputHandler.log.info(out)
+        length = self.fieldlines[0].maxLife
+        single_solver_x = partial(self.single_solver, field=self.field, solver=self.solver, rtl=self.r_tol, atl=self.a_tol, solver_events=self.events)
+
+        self.IO.log.info('Begin running {} ICs for max. {} spins...'.format(self.nlines, int(length/(2*np.pi * self.field.R0))))
+        tic = perf_counter()
+        with cf.ProcessPoolExecutor(max_workers=self.workers) as executor:
+            collected_output = executor.map(single_solver_x, self.fieldlines)
+        toc = perf_counter()
+        self.IO.log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(toc - tic))
+
+        return collected_output
 
 
-    return pathLength_, Poincare_output_, wall_output_
+    def single_solver(self, particle, field, solver, rtl, atl, solver_events):
+        """Run the solver for a single particle.
+        This method initializes the particle's position and runs the solver, logging the results.
+        Parameters:
+            particle (fieldLine): The particle object containing initial conditions and properties.
+            field (Mesh): The magnetic field mesh object.
+            solver (str): The name of the solver to use.
+            rtl (float): Relative tolerance for the solver.
+            atl (float): Absolute tolerance for the solver.
+            solver_events (list): List of events to be used in the solver.
+        Returns:
+            tmax (float): The maximum time reached by the solver.
+            data (np.ndarray): The event data collected by the solver.
+        """
+
+        self.IO.log.info('Start IC: {}'.format(particle.particleID))
+        init_cond = particle.pos0_XYZ
+        maxLength = particle.maxLife
+
+        for event in solver_events:
+            if event.__name__ == 'inVV':
+                event.direction = -1.0
+            elif event.__name__ == 'isphi360':
+                event.direction = -particle.direction
+            else:
+                event.direction = particle.direction
+
+        tic = perf_counter()
+        fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
+                                args = ([field]),
+                                dense_output=False,
+                                events = solver_events, 
+                                method=solver, rtol=rtl, atol=atl)
+        toc = perf_counter()
+        elapsed_timeInd = toc - tic
+
+        tmax = np.max(fieldlines.t)
+
+        if fieldlines.status == 0: #solver ran to max. time
+            self.IO.log.info('Success!: Particle {} of {} took {:.4f} sec.\tEnd at tmax={:.3f}'
+                .format(particle.particleID,
+                        particle.particleCount,
+                        elapsed_timeInd,
+                        tmax))
+        elif fieldlines.status == 1: #termination event
+            self.IO.log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
+                .format(particle.particleID,
+                        particle.particleCount,
+                        elapsed_timeInd,
+                        fieldlines.t_events[0]))
+        else: #solver failure
+            self.IO.log.critical('FAILURE!: Particle {}'
+                .format(particle.particleID))
+
+        data = fieldlines.y_events[:]
+
+        return tmax, data
+
+
+    def post_solver(self, solver_output):
+        """This method processes the solver output to extract path lengths and Poincare data,
+        and prepares the data for plotting and output.
+        Parameters:
+            solver_output (list): The output from the solver, containing tuples of path lengths and event data.
+        Returns:
+            pathLength_ (list): List of path lengths for each particle.
+            Poincare_output_ (list): List of Poincare data for each particle.
+            wall_output_ (list): List of wall intersection data for each particle.
+        """
+        ## PARSE OUTPUT INTO LISTS
+        pathLength_=[]
+        Poincare_output_ = []
+        wall_output_ = []
+        for pLngth, out in solver_output:
+            pathLength_ += [pLngth]
+            Poincare_output_ += [out[1:]]
+            if isinstance(out[0], np.ndarray) and out[0].any():
+                wall_output_ += [XYZ_to_RTP(out[0][0], self.field.R0)]
+
+        if self.double_line:
+            # Combine the positive and negative fieldlines into one
+            pathLength_ = [pathLength_[i]+pathLength_[i+self.nlines] for i in range(0,self.nlines)]
+            for line_index in range(0,self.nlines):
+                for event_index in range(len(Poincare_output_[line_index])):
+                    arr_a = Poincare_output_[line_index][event_index]
+                    arr_b = Poincare_output_[line_index+self.nlines][event_index]
+                    if arr_a.any() and arr_b.any():
+                        Poincare_output_[line_index][event_index] = np.vstack((arr_a, arr_b))
+            Poincare_output_ = Poincare_output_[:self.nlines]
+
+
+        ## POST-SOLVER PLOTTING AND OUTPUT
+        ####################
+        # import matplotlib.pyplot as plt
+        plt.rcParams.update({'font.size': 10})
+        plt.rcParams.update({'figure.autolayout':True})
+
+        self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
+        plot_workers = min(self.workers, 16)
+        # LOOPING OVER EACH PHI ANGLE
+        iter_in = enumerate(self.plot_angles)
+
+        save_output_x = partial(self.save_output, Pdata=Poincare_output_, saveData=True)
+        with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
+            outs = executor.map(save_output_x, iter_in)
+        # EXECUTE GENERATOR
+        for out in outs:
+            self.IO.log.info(out)
+
+        return pathLength_, Poincare_output_, wall_output_
+
+
+    def save_output(self, iter, Pdata, saveData=True):
+        """Function to output Poincare Plots and data set at a given Phi angle"""
+        num_sets = len(Pdata)
+        rminor = self.field.a
+        rmajor = self.field.R0
+        n, phi_ = iter
+
+        fig = plt.figure(figsize=(6, 6))
+        ax = fig.add_subplot(111, polar=True)
+
+        maxLength = 0
+        for i in range(num_sets):
+            maxLength = max(maxLength, len(Pdata[i][n]))
+
+        # Looping over each initial condition
+        scatter_points = np.full([num_sets, 2, maxLength], fill_value=np.nan)
+        for i in range(num_sets):
+            t_pts = Pdata[i][n]
+            point_total = max(0, len(t_pts)-1)
+
+            for j in range(point_total):
+                scatter_points[i][1][j], scatter_points[i][0][j], dum = XYZ_to_RTP(t_pts[j][:3], rmajor)
+
+            plt.scatter(scatter_points[i][0][:point_total], scatter_points[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
+
+        if saveData:
+            fname = self.anlys_name + '_{:03.0f}'.format(degrees(phi_))
+            self.IO.saveNumpyData(scatter_points, fname)
+        else:
+            pass 
+
+        ax.set_rmax(rminor)
+        ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+        ax.yaxis.set_tick_params(labelsize=5)
+        ax.grid(linewidth = 0.25, linestyle=':', c='k')
+        phi_phys = (phi_ + (198 * np.pi/180.)) % (2*np.pi)  
+        plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys*180/np.pi, phi_*180/np.pi), loc='left')
+        plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_*180/np.pi)
+        self.IO.saveFig(plot_name, dpi=250)
+        plt.close()
+
+        return '\tPHI: {}'.format(phi_*(180/np.pi))
+
+
+    def generate(self):
+        """Generate Poincare plots based on the initial conditions and magnetic field."""
+        solv_out = self.parallel_solver()
+        pathLength_test, Poincare_output_test, wall_output_test = self.post_solver(solv_out)
+        return pathLength_test, Poincare_output_test, wall_output_test
