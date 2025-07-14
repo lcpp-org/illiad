@@ -9,7 +9,6 @@ import classes.class_outputHandler as out
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 from utility.anlys_funcs import identifyLCFS
-from solver.poincare_gen import Gen_Poincare
 
 #---------------#
 # DEFINE FIELDS #
@@ -81,10 +80,10 @@ def main():
 
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
-    # tMax = Gen_Poincare(init_conds_rtp, SPINS, b_hidra, simIO, 'Poincare', *solver_args)[0]
-    PCare = Poincare(simIO, *solver_args)
-    PCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
-    tMax = PCare.generate()[0]
+
+    PoinCare = Poincare(simIO, *solver_args)
+    PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
+    tMax = PoinCare.run()[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
     identifyLCFS(LCFStype='inner', iconds=ic_rad, t_maxs=tMax, outputHandler=simIO)
@@ -92,6 +91,4 @@ def main():
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
-if __name__ == '__main__':
-
-    main()
+if __name__ == '__main__': main()
