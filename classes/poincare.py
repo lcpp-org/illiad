@@ -15,11 +15,11 @@ from classes.particle import fieldLine
 class Poincare():
     """Class to handle Poincare analysis of magnetic field lines."""
 
-    def __init__(self, outputHandler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
+    def __init__(self, io_handler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
         """Initializes the Poincare class with the specified solver parameters and writes to log.
 
         Args:
-            outputHandler: An object responsible for handling output operations, such as logging and directory creation.
+            io_handler: An object responsible for handling output operations, such as logging and directory creation.
             solvr (str, optional): The ODE solver to use. Defaults to 'LSODA'.
             r_tol (float, optional): Relative tolerance for the solver. Defaults to 1e-6.
             a_tol (float, optional): Absolute tolerance for the solver. Defaults to 1e-16.
@@ -27,7 +27,7 @@ class Poincare():
             double_line (bool, optional): Whether to use double line integration. Defaults to False.
             anlys_name (str, optional): Name of the analysis or subdirectory. Defaults to 'Poincare'.
         """
-        self.IO = outputHandler
+        self.IO = io_handler
         self.anlys_name = anlys_name
         self.solver = solvr
         self.r_tol = r_tol
@@ -45,11 +45,11 @@ class Poincare():
         self.IO.log.info(f"| THREADS        | {self.workers:<23} |")
         self.IO.log.info("+----------------+-------------------------+")
 
-    def set_conditions(self, ic_rtp_arr, spins, field, events=None):
+    def set_conditions(self, init_pos_arr: np.ndarray, spins: int, field: Mesh, events=None):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
-            ic_rtp_arr (np.ndarray): Array of initial conditions in RTP (radius, theta, phi) format.
+            init_pos_arr (np.ndarray): Array of initial conditions in RTP (radius, theta, phi) format.
             spins (int): Number of spins for the field lines.
             field (Mesh): The magnetic field mesh object.
             events (list, optional): List of event functions to be used in the solver. If None, a default set of Poincare events is used.
@@ -57,14 +57,14 @@ class Poincare():
         Returns:
             None
         """
-        self.nlines = len(ic_rtp_arr)
+        self.nlines = len(init_pos_arr)
         self.spins = spins
         self.field = field
 
         ## CONVERT TO XYZ COORDS
         ICs_XYZ = np.zeros(shape=(self.nlines, 3))
         for i in range(self.nlines):
-            ICs_XYZ[i] = RTP_to_XYZ(ic_rtp_arr[i], self.field.R0)
+            ICs_XYZ[i] = RTP_to_XYZ(init_pos_arr[i], self.field.R0)
         length = (2*np.pi * self.field.R0) * spins
 
         self.fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
@@ -443,11 +443,11 @@ class Poincare():
         self.IO.log.info(f"| NLINES         | {self.nlines:<23} |")
         self.IO.log.info(f"| SPINS          | {self.spins:<23} |")
         self.IO.log.info("| Initial Conditions (RTP):                |")
-        for ic in ic_rtp_arr:
+        for ic in init_pos_arr:
             self.IO.log.info(f"|     {str(ic):<23}   |")
         self.IO.log.info("+----------------+-------------------------+")
 
-    def parallel_solver(self):
+    def parallel_solver(self) -> cf.ProcessPoolExecutor:
         """Runs the solver in parallel for each particle.
 
         This method uses a process pool of 'self.workers' to execute the solver for each field line in parallel,
@@ -528,84 +528,82 @@ class Poincare():
             solver_output (list): The output from the solver, containing tuples of path lengths and event data.
 
         Returns:
-            tuple: (pathLength_, Poincare_output_, wall_output_)
-                pathLength_ (list): List of path lengths for each particle.
-                Poincare_output_ (list): List of Poincare data for each particle.
-                wall_output_ (list): List of wall intersection data for each particle.
+            tuple: (path_lengths, poincare_points, wall_points)
+                path_lengths (list): List of path lengths for each particle.
+                poincare_points (list): List of Poincare data for each particle.
+                wall_points (list): List of wall intersection data for each particle.
         """
         ## PARSE OUTPUT INTO LISTS
-        pathLength_=[]
-        Poincare_output_ = []
-        wall_output_ = []
+        path_lengths = []
+        poincare_points = []
+        wall_points = []
         for pLngth, out in solver_output:
-            pathLength_ += [pLngth]
-            Poincare_output_ += [out[1:]]
+            path_lengths += [pLngth]
+            poincare_points += [out[1:]]
             if isinstance(out[0], np.ndarray) and out[0].any():
-                wall_output_ += [XYZ_to_RTP(out[0][0], self.field.R0)]
+                wall_points += [XYZ_to_RTP(out[0][0], self.field.R0)]
 
         if self.double_line:
             # Combine the positive and negative fieldlines into one
-            pathLength_ = [pathLength_[i]+pathLength_[i+self.nlines] for i in range(0,self.nlines)]
+            path_lengths = [path_lengths[i]+path_lengths[i+self.nlines] for i in range(0,self.nlines)]
             for line_index in range(0,self.nlines):
-                for event_index in range(len(Poincare_output_[line_index])):
-                    arr_a = Poincare_output_[line_index][event_index]
-                    arr_b = Poincare_output_[line_index+self.nlines][event_index]
+                for event_index in range(len(poincare_points[line_index])):
+                    arr_a = poincare_points[line_index][event_index]
+                    arr_b = poincare_points[line_index+self.nlines][event_index]
                     if arr_a.any() and arr_b.any():
-                        Poincare_output_[line_index][event_index] = np.vstack((arr_a, arr_b))
-            Poincare_output_ = Poincare_output_[:self.nlines]
-
-        ## POST-SOLVER PLOTTING AND OUTPUT
-        plt.rcParams.update({'font.size': 10})
-        plt.rcParams.update({'figure.autolayout':True})
+                        poincare_points[line_index][event_index] = np.vstack((arr_a, arr_b))
+            poincare_points = poincare_points[:self.nlines]
 
         self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
+        save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True)
         plot_workers = min(self.workers, 16)
         iter_in = enumerate(self.plot_angles)
-
-        save_output_x = partial(self.save_output, Pdata=Poincare_output_, saveData=True)
         with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
-            outs = executor.map(save_output_x, iter_in)
-        for out in outs:
-            self.IO.log.info(out)
+            list(executor.map(save_output_partial, iter_in))
 
-        return pathLength_, Poincare_output_, wall_output_
+        return path_lengths, poincare_points, wall_points
 
-    def save_output(self, iter, Pdata, saveData=True):
+    def save_output(self, iter, xyz_list, saveData=True):
         """Outputs Poincare plots and data set at a given phi angle.
 
         Args:
             iter (tuple): Tuple of (index, phi angle).
-            Pdata (list): List of Poincare data for each particle.
+            xyz_list (list): List of Poincare data for each particle.
             saveData (bool, optional): Whether to save the data. Defaults to True.
 
         Returns:
             str: Log message indicating the phi angle processed.
         """
-        num_sets = len(Pdata)
+        num_sets = len(xyz_list)
         rminor = self.field.a
         rmajor = self.field.R0
         n, phi_ = iter
 
+
+        plt.rcParams.update({'font.size': 10})
+        plt.rcParams.update({'figure.autolayout':True})
+
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
 
-        maxLength = 0
-        for i in range(num_sets):
-            maxLength = max(maxLength, len(Pdata[i][n]))
+        # maxLength = 0
+        # for i in range(num_sets):
+        #     maxLength = max(maxLength, len(Pdata[i][n]))
+        maxLength = max(len(xyz_list[i][n]) for i in range(num_sets))
 
-        scatter_points = np.full([num_sets, 2, maxLength], fill_value=np.nan)
+        radtheta_pts = np.full([num_sets, 2, maxLength], fill_value=np.nan)
         for i in range(num_sets):
-            t_pts = Pdata[i][n]
-            point_total = max(0, len(t_pts)-1)
+            xyz_points = xyz_list[i][n]
+            point_total = max(0, len(xyz_points)-1)
 
             for j in range(point_total):
-                scatter_points[i][1][j], scatter_points[i][0][j], dum = XYZ_to_RTP(t_pts[j][:3], rmajor)
+                radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], rmajor)[:2]
 
-            plt.scatter(scatter_points[i][0][:point_total], scatter_points[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
+            plt.scatter(radtheta_pts[i][0][:point_total], radtheta_pts[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
 
         if saveData:
             fname = self.anlys_name + '_{:03.0f}'.format(degrees(phi_))
-            self.IO.saveNumpyData(scatter_points, fname)
+            self.IO.saveNumpyData(radtheta_pts, fname)
 
         ax.set_rmax(rminor)
         ax.set_rticks(np.arange(0.0, 0.19, 0.02))
@@ -616,8 +614,8 @@ class Poincare():
         plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_*180/np.pi)
         self.IO.saveFig(plot_name, dpi=250)
         plt.close()
-
-        return '\tPHI: {}'.format(phi_*(180/np.pi))
+        self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_*180/np.pi))
+        #return '\tPHI: {}'.format(phi_*(180/np.pi))
 
     def run(self):
         """Generates Poincare plots based on the initial conditions and magnetic field.
