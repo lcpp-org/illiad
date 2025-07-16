@@ -42,12 +42,12 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     # shift origin of r, theta coordinates from geometric center to magnetic axis
     # then sort points on theta
     magCenterCoords = np.empty((th_size, 2))
-    RTP_delta = XYZ_to_RTP(XYZ_delta, Bfield.R0)
+    RTP_delta = XYZ_to_RTP(XYZ_delta, Bfield.R0)[1::-1]
     RTP_delta_rev = np.copy(RTP_delta)
-    RTP_delta_rev[1] = RTP_delta_rev[1] + np.pi
+    RTP_delta_rev[0] += np.pi
 
     for i, theta, in enumerate(th_in):
-        magCenterCoords[i] = axisShift(r_in[i], theta, *RTP_delta[:2])
+        magCenterCoords[i] = axisShift(theta, r_in[i], *RTP_delta)
 
     # Sort data in increasing theta
     sortedMagCenter = magCenterCoords[np.argsort(magCenterCoords[:,0])]
@@ -70,11 +70,10 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     seedPts_0 = splev(theta_evals, fSurface_splineParms)
     derivs =  splev(theta_evals, fSurface_splineParms, der=1)
 
-
     ## PLOTTING THE SPLINE FIT
     thetaPlot = np.linspace(0., 2*np.pi, 5000)
     rPlot = splev(thetaPlot, fSurface_splineParms)
-    geoCenterCoords = axisShift(rPlot, thetaPlot, *RTP_delta_rev[:2])
+    geoCenterCoords = axisShift(thetaPlot, rPlot, *RTP_delta_rev)
 
     rPlotGeo = geoCenterCoords[1]
     thetaPlotGeo = geoCenterCoords[0]
@@ -93,14 +92,13 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     outputHandler.saveFig(spline_name)
     plt.close()
 
-
     ## Calculating (and plotting) the seed points
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
     #output_ind_geo = np.zeros((Ntheta, 2))
-    output_ind_geo = np.zeros((Ntheta, 3))
     output_ind     = np.zeros((Ntheta, 3))
+    output_ind_geo = np.zeros((Ntheta, 3))
     output_ind_XYZ = np.zeros((Ntheta, 3))
     output_ind_normal = np.zeros((Ntheta, 3))
     plot_norm_rtp = np.zeros((Ntheta, 3))
@@ -115,7 +113,7 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
             seedPt = seedPts_0[i] + adj_dr
             
             # shift back to geometric axis
-            output_ind_geo[i][:2] = axisShift(seedPt, theta, *RTP_delta_rev[:2])
+            output_ind_geo[i][:2] = axisShift(theta, seedPt, *RTP_delta_rev)
             output_ind_geo[i][1] = min(Bfield.a, output_ind_geo[i][1])
             output_ind_geo[i][2] = phi # keep phi constant for all points in this shell
             # convert rtp vector to xyz

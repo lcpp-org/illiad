@@ -6,7 +6,6 @@ from tqdm import tqdm, trange
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 import numpy as np
-from math import degrees
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
@@ -78,50 +77,6 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
     outputHandler.log.info('LCFS_index = {}'.format(LCFS_index))
 
     return LCFS_index
-
-
-def Output_Poincare(iter, field_, Pdata, anlys_name, outputHandler=logging.getLogger(), saveData=True):
-    """Function to output Poincare Plots and data set at a given Phi angle"""
-    num_sets = len(Pdata)
-    rminor = field_.a
-    rmajor = field_.R0
-    n, phi_ = iter
-
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, polar=True)
-
-    maxLength = 0
-    for i in range(num_sets):
-        maxLength = max(maxLength, len(Pdata[i][n]))
-
-    # Looping over each initial condition
-    scatter_points = np.full([num_sets, 2, maxLength], fill_value=np.nan)
-    for i in range(num_sets):
-        t_pts = Pdata[i][n]
-        point_total = max(0, len(t_pts)-1)
-
-        for j in range(point_total):
-            scatter_points[i][1][j], scatter_points[i][0][j], dum = XYZ_to_RTP(t_pts[j][:3], rmajor)
-
-        plt.scatter(scatter_points[i][0][:point_total], scatter_points[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
-
-    if saveData:
-        fname = anlys_name + '_{:03.0f}'.format(degrees(phi_))
-        outputHandler.saveNumpyData(scatter_points, fname)
-    else:
-        pass 
-
-    ax.set_rmax(rminor)
-    ax.set_rticks(np.arange(0.0, 0.19, 0.02))
-    ax.yaxis.set_tick_params(labelsize=5)
-    ax.grid(linewidth = 0.25, linestyle=':', c='k')
-    phi_phys = (phi_ + (198 * np.pi/180.)) % (2*np.pi)  
-    plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys*180/np.pi, phi_*180/np.pi), loc='left')
-    plot_name = anlys_name +'/'+ anlys_name + '_phi={:03.0f}.png'.format(phi_*180/np.pi)
-    outputHandler.saveFig(plot_name, dpi=250)
-    plt.close()
-
-    return '\tPHI: {}'.format(phi_*(180/np.pi))
 
 
 def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
