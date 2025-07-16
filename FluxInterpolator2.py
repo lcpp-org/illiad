@@ -14,13 +14,13 @@ def main():
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
     simIO.createSubDir(ANLYS_SUBDIR)
-
-    ## DEFINE MESH AND LOAD FIELD
+    ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
-    b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-    b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
+    b_hidra.set_nonPer_errField()
     lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
+
 
     ## LOAD FLUX DATA
     filepath = ANLYS_SUBDIR  + '/'
@@ -35,11 +35,12 @@ def main():
     validSurf_name = filepath + 'ValidSurfaces.npy'
     valid_surface = simIO.loadNumpyData(validSurf_name)
     valid_surface[lcfs_index:] = True # manually set some surfaces to valid
+    valid_surface[39] = False # manually set some surfaces to valid
 
     # Load Magnetic Axis point:
     filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(N_surfaces-1)
     axis_array = simIO.loadNumpyData(filename_center)
-    filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(39)
+    filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(SMALLEST_ISLAND_INDEX)
     island_axis_array = simIO.loadNumpyData(filename_center_island)
 
     # Load LCFS file:
@@ -47,7 +48,8 @@ def main():
     lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
     print(f'{lcfs_points_full.shape=}')
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
-    linear_flux_array = flux_norm_array[:, 20]
+    linear_flux_array = flux_norm_array[:, 4]
+
     # find the indices where valid_surface is True
     valid_indices = np.where(valid_surface)[0]
 
@@ -69,15 +71,15 @@ def main():
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         # axes points
-        points = np.zeros([4,2])
+        points = np.zeros([MAX_SUBSETS+1,2])
         points[0] = axis_array[phi_index][0]
         points[1:] = island_axis_array[phi_index]
 
         print(f'Central axis point: {axis_array[phi_index][0]}')
-        print(f'Island axis points: {points[1]}, {points[2]}, {points[3]}')
+        print(f'Island axis points: {points}')
         
         # linear values for the axes points
-        flux_norm = np.ones([4])
+        flux_norm = np.ones([MAX_SUBSETS+1])
     
         ## LOAD SCATTER POINTS (POINCARE DATA)
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
@@ -165,46 +167,41 @@ def output_phi_plots(phi_deg, mesh_theta, mesh_rad, data, name, subdir, output_h
     plot_data = np.vstack((data[-1], data))
     c = ax.pcolormesh(mesh_theta, mesh_rad, plot_data, shading='gouraud', cmap=colormap, vmin=plotmin, vmax=plotmax)
 
-    #ax.set_ylim(0, 0.19)
-    #ax.set_xlim(0, 2*np.pi)
     ax.set_rmax(0.19)
-    #ax.set_rticks(np.arange(0.0, 0.19, 0.02))
     ax.set_rticks([])
-    #plt.grid(True, which='both', linewidth=0.2, color='grey')
     plt.grid(False)
     fig.colorbar(c, ax=ax, label='Flux')
 
     output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
-    #plt.show()
     plt.close()
-
 
 
 if __name__ == '__main__':
     #### DEFINE ANALYSIS PARAMETERS ####
     ## RUN DIRECTORY AND SUBDIRECTORY
-    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    #ANLYS_SUBDIR = 'LCFS22_3x360x360mesh_SMOOTHER_7p5e6'
-    ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_SOFE1'
 
-    # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
-    # ANLYS_SUBDIR = 'LCFS18_3x360x60mesh_Production1'
+    #ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+
+    # ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
+    # ANLYS_SUBDIR = "LCFS40_3x360x360mesh_UPDATED"
+
+    ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_CORRECTCURR_lotol'
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_TOR = 0.9448 #0.9452
     FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-    FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
-    ERRFIELD_MAG = 1.5654e-4 # [Tesla]
-    ERRFIELD_DIR_DEG = 271.5 # [degrees]
+    CURRENT_TOR = 0.486 #[kA]
+    CURRENT_HEL = 0.900 #[kA]
+    CONFIG_TOR = 'default_toroidal'
+    CONFIG_HEL = 'default_helical_rev'
 
-    ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    LCFS_INPUT = 33 #25 #22
-    ## DEFINE ANGLES TO EVALUATE AND PLOT
+    ## DEFINE LCFS AND ANGLES TO EVALUATE
+    LCFS_INPUT = 29 #22 #29?
     NPHI = 360
     NTHETA = 360
-
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
     MAX_SUBSETS = 3
+    SMALLEST_ISLAND_INDEX = 47 #53 #39
 
     main()
