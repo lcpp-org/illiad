@@ -434,10 +434,10 @@ class Poincare():
                         isphi360] 
 
         if events is None:
-            self.events = poincare_events
+            self.solver_events = poincare_events
             self.plot_angles = np.linspace(np.pi/180., 2*np.pi, 360)
         else:
-            self.events = events
+            self.solver_events = events
 
         self.IO.log.info("+----------------+-------------------------+")
         self.IO.log.info(f"| NLINES         | {self.nlines:<23} |")
