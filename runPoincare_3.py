@@ -34,9 +34,9 @@ ERRFIELD_DIR_DEG = 271.5 #[degrees]
 #IC_PHI_DEG = 324. #Accepted iota1/3
 IC_PHI_DEG = 180. #Accepted iota1/4
 IC_THETA_DEG = 180.
-START_RAD = 0.150
+START_RAD = 0.140
 END_RAD = 0.020
-NLINES = 14 + 13 + 26 + 52
+NLINES = 13 + 12 + 24 + 48
 SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
 
 #-------------------#
@@ -55,13 +55,13 @@ SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
 SOLVER = 'LSODA'
 RTOL = 2.49e-12
 ATOL = 2.49e-8
-NTHREADS = 124 #-1
+NTHREADS = 28 #-1
 DOUBLE_LINE = False
 
 #-------------------------#
 # DEFINE OUTPUT DIRECTORY #
 #-------------------------#
-OUTPUT_DIR = "AcceptedIota4_1500spins_atole-8_2"
+OUTPUT_DIR = "AcceptedIota4_1500spins_atole-8"
 #OUTPUT_DIR = "DELETEME"
 
 
@@ -92,7 +92,7 @@ def main():
     init_conds_rtp = np.array([[R, ic_theta, ic_phi] for R in ic_rad])
 
     ## GENERATE POINCARE PLOTS
-    #NTHREADS = 120 #os.cpu_count() - 1
+    NTHREADS = 63 #os.cpu_count() - 1
     # if NTHREADS <= 0:
     #     NTHREADS = os.cpu_count() + NTHREADS
     # else:
