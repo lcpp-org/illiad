@@ -53,7 +53,11 @@ class Mesh:
         self.err_mag = 0.0 #1.5654e-4 # [Tesla]
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
         self.cos_err_dir = 1.0 #np.cos(self.err_dir)
-        self.sin_err_dir = 0.0 #np.sin(self.err_dir)   
+        self.sin_err_dir = 0.0 #np.sin(self.err_dir)
+        self.xerr_adder = 0.0
+        self.yerr_adder = 0.0
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
+
 
         self.att_mult = 1.0 
 
@@ -125,6 +129,9 @@ class Mesh:
             self.err_mag = torch.tensor(self.err_mag, dtype=torch.float64).to(device)
             self.cos_err_dir = torch.tensor(self.cos_err_dir, dtype=torch.float64).to(device)
             self.sin_err_dir = torch.tensor(self.sin_err_dir, dtype=torch.float64).to(device)
+            self.xerr_adder = torch.tensor(self.xerr_adder, dtype=torch.float64).to(device)
+            self.yerr_adder = torch.tensor(self.yerr_adder, dtype=torch.float64).to(device)
+            self.err_adder = torch.tensor(self.err_adder, dtype=torch.float64).to(device)
 
 
     # Align with new mesh.py
@@ -164,6 +171,9 @@ class Mesh:
         self.err_dir = err_dir
         self.cos_err_dir = np.cos(err_dir)
         self.sin_err_dir = np.sin(err_dir)
+        self.xerr_adder = self.err_mag * self.cos_err_dir
+        self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         #print(f'{vec_XYZ=}')
@@ -187,22 +197,29 @@ class Mesh:
 
     def interpField(self, point_XYZ, Cart=True):
         """
-        Method to return the interpolated field values at a point defined in Cartesian coordinates
-        Interpolation done via a weighted sum of field values at each node of the enclosing cell
-        The weight function is calculated as the volume of the octant opposed to the node
-        Get the location of the point in RTP coordinates,
-        keep in domains:
-        r:        0.0 -> r_max     (minor Radius)
-        theta: dtheta -> theta_max (2pi/Nperiods)
-        phi:     dphi -> phi_max   (2pi/Nperiods)
-        """
+        Returns the interpolated field values at a point defined in Cartesian coordinates.
 
+        Interpolation is performed using a weighted sum of field values at each node of the enclosing cell.
+        The weights are calculated as the volume of the octant opposed to each node.
+
+        The input point is converted to RTP coordinates and kept within the following domains:
+            r: 0.0 to r_max (minor radius)
+            theta: dtheta to theta_max (2pi / Nperiods)
+            phi: dphi to phi_max (2pi / Nperiods)
+
+        Args:
+            point_XYZ (torch.Tensor): Input point(s) in Cartesian coordinates.
+            Cart (bool): If True, input is in Cartesian coordinates; otherwise, RTP coordinates.
+
+        Returns:
+            torch.Tensor: Tensor of shape (3, Npts), where Npts is the number of input points.
+            Each column corresponds to the interpolated field vector [Bx, By, Bz] at the respective point.
+        """
         ## Sanitize input (or make sure we are passing torch tensors!)
         #print(f'{len(point_XYZ.shape)=}')
         #if len(point_XYZ.shape) < 2: # if we passed a single vector
         #point_XYZ = torch.tensor([point_XYZ], dtype=torch.float64).to(device)
         #print(f'{point_XYZ.shape=}')
-        
         Npts = torch.int64
         if len(point_XYZ.shape) < 2:
             Npts = 1
@@ -303,9 +320,9 @@ class Mesh:
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, -phi_rotation)
 
         if self.errField:
-            vecXYZ[0] += self.err_mag * self.cos_err_dir
-            vecXYZ[1] -= self.err_mag * self.sin_err_dir
-
+            # vecXYZ[0] += self.xerr_adder
+            # vecXYZ[1] -= self.yerr_adder
+            vecXYZ += self.err_adder
         return vecXYZ
 
 ###

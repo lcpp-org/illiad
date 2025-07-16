@@ -46,8 +46,10 @@ class Mesh:
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
         self.cos_err_dir = 1.0 #np.cos(self.err_dir)
         self.sin_err_dir = 0.0 #np.sin(self.err_dir)   
+        self.xerr_adder = 0.0
+        self.yerr_adder = 0.0
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
 
-        self.att_mult = 1.0 
         self.att_mult = 1.0 
 
     #def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
@@ -155,6 +157,10 @@ class Mesh:
         self.err_dir = err_dir
         self.cos_err_dir = np.cos(err_dir)
         self.sin_err_dir = np.sin(err_dir)
+        self.xerr_adder = self.err_mag * self.cos_err_dir
+        self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
+
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
@@ -271,8 +277,9 @@ class Mesh:
     
         if self.errField: # non-periodic perturbative error field applied
             #vecXYZ *= self.att_mult
-            vecXYZ[0] += self.err_mag * self.cos_err_dir
-            vecXYZ[1] -= self.err_mag * self.sin_err_dir
+            # vecXYZ[0] += self.err_mag * self.cos_err_dir
+            # vecXYZ[1] -= self.err_mag * self.sin_err_dir
+            vecXYZ += self.err_adder
 
         return vecXYZ, ph_localN
     
