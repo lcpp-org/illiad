@@ -7,7 +7,7 @@ import concurrent.futures as cf
 from time import perf_counter
 import matplotlib.pyplot as plt
 
-from phi_events import *
+from utility.phi_events import *
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 from classes.particle import fieldLine
 
