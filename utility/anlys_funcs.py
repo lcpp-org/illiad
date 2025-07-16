@@ -1,5 +1,11 @@
+"""Utility functions for analyzing field lines and particle trajectories in plasma physics simulations.
 
-#if __name__ == '__main__':
+This module is designed to work with the Poincare and Mesh classes.
+
+Functions:
+    identifyLCFS: Identifies the Last-Closed Flux Surface (LCFS).
+    boris_solver2: Implements a Boris solver for collisionless particle motion in magnetic and electric fields.
+"""
 import logging
 from time import perf_counter
 from tqdm import tqdm, trange
@@ -10,20 +16,26 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-from functools import partial
-import concurrent.futures as cf
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ, axisShift
-import phi_events
-
 
 def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=logging.getLogger(), num=11):
-    """Function returns the index of the Last-Closed Flux Surface, with the option
-        to input it directly, or determine it as the outermost confined surface, 
-        or the confined surface innward from the first unconfined surface. """
+    """Returns the index of the Last-Closed Flux Surface (LCFS).
 
+    Args:
+        LCFStype (str): Method to identify LCFS. One of 'inner', 'outer', or 'input'.
+        iconds (list): List of initial conditions (e.g., minor radii).
+        t_maxs (list): List of connection lengths for each initial condition.
+        outputHandler: Handler for logging and figure saving.
+        num (int): Index to use if LCFStype is 'input'.
+
+    Returns:
+        int: Index of the identified LCFS.
+
+    Raises:
+        ValueError: If LCFStype is not one of ['inner', 'outer', 'input'].
+    """
     LCFStypes = ['inner', 'outer', 'input']
     if LCFStype not in LCFStypes:
         raise ValueError("Invalid LCFS type. Expected one of: %s" % LCFStypes)
@@ -77,32 +89,6 @@ def identifyLCFS(LCFStype='inner', iconds=[0], t_maxs=[100], outputHandler=loggi
     outputHandler.log.info('LCFS_index = {}'.format(LCFS_index))
 
     return LCFS_index
-
-
-def boris_wrapper(ion_list, b_hidra, ion_temp_eV, dt, tmax, dr_String):
-    ion_ = ion_list[0]
-    log = logging.getLogger()
-    log.info('###########################################################################')
-    log.info('RUNNING BORIS-BUNEMAN SOLVER WITH NEW ION SEED POINTS:')
-    log.info('Initial Conditions:\t{} points'.format(len(ion_list)))
-    log.info('Ions:\tmass={}[amu], q={}[Coulomb], ion temp.={}[eV]'#, initial velocity={:.0f} [m/s]'
-             .format(ion_.mass, ion_.charge, ion_temp_eV))#, init_v_phi))
-    log.info('Shells generated at delta-r(s) of {}mm from LCFS'.format(dr_String))
-    log.info('SOLVER SETTINGS: tmax: {}sec., dt: {}sec., N={}pts'.format(tmax, dt, int(tmax/dt)))
-    log.info('###########################################################################\n')
-
-
-    ## PARALLELIZATION WITH CONCURRENT FUTURES 'MAP' OVER EACH PARTICLE
-    boris_x = partial(boris_solver, dt=dt, tmax=tmax, Bfield=b_hidra)
-    t_start = perf_counter()
-    with cf.ProcessPoolExecutor(max_workers=6) as executor:
-        boris_output_ = executor.map(boris_x, ion_list)#, chunksize=2)
-    t_stop = perf_counter()
-    tot_elapsed_time = t_stop - t_start
-    log.info('ALL SOLVERS FINISHED IN {} seconds\n###############\n\n'.format(tot_elapsed_time))
-
-    return boris_output_
-
 
 def boris_solver2(ions, dt, tmax, Bfield, Efield=None, trace_IDs=[]):
     """
@@ -223,81 +209,3 @@ def boris_solver2(ions, dt, tmax, Bfield, Efield=None, trace_IDs=[]):
     )
 
     return wallPts, wallVelocities, maxStep, trace_output
-
-def boris_solver(ion, dt, tmax, Bfield):
-    """Function to take in a particle and field object and solves the particle path until termination even or tmax
-       using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4)"""
-    log = logging.getLogger()
-    log.info('Start IC: {}, {}'.format(ion.particleID, ion.pos0_XYZ))
-    t_startInd = perf_counter()
-
-    B = np.empty(3, dtype=np.float64)
-    wallPt = np.zeros(3)
-    N = int((tmax // dt) + 1)
-    # Need particle parms: qdt2m, v0, p0
-    qdt2m = ion.charge_mass_ratio * dt/2
-    #print(f'{qdt2m=}')
-    ion.setPosition(0, ion.pos0_XYZ)
-
-
-    v_k = ion.vel0_XYZ
-
-    # Need v_n-1/2 to start
-    B, dum_ = Bfield.interpField(ion.pos_XYZ[0])
-
-    tvec = qdt2m * B# tvec given by (4-4, Eq11)
-
-    vprime = v_k + np.array([v_k[1]*tvec[2] - v_k[2]*tvec[1], 
-                         v_k[2]*tvec[0] - v_k[0]*tvec[2],
-                         v_k[0]*tvec[1] - v_k[1]*tvec[0]])   #np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
-    
-    svec = 2*tvec / ( 1 + (np.linalg.norm(tvec)*np.linalg.norm(tvec)) )# svec given by (4-4, Eq13)
-
-    vplus = v_k -  np.array([vprime[1]*svec[2] - vprime[2]*svec[1], 
-                            vprime[2]*svec[0] - vprime[0]*svec[2],
-                            vprime[0]*svec[1] - vprime[1]*svec[0]]) / 2 # from vminus, vprime, svec (4-4, Eq12), get vplus 
-
-    v_k = vplus
-
-    ## STEPPING THROUGH DTs
-    for k in range(N-1):
-        B, dum_ = Bfield.interpField(ion.pos_XYZ[k])
-
-        tvec = qdt2m * B# tvec given by (4-4, Eq11)
-
-        #vprime = v_k + np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
-        vprime = v_k + np.array([v_k[1]*tvec[2] - v_k[2]*tvec[1], 
-                                 v_k[2]*tvec[0] - v_k[0]*tvec[2],
-                                 v_k[0]*tvec[1] - v_k[1]*tvec[0]])   #np.cross(v_k, tvec)# vminus is incremented (4-4, Eq10), get vprime
-
-        svec = 2*tvec / ( 1 + (np.linalg.norm(tvec)*np.linalg.norm(tvec)) )# svec given by (4-4, Eq13)
-
-        #vplus = v_k + np.cross(vprime, svec)# from vminus, vprime, svec (4-4, Eq12), get vplus 
-        vplus = v_k + np.array([vprime[1]*svec[2] - vprime[2]*svec[1], 
-                                vprime[2]*svec[0] - vprime[0]*svec[2],
-                                vprime[0]*svec[1] - vprime[1]*svec[0]]) # from vminus, vprime, svec (4-4, Eq12), get vplus 
-
-        xplus = ion.pos_XYZ[k] + vplus*dt # from vplus, dt, get xplus
-        v_k = vplus
-        ion.setPosition(k+1, xplus)
-        
-        ion.maxLife = (k+1)*dt
-        if phi_events.inVV(1, ion.pos_XYZ[k+1], Bfield) < 0.0:
-            ion.terminated = True
-            wallPt = ion.pos_XYZ[k+1]
-            break
-
-    t_stopInd = perf_counter()
-    elapsed_timeInd = t_stopInd - t_startInd
-
-    if ion.terminated:
-        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t={:.5f}, k={}'
-                 .format(ion.particleID, ion.particleCount, elapsed_timeInd, ion.maxLife, ion.maxLife//dt))
-    else:
-        log.info('Success!: Particle {} of {} took {:.5f} sec.\tWall Event at t='
-                 .format(ion.particleID, ion.particleCount, elapsed_timeInd))
-        
-    return (wallPt, ion.pos_XYZ)
-
-
-
