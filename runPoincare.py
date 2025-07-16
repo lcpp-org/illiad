@@ -10,29 +10,35 @@ from classes.mesh import Mesh
 from classes.poincare import Poincare
 from utility.anlys_funcs import identifyLCFS
 
+#-------------------------#
+# DEFINE OUTPUT DIRECTORY #
+#-------------------------#
+OUTPUT_DIR = "AcceptedIota5_400spins_49Lines"
+
 #---------------#
 # DEFINE FIELDS #
 #---------------#
-FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_TOR = 0.9448
-FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-#FIELD_FILE_HEL = 'input_files/It000_Ih790_Iv000_1p000_1p000_64bit.npy'
-
-# TOROIDAL AND HELICAL MAGNETIC FIELDS
-TOROIDAL_CURRENT = 0.486 #[kA]
-HELICAL_CURRENT = 0.790  #[kA]
+CURRENT_TOR = 0.486 #[kA]
+CURRENT_HEL = 0.710 #[kA]
+CONFIG_TOR = 'default_toroidal'
+CONFIG_HEL = 'default_helical'
 
 #---------------------------#
 # DEFINE INITIAL CONDITIONS #
 #---------------------------#
 #IC_PHI_DEG = 324. #Accepted iota1/3
 #IC_PHI_DEG = 180. #Accepted iota1/4
-IC_PHI_DEG = 144. #ChangeTo iota1/4
+IC_PHI_DEG = 360. #Accepted iota1/5
+
+#IC_PHI_DEG = ?? #ChangeTo iota1/3
+#IC_PHI_DEG = 144. #ChangeTo iota1/4
+#IC_PHI_DEG = ?? #ChangeTo iota1/5
+
 IC_THETA_DEG = 180.
 START_RADIUS = 0.140
 END_RADIUS = 0.020
-NLINES = 13 + 12 #+ 24 #+ 48
-SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
+NLINES = 13 + 12 + 24 #+ 48
+SPINS = 400 # max length, SPIN = 2pi*R0 [meters]
 
 #-------------------#
 # SOLVER ARGUMENTS #
@@ -50,14 +56,9 @@ SPINS = 200 # max length, SPIN = 2pi*R0 [meters]
 SOLVER = 'LSODA'
 RTOL = 2.49e-12
 ATOL = 2.49e-8
-NTHREADS = 30 #-1
+NTHREADS = 31 #-1
 DOUBLE_LINE = False
 
-#-------------------------#
-# DEFINE OUTPUT DIRECTORY #
-#-------------------------#
-#OUTPUT_DIR = "AcceptedIota4_1300spins_atole-8_halfTheLines"
-OUTPUT_DIR = "ChangetoIota4_200spins_25Lines_newClass2"
 
 def main():
     """Main function to set up the mesh, load magnetic field data, and generate Poincare plots."""
@@ -68,9 +69,9 @@ def main():
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult='default_toroidal')
-    b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult='default_helical_rev')
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
     b_hidra.set_nonPer_errField()
+    b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
     ## SET UP INITIAL CONDITIONS
     ic_rad = np.array(np.linspace(START_RADIUS, END_RADIUS, NLINES))

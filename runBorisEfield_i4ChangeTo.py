@@ -16,47 +16,41 @@ kg_per_amu = 1.660_539_068E-27
 kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
+Ar_mass = 39.948 #amu
 
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
-FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_TOR = 0.9448
-FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
-ERRFIELD_MAG = 1.5654e-4 # [Tesla]
-ERRFIELD_DIR_DEG = 271.5 # [degrees]
+TOROIDAL_CURRENT = 0.486 #[kA]
+HELICAL_CURRENT = 0.790 #[kA]
+CONFIG_TOR = 'default_toroidal'
+CONFIG_HEL = 'default_helical_rev'
 
 # ELECTRIC FIELD
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
-# FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
-FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_ChangeToIota4.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
-
 # ION PROPERTIES
-ION_TEMP = 2.0 #eV 
-ION_MASS = Li_mass #amu
+ION_MASS = Ar_mass # amu
+ION_TEMP = 2.0 # eV 
 CHARGE_NUM = 1 # Z
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
+LCFS_INDEX = 39 #29 #40 # from Poincare output (simIO.log)
 NPHI = 60
 NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 15 #300
+NPARTICLES_PER_EMITTER = 100 #300
 
-# SIMULATION PARAMETERS
+# SOLVER PARAMETERS
 DT = 1e-8
-TMAX = 0.0006
+TMAX = 0.001
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Z1_TraceTest'
-#TAG= 'PlotTest_newestE'
-OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-
+TAG = "1ms_argon"
+OUTPUT_DIRECTORY_NAME = "ChangetoIota4_1500spins_atole-8_eng"
 
 
 #####################
@@ -66,50 +60,27 @@ OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-simIO.log.info('\n|=======================================================================================|'
-              +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(FIELD_FILE_TOR)
-              +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_TOR)
-              +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(FIELD_FILE_HEL)
-              +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_HEL)
-              +'\n| LOADED ERRFIELD MAG: {}'.format(ERRFIELD_MAG)
-              +'\n| LOADED ERRFIELD DIR: {}'.format(ERRFIELD_DIR_DEG)
-              +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(FIELD_FILE_ELECTRIC)
-              +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(FIELD_SCALE_ELECTRIC)
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(LCFS_INDEX)
-              +'\n| ION TEMPERATURE: {} eV'.format(ION_TEMP)
-              +'\n| ION MASS: {} amu'.format(ION_MASS)
-              +'\n| ION CHARGE: {}'.format(CHARGE_NUM)
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| RUNNING {} EMITTERS WITH {} PARTICLES PER EMITTER'.format( len(DELTRS)*NPHI*NTHETA, NPARTICLES_PER_EMITTER )
-              +'\n|  --> TOTAL PARTICLES: {}'.format( len(DELTRS)*NPHI*NTHETA*NPARTICLES_PER_EMITTER )
-              +'\n|---------------------------------------------------------------------------------------|'
-              +'\n| TIME STEP: {} sec'.format(DT)
-              +'\n| TOTAL TIME: {:.6f} sec'.format(TMAX)
-              +'\n|  --> # OF TIME STEPS: {}'.format(NSTEPS)
-              +'\n|=======================================================================================|\n\n\n')
+simIO.borisBoilerplate(globals())
 
 ## DEFINE STRING (FOR FILE NAME)
 delimiter = '-'
 dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
-cond_string = dr_String + 'mm_{}eV_LCFS{}_'.format(int(ION_TEMP), int(LCFS_INDEX))
+cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP), int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
 
 ## CALCULATE SOME CONSTANTS
 N_emitters = len(DELTRS) * NTHETA * NPHI
 N_particles = NPARTICLES_PER_EMITTER * N_emitters
 
-## DEFINE MESH AND LOAD FIELD
+## DEFINE MESH AND LOAD MAGNETIC FIELD
 b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=FIELD_SCALE_TOR, errField=True )
-b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=FIELD_SCALE_HEL)
-b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
-if FIELD_FILE_ELECTRIC:
-    e_hidra = Mesh(R0=0.72, a=0.19)
-    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                att_mult=FIELD_SCALE_ELECTRIC, errField=False )
-else:
-    e_hidra = None
+b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
+b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
+b_hidra.set_nonPer_errField()
 
+## DEFINE MESH AND LOAD ELECTRIC FIELD
+e_hidra = Mesh(R0=0.72, a=0.19)
+e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
+                                att_mult=FIELD_SCALE_ELECTRIC)
 
 
 ##########################
@@ -190,7 +161,6 @@ for ion, v_0 in zip(ion_list, initVel_array):
     ion.initOutput(DT, TMAX)
 
 
-
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
@@ -199,7 +169,6 @@ particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
 #wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
 wallPt_output, velocity_output, max_timeStep, ion_traces = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra, particle_tracker_list)
 simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
-
 
 
 ####################
@@ -213,20 +182,10 @@ max_timeStep = max_timeStep.cpu().numpy()
 ion_traces = ion_traces.cpu().numpy()
 
 
-
 ## SAVE WALL POINTS AND VELOCITIES
 filenameTrac = 'Ion_traces_' + cond_string+TAG
 simIO.saveNumpyData(ion_traces, filenameTrac)
 simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
-
-# # make a 3d plot of ion_traces paths, ion_traces[timestep, particle, x,y,z]
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.mplot3d import Axes3D
-
-
-
-
-
 
 
 
@@ -257,7 +216,6 @@ simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.
 toc = perf_counter()
 simIO.log.info('Output sent to cpu and converted to rtp in {}sec'.format(toc-tic))
 
-
 ## SAVE WALL POINTS AND VELOCITIES
 filename = 'Wallpt_OUTPUT_' + cond_string+TAG
 simIO.saveNumpyData(outputArray, filename)
@@ -278,40 +236,44 @@ theta_plot_deg = theta_plot*(180/np.pi)
 
 plotFuncs.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
-# ## PLOT HISTOGRAM OF WALL POINTS
-# plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-# ## PLOT *3D* HISTOGRAM
-# plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
+## PLOT HISTOGRAM OF WALL POINTS
+plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
 
+## PLOT *3D* HISTOGRAM
+plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
 # ## PLOT DISCRETE WALL POINTS
 # plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
+
 # ## PLOT DISCRETE WALL POINTS with Energy Colorscale
 # plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
 #                           runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
+
 # ## PLOT DISCRETE WALL POINTS with Angle Colorscale
 # plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
 #                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
-
-# ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
+## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
 # plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # PLOT FINAL ENERGY DISTRIBUTION
-# plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # Plot # of perticles running over time
-# plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
-# # PLOT DEPOSITION ANGLE DISTRIBUTION
+# ## PLOT FINAL ENERGY DISTRIBUTION
+# plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
+
+# ## PLOT DEPOSITION ANGLE DISTRIBUTION
 # plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
+## PLOT # OF PARTICLES RUNNING OVER TIME
+plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
-#                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-#                             runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+## C-C-COMBO PLOTS!
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+                            colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                            runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
 
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
-#                             colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-#                             runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+## C-C-COMBO PLOTS!
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+                            colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                            runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
 
 
 ## END RUN ##

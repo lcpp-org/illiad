@@ -16,4 +16,4 @@
 module load python/3
 export PYTHONPATH=${HOME}/scratch/mypython3:${PYTHONPATH}
 
-python3 runPoincare_2.py
+python3 runPoincare.py
