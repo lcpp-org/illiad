@@ -9,12 +9,9 @@ import matplotlib.pyplot as plt
 
 from utility.phi_events import *
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
-from classes.particle import fieldLine
-
-
+from classes.particle import FieldLine
 class Poincare():
     """Class to handle Poincare analysis of magnetic field lines."""
-
     def __init__(self, io_handler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
         """Initializes the Poincare class with the specified solver parameters and writes to log.
 
@@ -67,9 +64,9 @@ class Poincare():
             ICs_XYZ[i] = RTP_to_XYZ(init_pos_arr[i], self.field.R0)
         length = (2*np.pi * self.field.R0) * spins
 
-        self.fieldlines = [fieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
+        self.fieldlines = [FieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
         if self.double_line: 
-            self.fieldlines += [fieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
+            self.fieldlines += [FieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
 
         poincare_events = [ inVV, 
                         isphi1, 
@@ -471,7 +468,7 @@ class Poincare():
         """Runs the solver for a single particle.
 
         Args:
-            particle (fieldLine): The particle object containing initial conditions and properties.
+            particle (FieldLine): The particle object containing initial conditions and properties.
 
         Returns:
             tuple: (tmax, data) where tmax is the maximum time reached by the solver,
@@ -564,58 +561,56 @@ class Poincare():
         return path_lengths, poincare_points, wall_points
 
     def save_output(self, iter, xyz_list, saveData=True):
-        """Outputs Poincare plots and data set at a given phi angle.
-
+        """
+        Generates and saves Poincare plots and associated data for a given phi angle, and logs the operation.
+            
         Args:
-            iter (tuple): Tuple of (index, phi angle).
-            xyz_list (list): List of Poincare data for each particle.
-            saveData (bool, optional): Whether to save the data. Defaults to True.
-
+            iter (tuple): A tuple containing the index and phi angle (in radians).
+            xyz_list (list): A list of Poincare data arrays for each particle.
+            saveData (bool, optional): If True, saves the computed data to disk. Defaults to True.
+        
         Returns:
-            str: Log message indicating the phi angle processed.
+            None
+
+        Side Effects:
+            - Saves plot images and data files to disk.
+            - Logs the phi angle information.
         """
         num_sets = len(xyz_list)
         rminor = self.field.a
         rmajor = self.field.R0
-        n, phi_ = iter
-
-
+        n, phi = iter
+        phi_deg = phi*180/np.pi
         plt.rcParams.update({'font.size': 10})
         plt.rcParams.update({'figure.autolayout':True})
 
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
 
-        # maxLength = 0
-        # for i in range(num_sets):
-        #     maxLength = max(maxLength, len(Pdata[i][n]))
         maxLength = max(len(xyz_list[i][n]) for i in range(num_sets))
-
         radtheta_pts = np.full([num_sets, 2, maxLength], fill_value=np.nan)
         for i in range(num_sets):
             xyz_points = xyz_list[i][n]
             point_total = max(0, len(xyz_points)-1)
-
             for j in range(point_total):
                 radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], rmajor)[:2]
-
             plt.scatter(radtheta_pts[i][0][:point_total], radtheta_pts[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
 
         if saveData:
-            fname = self.anlys_name + '_{:03.0f}'.format(degrees(phi_))
+            fname = self.anlys_name + '_{:03.0f}'.format(degrees(phi))
             self.IO.saveNumpyData(radtheta_pts, fname)
 
         ax.set_rmax(rminor)
         ax.set_rticks(np.arange(0.0, 0.19, 0.02))
         ax.yaxis.set_tick_params(labelsize=5)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
-        phi_phys = (phi_ + (198 * np.pi/180.)) % (2*np.pi)  
-        plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys*180/np.pi, phi_*180/np.pi), loc='left')
-        plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_*180/np.pi)
+        phi_phys = (phi + (198 * np.pi/180.)) % (2*np.pi)
+        phi_phys_deg = phi_phys*180/np.pi
+        plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys_deg, phi_deg), loc='left')
+        plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_deg)
         self.IO.saveFig(plot_name, dpi=250)
         plt.close()
-        self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_*180/np.pi))
-        #return '\tPHI: {}'.format(phi_*(180/np.pi))
+        self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
 
     def run(self):
         """Generates Poincare plots based on the initial conditions and magnetic field.

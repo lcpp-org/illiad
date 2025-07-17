@@ -25,7 +25,7 @@ class Particle:
         self.vel0_XYZ = np.zeros(3, dtype=np.float32)
 
 
-class fieldLine(Particle):
+class FieldLine(Particle):
     def __init__(self, init_XYZ, maxlength, direction=1.0):
         super().__init__('fieldline')
         self.pos0_XYZ = init_XYZ
