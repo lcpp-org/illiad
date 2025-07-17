@@ -61,7 +61,7 @@ class Mesh:
 
         self.att_mult = 1.0 
 
-    def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period_ = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
+    def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
         """Loads a vector field from a file and sets mesh properties.
 
         The function loads a 3D vector field from a .npy file and initializes the mesh grid properties
@@ -69,7 +69,7 @@ class Mesh:
 
         Args:
             file_path (str, optional): Path to the .npy file containing the field arrays. Defaults to 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'.
-            period_ (np.ndarray, optional): Array specifying periodicity in [r, theta, phi] directions. Defaults to np.array([0, 1, 5], dtype=np.int32).
+            period (np.ndarray, optional): Array specifying periodicity in [r, theta, phi] directions. Defaults to np.array([0, 1, 5], dtype=np.int32).
             coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
             errField (bool, optional): If True, enables error field addition. Defaults to False.
             att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of ['default_toroidal', 'default_poloidal', 'default_poloidal_rev']. Defaults to 'default_toroidal'.
@@ -97,7 +97,7 @@ class Mesh:
 
             total_mult = att_mult * coilCurrent
             self.nr, self.ntheta, self.nphi = Bx_.shape
-            self.periodicity = period_
+            self.periodicity = period
             #self.att_mult = att_mult
             self.Bx = Bx_ * total_mult
             self.By = By_ * total_mult
@@ -335,7 +335,7 @@ class Mesh:
 
         return vecXYZ, ph_localN
 
-    def loadScalarField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
+    def loadScalarField(self, file_path, period = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
         """ 
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
@@ -348,7 +348,7 @@ class Mesh:
 
 
         self.nr, self.ntheta, self.nphi = val_.shape
-        self.periodicity = period_
+        self.periodicity = period
         self.att_mult = att_mult
         self.value = val_ * att_mult
         self.errField = errField
