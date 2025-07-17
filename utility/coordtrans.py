@@ -85,7 +85,8 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     Returns:
         torch.Tensor: Transformed point(s) in r-theta-phi coordinates, same shape as input.
     """
-    p_XYZ = torch.tensor(p_XYZ).to(device)
+    #p_XYZ = torch.tensor(p_XYZ).to(device)
+    p_XYZ = p_XYZ.clone().detach().to(device)
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
     x, y, z = p_XYZ.T
     x2 = x*x

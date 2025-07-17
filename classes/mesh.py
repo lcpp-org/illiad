@@ -5,19 +5,28 @@ from utility.coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
 
 class Mesh:
     """
-    ## Class to store the mesh data, properties, and interpolation methods
-    ### r, theta, and phi: 1D arrays with the grid points
-    * r:  minor radius, measured from the major radius $R_0$
-    * theta:  poloidal angle [0,2pi)
-    * phi:    toroidal angle [0,2pi)
-    #### Rmaj:   major radius of the tokamak
-    #### Rmin:   minor radius of the tokamak
-    #### dr: grid spacing in the r direction
-    #### dtheta: grid spacing in the theta direction
-    #### dphi:   grid spacing in the phi direction
+    Class to store the mesh data, properties, and interpolation methods
+    
+    r, theta, and phi are the 1D arrays with the grid points
+    
+    r: minor radius coordinate, measured from the geometrical center of the poloidal cross section
+    theta: poloidal angle [0,2pi)
+    phi: toroidal angle [0,2pi)
+    
+    Rmaj: major radius of the tokamak
+    Rmin: minor radius of the tokamak
+    
+    dr: grid spacing in the r direction
+    dtheta: grid spacing in the theta direction
+    dphi: grid spacing in the phi direction
     """
-
     def __init__(self, R0=0.72, a=0.19):
+        """Initializes the Mesh object.
+
+        Args:
+            R0 (float, optional): Major radius of the tokamak. Defaults to 0.0.
+            a (float, optional): Minor radius of the tokamak. Defaults to 0.0.
+        """
         self.R0 = R0
         self.a = a
         self.dr = 0.0
@@ -52,16 +61,22 @@ class Mesh:
 
         self.att_mult = 1.0 
 
-    #def loadCartesianField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
     def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period_ = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
-        """ 
-        This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
-        The grid properties are assumed from the dimensions of the input arrays
-        """
-        # self.Bx: np.float64[:][:][:]
-        # self.By: np.float64[:][:][:]
-        # self.Bz: np.float64[:][:][:]
+        """Loads a vector field from a file and sets mesh properties.
 
+        The function loads a 3D vector field from a .npy file and initializes the mesh grid properties
+        based on the input array dimensions. The field arrays are assumed to be in Cartesian coordinates.
+
+        Args:
+            file_path (str, optional): Path to the .npy file containing the field arrays. Defaults to 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'.
+            period_ (np.ndarray, optional): Array specifying periodicity in [r, theta, phi] directions. Defaults to np.array([0, 1, 5], dtype=np.int32).
+            coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
+            errField (bool, optional): If True, enables error field addition. Defaults to False.
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of ['default_toroidal', 'default_poloidal', 'default_poloidal_rev']. Defaults to 'default_toroidal'.
+
+        Raises:
+            ValueError: If the input array dimensions do not match.
+        """
         Bx_, By_, Bz_ = np.load(file_path)
 
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
@@ -118,13 +133,22 @@ class Mesh:
                 self.phi_max = (2*np.pi)
                 self.dphi = self.phi_max / (self.nphi-1)
                 self.phi_min = 0.
-                
 
-    #def addFieldPerturbation(self, file_path, att_mult=1.0):
     def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_helical'):
-        """ 
-        This function adds a vector field from a file to an existing vector field.
-        The array sizes must match the existing mesh dimensions and periodicity is assumed the same
+        """Adds a vector field perturbation from a file to the existing mesh field.
+
+        The perturbation field is loaded from a file and added to the current mesh field.
+        Array sizes must match the existing mesh dimensions, and periodicity is assumed to be the same.
+
+        Args:
+            file_path (str, optional): Path to the .npy file containing the perturbation field arrays. 
+                Defaults to 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'.
+            coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of 
+                ['default_toroidal', 'default_helical', 'default_helical_rev']. Defaults to 'default_helical'.
+
+        Raises:
+            ValueError: If the input array dimensions do not match the mesh field dimensions.
         """
         Bx_, By_, Bz_ = np.load(file_path)
 
@@ -151,8 +175,15 @@ class Mesh:
             self.Bz += (Bz_ * total_mult)
 
     def set_nonPer_errField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
-        """This function sets the magnitude and direction (measured from the phi_c=0, i.e. 18degrees CW from the South Split)
-          of the non-periodic error field. It also calculates the cosine and sine of the error direction for efficiency in the interpolation function"""
+        """Sets the magnitude and direction of the non-periodic error field.
+
+        The direction is measured from phi_c=0 (i.e., 18 degrees clockwise from the South Split).
+        Also computes and stores the cosine and sine of the error direction for efficient interpolation.
+
+        Args:
+            err_mag (float, optional): Magnitude of the error field. Defaults to 1.5654e-4.
+            err_dir (float, optional): Direction of the error field in radians. Defaults to 271.5*np.pi/180.
+        """
         self.err_mag = err_mag
         self.err_dir = err_dir
         self.cos_err_dir = np.cos(err_dir)
@@ -161,9 +192,21 @@ class Mesh:
         self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
 
-
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
         """
+        Rotates a 3D Cartesian vector around the z-axis by a given angle phi.
+
+        Args:
+            vec_XYZ (np.ndarray): A 3-element array representing the Cartesian vector [x, y, z].
+            delta_phi (np.ndarray or float): The rotation angle in radians. Positive values rotate clockwise when viewed from above.
+
+        Returns:
+            np.ndarray: The rotated 3D Cartesian vector as a array of shape (3,).
+
+        Notes:
+            - Rotation is performed around the z-axis.
+            - The z-component remains unchanged.
+            - When viewed from above, positive phi rotates the vector clockwise.
         Function takes in a cartesian vector and a phi angle
         Returns the cartesian values of the vector rotated by phi degrees
         convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
@@ -180,14 +223,23 @@ class Mesh:
 
     def interpField(self, point_XYZ, Cart=True):
         """
-        Method to return the interpolated field values at a point defined in Cartesian coordinates
-        Interpolation done via a weighted sum of field values at each node of the enclosing cell
-        The weight function is calculated as the volume of the octant opposed to the node
-        Get the location of the point in RTP coordinates,
-        keep in domains:
-        r:        0.0 -> r_max     (minor Radius)
-        theta: dtheta -> theta_max (2pi/Nperiods)
-        phi:     dphi -> phi_max   (2pi/Nperiods)
+        Returns the interpolated field values at a point defined in Cartesian coordinates.
+
+        Interpolation is performed using a weighted sum of field values at each node of the enclosing cell.
+        The weights are calculated as the volume of the octant opposed to each node.
+
+        The input point is converted to RTP coordinates and kept within the following domains:
+            r: 0.0 to r_max (minor radius)
+            theta: dtheta to theta_max (2pi / Nperiods)
+            phi: dphi to phi_max (2pi / Nperiods)
+
+        Args:
+            point_XYZ (np.ndarray): Input point(s) in Cartesian coordinates.
+            Cart (bool): If True, input is in Cartesian coordinates; otherwise, RTP coordinates.
+
+        Returns:
+            np.ndarray: Array of shape (3, Npts), where Npts is the number of input points.
+            Each column corresponds to the interpolated field components [Bx, By, Bz] at the respective point.
         """
         ## Sanitize input (or make sure we are passing torch tensors!)
         Npts = 1 #Npts = point_XYZ.shape[0]
@@ -282,7 +334,6 @@ class Mesh:
             vecXYZ += self.err_adder
 
         return vecXYZ, ph_localN
-    
 
     def loadScalarField(self, file_path, period_ = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
         """ 
@@ -417,11 +468,8 @@ class Mesh:
         # B field vectors at the 8 corner nodes
         nodeVals = np.zeros((8, 1))
         nodeVals[:, 0] = self.value[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
-        # print(f"nodeVals: {nodeVals}")
 
         # result is sum of B field vectors weighted with sub-element volumes
         scalarVal = np.dot(Areas, nodeVals) / np.sum(Areas)
-        # print(f"scalarVal: {scalarVal}")
-
 
         return scalarVal, ph_localN

@@ -1,15 +1,13 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from utility.coordtrans import XYZ_to_RTP2 #, rot_vecXYZ_byPHI
+from utility.coordtrans import XYZ_to_RTP2
 import logging
 
-#import numba as nb
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
 
-# define a class with mesh information
 class Mesh:
     """
     Class to store the mesh data, properties, and interpolation methods
@@ -27,29 +25,37 @@ class Mesh:
     dtheta: grid spacing in the theta direction
     dphi: grid spacing in the phi direction
     """
-
     def __init__(self, R0=0.0, a=0.0):
+        """Initializes the Mesh object.
+
+        Args:
+            R0 (float, optional): Major radius of the tokamak. Defaults to 0.0.
+            a (float, optional): Minor radius of the tokamak. Defaults to 0.0.
+        """
         #self.log = logging.getLogger()
         self.R0 = R0
         self.a = a
+
         self.dr = 0.0
         self.dtheta = 0.0
         self.dphi = 0.0
         self.nr = 0
         self.ntheta = 0
         self.nphi = 0
+
         self.r_max = 0
         self.theta_max = 0
         self.phi_max = 0
         self.r_min = 0
         self.theta_min = 0
         self.phi_min = 0
+
         self.Bx: np.float64[:][:][:]
         self.By: np.float64[:][:][:]
         self.Bz: np.float64[:][:][:]
         self.periodicity: np.int32[:]
+        
         self.errField: np.bool
-
         self.err_mag = 0.0 #1.5654e-4 # [Tesla]
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
         self.cos_err_dir = 1.0 #np.cos(self.err_dir)
@@ -58,15 +64,24 @@ class Mesh:
         self.yerr_adder = 0.0
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
 
-
         self.att_mult = 1.0 
 
     def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period_ = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
-        """ 
-        This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
-        The grid properties are assumed from the dimensions of the input arrays
-        """
+        """Loads a vector field from a file and sets mesh properties.
 
+        The function loads a 3D vector field from a .npy file and initializes the mesh grid properties
+        based on the input array dimensions. The field arrays are assumed to be in Cartesian coordinates.
+
+        Args:
+            file_path (str, optional): Path to the .npy file containing the field arrays. Defaults to 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'.
+            period_ (np.ndarray, optional): Array specifying periodicity in [r, theta, phi] directions. Defaults to np.array([0, 1, 5], dtype=np.int32).
+            coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
+            errField (bool, optional): If True, enables error field addition. Defaults to False.
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of ['default_toroidal', 'default_poloidal', 'default_poloidal_rev']. Defaults to 'default_toroidal'.
+
+        Raises:
+            ValueError: If the input array dimensions do not match.
+        """
         Bx_, By_, Bz_ = np.load(file_path)
 
         if Bx_.shape != By_.shape or Bx_.shape != Bz_.shape:
@@ -125,20 +140,22 @@ class Mesh:
             self.dr = torch.tensor(self.dr, dtype=torch.float64).to(device)
             self.dtheta = torch.tensor(self.dtheta, dtype=torch.float64).to(device)
             self.dphi = torch.tensor(self.dphi, dtype=torch.float64).to(device)
-            # align with new mesh.py
-            self.err_mag = torch.tensor(self.err_mag, dtype=torch.float64).to(device)
-            self.cos_err_dir = torch.tensor(self.cos_err_dir, dtype=torch.float64).to(device)
-            self.sin_err_dir = torch.tensor(self.sin_err_dir, dtype=torch.float64).to(device)
-            self.xerr_adder = torch.tensor(self.xerr_adder, dtype=torch.float64).to(device)
-            self.yerr_adder = torch.tensor(self.yerr_adder, dtype=torch.float64).to(device)
-            self.err_adder = torch.tensor(self.err_adder, dtype=torch.float64).to(device)
 
-
-    # Align with new mesh.py
     def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_helical'):
-        """ 
-        This function adds a vector field from a file to an existing vector field.
-        The array sizes must match the existing mesh dimensions and periodicity is assumed the same
+        """Adds a vector field perturbation from a file to the existing mesh field.
+
+        The perturbation field is loaded from a file and added to the current mesh field.
+        Array sizes must match the existing mesh dimensions, and periodicity is assumed to be the same.
+
+        Args:
+            file_path (str, optional): Path to the .npy file containing the perturbation field arrays. 
+                Defaults to 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'.
+            coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of 
+                ['default_toroidal', 'default_helical', 'default_helical_rev']. Defaults to 'default_helical'.
+
+        Raises:
+            ValueError: If the input array dimensions do not match the mesh field dimensions.
         """
         Bx_, By_, Bz_ = np.load(file_path)
 
@@ -165,8 +182,15 @@ class Mesh:
             self.Bz += torch.tensor((Bz_ * total_mult), dtype=torch.float64).to(device)
 
     def set_nonPer_errField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
-        """This function sets the magnitude and direction (measured from the phi_c=0, i.e. 18degrees CW from the South Split)
-          of the non-periodic error field. It also calculates the cosine and sine of the error direction for efficiency in the interpolation function"""
+        """Sets the magnitude and direction of the non-periodic error field.
+
+        The direction is measured from phi_c=0 (i.e., 18 degrees clockwise from the South Split).
+        Also computes and stores the cosine and sine of the error direction for efficient interpolation.
+
+        Args:
+            err_mag (float, optional): Magnitude of the error field. Defaults to 1.5654e-4.
+            err_dir (float, optional): Direction of the error field in radians. Defaults to 271.5*np.pi/180.
+        """
         self.err_mag = err_mag
         self.err_dir = err_dir
         self.cos_err_dir = np.cos(err_dir)
@@ -174,23 +198,40 @@ class Mesh:
         self.xerr_adder = self.err_mag * self.cos_err_dir
         self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
+        self.err_adder = torch.tensor(self.err_adder, dtype=torch.float64).to(device)
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
-        #print(f'{vec_XYZ=}')
-        # Function takes in a cartesian vector and a phi angle
-        # Returns the cartesian values of the vector rotated by phi degrees
-        # convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
-        # convention: +phi is clockwise when viewed from above
+        """
+        Rotates a 3D Cartesian vector around the z-axis by a given angle phi.
+
+        Args:
+            vec_XYZ (torch.Tensor): A 3-element tensor representing the Cartesian vector [x, y, z].
+            delta_phi (torch.Tensor or float): The rotation angle in radians. Positive values rotate clockwise when viewed from above.
+
+        Returns:
+            torch.Tensor: The rotated 3D Cartesian vector as a tensor of shape (3,).
+
+        Notes:
+            - Rotation is performed around the z-axis.
+            - The z-component remains unchanged.
+            - When viewed from above, positive phi rotates the vector clockwise.
+        Function takes in a cartesian vector and a phi angle
+        Returns the cartesian values of the vector rotated by phi degrees
+        convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
+        convention: +phi is clockwise when viewed from above
+        """
         rotated_XYZ = torch.zeros(vec_XYZ.shape, dtype=torch.float64).to(device)
         #xFormMat = np.array([[ np.cos(delta_phi), (-1)*np.sin(delta_phi), zeros_],
         #                     [ np.sin(delta_phi),      np.cos(delta_phi), zeros_],
         #                     [           zeros_,             zeros_,       ones_]],
         #                    )#dtype=torch.float64)
         #xFormMatrix = torch.tensor(xFormMat)
-
         #rotated_XYZ = torch.tensordot( vec_XYZ.T, xFormMatrix, dims=([0],[1]) )
-        rotated_XYZ[0] = torch.cos(delta_phi)*vec_XYZ[0] - torch.sin(delta_phi)*vec_XYZ[1]
-        rotated_XYZ[1] = torch.sin(delta_phi)*vec_XYZ[0] + torch.cos(delta_phi)*vec_XYZ[1]
+
+        cos_phi = torch.cos(delta_phi)
+        sin_phi = torch.sin(delta_phi)
+        rotated_XYZ[0] = cos_phi*vec_XYZ[0] - sin_phi*vec_XYZ[1]
+        rotated_XYZ[1] = sin_phi*vec_XYZ[0] + cos_phi*vec_XYZ[1]
         rotated_XYZ[2] = vec_XYZ[2]
 
         return rotated_XYZ
@@ -213,7 +254,7 @@ class Mesh:
 
         Returns:
             torch.Tensor: Tensor of shape (3, Npts), where Npts is the number of input points.
-            Each column corresponds to the interpolated field vector [Bx, By, Bz] at the respective point.
+            Each column corresponds to the interpolated field components [Bx, By, Bz] at the respective point.
         """
         ## Sanitize input (or make sure we are passing torch tensors!)
         #print(f'{len(point_XYZ.shape)=}')
@@ -261,11 +302,11 @@ class Mesh:
         invth_el = self.dtheta - th_el
         invph_el = self.dphi - ph_el
 
-        r_lowr_el = r_low * r_el
-        r_localinvr_el = r_local * invr_el
+        # r_lowr_el = r_low * r_el
+        # r_localinvr_el = r_local * invr_el
         # above replaced with below in mesh.py to fix failing interp at r=0
-        #r_lowr_el = (r_low + r_el/2) * r_el
-        #r_localinvr_el = (r_local + invr_el/2) * invr_el
+        r_lowr_el = (r_low + r_el/2) * r_el
+        r_localinvr_el = (r_local + invr_el/2) * invr_el
 
         # sub-element volumes
         A1 = (self.R0 + r_low*torch.cos(th_low))     * r_lowr_el      * th_el    * ph_el
@@ -324,33 +365,3 @@ class Mesh:
             # vecXYZ[1] -= self.yerr_adder
             vecXYZ += self.err_adder
         return vecXYZ
-
-###
-def XYZ_to_RTP2(p_XYZ, Rmajor):
-    # Function to take in a point defined in Cartesian coordinates
-    # And return a point in r-theta-phi coordinates
-    # convention: When looking at a cross-section to the right of the +z axis, +theta is counterclockwise
-    # convention: +phi is clockwise when viewed from above
-    #p_XYZ = torch.tensor(p_XYZ).to(device)
-    p_XYZ = p_XYZ.clone().detach().to(device)
-    p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
-    x, y, z = p_XYZ.permute(*torch.arange(p_XYZ.ndim - 1, -1, -1)) #= p_XYZ.T throws a warning
-    x2 = x*x
-    y2 = y*y
-    z2 = z*z
-    R = torch.sqrt(x2 + y2)
-
-    p_RTP[..., 0] =  torch.sqrt(x2 + y2 + z2 + Rmajor * Rmajor - 2 * Rmajor * R)
-
-    den = R - Rmajor
-    theta = torch.arctan2(z,den) # arctan2 returns radians from (-pi to +pi)
-    # here we shift the domain to (0 to 2*pi)
-    p_RTP[..., 1] = torch.where(theta<0, theta + 2*torch.pi, theta)
-    #p_RTP.T[1] = theta
-
-    phi = (-1) * torch.arctan2(y,x) # arctan2 returns radians from (-pi to +pi)
-    # here we shift the domain to (0 to 2*pi)
-    p_RTP[..., 2] = torch.where(phi<0, phi + 2*torch.pi, phi)
-    #p_RTP.T[2] = phi
-
-    return p_RTP
