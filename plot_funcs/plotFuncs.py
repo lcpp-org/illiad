@@ -3,8 +3,7 @@ from matplotlib import patches, colors, cm, colormaps
 import copy
 import numpy as np
 import logging
-from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP2
-#import class_outputHandler as out
+from utility.coordtrans import XYZ_to_RTP2
 
 # UIUC branding color palette
 UIUC = {
@@ -16,20 +15,15 @@ UIUC = {
     'il_stormlight1': '#8D8F8E',
     }
 
-
 ## PORT PLOTTING CONVENIENCE FUNCTION
 def plotPorts(ax_, simIO):
-    #simIO = logging.getLogger()
-    #ax_ = figure.add_subplot()
-
+    """Plots the ports on the given axis."""
     # Import data on HIDRA port size/locations for plotting
     ports = simIO.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
     for port in ports.T:
         port_plot = patches.Ellipse((port[0], port[1]), port[2], port[3],
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
-
-
 
 def plotWallHist(wallPtArray, runString, simIO):
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
@@ -92,7 +86,6 @@ def plotWallHist(wallPtArray, runString, simIO):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-
 def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
@@ -136,7 +129,6 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=Non
     simIO.saveFig(plotname, dpi=700)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
-
 
 def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     #log = logging.getLogger()
@@ -206,7 +198,6 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     plt.close()
     #plt.show()
 
-
 def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
@@ -222,16 +213,13 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     dist, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
+    lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
     startfit_i = np.where(dist == np.max(dist))[0][0] + 70 # start fitting 25 bins after the maximum for a better slope fit
     stopfit_i = np.where(dist < 1)[0][0]
- 
-    lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
-
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
     else:
         slope, intercept = np.polyfit(bin_centers, lnE, 1)
-
     Te_calc = -1/slope
 
     plt.figure()
@@ -248,7 +236,6 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
-
 
 def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     ## create a 1d histogram of initial energies using numpy hist
@@ -291,7 +278,6 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-
 def plotDepoAngles(angle_array, runString='default', simIO=None):
 
     plt.figure()
@@ -308,7 +294,6 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
-
 
 def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
     plt.rcParams.update({'font.size': 6})
@@ -391,7 +376,6 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-
 def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
 
@@ -426,7 +410,6 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     #plt.savefig(simIO.outputDir + '/ParticlesRunningOverTime_' + cond_string + TAG + '.png')
     plt.close()
-
 
 def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
     simIO.log.info('Plotting Combined Histogram...')
@@ -538,7 +521,6 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-
 def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     print('ion_traces shape:', ion_traces.shape)
 
@@ -595,7 +577,6 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-
 def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
     print('ion_traces shape:', ion_traces.shape)
     fig = plt.figure()
@@ -616,10 +597,6 @@ def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
             ax.plot(this_theta, this_r, linewidth=0.5, zorder=5)
 
     ax.set_rlim([0., b_hidra.a])#[-1, 1])
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # ax.set_axis_off()  # Remove bounding box and grid
 
     plotname = 'IonTracesPoin_' + runString + '.png'
     simIO.saveFig(plotname, dpi=600)
