@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from utility.phi_events import *
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 from classes.particle import FieldLine
+
 class Poincare():
     """Class to handle Poincare analysis of magnetic field lines."""
     def __init__(self, io_handler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
@@ -444,7 +445,7 @@ class Poincare():
             self.IO.log.info(f"|     {str(ic):<23}   |")
         self.IO.log.info("+----------------+-------------------------+")
 
-    def parallel_solver(self) -> cf.ProcessPoolExecutor:
+    def parallel_solver(self) -> iter:
         """Runs the solver in parallel for each particle.
 
         This method uses a process pool of 'self.workers' to execute the solver for each field line in parallel,
@@ -522,7 +523,7 @@ class Poincare():
         and prepares the data for plotting and output.
 
         Args:
-            solver_output (list): The output from the solver, containing tuples of path lengths and event data.
+            solver_output (iterator): The output from the solver, containing tuples of path lengths and event data.
 
         Returns:
             tuple: (path_lengths, poincare_points, wall_points)
@@ -601,7 +602,7 @@ class Poincare():
             self.IO.saveNumpyData(radtheta_pts, fname)
 
         ax.set_rmax(rminor)
-        ax.set_rticks(np.arange(0.0, 0.19, 0.02))
+        ax.set_rticks(np.arange(0.0, rminor, 0.02))
         ax.yaxis.set_tick_params(labelsize=5)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
         phi_phys = (phi + (198 * np.pi/180.)) % (2*np.pi)
