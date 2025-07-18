@@ -1,18 +1,16 @@
 import numpy as np
 import logging
-from scipy.interpolate import make_smoothing_spline, spalde, splev, splrep
-
-from utility.coordtrans import *
-
+from scipy.interpolate import splev, splrep
+#from scipy.interpolate import make_smoothing_spline, spalde, splev, splrep
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
+from utility.coordtrans import *
+
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
-#def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, filename):
 def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, filename, genNormals=False, Efield=None):
     outputHandler.createSubDir(filename)
     r_in = r_in[~np.isnan(r_in)]
@@ -23,11 +21,9 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     if phi_deg == 324:
         r_in = r_in[30:]
         th_in = th_in[30:]
-
     th_size = th_in.size
 
     # find the centroid(?) by average positions
-    # two 'for loops', wow
     x_in = np.empty(th_size)
     y_in = np.empty(th_size)
     z_in = np.empty(th_size)
@@ -39,13 +35,11 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     z_avg = (np.max(z_in) + np.min(z_in))/2
     XYZ_delta = np.array([x_avg, y_avg, z_avg])
 
-    # shift origin of r, theta coordinates from geometric center to magnetic axis
-    # then sort points on theta
-    magCenterCoords = np.empty((th_size, 2))
+    # shift origin of r, theta coords from geo center to magnetic axis, sort pts on theta
     RTP_delta = XYZ_to_RTP(XYZ_delta, Bfield.R0)[1::-1]
     RTP_delta_rev = np.copy(RTP_delta)
     RTP_delta_rev[0] += np.pi
-
+    magCenterCoords = np.empty((th_size, 2))
     for i, theta, in enumerate(th_in):
         magCenterCoords[i] = axisShift(theta, r_in[i], *RTP_delta)
 
@@ -74,7 +68,6 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     thetaPlot = np.linspace(0., 2*np.pi, 5000)
     rPlot = splev(thetaPlot, fSurface_splineParms)
     geoCenterCoords = axisShift(thetaPlot, rPlot, *RTP_delta_rev)
-
     rPlotGeo = geoCenterCoords[1]
     thetaPlotGeo = geoCenterCoords[0]
 
@@ -96,7 +89,6 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
     fig = plt.figure()
     ax = fig.add_subplot(111, polar=True)
     plt.plot(thetaPlotGeo, rPlotGeo, '-k', linewidth=0.5) # fitted spline curve
-    #output_ind_geo = np.zeros((Ntheta, 2))
     output_ind     = np.zeros((Ntheta, 3))
     output_ind_geo = np.zeros((Ntheta, 3))
     output_ind_XYZ = np.zeros((Ntheta, 3))
@@ -127,10 +119,8 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
                 output_ind_normal[i] = Efield.interpField(tensor_ind_XYZ[i], Cart=True).cpu().numpy()
                 output_ind_normal[i] /= np.linalg.norm(output_ind_normal[i]) # normalize the vector
 
-        
         plt.plot(output_ind_geo[:,0], output_ind_geo[:,1], '--o', linewidth=0.25, markersize=0.50)
 
-        
         outData.extend(np.copy(output_ind_XYZ))
         if genNormals:
             outNormals.extend(np.copy(output_ind_normal))
