@@ -1,31 +1,28 @@
+"""
 ####------------------------------------------------------####
 #### GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD ####
 ####------------------------------------------------------####
+"""
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 
 import classes.class_outputHandler as out
+#from classes.outputHandler import OutputHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 from utility.anlys_funcs import identifyLCFS
 
-#-------------------------#
 # DEFINE OUTPUT DIRECTORY #
-#-------------------------#
 OUTPUT_DIR = "AcceptedIota5_400spins_49Lines"
 
-#---------------#
 # DEFINE FIELDS #
-#---------------#
 CURRENT_TOR = 0.486 #[kA]
 CURRENT_HEL = 0.710 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
-#---------------------------#
 # DEFINE INITIAL CONDITIONS #
-#---------------------------#
 #IC_PHI_DEG = 324. #Accepted iota1/3
 #IC_PHI_DEG = 180. #Accepted iota1/4
 IC_PHI_DEG = 360. #Accepted iota1/5
@@ -40,10 +37,7 @@ END_RADIUS = 0.020
 NLINES = 13 + 12 + 24 #+ 48
 SPINS = 400 # max length, SPIN = 2pi*R0 [meters]
 
-#-------------------#
 # SOLVER ARGUMENTS #
-#-------------------#
-"""
 # NTHREADS:
 ##  N > 0: use N threads
 ##  N = 0: use all available threads
@@ -52,17 +46,16 @@ SPINS = 400 # max length, SPIN = 2pi*R0 [meters]
 ##  True: run each fieldline in both directions from the init pos 
 ##        !ONLY USE WHEN (NTHREADS > NLINES)!
 ##  False: run each fieldline in +B direction from the init pos
-"""
 SOLVER = 'LSODA'
 RTOL = 2.49e-12
 ATOL = 2.49e-8
 NTHREADS = 31 #-1
 DOUBLE_LINE = False
 
-
 def main():
-    """Main function to set up the mesh, load magnetic field data, and generate Poincare plots."""
-
+    """
+    Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
+    """
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
     simIO = out.IOHandler(OUTPUT_DIR) 
     simIO.startLog()
@@ -81,7 +74,6 @@ def main():
 
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
-
     PoinCare = Poincare(simIO, *solver_args)
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
     tMax = PoinCare.run()[0]
