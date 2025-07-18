@@ -6,7 +6,7 @@ import classes.class_outputHandler as out
 from classes.meshNew import *
 from utility.coordtrans import *
 from utility.anlys_funcs import *
-from utility.point_generators import generateSeedShells
+from utility.point_generators import generateSeedShells, generate_MB_velocities
 from classes.particle import *
 
 import plot_funcs.plotFuncs as plotFuncs
@@ -24,7 +24,6 @@ He_mass = 4.002602 #amu
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
 HELICAL_CURRENT = 0.900 #[kA]
-
 # ELECTRIC FIELD
 FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
@@ -49,7 +48,6 @@ NSTEPS = int(TMAX / DT)
 # UNIQUE OUTPUT TAG
 TAG= '60V_Z1_postSOFE_UPDATES'
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-
 
 
 #####################
@@ -81,10 +79,7 @@ e_hidra = Mesh(R0=0.72, a=0.19)
 e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
                                 att_mult=FIELD_SCALE_ELECTRIC)
 
-
-##########################
-## POSITION GENERATION: ##
-##########################
+## POSITION GENERATION:
 ## DEFINE ARRAYS FOR SEED POINT GENERATION
 phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist()
 theta_arr = np.linspace(0, 2*np.pi*(1 - 1/NTHETA), NTHETA)
@@ -107,31 +102,11 @@ for phi_gen_deg in phiGen_arr:
 print('\n')
 simIO.log.info('FINISHED LOADING NUMPY DATA & GENERATING INIT. POSITIONS\n')
 
-##########################
-## VELOCITY GENERATION: ##
-##########################
-# GENERATE RANDOM UNIT VECTORS, UNIFORMLY DISTRIBUTED IN A HEMISPHERE, POLE AT +Z
-r = np.random.uniform(0, 1, N_particles)
-z = np.sqrt(1 - r**2)
-phi = np.random.uniform(0, 2 * np.pi, N_particles)
-x = r * np.cos(phi)
-y = r * np.sin(phi)
-initVel_array = np.stack([x, y, z], axis=1) # shape (N, 3)
-
-# GENERATE NORMAL DISTRIBUTION OF SPEEDS
-# Calculate the root mean square velocities
-v_rms1d = np.sqrt( kboltz*ION_TEMP / (ION_MASS*kg_per_amu) )
-initSpeeds = v_rms1d * np.sqrt(np.random.chisquare(df=3, size=N_particles))
-
-# APPLY INIT SPEEDS TO THE RANDOM UNIT VECTORS
-initVel_array *= initSpeeds[:, None]
-
-# ROTATE TO ALIGN POLE WITH NORMAL VECTOR
-for i,normal in enumerate(normals_list):
-    Rotater = align_z_to_vector(normal)
-    initVel_array[::NPARTICLES_PER_EMITTER] = initVel_array[::NPARTICLES_PER_EMITTER] @ Rotater.T
-
+## VELOCITY GENERATION:
 tic = perf_counter()
+initVel_array = generate_MB_velocities(N_particles=N_particles, normals_list=normals_list,
+                                       ion_temp=ION_TEMP, ion_mass=ION_MASS,
+                                       nparticles_per_emitter=NPARTICLES_PER_EMITTER)
 
 initVelPos = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 6))
 ion_list = []
@@ -160,7 +135,6 @@ for ion, v_0 in zip(ion_list, initVel_array):
     ion.initOutput(DT, TMAX)
 
 
-
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
 ## RUN BORIS SOLVER FOR PARTICLES ##
 ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
@@ -181,14 +155,6 @@ wallPt_output = wallPt_output.cpu().numpy()
 velocity_output = velocity_output.cpu().numpy()
 max_timeStep = max_timeStep.cpu().numpy()
 ion_traces = ion_traces.cpu().numpy()
-
-
-## SAVE WALL POINTS AND VELOCITIES
-filenameTrac = 'Ion_traces_' + cond_string+TAG
-simIO.saveNumpyData(ion_traces, filenameTrac)
-simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
-
-
 
 # filter out rows containing all zeros
 wallPt_output = wallPt_output[~np.all(wallPt_output == 0, axis=1)]
@@ -219,9 +185,16 @@ simIO.log.info('Output sent to cpu and converted to rtp in {}sec'.format(toc-tic
 
 
 ## SAVE WALL POINTS AND VELOCITIES
+###############################
+filenameTrac = 'Ion_traces_' + cond_string+TAG
+simIO.saveNumpyData(ion_traces, filenameTrac)
+simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
+
 filename = 'Wallpt_OUTPUT_' + cond_string+TAG
 simIO.saveNumpyData(outputArray, filename)
 simIO.log.info('OUTPUT RESULT DATA: {}'.format(filename))
+
+
 
 # COORDINATE FLIIPING & CONVERSION
 phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel

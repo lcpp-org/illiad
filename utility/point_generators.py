@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 plt.rcParams.update({'figure.autolayout':True})
 
-from utility.coordtrans import *
-
+from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP, RTP_XYZ_JAC, axisShift, align_z_to_vector
 import torch
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, filename, genNormals=False, Efield=None):
     outputHandler.createSubDir(filename)
@@ -152,3 +153,46 @@ def generateSeedShells(drList, Ntheta, r_in, th_in, phi, Bfield, outputHandler, 
         return outArray, outNormalsArray
     else:
         return outArray
+
+def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparticles_per_emitter=1):
+    """
+    Generates initial velocities for particles following a Maxwell-Boltzmann energy distribution.
+
+    The function samples random directions uniformly over a hemisphere and scales the velocities
+    according to the specified ion temperature. The resulting velocity vectors are rotated to align
+    with the provided surface normals.
+
+    Args:
+        N_particles (int): Number of particles to generate velocities for.
+        normals_list (array-like): List or array of normal vectors to align velocities with.
+        ion_temp (float): Ion temperature in eV.
+        ion_mass (float): Ion mass in atomic mass units (amu).
+        nparticles_per_emitter (int, optional): Number of particles per emitter. Defaults to 1.
+
+    Returns:
+        np.ndarray: Array of shape (N_particles, 3) containing the generated velocity vectors.
+    """
+    kg_per_amu = 1.660_539_068E-27
+    kboltz = 1.602_176_634E-19 # Joules/eV
+    r = np.random.uniform(0, 1, N_particles)
+
+    z = np.sqrt(1 - r**2)
+    phi = np.random.uniform(0, 2 * np.pi, N_particles)
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+    velocity_array = np.stack([x, y, z], axis=1) # shape (N, 3)
+
+    # GENERATE NORMAL DISTRIBUTION OF SPEEDS
+    # Calculate the root mean square velocities
+    v_rms1d = np.sqrt( kboltz*ion_temp / (ion_mass*kg_per_amu) )
+    initSpeeds = v_rms1d * np.sqrt(np.random.chisquare(df=3, size=N_particles))
+
+    # APPLY INIT SPEEDS TO THE RANDOM UNIT VECTORS
+    velocity_array *= initSpeeds[:, None]
+
+    # ROTATE TO ALIGN POLE WITH NORMAL VECTOR
+    for i,normal in enumerate(normals_list):
+        Rotater = align_z_to_vector(normal)
+        velocity_array[::nparticles_per_emitter] = velocity_array[::nparticles_per_emitter] @ Rotater.T
+
+    return velocity_array
