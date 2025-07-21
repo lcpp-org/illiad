@@ -26,6 +26,7 @@ def plotPorts(ax_, simIO):
         ax_.add_patch(port_plot)
 
 def plotWallHist(wallPtArray, runString, simIO):
+    """ Plots a histogram of wall intersection points from the simulation."""
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
 
     # extract theta and phi
@@ -54,7 +55,7 @@ def plotWallHist(wallPtArray, runString, simIO):
 
     ## PLOT HISTOGRAM
     plt.rcParams.update({'font.size': 8})
-    plt.rcParams.update({'figure.autolayout':True})
+    #plt.rcParams.update({'figure.autolayout':True})
 
     w, h = plt.figaspect(0.4)
     fig = plt.figure(figsize=(w, h))
@@ -80,6 +81,7 @@ def plotWallHist(wallPtArray, runString, simIO):
     ax.set_yticks(np.linspace(-180, 180, 5))
     ax.set_yticklabels(['Inner   \nMidplane', 'Bottom', 'Outer   \nMidplane', 'Top', 'Inner   \nMidplane'])
     ax.yaxis.set_tick_params(labelsize=5)
+    plt.tight_layout()
 
     plotname = 'Wall_Histogram_' + runString + '.png'
     simIO.saveFig(plotname, dpi=200)
@@ -87,9 +89,10 @@ def plotWallHist(wallPtArray, runString, simIO):
     plt.close()
 
 def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
+    """Plots the discrete wall intersection points from the simulation."""
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
-    plt.rcParams.update({'figure.autolayout':True})
+    #plt.rcParams.update({'figure.autolayout':True})
     fig = plt.figure()
     ax = fig.add_subplot(polar=False, aspect=0.2)
     plotPorts(ax, simIO)
@@ -124,13 +127,14 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=Non
     ax.yaxis.set_tick_params(labelsize=5)
 
     ax.set_title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString )
-
+    plt.tight_layout()
     plotname = 'Wallpoints_BorisPts_' + runString +  '.png'
     simIO.saveFig(plotname, dpi=700)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
 def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
+    """Plots the discrete wall intersection points in 3D."""
     #log = logging.getLogger()
     #simIO.log.info('Attempting 3D plot...')
     ntheta = int(360*1 + 1)
@@ -189,7 +193,7 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     ax2.set_axis_off()
     ax2.elev = 2 #2
     ax2.azim = -94
-
+    #plt.tight_layout()
     plt.title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString)
 
     plotname = 'WallHist3D_' + runString + '.png'
@@ -199,6 +203,7 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     #plt.show()
 
 def plotInitEnergies(init_file, mass, runString='default', simIO=None):
+    """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
@@ -229,8 +234,8 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     plt.ylabel('Number of Particles')
     plt.xlim(0, min(Te_calc*4,5000)) # limit x-axis to 5 times the calculated temperature
     #plt.yscale('log')
-    
     plt.title('Initial Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
+    plt.tight_layout()
 
     plotname = 'E0_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
@@ -238,6 +243,7 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     plt.close()
 
 def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
+    """Plots the final energy distribution of particles."""
     ## create a 1d histogram of initial energies using numpy hist
     dist, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -272,6 +278,7 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     #plt.yscale('log')
 
     plt.title('Final Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
+    plt.tight_layout()
 
     plotname = 'Ef_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
@@ -279,7 +286,7 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     plt.close()
 
 def plotDepoAngles(angle_array, runString='default', simIO=None):
-
+    """Plots the distribution of deposition angles from the simulation."""
     plt.figure()
     plt.grid(which='both', zorder=0)
     plt.hist(angle_array, bins=90, density=False, color=UIUC['il_blue'], edgecolor=UIUC['il_orange'], linewidth=0.3, zorder=2)
@@ -289,6 +296,7 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     plt.xlim(0, 90)
 
     plt.title('Ion Angle Distribution (degrees from normal)')
+    plt.tight_layout()
 
     plotname = 'Angle_Dist_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
@@ -296,8 +304,9 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     plt.close()
 
 def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
+    """Plots the combined 2D histogram and 1D statistical distribution of the given data."""
     plt.rcParams.update({'font.size': 6})
-    plt.rcParams.update({'figure.autolayout':True})
+    #plt.rcParams.update({'figure.autolayout':True})
 
     tot_scale = 0.8
 
@@ -353,30 +362,21 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
         color = cmap(norm(bin_left))  # or use bin center: (bin_left + bin_right)/2
         patch.set_facecolor(color)
 
-
     axDist.grid(which='both', zorder=0)
-
     axDist.set_xlabel(colorLabel, fontsize=12)
-    # axDist.set_xlim(colorRange)
-    # nxticks = 5
-    # lower_xtick = colorRange[0] + (colorRange[1] - colorRange[0]) / (nxticks+1)
-    # upper_xtick = colorRange[1] - (colorRange[1] - colorRange[0]) / (nxticks+1)
-    # axDist.set_xticks(np.linspace(lower_xtick, upper_xtick, nxticks))
-
     axDist.xaxis.set_tick_params(labelsize=10)
-
     axDist.set_yticklabels([])
     axDist.yaxis.set_tick_params(color='white')
 
-
     # Remove all padding between subplots
-    plt.subplots_adjust(wspace=0) #, hspace=0)
-    plotname = 'Wallpoints_BorisPts_' + runString +  '.png'
+    #plt.subplots_adjust(wspace=0, hspace=0)
+    plotname = 'WallPts_' + runString +  '.png'
     simIO.saveFig(plotname, dpi=400)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
 def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
+    """Plots the percent of particles running over time."""
     # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
 
     # Calculate the number of particles running over time (efficiently)
@@ -403,7 +403,7 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
     ax.grid(which='minor', linestyle=':', linewidth=0.5)
     ax.grid(which='major', linestyle='-', linewidth=1)
     ax.set_xlim(0, tmax)
-    #plt.legend()
+    plt.tight_layout()
 
     plotname = 'IonsVtime_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
@@ -412,6 +412,7 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
     plt.close()
 
 def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
+    """Plots a combined histogram of wall intersection points and the percent of particles running over time."""
     simIO.log.info('Plotting Combined Histogram...')
 
     ## CREATE HISTOGRAM
@@ -453,7 +454,7 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
 
     ## PLOT HISTOGRAM
     plt.rcParams.update({'font.size': 8})
-    plt.rcParams.update({'figure.autolayout':True})
+    #plt.rcParams.update({'figure.autolayout':True})
 
     tot_scale = 0.8
     width_left = 5/6 * tot_scale #fig_height / aspect_left
@@ -522,29 +523,19 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     plt.close()
 
 def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
-    print('ion_traces shape:', ion_traces.shape)
-
-    ntheta = int(360*1 + 1)
-    nphi = int(360*2 + 1)
-
+    """Plots the ion traces in 3D."""
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.set_title('Ion Traces')
 
-
-    ## PLOT VACUUM VESSEL TORUS
+    ## PLOT VACUUM VESSEL BOTTOM-HALF TORUS
     nphi = ntheta = 180
-    #ptheta = np.linspace(-np.pi, np.pi, ntheta)
     ptheta = np.linspace(-np.pi, 0, int(np.ceil(ntheta/2)) )
-    
     pphi = np.linspace(0, 2.*np.pi, nphi)
-    #pphi = np.linspace(0, np.pi, int(np.ceil(nphi/2)) ) # only plot half the torus, since it is symmetric
-
     ptheta, pphi = np.meshgrid(ptheta, pphi)
     px = (b_hidra.R0 + b_hidra.a*np.cos(ptheta)) * np.cos(pphi)
     py = (b_hidra.R0 + b_hidra.a*np.cos(ptheta)) * np.sin(pphi)
     pz = b_hidra.a * np.sin(ptheta)
-
     ax.plot_surface(px, py, pz, rstride=9, cstride=9,
                      facecolor='lightgrey',
                      edgecolor='k', linewidth=0.1,
@@ -558,8 +549,8 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
         this_X = this_ion[:,0] #ion_traces[:, i, 0]
         this_Y = this_ion[:,1] #ion_traces[:, i, 1]
         this_Z = this_ion[:,2] #ion_traces[:, i, 2]
-
         #ax.plot(ion_traces[:, i, 0], ion_traces[:, i, 1], ion_traces[:, i, 2])
+
         skip_indices = [0,1,3,5,6,7,8,10]
         if i not in skip_indices:
             ax.plot(this_X, this_Y, this_Z, linewidth=0.5, zorder=5)
@@ -571,6 +562,7 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.set_axis_off()  # Remove bounding box and grid
+    plt.tight_layout()
 
     plotname = 'IonTraces_' + runString + '.png'
     simIO.saveFig(plotname, dpi=600)
@@ -578,6 +570,7 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     plt.close()
 
 def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
+    """Plots the ion traces in polar coordinates (Poincare plot)."""
     print('ion_traces shape:', ion_traces.shape)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
