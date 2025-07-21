@@ -14,7 +14,7 @@ from tqdm.contrib.logging import logging_redirect_tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
-plt.rcParams.update({'figure.autolayout':True})
+#plt.rcParams.update({'figure.autolayout':True})
 
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

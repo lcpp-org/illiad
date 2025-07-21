@@ -47,7 +47,7 @@ class FieldLine(Particle):
 
 
 class Ion(Particle):
-    def __init__(self, init_XYZ, mass_amu, charge_z, maxlife):
+    def __init__(self, init_XYZ, mass_amu, charge_z, maxlife=0.0):
         super().__init__('ion')
         self.terminated = False
 
