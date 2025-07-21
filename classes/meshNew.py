@@ -62,7 +62,7 @@ class Mesh:
         self.sin_err_dir = 0.0 #np.sin(self.err_dir)
         self.xerr_adder = 0.0
         self.yerr_adder = 0.0
-        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64).T
 
         self.att_mult = 1.0 
 
@@ -140,6 +140,7 @@ class Mesh:
             self.dr = torch.tensor(self.dr, dtype=torch.float64).to(device)
             self.dtheta = torch.tensor(self.dtheta, dtype=torch.float64).to(device)
             self.dphi = torch.tensor(self.dphi, dtype=torch.float64).to(device)
+            self.errField = torch.tensor(errField, dtype=torch.bool).to(device)
 
     def addFieldPerturbation(self, file_path='input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy', coilCurrent=1.0, att_mult='default_helical'):
         """Adds a vector field perturbation from a file to the existing mesh field.
@@ -197,7 +198,7 @@ class Mesh:
         self.sin_err_dir = np.sin(err_dir)
         self.xerr_adder = self.err_mag * self.cos_err_dir
         self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
-        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64).T
         self.err_adder = torch.tensor(self.err_adder, dtype=torch.float64).to(device)
 
     def rot_vecXYZ_byPHI(self, vec_XYZ, delta_phi):
@@ -354,14 +355,12 @@ class Mesh:
         vecXYZ = (Bvec1*A1 + Bvec2*A2 + Bvec3*A3 + Bvec4*A4 + Bvec5*A5 + Bvec6*A6 + Bvec7*A7 + Bvec8*A8) / (A1+A2+A3+A4+A5+A6+A7+A8)
 
         # if the mesh is defined with periodic symmetry, we must 
-        # perform a rotational transform based on which 'period' of the mesh
-        # the point is located
+        # perform a rotational transform based on which 'period' of the mesh the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
         phi_rotation = ph_localN * self.phi_max  # angle of transform
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, -phi_rotation)
 
         if self.errField:
-            # vecXYZ[0] += self.xerr_adder
-            # vecXYZ[1] -= self.yerr_adder
-            vecXYZ += self.err_adder
+            vecXYZ += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
+
         return vecXYZ
