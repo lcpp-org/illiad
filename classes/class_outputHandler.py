@@ -17,14 +17,15 @@ class IOHandler:
     def __init__(self, run_name):
         # get script directory
         self.module_path = os.path.realpath(os.path.dirname(__file__))
-
+        self.module_path = os.path.join(self.module_path, '..')
+        self.module_path = os.path.abspath(self.module_path)
+        print('Executing script in {}'.format(self.module_path))
+              
         self.log = logging.getLogger("Poincare")
 
-        #self.module_path = os.path.realpath(os.path.dirname(__file__))
-        print('Executing script in {}'.format(self.module_path))
-
         # Create output directories if none exist
-        self.output_dir = os.path.join(self.module_path, '..', 'output')
+        #self.output_dir = os.path.join(self.module_path, '..', 'output')
+        self.output_dir = os.path.join(self.module_path, 'output')
         self.output_dir = os.path.abspath(self.output_dir)
         
         try:
@@ -44,13 +45,13 @@ class IOHandler:
         try:
             os.mkdir(self.data_dir)
         except OSError as error:
-            print(error)
+            pass #print(error)
 
         self.plot_dir = os.path.join(self.run_dir, 'plots')
         try:
             os.mkdir(self.plot_dir)
         except OSError as error:
-            print(error)
+            pass #print(error)
 
     def startLog(self):
         # Creates a logger instance and configures the logging opions, handlers, formatting, etc.        
@@ -139,7 +140,7 @@ class IOHandler:
     def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory
         name_loc = os.path.join( self.plot_dir, name)
-        plt.savefig(name_loc, dpi=dpi)
+        plt.savefig(name_loc, dpi=dpi, bbox_inches=None)
 
     def loadPorts_fromCSV(self, name):
         """ 
