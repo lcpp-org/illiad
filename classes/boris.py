@@ -66,8 +66,8 @@ class Boris():
         self.ion_list = ion_list
         self.cond_string = cond_string
         ## SET OUTPUT
-        for ion in ion_list:
-            ion.initOutput(dt, tmax)
+        # for ion in ion_list:
+        #     ion.initOutput(dt, tmax)
 
         # self.IO.log.info("+----------------+-------------------------+")
         # self.IO.log.info(f"| DT             | {self.dt:<23} |")
