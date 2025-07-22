@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy.integrate import solve_ivp
 from math import degrees
@@ -10,18 +11,26 @@ import matplotlib.pyplot as plt
 from utility.phi_events import *
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 from classes.particle import FieldLine
+import gc
 
 class Poincare():
     """Class to handle Poincare analysis of magnetic field lines."""
-    def __init__(self, io_handler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=6, double_line=False, anlys_name='Poincare'):
+    def __init__(self, io_handler, solvr='LSODA', r_tol=1e-6, a_tol=1e-16, workers=-1, double_line=False, anlys_name='Poincare'):
         """Initializes the Poincare class with the specified solver parameters and writes to log.
+
+        workers > 0: use N threads
+        workers = 0: use all available threads
+        workers < 0: use all but the last N threads
+
+        double_line True: run each fieldline in both directions from the init pos (!ONLY USE WHEN (NTHREADS > NLINES)!)
+        double_line False: run each fieldline in +B direction from the init pos
 
         Args:
             io_handler: An object responsible for handling output operations, such as logging and directory creation.
             solvr (str, optional): The ODE solver to use. Defaults to 'LSODA'.
             r_tol (float, optional): Relative tolerance for the solver. Defaults to 1e-6.
             a_tol (float, optional): Absolute tolerance for the solver. Defaults to 1e-16.
-            workers (int, optional): Number of worker threads to use. Defaults to 6.
+            workers (int, optional): Number of worker threads to use. Defaults to -1.
             double_line (bool, optional): Whether to use double line integration. Defaults to False.
             anlys_name (str, optional): Name of the analysis or subdirectory. Defaults to 'Poincare'.
         """
@@ -30,8 +39,11 @@ class Poincare():
         self.solver = solvr
         self.r_tol = r_tol
         self.a_tol = a_tol
-        self.workers = workers
         self.double_line = double_line
+        if workers <= 0: 
+            self.workers = os.cpu_count() + workers
+        else:
+            self.workers = workers
 
         self.IO.createSubDir(anlys_name)
         self.IO.log.info("+----------------+-------------------------+")
@@ -554,7 +566,7 @@ class Poincare():
 
         self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
         save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True)
-        plot_workers = min(self.workers, 16)
+        plot_workers = min(self.workers, 12)
         iter_in = enumerate(self.plot_angles)
         with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
             list(executor.map(save_output_partial, iter_in))
@@ -564,12 +576,15 @@ class Poincare():
     def save_output(self, iter, xyz_list, saveData=True):
         """
         Generates and saves Poincare plots and associated data for a given phi angle, and logs the operation.
-            
+
+        Note:
+            This method uses self.field and self.anlys_name, which are required for correct operation in a multiprocessing context.
+
         Args:
             iter (tuple): A tuple containing the index and phi angle (in radians).
             xyz_list (list): A list of Poincare data arrays for each particle.
             saveData (bool, optional): If True, saves the computed data to disk. Defaults to True.
-        
+
         Returns:
             None
 
@@ -577,41 +592,49 @@ class Poincare():
             - Saves plot images and data files to disk.
             - Logs the phi angle information.
         """
-        num_sets = len(xyz_list)
-        rminor = self.field.a
-        rmajor = self.field.R0
+
         n, phi = iter
         phi_deg = phi*180/np.pi
-        plt.rcParams.update({'font.size': 10})
-        plt.rcParams.update({'figure.autolayout':True})
 
+        plt.rcParams.update({'font.size': 10})
         fig = plt.figure(figsize=(6, 6))
         ax = fig.add_subplot(111, polar=True)
 
+        num_sets = len(xyz_list)
         maxLength = max(len(xyz_list[i][n]) for i in range(num_sets))
         radtheta_pts = np.full([num_sets, 2, maxLength], fill_value=np.nan)
         for i in range(num_sets):
             xyz_points = xyz_list[i][n]
             point_total = max(0, len(xyz_points)-1)
             for j in range(point_total):
-                radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], rmajor)[:2]
+                radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], self.field.R0)[:2]
             plt.scatter(radtheta_pts[i][0][:point_total], radtheta_pts[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
 
         if saveData:
-            fname = self.anlys_name + '_{:03.0f}'.format(degrees(phi))
+            fname = self.anlys_name + '_{:03.0f}'.format(phi_deg)
             self.IO.saveNumpyData(radtheta_pts, fname)
 
-        ax.set_rmax(rminor)
-        ax.set_rticks(np.arange(0.0, rminor, 0.02))
+        ax.set_rmax(self.field.a)
+        ax.set_rticks(np.arange(0.0, self.field.a, 0.02))
         ax.yaxis.set_tick_params(labelsize=5)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
+
         phi_phys = (phi + (198 * np.pi/180.)) % (2*np.pi)
         phi_phys_deg = phi_phys*180/np.pi
-        plt.title('$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n$\phi_c$={:02.0f}$\degree$'.format(phi_phys_deg, phi_deg), loc='left')
+        phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
+        phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
+        ax.set_title(phi_phy_string + phy_comp_string, loc='left')
+
         plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_deg)
+        plt.tight_layout()
         self.IO.saveFig(plot_name, dpi=250)
-        plt.close()
+        plt.close(fig)
+        del fig, ax, radtheta_pts, xyz_list
+        gc.collect()
         self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
+
+
+
 
     def run(self):
         """Generates Poincare plots based on the initial conditions and magnetic field.
