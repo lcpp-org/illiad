@@ -67,6 +67,7 @@ class Poincare():
         Returns:
             None
         """
+        self.IC_rtp_arr = init_pos_arr
         self.nlines = len(init_pos_arr)
         self.spins = spins
         self.field = field
@@ -566,12 +567,74 @@ class Poincare():
 
         self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
         save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True)
-        plot_workers = min(self.workers, 12)
+        plot_workers = min(self.workers, 9)
         iter_in = enumerate(self.plot_angles)
         with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
-            list(executor.map(save_output_partial, iter_in))
+            #list(executor.map(save_output_partial, iter_in))
+            executor.map(save_output_partial, iter_in)
 
         return path_lengths, poincare_points, wall_points
+
+    def identifyLCFS(self, LCFStype='inner', t_maxs=[100], index=0):
+        """Returns the index of the Last-Closed Flux Surface (LCFS).
+
+        Args:
+            LCFStype (str): Method to identify LCFS. One of 'inner', 'outer', or 'input'.
+            t_maxs (list): List of connection lengths for each initial condition.
+            index_in (int): Index to use if LCFStype is 'input'.
+
+        Returns:
+            int: Index of the identified LCFS.
+
+        Raises:
+            ValueError: If LCFStype is not one of ['inner', 'outer', 'input'].
+        """
+        LCFStypes = ['inner', 'outer', 'input']
+        if LCFStype not in LCFStypes:
+            raise ValueError("Invalid LCFS type. Expected one of: %s" % LCFStypes)
+
+        elif LCFStype == 'input':
+                LCFS_index = index
+
+        elif LCFStype == 'inner':
+            # Assuming surfaces are ordered from 'out' to 'in':
+            ## This returns the LCFS 'inside' ALL open flux surfaces
+            maxTime = np.max(t_maxs)
+            # Get indices of open flux surfaces
+            openSurface_ind = [i for i, t in enumerate(t_maxs) if t != maxTime]
+            if openSurface_ind:
+                LCFS_index = max(openSurface_ind) + 1
+            else:
+                LCFS_index = 1
+
+            plt.figure()
+            plt.plot(self.IC_rtp_arr, t_maxs, '-o', c='k')
+            plt.plot(self.IC_rtp_arr[LCFS_index], maxTime, '^', c='b')
+
+            plt.title(r'Connection length vs. $r_{initial} (@{}\phi=324\degree)$')
+            plt.yscale('log')
+            plt.grid(True, which='both')
+            plt.xlabel('Connection length [m]')
+            self.IO.saveFig('connectLengths')
+            plt.close()
+
+        elif LCFStype == 'outer':
+            maxTime = np.max(t_maxs)
+            LCFS_index = t_maxs.index(maxTime)
+
+            plt.figure()
+            plt.plot(self.IC_rtp_arr, t_maxs, '-o', c='k')
+            plt.plot(self.IC_rtp_arr[LCFS_index], maxTime, '^', c='b')
+
+            plt.title(r'Connection length vs. $r_{initial} (@{}\phi=324\degree)$')
+            plt.yscale('log')
+            plt.grid(True, which='both')
+            plt.xlabel('Connection length [m]')
+            self.IO.saveFig('connectLengths')
+            plt.close()
+
+        self.IO.log.info('LCFS_index = {}'.format(LCFS_index))
+        return LCFS_index
 
     def save_output(self, iter, xyz_list, saveData=True):
         """
@@ -632,8 +695,6 @@ class Poincare():
         del fig, ax, radtheta_pts, xyz_list
         gc.collect()
         self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
-
-
 
 
     def run(self):
