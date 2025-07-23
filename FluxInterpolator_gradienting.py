@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 
 import classes.class_outputHandler as out
 from classes.mesh import *
-from utility.anlys_funcs import identifyLCFS
 from utility.coordtrans import RTP_XYZ_JAC
 
 def main():
@@ -20,7 +19,6 @@ def main():
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
-    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     # load numpy data using simIO method: big_grid_linear, big_grid_parabolic
     big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear.npy')
@@ -42,7 +40,7 @@ def main():
     print(f'{big_flux_Lingrad_radial.shape=}')
 
     # Load LCFS file:
-    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(lcfs_index+1))
+    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX+1))
     lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
     
     # set all points outside the LCFS to zero
@@ -154,7 +152,7 @@ if __name__ == '__main__':
     CONFIG_HEL = 'default_helical_rev'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INPUT = 39 #40 #22 #29?
+    LCFS_INDEX = 39 #40 #22 #29?
     NPHI = 360
     NTHETA = 360
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)

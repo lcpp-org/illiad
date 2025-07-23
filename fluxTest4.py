@@ -9,7 +9,6 @@ import matplotlib.gridspec as gridspec
 
 from classes.mesh import *
 from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
-from utility.anlys_funcs import identifyLCFS
 np.set_printoptions(threshold=np.inf)
 
 def main():
@@ -22,7 +21,6 @@ def main():
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
-    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
 
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         ## LOAD POINCARE DATA
@@ -45,10 +43,10 @@ def main():
             plotData_list = [ [0]*NSURFACE for _ in range(len(PHI_GENs)) ]
 
             valid_surfs = np.zeros(NSURFACE, dtype=bool) # keep track of valid surfaces
-            valid_surfs[lcfs_index:] = True  # set all surfaces after LCFS to valid
+            valid_surfs[LCFS_INDEX:] = True  # set all surfaces after LCFS to valid
 
         ## LOOP THROUGH FLUX SURFACES TO FIND SUBSETS (ISLAND) AND THE SET OF SMALLEST ISLANDS
-        first_loop_output = first_surface_loop(flux_surfaces, mag_axis, b_hidra, lcfs_index, NSURFACE, MAX_SUBSETS)
+        first_loop_output = first_surface_loop(flux_surfaces, mag_axis, b_hidra, LCFS_INDEX, NSURFACE, MAX_SUBSETS)
         smallest_island_index, num_subsets, subsetData, subsetCenters, hist_output = first_loop_output
         hist, bin_edges, wrap_flag = hist_output
         simIO.log.info('# of subset in each surface: {}'.format(num_subsets))
@@ -56,7 +54,7 @@ def main():
 
         ## (2ND) LOOP THROUGH FLUX SURFACES TO SHIFT DATA AND SPLINE FIT
         Fluxes = []
-        for surf_index in range(lcfs_index, NSURFACE):
+        for surf_index in range(LCFS_INDEX, NSURFACE):
             N_subsets = num_subsets[surf_index]
             ## GET R, THETA FOR FLUX SURFACE
             th_in, r_in = flux_surfaces[surf_index]
@@ -107,19 +105,19 @@ def main():
 
         # PRINTING FLUXES AS OUTPUT:
         for i, flux in enumerate(Fluxes):
-            this_surf_index = i + lcfs_index
+            this_surf_index = i + LCFS_INDEX
             tot_flux_array[this_surf_index][phi_index] = np.sum(flux, axis=-1)
-            lcfs_flux = tot_flux_array[lcfs_index][phi_index]
+            lcfs_flux = tot_flux_array[LCFS_INDEX][phi_index]
             temp_norm = (1 - (tot_flux_array[this_surf_index][phi_index]/lcfs_flux))
             total_flux_norm[this_surf_index][phi_index] = np.copy(max(temp_norm, 0.))
 
         # FORMATTING DATA TO SAVE AS NUMPY ARRAY
-        for surf_index in range(lcfs_index, NSURFACE):
+        for surf_index in range(LCFS_INDEX, NSURFACE):
             plot_tr_points = plotData_list[phi_index][surf_index]
             NOW_NPTS = plot_tr_points.shape[0]
             plot_thetas = plot_tr_points.T[0]
             plot_radii = plot_tr_points.T[1]
-            lcfs_radii = plotData_list[phi_index][lcfs_index].T[1]
+            lcfs_radii = plotData_list[phi_index][LCFS_INDEX].T[1]
 
             # Filter out wild fits
             delta_plot_rs = np.max(lcfs_radii) - np.max(plot_radii)
@@ -131,13 +129,13 @@ def main():
 
     ## OUTPUT FLUXES
     # Set fluxes outside of LCFS to be equal to the LCFS flux
-    tot_flux_array[:lcfs_index][:] = tot_flux_array[lcfs_index][:]
+    tot_flux_array[:LCFS_INDEX][:] = tot_flux_array[LCFS_INDEX][:]
     # Set range of data to be between 0 and the LCFS flux
     tot_flux_array = np.maximum(tot_flux_array, 0.0)
-    tot_flux_array = np.minimum(tot_flux_array, tot_flux_array[lcfs_index])
+    tot_flux_array = np.minimum(tot_flux_array, tot_flux_array[LCFS_INDEX])
 
     # Set normed fluxes outside of LCFS to be equal to the 0
-    total_flux_norm[:lcfs_index][:] = 0
+    total_flux_norm[:LCFS_INDEX][:] = 0
     # Set range of data to be between 0 and 1
     total_flux_norm = np.maximum(total_flux_norm, 0.0)
     total_flux_norm = np.minimum(total_flux_norm, 1.0)
@@ -170,7 +168,7 @@ def main():
     plt.close()
 
     # SAVE THE NUMPY ARRAYS TO INDIVIDUAL FILES USING SIMIO METHOD
-    for surf_index in range(lcfs_index, NSURFACE):
+    for surf_index in range(LCFS_INDEX, NSURFACE):
         filename_center = ANLYS_SUBDIR + '/fSurf_{:03d}_center.npy'.format(surf_index)
         simIO.saveNumpyData(centers_array[surf_index], filename_center)
         filename_pt_mesh = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(surf_index)
@@ -579,7 +577,7 @@ if __name__ == '__main__':
     CONFIG_HEL = 'default_helical_rev'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INPUT = 39 #40 #22 #29?
+    LCFS_INDEX = 39 #40 #22 #29?
     NPHI = 360
     NTHETA = 360
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)

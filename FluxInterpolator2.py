@@ -7,7 +7,6 @@ from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 
 from classes.mesh import *
-from utility.anlys_funcs import identifyLCFS
 
 def main():
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -19,8 +18,6 @@ def main():
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
-    lcfs_index = identifyLCFS(LCFStype='input', num=LCFS_INPUT, outputHandler=simIO)
-
 
     ## LOAD FLUX DATA
     filepath = ANLYS_SUBDIR  + '/'
@@ -34,7 +31,7 @@ def main():
     # LOAD VALID SURFACE DATA
     validSurf_name = filepath + 'ValidSurfaces.npy'
     valid_surface = simIO.loadNumpyData(validSurf_name)
-    valid_surface[lcfs_index:] = True # manually set some surfaces to valid
+    valid_surface[LCFS_INDEX:] = True # manually set some surfaces to valid
     #valid_surface[39] = False # manually set some surfaces to valid
 
     # Load Magnetic Axis point:
@@ -44,7 +41,7 @@ def main():
     island_axis_array = simIO.loadNumpyData(filename_center_island)
 
     # Load LCFS file:
-    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(lcfs_index+1))
+    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX+1))
     lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
     print(f'{lcfs_points_full.shape=}')
     # Choosing one 'well-behaved' angle for the calculation (no failed calculations)
@@ -95,7 +92,7 @@ def main():
         # plt.show()
 
         ## LOOP THROUGH SURFACES
-        for surface_index in range(lcfs_index, N_surfaces):
+        for surface_index in range(LCFS_INDEX, N_surfaces):
             if valid_surface[surface_index] == False:
                 print(f'Skipping surface {surface_index} (not valid)')
             else:
@@ -201,7 +198,7 @@ if __name__ == '__main__':
     CONFIG_HEL = 'default_helical_rev'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INPUT = 39 #40 #22 #29?
+    LCFS_INDEX = 39 #40 #22 #29?
     NPHI = 360
     NTHETA = 360
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
