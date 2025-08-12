@@ -3,7 +3,6 @@
 #### GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD ####
 ####------------------------------------------------------####
 """
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -11,46 +10,54 @@ import classes.class_outputHandler as out
 #from classes.outputHandler import OutputHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
-from utility.anlys_funcs import identifyLCFS
 
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "AcceptedIota5_400spins_49Lines"
+OUTPUT_DIR = "Iota4-dflt_800spins_89Lines_RK45_2"
 
 # DEFINE FIELDS #
+"""
+# COIL CURRENTS NORMALLY RUN ON HIDRA
+###########################################
+#      | [Amp]| [Amp]| [Amp]| [deg]       #
+# IOTA |  I_T |  I_H |  I_V | PHI FWD/REV #
+# 1/3  |  486 |  900 |   00 | 324/???     #
+# 1/4  |  486 |  790 |   00 | 180/144     #
+# 1/5  |  486 |  710 |   00 | 360/???     #
+# 1/7  |  581 |  581 |   00 | ???/???     #
+# MAX. | 3500 | 7000 |   ?? | ???/???     #
+###########################################
+"""
 CURRENT_TOR = 0.486 #[kA]
-CURRENT_HEL = 0.710 #[kA]
+CURRENT_HEL = 0.790 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
 # DEFINE INITIAL CONDITIONS #
-#IC_PHI_DEG = 324. #Accepted iota1/3
-#IC_PHI_DEG = 180. #Accepted iota1/4
-IC_PHI_DEG = 360. #Accepted iota1/5
-
-#IC_PHI_DEG = ?? #ChangeTo iota1/3
-#IC_PHI_DEG = 144. #ChangeTo iota1/4
-#IC_PHI_DEG = ?? #ChangeTo iota1/5
-
+IC_PHI_DEG = 180. #Accepted iota1/4
 IC_THETA_DEG = 180.
-START_RADIUS = 0.140
+START_RADIUS = 0.130
 END_RADIUS = 0.020
-NLINES = 13 + 12 + 24 #+ 48
-SPINS = 400 # max length, SPIN = 2pi*R0 [meters]
+#NLINES = 14 + 13 + 26 + 52 + 104
+NLINES = 12 + 11 + 22 + 44 #+ 88
+SPINS = 800 # max length, SPIN = 2pi*R0 [meters]
 
-# SOLVER ARGUMENTS #
-# NTHREADS:
-##  N > 0: use N threads
-##  N = 0: use all available threads
-##  N < 0: use all but the last N threads
+# DEFINE SOLVER PARAMETERS #
+"""
+##  NTHREADS > 0: use N threads
+##  NTHREADS = 0: use all available threads
+##  NTHREADS < 0: use all but the last N threads
 # DOUBLE_LINE:
 ##  True: run each fieldline in both directions from the init pos 
 ##        !ONLY USE WHEN (NTHREADS > NLINES)!
 ##  False: run each fieldline in +B direction from the init pos
-SOLVER = 'LSODA'
+"""
+#SOLVER = 'LSODA'
+SOLVER = 'RK45'
 RTOL = 2.49e-12
 ATOL = 2.49e-8
-NTHREADS = 31 #-1
+NTHREADS = -1
 DOUBLE_LINE = False
+
 
 def main():
     """
@@ -67,19 +74,18 @@ def main():
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
     ## SET UP INITIAL CONDITIONS
-    ic_rad = np.array(np.linspace(START_RADIUS, END_RADIUS, NLINES))
+    ic_radii = np.array(np.linspace(START_RADIUS, END_RADIUS, NLINES))
     ic_theta = IC_THETA_DEG * np.pi/180.
     ic_phi = IC_PHI_DEG * np.pi/180.
-    init_conds_rtp = np.array([[R, ic_theta, ic_phi] for R in ic_rad])
+    init_conds_rtp = np.array([[ic_r, ic_theta, ic_phi] for ic_r in ic_radii])
 
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
     PoinCare = Poincare(simIO, *solver_args)
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
-    tMax = PoinCare.run()[0]
-
+    out_tMax = PoinCare.run()[0]
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    identifyLCFS(LCFStype='inner', iconds=ic_rad, t_maxs=tMax, outputHandler=simIO)
+    PoinCare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
