@@ -1,10 +1,13 @@
-import numpy as np
-#import numba as nb
+"""
+# utility/coordtrans.py
+# This module provides functions for coordinate transformations between
+# r-theta-phi (RTP) coordinates and Cartesian (XYZ) coordinates.
+# """
 
+import numpy as np
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
-
 
 def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     """Converts r-theta-phi coordinates to Cartesian coordinates.
