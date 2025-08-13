@@ -36,24 +36,22 @@ class Particle:
 
 
 class FieldLine(Particle):
-    """Represents a field line in the magnetic field."""
+    """Represents a field line in the magnetic field.
+
+    Args:
+        init_XYZ (array-like): Initial position coordinates of the field line.
+        maxlength (float): Maximum length or lifespan of the field line.
+        direction (float, optional): Direction of the field line's movement. Defaults to 1.0.
+
+    Attributes:
+        pos0_XYZ (np.ndarray): Initial position coordinates.
+        maxLife (float): Maximum length or lifespan.
+        direction (float): Direction of movement.
+        vel0_XYZ (int): Initial velocity, default is 0.
+        charge (float): Particle charge, default is 0.0.
+        mass (float): Particle mass, default is 0.0.
+    """
     def __init__(self, init_XYZ, maxlength, direction=1.0):
-        """
-        Initializes a new Particle instance.
-
-        Args:
-            init_XYZ (Any): Initial position coordinates of the particle.
-            maxlength (Any): Maximum lifespan or length of the particle.
-            direction (float, optional): Direction of the particle's movement. Defaults to 1.0.
-
-        Attributes:
-            pos0_XYZ (Any): Initial position coordinates.
-            maxLife (Any): Maximum lifespan or length.
-            direction (float): Direction of movement.
-            vel0_XYZ (int): Initial velocity, default is 0.
-            charge (float): Particle charge, default is 0.0.
-            mass (float): Particle mass, default is 0.0.
-        """
         super().__init__('fieldline')
         self.pos0_XYZ = init_XYZ
         self.maxLife = maxlength
