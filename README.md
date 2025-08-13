@@ -14,15 +14,18 @@
 
 ## Dependencies
 
-- numpy
-- scipy
-- matplotlib
-- pandas
-- tqdm
-- torch (PyTorch)
+*Note that these are the current versions used on the Illinois Campus Cluster (ICC).  
+Use with other versions is not guaranteed.*
+- python==3.11.11
+- numpy==2.3.1
+- scipy==1.16.0
+- matplotlib==3.10.3
+- pandas==2.3.1
+- tqdm==4.67.1
+- torch==2.7.1 (PyTorch)
 
 ## Getting Started
 
 1. Install the required dependencies.
-2. Explore the `examples/` directory for demonstration scripts covering field modeling, field line tracing, Poincaré map generation, flux and electric field calculations, and kinetic ion tracing.
+2. Explore the `run....py` scripts in the base directory for demo scripts covering field modeling, Poincaré map generation, flux calculations, and kinetic ion tracing.
 3. Refer to the documentation for API details and advanced usage.
