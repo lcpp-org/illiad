@@ -1,3 +1,5 @@
+
+
 import logging
 import classes.class_outputHandler as out
 
@@ -16,7 +18,13 @@ from classes.mesh import *
 from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 np.set_printoptions(threshold=np.inf)
 
-def main():
+def fluxCalculator():
+    global ANLYS_DIR, ANLYS_SUBDIR
+    global FIELD_FILE_TOR, FIELD_FILE_HEL, CURRENT_TOR, CURRENT_HEL, CONFIG_TOR, CONFIG_HEL
+    global LCFS_INDEX, NPHI, NTHETA, PHI_GENs
+    global MAX_SUBSETS, SMOOTH_FCTR, INTEGRATE_EPSABS, INTEGRATE_EPSREL
+    global PLOT_ALL
+
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
@@ -188,26 +196,6 @@ def main():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def find_Axis(theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh) -> np.ndarray:
     """
     Computes the geometric center (axis) of a set of points in (r, theta) coordinates.
@@ -243,8 +231,6 @@ def find_Axis(theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh) -> np.nda
     axis_thetar = XYZ_to_RTP(axis_xyz, field.R0)[1::-1]
 
     return axis_thetar
-
-
 
 def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
     """Function to find contiguous subsets of points in theta-r space"""
@@ -291,7 +277,6 @@ def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
             split_data = [theta_r_pts]
 
     return split_data, found_centers, hist, bin_edges, wrapped_flag
-
 
 def find_subsets_new(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
     split_data = []
@@ -409,7 +394,7 @@ def spline_Data(theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
     # spline parameters
     return splrep(theta_spl, rad_spl, k=3, s=smoothing, per=False, full_output=1, quiet=1)
 
-def integrate_flux(spline_parms, spline_axis, phi, ffield, err_abs=1e-5, err_rel=1e-3):
+def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=1e-3):
     """
     Integrates the total toroidal flux contained within the given spline, defined relative to the specified center.
 
@@ -700,4 +685,4 @@ if __name__ == '__main__':
     ## PLOTTING FLAG
     PLOT_ALL = True
 
-    main()
+    fluxCalculator()
