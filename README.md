@@ -1,17 +1,24 @@
 # fieldlines-uiuc
 
 ```
-█████████████████
-█████████████████
+████████████████
+████████████████
    ██████████
    ██████████
    ██████████
    ██████████
    ██████████
-   ██████████
-█████████████████
-█████████████████
+████████████████
+████████████████
 ```
+
+
+
+
+
+
+
+
 
 `fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing electromagnetic fields, with a primary focus on magnetic field structures. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
 
