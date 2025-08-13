@@ -49,7 +49,7 @@ class Boris():
         # self.IO.log.info("+----------------+-------------------------+")
 
 
-    def set_conditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3):
+    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
