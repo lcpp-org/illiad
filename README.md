@@ -1,5 +1,28 @@
 # fieldlines-uiuc
 
+```
+████████████████████████████████████████
+████████████████████████████████████████
+████████████████████████████████████████
+████████████████████████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+    ██████████████████████
+████████████████████████████████████████
+████████████████████████████████████████
+████████████████████████████████████████
+████████████████████████████████████████
+```
+
 `fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing electromagnetic fields, with a primary focus on magnetic field structures. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
 
 ## Features
@@ -29,3 +52,4 @@ Use with other versions is not guaranteed.*
 1. Install the required dependencies.
 2. Explore the `run....py` scripts in the base directory for demo scripts covering field modeling, Poincaré map generation, flux calculations, and kinetic ion tracing.
 3. Refer to the documentation for API details and advanced usage.
+
