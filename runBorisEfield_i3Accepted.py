@@ -1,15 +1,29 @@
+"""
+Runs the full simulation pipeline for ion tracking in a magnetic and electric field environment.
+
+This function performs the following steps:
+  1. Sets up the output directory and logging.
+  2. Calculates the number of emitters and particles.
+  3. Initializes mesh objects for magnetic and electric fields and loads field data.
+  4. Initializes ion properties and their initial positions/velocities.
+  5. Saves the initial conditions to disk.
+  6. Runs the Boris particle solver for the initialized ions.
+  7. Processes and transforms output coordinates for plotting.
+  8. Generates a series of plots for particle trajectories, wall hits, deposition angles, and energies.
+  9. Logs the completion of the simulation.
+All configuration and physical parameters are expected to be defined in the global scope or imported modules.
+"""
+
 ## IMPORTS
 import numpy as np
 from time import perf_counter
 
-import classes.class_outputHandler as out
-from classes.meshNew import *
-from utility.coordtrans import *
-from utility.anlys_funcs import *
-from utility.point_generators import generateSeedShells, generate_MB_velocities
-from classes.particle import *
+from classes.iohandler import IOHandler
+from classes.meshNew import Mesh
+from classes.boris import Boris
 
-import plot_funcs.plotFuncs as plotFuncs
+from utility.coordtrans import *
+from utility.point_generators import ionInitializer
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
@@ -17,235 +31,106 @@ kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
 
-############################
-## SET SIMULATION INPUTS: ##
-############################
-
+## SET SIMULATION INPUTS:
+# ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
+OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+TAG = "EXAMPLE"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
 HELICAL_CURRENT = 0.900 #[kA]
+CONFIG_TOR = 'default_toroidal'
+CONFIG_HEL = 'default_helical'
 # ELECTRIC FIELD
+#FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
 FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
-
+FIELD_SCALE_ELECTRIC = 100.0 # [Volts]
 # ION PROPERTIES
-ION_TEMP = 2.0 #eV 
-ION_MASS = Li_mass #amu
-CHARGE_NUM = 1 # Z
-
+ION_MASS = Li_mass # [amu]
+ION_TEMP = 5.0 # [eV]
+CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
+LCFS_INDEX = 37 #30 #29 #40 (from Poincare output (simIO.log))
+DELTRS = [0.000] # [m]
 NPHI = 60
-NTHETA = 72 #90
-DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 15 #300
-
+NTHETA = 72
+NPARTICLES_PER_EMITTER = 100
 # SIMULATION PARAMETERS
-DT = 1e-8
-TMAX = 0.0006
+DT = 1e-8 # [s]
+TMAX = 0.001 # [s]
 NSTEPS = int(TMAX / DT)
 
-# UNIQUE OUTPUT TAG
-TAG= '60V_Z1_postSOFE_UPDATES'
-OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+
+## RUN SIMULATION:
+def main():
+    ## SET UP RUN DIRECTORY AND LOGGING
+    simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
+    simIO.startLog()
+    simIO.borisBoilerplate(globals())
+
+    ## DEFINE STRING (FOR FILE NAME)
+    delimiter = '-'
+    dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
+    cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
+                                                               int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
+    ## CALCULATE SOME CONSTANTS
+    N_emitters = len(DELTRS) * NTHETA * NPHI
+    N_particles = NPARTICLES_PER_EMITTER * N_emitters
+
+    ## DEFINE MESH AND LOAD MAGNETIC AND ELECTRIC FIELD
+    b_hidra = Mesh(R0=0.72, a=0.19)
+    b_hidra.setErrorField()
+    b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
+    e_hidra = Mesh(R0=0.72, a=0.19)
+    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
+                                    att_mult=FIELD_SCALE_ELECTRIC)
+
+    ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
+    init_conds = [LCFS_INDEX, NPHI, NTHETA, DELTRS, NPARTICLES_PER_EMITTER]
+    ion_properties = [ION_MASS, CHARGE_NUM, ION_TEMP]
+    ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
+
+    ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
+    IC_filename = 'initVelPos_' + cond_string+TAG
+    simIO.saveNumpyData(initVelPos, IC_filename)
+    simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
+
+    ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+    ## RUN BORIS SOLVER FOR PARTICLES ##
+    ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
+    particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
+    ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
+    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX)
+    output_array, energy_output, depo_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
+    simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
+
+    ## COORDINATE FLIPPING & CONVERSION
+    phi_plot = 2*np.pi - output_array[2] # flip phi for the perspective outside the vacuum vessel
+    phi_adder_ccw = -18. # degrees, phi_comp is 18 CW from south-side split
+    
+    theta_plot = output_array[1]
+    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
+    phi_plot_deg = (phi_plot*(180/np.pi) + phi_adder_ccw) % 360.
+    theta_plot_deg = theta_plot*(180/np.pi)
+
+    ## PLOTTING
+    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO)
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles_deg, colorRange=[0, 90], 
+                                colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_output,
+                                colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+    
+    ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
+
+    ## END RUN ##
+    simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
 
-#####################
-## RUN SIMULATION: ##
-#####################
-## SET UP RUN DIRECTORY AND LOGGING
-## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
-simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
-simIO.startLog()
-simIO.borisBoilerplate(globals())
-
-## DEFINE STRING (FOR FILE NAME)
-delimiter = '-'
-dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
-cond_string = dr_String + 'mm_{}eV_LCFS{}_'.format(int(ION_TEMP), int(LCFS_INDEX))
-
-## CALCULATE SOME CONSTANTS
-N_emitters = len(DELTRS) * NTHETA * NPHI
-N_particles = NPARTICLES_PER_EMITTER * N_emitters
-
-## DEFINE MESH AND LOAD MAGNETIC FIELD
-b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult='default_toroidal')
-b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult='default_helical')
-b_hidra.set_nonPer_errField()
-
-## DEFINE MESH AND LOAD ELECTRIC FIELD
-e_hidra = Mesh(R0=0.72, a=0.19)
-e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                att_mult=FIELD_SCALE_ELECTRIC)
-
-## POSITION GENERATION:
-## DEFINE ARRAYS FOR SEED POINT GENERATION
-phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist()
-theta_arr = np.linspace(0, 2*np.pi*(1 - 1/NTHETA), NTHETA)
-seed_subset = []
-seed_list = []
-normals_list = []
-initVel_list = []
-## GENERATE SEED POINTS
-simIO.log.info('GENERATING SEED POINTS:')
-for phi_gen_deg in phiGen_arr:
-    filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
-    th_in, r_in = simIO.loadNumpyData(filename)[LCFS_INDEX]
-
-    phi_gen = phi_gen_deg*np.pi/180
-    seed_subset, normals = generateSeedShells(DELTRS, NTHETA, r_in, th_in, phi_gen,
-        b_hidra, simIO, 'IonSeedPts_{}mm'.format(dr_String), genNormals=True, Efield=e_hidra)
-
-    seed_list.extend(seed_subset)
-    normals_list.extend(normals)
-print('\n')
-simIO.log.info('FINISHED LOADING NUMPY DATA & GENERATING INIT. POSITIONS\n')
-
-## VELOCITY GENERATION:
-tic = perf_counter()
-initVel_array = generate_MB_velocities(N_particles=N_particles, normals_list=normals_list,
-                                       ion_temp=ION_TEMP, ion_mass=ION_MASS,
-                                       nparticles_per_emitter=NPARTICLES_PER_EMITTER)
-
-initVelPos = np.zeros((NPARTICLES_PER_EMITTER*N_emitters, 6))
-ion_list = []
-for i in range(NPARTICLES_PER_EMITTER):
-    # chunking
-    starti = i*N_emitters
-    stopi = (i+1)*N_emitters
-    # setting velocities nad positions  in array as chunks
-    initVelPos[starti:stopi, 0:3] = initVel_array[starti:stopi]
-    initVelPos[starti:stopi, 3:6] = np.array(seed_list)
-    # instantiating ions in a list
-    ion_list += [Ion(seed_pt, ION_MASS, CHARGE_NUM, TMAX) for seed_pt in seed_list]
-
-toc = perf_counter()
-simIO.log.info('Velocities generated in {}sec'.format(toc-tic))
-simIO.log.info('initVel_array shape={}'.format(initVel_array.shape) )
-
-## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
-IC_filename = 'initVelPos_' + cond_string+TAG
-simIO.saveNumpyData(initVelPos, IC_filename)
-simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
-
-## SET INITIAL STATES AND OUTPUT(?necessary?)
-for ion, v_0 in zip(ion_list, initVel_array):
-    ion.initVelocity(v_0)
-    ion.initOutput(DT, TMAX)
-
-
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-## RUN BORIS SOLVER FOR PARTICLES ##
-##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
-particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
-# It returns the wall intersection points and their indices.
-#wallPt_output, velocity_output, max_timeStep = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra)
-wallPt_output, velocity_output, max_timeStep, ion_traces = boris_solver2(ion_list, DT, TMAX, b_hidra, e_hidra, particle_tracker_list)
-simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
-
-
-
-####################
-## PREPARE OUTPUT ##
-####################
-tic = perf_counter()
-
-wallPt_output = wallPt_output.cpu().numpy()
-velocity_output = velocity_output.cpu().numpy()
-max_timeStep = max_timeStep.cpu().numpy()
-ion_traces = ion_traces.cpu().numpy()
-
-# filter out rows containing all zeros
-wallPt_output = wallPt_output[~np.all(wallPt_output == 0, axis=1)]
-# Filter velocity_output and get the indices of nonzero rows
-nonzero_indices = ~np.all(velocity_output == 0, axis=1)
-velocity_output = velocity_output[nonzero_indices]
-max_timeStep = max_timeStep[nonzero_indices]
-
-speed_output = np.linalg.norm(velocity_output, axis=1)
-energy_output = 0.5 * ION_MASS * kg_per_amu * speed_output**2 / kboltz #convert speed to energy in eV
-simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV'.format(
-    np.min(energy_output), np.max(energy_output), np.mean(energy_output)))
-
-wallPtArray = np.asarray( [XYZ_to_RTP(wall_point, b_hidra.R0) for wall_point in wallPt_output] ).T
-outputArray = np.vstack((wallPtArray, velocity_output.T, max_timeStep[None, :]))
-
-## CALCULATE ANGLE FROM NORMAL
-unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
-radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
-deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
-deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
-
-simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
-    np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
-
-toc = perf_counter()
-simIO.log.info('Output sent to cpu and converted to rtp in {}sec'.format(toc-tic))
-
-
-## SAVE WALL POINTS AND VELOCITIES
-###############################
-filenameTrac = 'Ion_traces_' + cond_string+TAG
-simIO.saveNumpyData(ion_traces, filenameTrac)
-simIO.log.info('OUTPUT ION TRACES: {}'.format(filename))
-
-filename = 'Wallpt_OUTPUT_' + cond_string+TAG
-simIO.saveNumpyData(outputArray, filename)
-simIO.log.info('OUTPUT RESULT DATA: {}'.format(filename))
-
-
-
-# COORDINATE FLIIPING & CONVERSION
-phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-theta_plot = wallPtArray[1]
-theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-
-a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
-phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
-theta_plot_deg = theta_plot*(180/np.pi)
-
-# ##############
-# ## PLOTTING ##
-# ##############
-
-plotFuncs.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
-
-# ## PLOT HISTOGRAM OF WALL POINTS
-# plotFuncs.plotWallHist(wallPtArray, cond_string+TAG, simIO=simIO)
-# ## PLOT *3D* HISTOGRAM
-# plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
-
-
-# ## PLOT DISCRETE WALL POINTS
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
-# ## PLOT DISCRETE WALL POINTS with Energy Colorscale
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=energy_output, colorLabel='Ion Deposition Energy (eV)',
-#                           runString=cond_string+TAG+'_EnergyDepo', simIO=simIO)
-# ## PLOT DISCRETE WALL POINTS with Angle Colorscale
-# plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=deposition_angles_deg, colorRange=[0, 90], colorLabel='Ion Deposition Angle (deg. from normal)',
-#                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
-
-
-# ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-# plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # PLOT FINAL ENERGY DISTRIBUTION
-# plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
-# # Plot # of perticles running over time
-# plotFuncs.plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
-
-# # PLOT DEPOSITION ANGLE DISTRIBUTION
-# plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
-
-
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
-#                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-#                             runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
-
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
-#                             colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-#                             runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
-
-
-## END RUN ##
-simIO.log.info('## SIM FINISHED! ##\n\n\n')
+if __name__ == "__main__":
+    main()
