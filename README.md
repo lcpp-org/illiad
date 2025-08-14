@@ -1,13 +1,15 @@
-# fieldlines-uiuc
 
 ```
-████████
-  ████
-  ████
-████████ LLINOIS
+    ----------------------------------------------------------
+    |               ████  ████ ████████ ████  ████ █████████ |
+    |               ████  ████   ████   ████  ████ ████      |
+    | FIELDLINES    ████  ████   ████   ████  ████ ████      |
+    |               ██████████ ████████ ██████████ █████████ |
+    ----------------------------------------------------------
 ```
+## Summary
 
-`fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing electromagnetic fields, with a primary focus on magnetic field structures. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
+`fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing impurity ion transport in a toroidal device, with a primary focus on lithium deposition in **HIDRA**, the Hybrid Illinois Device for Reasearch and Applications. It is designed as a 'ones stop shop,' capable of simulating the magentic field from the Biot-Savart law, addition of perturbative error fields, fieldline tracing and Poincare map generation and analysis, and kinetic ion tracing. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
 
 ## Features
 
