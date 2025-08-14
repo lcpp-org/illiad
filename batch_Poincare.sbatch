@@ -15,4 +15,5 @@
 
 module load python/3.11.11
 export PYTHONPATH=${HOME}/scratch/mypython3:${PYTHONPATH}
+echo $PYTHONPATH
 python3 runPoincare.py

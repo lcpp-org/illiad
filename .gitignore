@@ -162,8 +162,8 @@ cython_debug/
 input_files/*.npy
 input_files/*.txt
 output/*
-*.o3*
-*.e3*
+*.o4*
+*.e4*
 *.sbatch
 NPR598/*
 Miniforge3-Linux-x86_64.sh

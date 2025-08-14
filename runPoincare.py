@@ -12,7 +12,7 @@ from classes.mesh import Mesh
 from classes.poincare import Poincare
 
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "Iota4-dflt_800spins_89Lines_RK45_2"
+OUTPUT_DIR = "Iota4-dflt_1500spins_89Lines_RK45"
 
 # DEFINE FIELDS #
 """
@@ -39,7 +39,7 @@ START_RADIUS = 0.130
 END_RADIUS = 0.020
 #NLINES = 14 + 13 + 26 + 52 + 104
 NLINES = 12 + 11 + 22 + 44 #+ 88
-SPINS = 800 # max length, SPIN = 2pi*R0 [meters]
+SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
 
 # DEFINE SOLVER PARAMETERS #
 """
