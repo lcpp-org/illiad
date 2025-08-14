@@ -607,11 +607,10 @@ class Poincare():
             else:
                 LCFS_index = 1
 
-            self.IO.log.info('IC_rtp_arr = {}'.format(self.IC_rtp_arr))
             plt.figure()
             plt.plot(self.IC_rtp_arr.T[0], t_maxs, '-o', c='k')
             ## CHECK
-            #plt.plot(self.IC_rtp_arr[LCFS_index], maxTime, '^', c='b')
+            plt.plot(self.IC_rtp_arr[LCFS_index][0], t_maxs[LCFS_index], '^', c='b')
 
             plt.title(r'Connection length vs. $r_{initial} (@{}\phi=324\degree)$')
             plt.yscale('log')
