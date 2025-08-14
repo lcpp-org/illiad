@@ -6,8 +6,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import classes.class_outputHandler as out
-#from classes.outputHandler import OutputHandler
+from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 
@@ -64,7 +63,7 @@ def main():
     Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
     """
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
-    simIO = out.IOHandler(OUTPUT_DIR) 
+    simIO = IOHandler(OUTPUT_DIR) 
     simIO.startLog()
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
