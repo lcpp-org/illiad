@@ -9,7 +9,7 @@
 ```
 ## Summary
 
-`fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing impurity ion transport in a toroidal device, with a primary focus on lithium deposition in **HIDRA**, the Hybrid Illinois Device for Reasearch and Applications. It is designed as a 'ones stop shop,' capable of simulating the magentic field from the Biot-Savart law, addition of perturbative error fields, fieldline tracing and Poincare map generation and analysis, and kinetic ion tracing. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
+`fieldlines-uiuc` is a Python package for modeling, visualizing, and analyzing impurity ion transport in a toroidal device, with a primary focus on lithium deposition in **HIDRA**, the Hybrid Illinois Device for Research and Applications. It is designed as a 'ones stop shop,' capable of simulating the magnetic field from the Biot-Savart law, addition of perturbative error fields, fieldline tracing and Poincare map generation and analysis, and kinetic ion tracing. It is designed for both educational and research use, providing a flexible framework for exploring field line dynamics and plasma physics phenomena.
 
 ## Features
 
@@ -18,7 +18,6 @@
 - **Poincaré Maps:** Generate Poincaré sections to study field line topology and magnetic surfaces.
 - **Flux and Electric Field Calculation:** Compute magnetic flux surfaces and evaluate electric fields derived from the modeled systems.
 - **Kinetic Ion Tracing:** Run high-performance kinetic ion trajectory simulations on the GPU using PyTorch, enabling large-scale particle tracing and analysis.
-- **Interactive Visualization:** Visualize field lines, Poincaré maps, and particle trajectories interactively with Matplotlib.
 - **Batch Processing and Data Analysis:** Automate simulations and analyze results efficiently using Pandas and TQDM for progress tracking.
 
 ## Dependencies
