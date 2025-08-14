@@ -226,7 +226,7 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     return velocity_array
 
 
-def ion_initializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO'):
+def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO'):
 
     mass, charge, temperature = ion_properties
     lcfs_index, nphi, ntheta, deltrs, nparticles_per_emitter = initial_conditions

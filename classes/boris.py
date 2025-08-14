@@ -49,7 +49,7 @@ class Boris():
         # self.IO.log.info("+----------------+-------------------------+")
 
 
-    def set_conditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3):
+    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
@@ -257,10 +257,19 @@ class Boris():
         self.IO.log.info('OUTPUT RESULT DATA: {}'.format(wallpts_filename))
 
     def run(self, Bfield, Efield=None, trace_IDs=[]):
-        """Generates Poincare plots based on the initial conditions and magnetic field.
+        """Runs the Boris solver and processes the results.
+
+        Args:
+            Bfield: Magnetic field object providing field interpolation methods.
+            Efield: Electric field object providing field interpolation methods. Defaults to None.
+            trace_IDs: List of particle IDs to trace. Defaults to [].
 
         Returns:
-
+            Tuple containing:
+                outputArray (np.ndarray): Array of wall point and velocity data.
+                energy_output (np.ndarray): Array of particle energies at termination (in eV).
+                deposition_angles_deg (np.ndarray): Array of deposition angles (in degrees).
+                ion_traces (np.ndarray): Array of traced particle positions.
         """
         solv_out = self.parallel_solver(self.ion_list, Bfield, Efield, trace_IDs=trace_IDs)
 

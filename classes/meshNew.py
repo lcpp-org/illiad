@@ -182,7 +182,7 @@ class Mesh:
             self.By += torch.tensor((By_ * total_mult), dtype=torch.float64).to(device)
             self.Bz += torch.tensor((Bz_ * total_mult), dtype=torch.float64).to(device)
 
-    def set_nonPer_errField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
+    def setErrorField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
         """Sets the magnitude and direction of the non-periodic error field.
 
         The direction is measured from phi_c=0 (i.e., 18 degrees clockwise from the South Split).
