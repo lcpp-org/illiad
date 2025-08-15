@@ -527,9 +527,7 @@ class Poincare():
             self.IO.log.critical('FAILURE!: Particle {}'
                 .format(particle.particleID))
 
-        data = fieldlines.y_events[:]
-
-        return tmax, data
+        return tmax, fieldlines.y_events[:]
 
     def post_solver(self, solver_output):
         """Processes the solver output to extract path lengths and Poincare data,
@@ -566,6 +564,7 @@ class Poincare():
             poincare_points = poincare_points[:self.nlines]
 
         self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
+        # self.IO.log.info('path_lengths: {}'.format(path_lengths))
         save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True)
         plot_workers = min(self.workers, 9)
         iter_in = enumerate(self.plot_angles)
@@ -575,6 +574,7 @@ class Poincare():
 
         return path_lengths, poincare_points, wall_points
 
+    
     def identifyLCFS(self, LCFStype='inner', t_maxs=[100], index=0):
         """Returns the index of the Last-Closed Flux Surface (LCFS).
 
@@ -608,9 +608,9 @@ class Poincare():
                 LCFS_index = 1
 
             plt.figure()
-            plt.plot(self.IC_rtp_arr, t_maxs, '-o', c='k')
+            plt.plot(self.IC_rtp_arr.T[0], t_maxs, '-o', c='k')
             ## CHECK
-            #plt.plot(self.IC_rtp_arr[LCFS_index], maxTime, '^', c='b')
+            plt.plot(self.IC_rtp_arr[LCFS_index][0], t_maxs[LCFS_index], '^', c='b')
 
             plt.title(r'Connection length vs. $r_{initial} (@{}\phi=324\degree)$')
             plt.yscale('log')
@@ -709,5 +709,5 @@ class Poincare():
         """
         solv_out = self.parallel_solver()
         pathLength, Poincare_output, wall_output = self.post_solver(solv_out)
-
+        # self.IO.log.info('pathLength: {}'.format(pathLength))
         return pathLength, Poincare_output, wall_output
