@@ -1,7 +1,17 @@
 """
-####------------------------------------------------------####
-#### GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD ####
-####------------------------------------------------------####
+#------------------------------------------------------#
+# GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD #
+#------------------------------------------------------#
+#        COIL CURRENTS NORMALLY RUN ON HIDRA           #
+#------------------------------------------------------#
+#  IOTA  |   I_T   |   I_H   |   I_V   |  PHI FWD/REV  #
+#        |  [Amp]  |  [Amp]  |  [Amp]  |     [deg]     #
+#  1/3   |   486   |   900   |  0000   |    324/???    #
+#  1/4   |   486   |   790   |  0000   |    180/144    #
+#  1/5   |   486   |   710   |  0000   |    360/???    #
+#  1/7   |   581   |   581   |  0000   |    ???/???    #
+#  MAX.  |  3500   |  7000   |  ????   |    ???/???    #
+#------------------------------------------------------#
 """
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,34 +20,18 @@ from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 
-# DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "Iota4-dflt_1500spins_89Lines_RK45"
-
 # DEFINE FIELDS #
-"""
-# COIL CURRENTS NORMALLY RUN ON HIDRA
-###########################################
-#      | [Amp]| [Amp]| [Amp]| [deg]       #
-# IOTA |  I_T |  I_H |  I_V | PHI FWD/REV #
-# 1/3  |  486 |  900 |   00 | 324/???     #
-# 1/4  |  486 |  790 |   00 | 180/144     #
-# 1/5  |  486 |  710 |   00 | 360/???     #
-# 1/7  |  581 |  581 |   00 | ???/???     #
-# MAX. | 3500 | 7000 |   ?? | ???/???     #
-###########################################
-"""
 CURRENT_TOR = 0.486 #[kA]
 CURRENT_HEL = 0.790 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
-
 # DEFINE INITIAL CONDITIONS #
 IC_PHI_DEG = 180. #Accepted iota1/4
 IC_THETA_DEG = 180.
 START_RADIUS = 0.130
 END_RADIUS = 0.020
 #NLINES = 14 + 13 + 26 + 52 + 104
-NLINES = 12 + 11 + 22 + 44 #+ 88
+NLINES = 12 + 11 + 22 + 44 + 88
 SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
 
 # DEFINE SOLVER PARAMETERS #
@@ -53,9 +47,13 @@ SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
 #SOLVER = 'LSODA'
 SOLVER = 'RK45'
 RTOL = 2.49e-12
-ATOL = 2.49e-8
+#ATOL = 2.49e-8
+ATOL = 2.49e-9
 NTHREADS = -1
 DOUBLE_LINE = False
+
+# DEFINE OUTPUT DIRECTORY #
+OUTPUT_DIR = "RK45-2p49e9_Iota4FWD_1500spins_177Lines"
 
 
 def main():
