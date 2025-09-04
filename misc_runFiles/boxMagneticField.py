@@ -4,11 +4,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from AGmesh import *
 
-df = pd.read_csv("input_files/small_box.csv")
+df = pd.read_csv("input_files/large_box.csv")
 print(df.head(10))
 
 magMesh = Mesh()
-magMesh.loadCartesianField("input_files/It3500_Ih6300_Iv000_1p000_1p000_64bit.npy",att_mult="default_poloidal")
+magMesh.loadCartesianField("input_files/It3500_Ih6300_Iv000_1p000_1p000_64bit.npy", errField=True, att_mult="default_poloidal")
 #print(magMesh.Bx.shape)
 
 
@@ -95,16 +95,18 @@ transMatrixInv = np.linalg.inv(transMatrix)
 
 B_list = []
 for i in range(len(df["x"])):
+    #print(i) if i<51 else ""
     x = df["x"][i]/1000
     y = df["y"][i]/1000
-    z = df["z"][i]/1000
+    z = df["z"][i]/1000    
+    #print([x,y,z]) if i<51 else ""
     xyz_normalCoord = [x,y,z] @ transMatrixInv
-    print(xyz_normalCoord) if i<51 else ""
+    #print(xyz_normalCoord) if i<51 else ""
     Bxyz, phi = magMesh.interpField(xyz_normalCoord, Cart=True)
     Bxyz_newCoord = Bxyz
-    print(Bxyz)if i<51 else ""
+    #print(Bxyz)if i<51 else ""
     Bxyz_newCoord = Bxyz @ transMatrix
-    print(Bxyz_newCoord)if i<51 else ""
+    #print(Bxyz_newCoord)if i<51 else ""
     
     mag = np.sqrt(sum(Bxyz_newCoord**2))
     Bxyz_newCoord = Bxyz_newCoord.tolist()
@@ -112,4 +114,4 @@ for i in range(len(df["x"])):
     B_list.append(Bxyz_newCoord)
 
 df2 = pd.DataFrame(B_list, columns=["Bx", "By", "Bz", "B"])
-#print(df2.head(50))
+print(df2.head(50))
