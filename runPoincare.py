@@ -1,61 +1,53 @@
 """
-####------------------------------------------------------####
-#### GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD ####
-####------------------------------------------------------####
+#------------------------------------------------------#
+# GENERATING POINCARE PLOTS FOR HIDRA'S MAGNETIC FIELD #
+#------------------------------------------------------#
+#        COIL CURRENTS NORMALLY RUN ON HIDRA           #
+#------------------------------------------------------#
+#  IOTA  |   I_T   |   I_H   |   I_V   |  PHI FWD/REV  #
+#        |  [Amp]  |  [Amp]  |  [Amp]  |     [deg]     #
+#  1/3   |   486   |   900   |    00   |    324/???    #
+#  1/4   |   486   |   790   |    00   |    180/144    #
+#  1/5   |   486   |   710   |    00   |    360/???    #
+#  1/7   |   581   |   581   |    00   |    ???/???    #
+#  MAX.  |  3500   |  7000   |    ??   |    ???/???    #
+#------------------------------------------------------#
+##  NTHREADS:
+#    > 0: use N threads
+#    = 0: use all available threads
+#    < 0: use all but the last N threads
+## DOUBLE_LINE:
+#    True: run each fieldline in both directions from the init pos *!ONLY USE WHEN NTHREADS > NLINES!*
+#    False: run each fieldline in +B direction from the init pos
 """
 import numpy as np
 import matplotlib.pyplot as plt
-
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 
-# DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "Iota4-dflt_1500spins_89Lines_RK45"
-
 # DEFINE FIELDS #
-"""
-# COIL CURRENTS NORMALLY RUN ON HIDRA
-###########################################
-#      | [Amp]| [Amp]| [Amp]| [deg]       #
-# IOTA |  I_T |  I_H |  I_V | PHI FWD/REV #
-# 1/3  |  486 |  900 |   00 | 324/???     #
-# 1/4  |  486 |  790 |   00 | 180/144     #
-# 1/5  |  486 |  710 |   00 | 360/???     #
-# 1/7  |  581 |  581 |   00 | ???/???     #
-# MAX. | 3500 | 7000 |   ?? | ???/???     #
-###########################################
-"""
 CURRENT_TOR = 0.486 #[kA]
 CURRENT_HEL = 0.790 #[kA]
-CONFIG_TOR = 'default_toroidal'
-CONFIG_HEL = 'default_helical'
+CONFIG_TOR = "default_toroidal"
+CONFIG_HEL = "default_helical"
 
 # DEFINE INITIAL CONDITIONS #
-IC_PHI_DEG = 180. #Accepted iota1/4
-IC_THETA_DEG = 180.
-START_RADIUS = 0.130
-END_RADIUS = 0.020
-#NLINES = 14 + 13 + 26 + 52 + 104
-NLINES = 12 + 11 + 22 + 44 #+ 88
-SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
+IC_PHI_DEG = 180. #[deg]
+IC_THETA_DEG = 180. #[deg]
+START_RADIUS = 0.150 #[m]
+END_RADIUS = 0.020 #[m]
+NLINES = 14 + 13 # + 26 + 52 + 104
+SPINS = 2000 # max length, SPIN = 2pi*R0 [meters]
 
 # DEFINE SOLVER PARAMETERS #
-"""
-##  NTHREADS > 0: use N threads
-##  NTHREADS = 0: use all available threads
-##  NTHREADS < 0: use all but the last N threads
-# DOUBLE_LINE:
-##  True: run each fieldline in both directions from the init pos 
-##        !ONLY USE WHEN (NTHREADS > NLINES)!
-##  False: run each fieldline in +B direction from the init pos
-"""
-#SOLVER = 'LSODA'
-SOLVER = 'RK45'
+SOLVER = "RK45" #'LSODA'
 RTOL = 2.49e-12
-ATOL = 2.49e-8
+ATOL = 1e-8
 NTHREADS = -1
 DOUBLE_LINE = False
+# DEFINE OUTPUT DIRECTORY #
+OUTPUT_DIR = "RK45-1e8_Iota4FWD_2000spins_27Lines"
 
 
 def main():
@@ -83,6 +75,7 @@ def main():
     PoinCare = Poincare(simIO, *solver_args)
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
     out_tMax = PoinCare.run()[0]
+
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
     PoinCare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
 

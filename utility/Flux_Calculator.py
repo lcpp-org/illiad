@@ -15,6 +15,7 @@ from sklearn.cluster import KMeans, SpectralClustering
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 
 from classes.mesh import *
+from classes.iohandler import IOHandler
 from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 np.set_printoptions(threshold=np.inf)
 
@@ -26,7 +27,7 @@ def fluxCalculator():
     global PLOT_ALL
 
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
-    simIO = out.IOHandler(ANLYS_DIR)
+    simIO = IOHandler(ANLYS_DIR)
     simIO.startLog()
     simIO.createSubDir(ANLYS_SUBDIR)
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
@@ -64,58 +65,59 @@ def fluxCalculator():
         smallest_island_index, num_subsets, subsetData, subsetCenters, hist_output = first_loop_output
         hist, bin_edges, wrap_flag = hist_output
 
-        # Log surface numbers and number of subsets side-by-side in columns
-        simIO.log.info('Surface\tNum_Subsets')
-        for surf_num, n_sub in zip(range(NSURFACE), num_subsets):
-            simIO.log.info(f'{surf_num:3d}\t{n_sub}')
-        simIO.log.info('Smallest island index: {}'.format(smallest_island_index))
+        # # Log surface numbers and number of subsets side-by-side in columns
+        # simIO.log.info('Surface\tNum_Subsets')
+        # for surf_num, n_sub in zip(range(NSURFACE), num_subsets):
+        #     simIO.log.info(f'{surf_num:3d}\t{n_sub}')
+        # simIO.log.info('Smallest island index: {}'.format(smallest_island_index))
 
         ## (2ND) LOOP THROUGH FLUX SURFACES TO SHIFT DATA AND SPLINE FIT
         Fluxes = []
         for surf_index in range(LCFS_INDEX, NSURFACE):
             N_subsets = num_subsets[surf_index]
-            ## GET R, THETA FOR FLUX SURFACE
-            th_in, r_in = flux_surfaces[surf_index]
-            r_in = r_in[~np.isnan(r_in)]
-            th_in = th_in[~np.isnan(th_in)]
-            th_size = th_in.size
-
-            # SHIFT ORIGIN OF R, THETA COORDINATES FROM GEOMETRIC CENTER TO MAGNETIC AXIS
-            points_tr_MagAxis = np.empty((th_size, 2))
-            points_tr_MagAxis[:] = axisShift(th_in, r_in[:], *mag_axis).T
-
-            # REMOVE DUPLICATE THETA VALUES AND SORT DATA IN INCREASING THETA
-            unique_indices = np.unique(points_tr_MagAxis[:, 0], return_index=True)[1]
-            points_tr_MagAxis = points_tr_MagAxis[unique_indices]
-            th_size = points_tr_MagAxis.shape[0]
-            points_tr_MagAxis = points_tr_MagAxis[np.argsort(points_tr_MagAxis[:, 0])]
 
             ## SUBSET LOOP: LOOP TO SPLINE, CALCULATE FLUX, AND CREATE REGULARLY-SPACED POINTS
             output = subset_looper(subsetData, subsetCenters, surf_index,
                                     smallest_island_index, N_subsets, wrap_flag,
                                     b_hidra, mag_axis_rev, NTHETA, PHI_GEN_DEG,
                                     INTEGRATE_EPSABS, INTEGRATE_EPSREL, SMOOTH_FCTR, simIO)
+            points_tr_geoAxis, spline_tr_magAxis, subCenters_geo, subset_flux_list, valid_surfs[surf_index] = output
 
-            points_tr_GeoAxis, spline_tr_MagAxis, subCenters_geo, subset_flux_list, valid_surfs[surf_index] = output
             ## APPENDING LISTS AND RESHAPING ARRAYS
             total_npts = num_subsets[surf_index] * NTHETA
-            plotData_list[phi_index][surf_index] = points_tr_GeoAxis.reshape((total_npts, 2), order='C', copy=True)
+            plotData_list[phi_index][surf_index] = points_tr_geoAxis.reshape((total_npts, 2), order='C', copy=True)
             Fluxes += [subset_flux_list]
             centers_array[surf_index][phi_index] = subCenters_geo
 
             ## CHECKING IF SURFACE IS 'VALID'
-            if np.any(spline_tr_MagAxis[:,:,1] >= 0.19) or np.any(spline_tr_MagAxis[:,:,1] < 0.0):
+            if np.any(spline_tr_magAxis[:,:,1] >= 0.19) or np.any(spline_tr_magAxis[:,:,1] < 0.0):
                 valid_surfs[surf_index] = False # not a valid surface for interpolation
                 simIO.log.info( '\tSurface #{} NOT A VALID SURFACE!!!'.format(surf_index) )
-
             ## PLOTTING EACH FLUX SURFACE AT EACH PHI ANGLE
             if PLOT_ALL:
-                # filter out wild fits: if np.all(radpoints_tr_MagAxis < 0.19) and np.all(radpoints_tr_MagAxis > 0.0): 
+                ## GET R, THETA FOR FLUX SURFACE
+                th_in, r_in = flux_surfaces[surf_index]
+                r_in = r_in[~np.isnan(r_in)]
+                th_in = th_in[~np.isnan(th_in)]
+                th_size = th_in.size
+
+                # SHIFT ORIGIN OF R, THETA COORDINATES FROM GEOMETRIC CENTER TO MAGNETIC AXIS
+                points_tr_magAxis = np.empty((th_size, 2))
+                points_tr_magAxis[:] = axisShift(th_in, r_in[:], *mag_axis).T
+
+                # REMOVE DUPLICATE THETA VALUES AND SORT DATA IN INCREASING THETA
+                unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True)[1]
+                points_tr_magAxis = points_tr_magAxis[unique_indices]
+                th_size = points_tr_magAxis.shape[0]
+                points_tr_magAxis = points_tr_magAxis[np.argsort(points_tr_magAxis[:, 0])]
+
+                
+                # filter out wild fits: if np.all(radpoints_tr_magAxis < 0.19) and np.all(radpoints_tr_magAxis > 0.0): 
                 # plot the data points
-                ax1.scatter(points_tr_MagAxis.T[0]*180./np.pi, points_tr_MagAxis.T[1], color='k', s=0.10, linewidths=0.0) # mag-axis point
+                ax1.scatter(points_tr_magAxis.T[0]*180./np.pi, points_tr_magAxis.T[1], color='k', s=0.10, linewidths=0.0) # mag-axis point
                 # plot the spline fit
                 for i in range(0, num_subsets[surf_index]):
-                    ax1.scatter(spline_tr_MagAxis[i].T[0]*180./np.pi, spline_tr_MagAxis[i].T[1], s=0.3, linewidths=0.05)
+                    ax1.scatter(spline_tr_magAxis[i].T[0]*180./np.pi, spline_tr_magAxis[i].T[1], s=0.3, linewidths=0.05)    #ax1.scatter(subsetCenters[surf_index][i][0]*180./np.pi, subsetCenters[surf_index][i][1], s=20, color='k', marker='o')
                 # plot the histogram
                 if num_subsets[surf_index] > 1:
                     pass
@@ -136,14 +138,22 @@ def fluxCalculator():
             NOW_NPTS = plot_tr_points.shape[0]
             plot_thetas = plot_tr_points.T[0]
             plot_radii = plot_tr_points.T[1]
-            lcfs_radii = plotData_list[phi_index][LCFS_INDEX].T[1]
+            lcfs_radii = axisShift(*plotData_list[phi_index][LCFS_INDEX].T, *mag_axis_rev)[1]
+            plot_centers_geo = axisShift(*subsetCenters[surf_index].T, *mag_axis_rev)
 
             # Filter out wild fits
             delta_plot_rs = np.max(lcfs_radii) - np.max(plot_radii)
             if delta_plot_rs > 0.: # Add points to output arrays
                 flat_point_meshes[surf_index][phi_index][:NOW_NPTS] = plot_tr_points
-                if PLOT_ALL: ax4.scatter(plot_thetas, plot_radii, s=0.3, linewidths=0.0)
+                if PLOT_ALL: 
+                    ax4.scatter(plot_thetas, plot_radii, s=0.3, linewidths=0.0)
+                    # if plot_centers_geo.shape[-1] > 1:
+                    #     ax4.scatter(plot_centers_geo[0], plot_centers_geo[1], s=3, color='k', marker='o')
+            if PLOT_ALL:
+                if plot_centers_geo.shape[-1] > 1:
+                    ax4.scatter(plot_centers_geo[0], plot_centers_geo[1], s=3, color='k', marker='o')
 
+        # PLOTTING ALL FLUX SURFACES AT EACH PHI ANGLE
         if PLOT_ALL: finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, MAX_SUBSETS, simIO)
 
     ## OUTPUT FLUXES
@@ -194,8 +204,6 @@ def fluxCalculator():
         simIO.saveNumpyData(flat_point_meshes[surf_index], filename_pt_mesh)
 
 
-
-
 def find_Axis(theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh) -> np.ndarray:
     """
     Computes the geometric center (axis) of a set of points in (r, theta) coordinates.
@@ -232,13 +240,28 @@ def find_Axis(theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh) -> np.nda
 
     return axis_thetar
 
-def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
-    """Function to find contiguous subsets of points in theta-r space"""
-    # make a histogram of the point density vs theta
+
+def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=120):
+    """Function to find contiguous subsets of points in theta-r space
+    Args:
+        max_subsets (int): Maximum number of subsets to find.
+        theta_r_pts (np.ndarray): Array of points in (theta, r) coordinates, wrt to the magnetic Axis.
+        mag_axis (np.ndarray): Magnetic axis position in (theta, r) coordinates, wrt to the geometric Axis.
+        field (Mesh): Mesh object used for coordinate transformations.
+        BINS (int): Number of bins to use for histogramming.
+
+    RETURNS:
+        * split_data (list): List of arrays containing the split data points wrt to magnetic axis.
+        * found_centers (np.ndarray): Array of found centers wrt to magnetic axis for each subset.
+        hist (np.ndarray): Histogram of point density vs theta.
+        bin_edges (np.ndarray): Edges of the bins used for the histogram.
+        wrapped_flag (bool): Flag indicating if the data wraps around.
+    """
+    ## HISTOGRAM OF THE POINT DENSITY VS THETA
     hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=BINS, range=(0., 2*np.pi))
     dtheta_bin = bin_edges[1] - bin_edges[0]
 
-    # find how many contiguous sets of adjacents bins there are
+    ## FIND CONTIGUOUS SETS OF NON-ZERO BINS
     non_empty_bins = np.where(hist > 0)[0]
     contiguous_sets = np.split(non_empty_bins, np.where(np.diff(non_empty_bins) != 1)[0]+1)
     # if the first and last bins are non-empty, then the first and last sets of bins are contiguous
@@ -250,7 +273,8 @@ def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
         wrapped_flag = False
     num_sets = len(contiguous_sets)
 
-    split_data = []
+    ## SPLIT THE DATA POINTS INTO SUBSETS
+    split_data_magAxis = []
     found_centers = np.zeros([num_sets, 2])
     for i, contiguous_set in enumerate(contiguous_sets):
         thisSet_tr = []
@@ -267,24 +291,21 @@ def find_subsets(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
         if num_sets == max_subsets:
             found_centers[i][:] = find_Axis(thisSet_tr.T[0], thisSet_tr.T[1], field)
             # shift the data to be relative to the center of the subset
-            thisSetLocAxis = np.array([axisShift(theta, r, *found_centers[i]) for theta, r in thisSet_tr])
-            thisSetLocAxis = thisSetLocAxis[np.argsort(thisSetLocAxis[:, 0])]
-            split_data += [thisSetLocAxis]
+            # thisSetLocAxis = np.array([axisShift(theta, r, *found_centers[i]) for theta, r in thisSet_tr])
+            # thisSetLocAxis = thisSetLocAxis[np.argsort(thisSetLocAxis[:, 0])]
+            split_data_magAxis +=[thisSet_tr] #+=[thisSetLocAxis] # TEST OUT *NOT SHIFTING DATA YET!
         # if there is only 1 subset, or lots(noisy data), then keep the original magnetic axis
         else:
             found_centers[i][:] = mag_axis[:2]
-            thisSetLocAxis = thisSet_tr
-            split_data = [theta_r_pts]
+            # thisSetLocAxis = thisSet_tr
+            split_data_magAxis = [theta_r_pts]
 
-    return split_data, found_centers, hist, bin_edges, wrapped_flag
+    return split_data_magAxis, found_centers, hist, bin_edges, wrapped_flag
 
-def find_subsets_new(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
+
+def find_subsets_kmeans(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
     split_data = []
     wrapped_flag = False
-    w_sil: float = 0.6,
-    w_ch: float = 0.4,
-    low_structure_sil_threshold: float = 0.05
-
     theta = theta_r_pts.T[0]
     r = theta_r_pts.T[1]
     features = np.column_stack((r, np.sin(theta), np.cos(theta)))
@@ -293,29 +314,21 @@ def find_subsets_new(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
         km = KMeans(n_clusters=1, random_state=0)
         labels = km.fit_predict(features)
     
-    #best_score = 0.64
-    best_score = 3000
+    best_score = 3000 #0.64
     best_k = 1
     best_labels = 1
-    #for k in range(2, max_subsets+1):
-    for k in range(max_subsets, max_subsets+1):
-
-
-        #km = KMeans(n_clusters=k, random_state=0)
-        # km = KMeans(n_clusters=k, n_init=10, random_state=0, algorithm='elkan')
-        # labels = km.fit_predict(features)
-
-        spectral = SpectralClustering(n_clusters=k, random_state=0, assign_labels='discretize')
-        labels = spectral.fit_predict(features)
+    for k in range(max_subsets, max_subsets+1): # !!only doing 1 n!!  (2 -> max_subsets)
+        km = KMeans(n_clusters=k, n_init=10, random_state=0, algorithm='elkan')
+        labels = km.fit_predict(features)
 
         sil_score = silhouette_score(features, labels)
         score = calinski_harabasz_score(features, labels)
-        print(f'k={k}, sil_score: {sil_score}, ch_score: {score}')
-
+        #print(f'k={k}, sil_score: {sil_score}, ch_score: {score}')
         if score > best_score:
             best_score = score
             best_k = k
             best_labels = labels
+
     if best_k < 3:
         best_k = 1
         found_centers = np.zeros([best_k, 2])
@@ -328,16 +341,65 @@ def find_subsets_new(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
         for k in range(0, best_k):
             subset_data = theta_r_pts[best_labels == k]
             found_centers[k][:] = find_Axis(subset_data.T[0], subset_data.T[1], field)
-            subset_data_locAxis = np.array([axisShift(theta, r, *found_centers[k]) for theta, r in subset_data])
+            subset_data_locAxis = np.array([axisShift(theta, r, *found_centers[k]) for theta,r in subset_data])
             subset_data_locAxis = subset_data_locAxis[np.argsort(subset_data_locAxis[:, 0])]
             split_data += [subset_data_locAxis] # no need to sort?
             if subset_data.T[0].max() - subset_data.T[0].min() > np.pi:
                 wrapped_flag = True
 
-    hist = []
-    bin_edges = []
+    hist = bin_edges = [] # leftover returns from histogram subset finding
 
     return split_data, found_centers, hist, bin_edges, wrapped_flag
+
+
+def find_subsets_spectral(max_subsets, theta_r_pts, mag_axis, field, BINS=30):
+    split_data = []
+    wrapped_flag = False
+    theta = theta_r_pts.T[0]
+    r = theta_r_pts.T[1]
+    features = np.column_stack((r, np.sin(theta), np.cos(theta)))
+
+    if max_subsets == 1:
+        km = KMeans(n_clusters=1, random_state=0)
+        labels = km.fit_predict(features)
+    
+    best_score = 3000 #0.64
+    best_k = 1
+    best_labels = 1
+    for k in range(max_subsets, max_subsets+1): # !!only doing 1 n!!  (2 -> max_subsets)
+        spectral = SpectralClustering(n_clusters=k, n_init=1, random_state=0, assign_labels='kmeans')
+        labels = spectral.fit_predict(features)
+
+        sil_score = silhouette_score(features, labels)
+        score = calinski_harabasz_score(features, labels)
+        #print(f'k={k}, sil_score: {sil_score}, ch_score: {score}')
+        if score > best_score:
+            best_score = score
+            best_k = k
+            best_labels = labels
+
+    if best_k < 3:
+        best_k = 1
+        found_centers = np.zeros([best_k, 2])
+        split_data = [theta_r_pts]
+        found_centers[0][:] = mag_axis[:2]
+        wrapped_flag = False
+    else:
+        found_centers = np.zeros([best_k, 2])
+        
+        for k in range(0, best_k):
+            subset_data = theta_r_pts[best_labels == k]
+            found_centers[k][:] = find_Axis(subset_data.T[0], subset_data.T[1], field)
+            subset_data_locAxis = np.array([axisShift(theta, r, *found_centers[k]) for theta,r in subset_data])
+            subset_data_locAxis = subset_data_locAxis[np.argsort(subset_data_locAxis[:, 0])]
+            split_data += [subset_data_locAxis] # no need to sort?
+            if subset_data.T[0].max() - subset_data.T[0].min() > np.pi:
+                wrapped_flag = True
+
+    hist = bin_edges = [] # leftover returns from histogram subset finding
+    return split_data, found_centers, hist, bin_edges, wrapped_flag
+
+
 
 def shift_the_subcenters(surf_index, smallest_island_index, subsetCenters, num_subsets, wrap_flag):
     """Function performs tests to see if there is a misalignment of subset centers between the smallest island set and the current island set.
@@ -346,22 +408,22 @@ def shift_the_subcenters(surf_index, smallest_island_index, subsetCenters, num_s
     shifted_data = np.zeros([num_subsets, 2])
     smallest_centers = subsetCenters[smallest_island_index]
     these_centers = subsetCenters[surf_index]
-    #print(f'{smallest_centers=}\n{these_centers=}   ')
-    shifted_data = axisShift(*smallest_centers.T, *these_centers.T).T
 
     dtheta_this_to_smallest = smallest_centers[0][0] - these_centers[0][0]
+    misalign_cond = abs(dtheta_this_to_smallest) > np.pi / 2.  # subset centers don't line up between current and smallest island subset
+
     first_set_theta = smallest_centers[0][0]  # first set's dist. to 0
     last_set_theta = 2*np.pi - smallest_centers[-1][0]  # last set's dist. to 0
-
     proximity_cond = first_set_theta > last_set_theta
-    misalign_cond = abs(dtheta_this_to_smallest) > np.pi / 2.  # subset centers don't line up between current and smallest island subset
+
     shift_flag = wrap_flag and proximity_cond and misalign_cond
-    print(f'{shift_flag=}')
     if shift_flag:
         for subset_index in range(num_subsets):
                 shifted_data[subset_index] = axisShift(*smallest_centers[subset_index-1], *these_centers[subset_index])
-    
+    else:
+        shifted_data = axisShift(*smallest_centers.T, *these_centers.T).T
     return shifted_data, shift_flag
+
 
 def spline_Data(theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
     """Create a smoothing spline fit of the data points.
@@ -379,6 +441,8 @@ def spline_Data(theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
         tuple: Spline parameters as returned by `scipy.interpolate.splrep`, including the
             tuple (t, c, k), the sum of squared residuals, a flag indicating failure, and a message.
     """
+    if len(theta_pts) <= 3:
+        return None, None, True, "Not enough points for cubic spline (need > 3)"
     # Copy data to both ends for pseudo-periodicity (smooth spline endpoints) 
     # Unsure why this seems to work better than setting "per=True" in splrep
     append_length = int(len(theta_pts)/2)
@@ -458,65 +522,60 @@ def first_surface_loop(flux_surfaces, mag_axis, field, start_index, end_index, m
     Returns:
         smallest_island_index (int): Index of the flux surface containing the smallest-radius island among those with multiple islands.
         num_subsets (np.ndarray): Array of the number of subsets found for each surface.
-        split_data (list): List of lists containing subset data for each surface.
-        surface_axes (list): List of local centers for each subset in each surface.
+        split_data_magAxis (list): List of lists containing subset data wrt to magnetic axis for each surface.
+        surface_axes_magAxis (list): List of local centers wrt to magnetic axis for each subset in each surface.
         hist_data (tuple): Tuple containing (hist, bin_edges, wrap_flag) for each surface, useful for diagnostics or plotting.
     """
     num_subsets = np.zeros(end_index, dtype=int)
     set_mean_rads = np.zeros(end_index)
-    split_data = [0]*end_index
-    surface_axes = [0]*end_index
+    split_data_magAxis = [0]*end_index
+    surface_axes_magAxis = [0]*end_index
     hist = [0]*end_index
     bin_edges = [0]*end_index
     wrap_flag = [0]*end_index
-
     for surf_index in range(start_index, end_index):
-        ## GET R, THETA FOR FLUX SURFACE
+        # get r, theta for flux surface
         th_in, r_in = flux_surfaces[surf_index]
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]
         th_size = th_in.size
-
-        # shift origin of r, theta coordinates from geometric center to magnetic axis
-        points_tr_MagAxis = np.empty((th_size, 2))
-
+        # shift origin of r, theta coords from geo center to mag axis 
+        pts_tr_magAxis = np.empty((th_size, 2))
         for j, theta in enumerate(th_in):
-            points_tr_MagAxis[j] = axisShift(theta, r_in[j], *mag_axis)
+            pts_tr_magAxis[j] = axisShift(theta, r_in[j], *mag_axis)
+        # remove duplicate thetas, sort data in increasing theta
+        unique_indices = np.unique(pts_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
+        pts_tr_magAxis = pts_tr_magAxis[unique_indices]
+        pts_tr_magAxis = pts_tr_magAxis[np.argsort(pts_tr_magAxis[:, 0])]
 
-        # Remove duplicate theta values, sort data in increasing theta
-        unique_indices = np.unique(points_tr_MagAxis[:, 0], return_index=True, return_counts=False)[1:]
-        points_tr_MagAxis = points_tr_MagAxis[unique_indices]
-        th_size = points_tr_MagAxis.shape[0]
-        points_tr_MagAxis = points_tr_MagAxis[np.argsort(points_tr_MagAxis[:, 0])]
+        # find subsets of the data, and their local centers,!! DATA RETURNED AS THETA, R RELATIVE TO MAG AXIS
+        output_histogram_method = find_subsets(max_subsets, pts_tr_magAxis, mag_axis, field, BINS=HIST_BINS)
+        if ISLAND_ALGORITHM == 'histogram':  output = output_histogram_method
+        elif ISLAND_ALGORITHM == 'kmeans':   output = find_subsets_kmeans(max_subsets, pts_tr_magAxis, mag_axis, field)
+        elif ISLAND_ALGORITHM == 'spectral': output = find_subsets_spectral(max_subsets, pts_tr_magAxis, mag_axis, field)
+        else: raise ValueError(f"Unknown ISLAND_ALGORITHM: {ISLAND_ALGORITHM}")
+        wrap_flag[surf_index] = output_histogram_method[-1] # use histogram output for wrap_flag
 
-        # find subsets of the data, and their local centers, data returned as theta, r relative to local center
-        print(f'{surf_index=}')
-        output = find_subsets(max_subsets, points_tr_MagAxis, mag_axis, field, BINS=120)
-        #output = find_subsets_new(max_subsets, points_tr_MagAxis, mag_axis, field, BINS=120)
+        ## initialize split_data with data w.r.t. magnetic axis
+        split_data_magAxis[surf_index], surface_axes_magAxis[surf_index] = output[:2]
+        num_subsets[surf_index] = len(split_data_magAxis[surf_index])
 
-
-        split_data[surf_index], surface_axes[surf_index] = output[:2]
-        num_subsets[surf_index] = len(split_data[surf_index])
-
-        hist[surf_index], bin_edges[surf_index], wrap_flag[surf_index] = output[2:]
-
-        subset_mean_rads = np.zeros(num_subsets[surf_index])
         # LOOP THROUGH SUBSETS
+        subset_mean_rads = np.zeros(num_subsets[surf_index])
         for subset_index in range(num_subsets[surf_index]):
-            rad_toSpline = split_data[surf_index][subset_index].T[1]
+            rad_toSpline = split_data_magAxis[surf_index][subset_index].T[1]
             subset_mean_rads[subset_index] = np.mean(rad_toSpline)
         set_mean_rads[surf_index] = np.mean(subset_mean_rads)
 
     # FIND THE INDEX OF THE ISLANDS OF SMALLEST RADIUS
     island_indices = np.where(num_subsets > 1)[0]
-    if island_indices.size > 0:
-        smallest_island_index = island_indices[np.argmin(set_mean_rads[island_indices])]
-    else:
-        smallest_island_index = end_index - 1  # If no islands found, return the last surface index
+    if island_indices.size > 0: smallest_island_index = island_indices[np.argmin(set_mean_rads[island_indices])]
+    else: smallest_island_index = end_index - 1  #If no islands found, return the last surface index
 
     hist_data = (hist, bin_edges, wrap_flag)
+    return smallest_island_index, num_subsets, split_data_magAxis, surface_axes_magAxis, hist_data
 
-    return smallest_island_index, num_subsets, split_data, surface_axes, hist_data
+
 
 def subset_looper(subsetData, subsetCenters, surf_index,
                   smallest_island_index, num_subsets, wrap_flag,
@@ -556,6 +615,9 @@ def subset_looper(subsetData, subsetCenters, surf_index,
     subCenters_geo       = np.zeros([num_subsets, 2])
     THETA_GENs = np.linspace(2*np.pi/NTHETA, 2*np.pi, NTHETA)
 
+
+    # subsetData NOW DEFINED REL. TO MAG AXIS, NOT LOCAL ISLAND AXES!!
+
     # Subset ordering may have changed due to periodic wraparound of centers
     if num_subsets > 1: 
         subCenters_Shift, shiftint = shift_the_subcenters(surf_index, smallest_island_index,
@@ -565,16 +627,20 @@ def subset_looper(subsetData, subsetCenters, surf_index,
     ## LOOP THROUGH SUBSETS TO SPLINE, CALCULATE FLUX, CREATE REGULARLY-SPACED POINTS
     subset_flux_list = []
     for subset_idx in range(num_subsets):
-        current_data = subsetData[surf_index][subset_idx]
+
         current_center = subsetCenters[surf_index][subset_idx]
+        current_data = subsetData[surf_index][subset_idx]
 
         ## SHIFT DATA POINTS TO BE RELATIVE TO THE CENTERS OF THE SMALLEST ISLANDS
         if num_subsets > 1:
+            current_center = subsetCenters[smallest_island_index][subset_idx-shiftint]
             for i in range(len(current_data)):
-                current_data[i] = axisShift(*current_data[i], *subCenters_Shift[subset_idx])
+                #current_data[i] = axisShift(*current_data[i], *subCenters_Shift[subset_idx])
+                current_data[i] = axisShift(*current_data[i], *current_center)
             # sort by theta and set the centers of all island as the centers of the smallest islands
             current_data = current_data[np.argsort(current_data.T[0])]
-            current_center = subsetCenters[smallest_island_index][subset_idx-shiftint]
+            #current_center = subsetCenters[smallest_island_index][subset_idx-shiftint]
+
             subCenters_geo[subset_idx][:] = axisShift(*current_center, *mag_axis_rev)
         else:
             subCenters_geo[subset_idx] = current_center
@@ -585,6 +651,7 @@ def subset_looper(subsetData, subsetCenters, surf_index,
             valid_surface = False # not a valid surface for interpolation
             simIO.log.info( '\tSurface #{} NOT A VALID SURFACE!!!'.format(surf_index) )
             simIO.log.info( '\tSurface #{}, fail: {}\tmsg: {}'.format(surf_index, bool(fail), msg) )
+            continue
         else:
             valid_surface = True # valid surface for interpolation
 
@@ -614,6 +681,7 @@ def subset_looper(subsetData, subsetCenters, surf_index,
 
     return splined_tr_GeoAxis, splined_tr_MagAxis, subCenters_geo, subset_flux_list, valid_surface
 
+
 def init_plotting():
     fig = plt.figure()
     gs = gridspec.GridSpec(2, 2, width_ratios=[2, 1])
@@ -636,11 +704,12 @@ def finalize_plotting(ax1, ax2, ax4, PHI_GEN_DEG, surf_index, num_subsets, MAX_S
     ax2.tick_params(axis='both', which='major', labelsize=6)
     ax2.grid(linewidth = 0.25, linestyle=':', c='k')
 
+    print('Plotting Flux Surfaces {} @ phi={}'.format(surf_index, PHI_GEN_DEG))
     ax4.set_title('Flux Surfaces {} @ phi={}\nIsland surfaces detected:{}'.format(surf_index, PHI_GEN_DEG, num_islandSurfaces), fontsize=8)
     ax4.set_rlim(0, 0.19)
     ax4.tick_params(axis='both', which='major', labelsize=6)
     ax4.grid(linewidth = 0.25, linestyle='--', c='grey')
-    simIO.saveFig(ANLYS_SUBDIR+'/Flux_at_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=400)
+    simIO.saveFig(ANLYS_SUBDIR+'/Flux_at_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=600)
     plt.close()
 
 if __name__ == '__main__':
@@ -681,8 +750,9 @@ if __name__ == '__main__':
     # INTEGRATE_EPSREL=1e-3 #4.49e-3
     INTEGRATE_EPSABS=1e-3
     INTEGRATE_EPSREL=1e-2
-
+    HIST_BINS = 120
     ## PLOTTING FLAG
+    ISLAND_ALGORITHM = 'histogram' # 'kmeans', 'spectral
     PLOT_ALL = True
 
     fluxCalculator()
