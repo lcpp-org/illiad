@@ -29,23 +29,27 @@ class Mesh:
         """
         self.R0 = R0
         self.a = a
+
         self.dr = 0.0
         self.dtheta = 0.0
         self.dphi = 0.0
         self.nr = 0
         self.ntheta = 0
         self.nphi = 0
+
         self.r_max = 0
         self.theta_max = 0
         self.phi_max = 0
         self.r_min = 0
         self.theta_min = 0
         self.phi_min = 0
+
         self.Bx: np.float64[:][:][:]
         self.By: np.float64[:][:][:]
         self.Bz: np.float64[:][:][:]
         self.value: np.float64[:][:][:]
         self.periodicity: np.int32[:]
+
         self.errField: np.bool
         # self.err_mag = 2.828427E-4 * 1.2
         # self.err_dir = 270.* np.pi/180
@@ -173,6 +177,26 @@ class Mesh:
             self.Bx += (Bx_ * total_mult)
             self.By += (By_ * total_mult)
             self.Bz += (Bz_ * total_mult)
+
+    def setErrorField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
+        """Sets the magnitude and direction of the non-periodic error field.
+
+        The direction is measured from phi_c=0 (i.e., 18 degrees clockwise from the South Split).
+        Also computes and stores the cosine and sine of the error direction for efficient interpolation.
+
+        Args:
+            err_mag (float, optional): Magnitude of the error field. Defaults to 1.5654e-4.
+            err_dir (float, optional): Direction of the error field in radians. Defaults to 271.5*np.pi/180.
+        """
+        self.err_mag = err_mag
+        self.err_dir = err_dir
+        self.cos_err_dir = np.cos(err_dir)
+        self.sin_err_dir = np.sin(err_dir)
+        self.xerr_adder = self.err_mag * self.cos_err_dir
+        self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
+        self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64).T
+        #self.err_adder = torch.tensor(self.err_adder, dtype=torch.float64).to(device)
+
 
     def set_nonPer_errField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
         """Sets the magnitude and direction of the non-periodic error field.

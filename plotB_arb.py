@@ -4,42 +4,58 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import classes.class_outputHandler as out
-from classes.mesh import *
+# import classes.class_outputHandler as out
+from classes.iohandler import IOHandler
+#from classes.mesh import *
+from classes.mesh import Mesh
 from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 
 
-#FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_TOR = 0.9448
-INPUT_CURR_TOR = 3500. #486
+# #FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
+# FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
+# FIELD_SCALE_TOR = 0.9448
+# INPUT_CURR_TOR = 3500. #486
 
-#FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
-INPUT_CURR_HEL = 0. #6300. #3150
+# #FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+# FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
+# FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
+# INPUT_CURR_HEL = 0. #6300. #3150
 
-ERRFIELD_MAG = 1.5654e-4 #[Tesla]
-ERRFIELD_DIR_DEG = 271.5 #[degrees]
+# ERRFIELD_MAG = 1.5654e-4 #[Tesla]
+# ERRFIELD_DIR_DEG = 271.5 #[degrees]
 
-DATA_FILE = 'input_files/large_box.csv'
+# TOROIDAL AND HELICAL MAGNETIC FIELDS
+TOROIDAL_CURRENT = 3.50 #[kA]
+HELICAL_CURRENT = 0.00 #[kA]
+CONFIG_TOR = 'default_toroidal'
+CONFIG_HEL = 'default_helical'
+
+
+DATA_FILE = 'input_files/new_pfc_loc_coords.csv'
+#DATA_FILE = 'input_files/large_box.csv'
 #DATA_FILE = 'input_files/small_box.csv'
 
-OUTPUT_DIRECTORY_NAME = "BFIELDS_063025"
-OUTPUT_FILE_NAME = '3500-IT_0000-IH_small_box'
+OUTPUT_DIRECTORY_NAME = "BFIELDS_090825"
+OUTPUT_FILE_NAME = '3500-IT_0000-IH_new_pfc_loc'
 
 ## SET UP RUN DIRECTORY
-simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
+simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
 
 ## DEFINE MESH AND LOAD FIELD
-tor_mult_total = FIELD_SCALE_TOR * INPUT_CURR_TOR/1000.
-hel_mult_total = FIELD_SCALE_HEL * INPUT_CURR_HEL/1000.
+# tor_mult_total = FIELD_SCALE_TOR * INPUT_CURR_TOR/1000.
+# hel_mult_total = FIELD_SCALE_HEL * INPUT_CURR_HEL/1000.
+# b_hidra = Mesh(R0=0.72, a=0.19)
+# b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=tor_mult_total, errField=True )
+# b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=hel_mult_total)
+# b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
 
 b_hidra = Mesh(R0=0.72, a=0.19)
-b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=tor_mult_total, errField=True )
-b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=hel_mult_total)
-b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
+b_hidra.setErrorField()
+b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
+b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
+
+
 
 ## LOAD MESH OF DESIRED POINTS FROM CSV
 ## Data given in XYZ coords,
@@ -85,5 +101,5 @@ plt.title('HIDRA B-field points in Cartesian coordinates')
 plt.colorbar(sc, label='B-field magnitude (T)', shrink=0.8)
 plt.tight_layout()
 # Save the figure
-#plt.show()
+plt.show()
 simIO.saveFig(OUTPUT_FILE_NAME+'.png', dpi=300)
