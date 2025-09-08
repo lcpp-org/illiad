@@ -49,6 +49,9 @@ DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
 OUTPUT_DIR = "RK45-1e8_Iota4FWD_2000spins_27Lines"
 
+# DEFINE OUTPUT DIRECTORY #
+OUTPUT_DIR = "RK45-2p49e9_Iota4FWD_1500spins_177Lines"
+
 
 def main():
     """

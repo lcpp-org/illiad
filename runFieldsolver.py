@@ -13,7 +13,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #################
 
 ## NAME YOUR OUTPUT FILE
-output_name = 'It000_Ih790_Iv000_1p000_1p000_64bit'
+output_name = 'It3500_Ih6300_Iv000_1p000_1p000_64bit'
 
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
@@ -33,8 +33,8 @@ mesh_size = hi_res
 # MAX. | 3500 | 7000 |   ?? #
 #############################
 # INPUT COIL CURRENTS:
-I_toro = 0000.   #[Amps]
-I_heli = 0790.   #[Amps]
+I_toro = 3500.   #[Amps]
+I_heli = 6300.   #[Amps]
 I_vert = 0000.   #[Amps]
 
 s_toro = 1.0
