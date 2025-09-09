@@ -1,14 +1,16 @@
 import pandas as pd
 import torch
+import numpy as np
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from AGmesh import *
+from classes.mesh import Mesh
 
 df = pd.read_csv("input_files/large_box.csv")
 print(df.head(10))
 
 magMesh = Mesh()
-magMesh.loadCartesianField("input_files/It3500_Ih6300_Iv000_1p000_1p000_64bit.npy", errField=True, att_mult="default_poloidal")
+magMesh.setErrorField()
+magMesh.loadCartesianField("input_files/It3500_Ih0000_Iv000_1p000_1p000_64bit.npy", errField=True)
 #print(magMesh.Bx.shape)
 
 
@@ -96,9 +98,9 @@ transMatrixInv = np.linalg.inv(transMatrix)
 B_list = []
 for i in range(len(df["x"])):
     #print(i) if i<51 else ""
-    x = df["x"][i]/1000
-    y = df["y"][i]/1000
-    z = df["z"][i]/1000    
+    x = float(df["x"][i])/1000
+    y = float(df["y"][i])/1000
+    z = float(df["z"][i])/1000    
     #print([x,y,z]) if i<51 else ""
     xyz_normalCoord = [x,y,z] @ transMatrixInv
     #print(xyz_normalCoord) if i<51 else ""
@@ -114,4 +116,4 @@ for i in range(len(df["x"])):
     B_list.append(Bxyz_newCoord)
 
 df2 = pd.DataFrame(B_list, columns=["Bx", "By", "Bz", "B"])
-print(df2.head(50))
+df2.to_csv("output/boxMagneticField.csv")

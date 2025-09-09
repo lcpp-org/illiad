@@ -31,11 +31,11 @@ CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
 
-DATA_FILE = 'input_files/new_pfc_loc_coords.csv'
-#DATA_FILE = 'input_files/large_box.csv'
+#DATA_FILE = 'input_files/new_pfc_loc_coords.csv'
+DATA_FILE = 'input_files/large_box.csv'
 #DATA_FILE = 'input_files/small_box.csv'
 
-OUTPUT_DIRECTORY_NAME = "BFIELDS_090825"
+OUTPUT_DIRECTORY_NAME = "BFIELDS_090925"
 OUTPUT_FILE_NAME = '3500-IT_0000-IH_new_pfc_loc'
 
 ## SET UP RUN DIRECTORY
@@ -60,7 +60,7 @@ b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
 ## LOAD MESH OF DESIRED POINTS FROM CSV
 ## Data given in XYZ coords,
 ## +X pointing to North Split(phi_comp=+162deg), and +Z pointing *DOWN*!
-points_CADxyz = simIO.loadCSV(DATA_FILE)# / 1000 #convert from mm to m
+points_CADxyz = simIO.loadCSV(DATA_FILE)
 simIO.log.info(f'{points_CADxyz.shape=}')
 
 ## ROTATION TRANSFORM MATRIX:
@@ -79,7 +79,7 @@ fields_CADxyz = np.zeros_like(points_CADxyz)
 for i, point_cad in enumerate(points_CADxyz):
     points_SIMxyz[i] = np.dot(xFormMatrix, point_cad/1000)  #convert from mm to m
     fields_SIMxyz[i] = b_hidra.interpField(points_SIMxyz[i], Cart=True)[0]
-    fields_CADxyz[i] = np.dot(xFormMatrix.T, fields_SIMxyz[i])  # apply inverse rotation
+    fields_CADxyz[i] = np.dot(xFormMatrix, fields_SIMxyz[i])  # apply inverse rotation
 #print(f'{points_SIMxyz[:, 0]=}')
 
 
@@ -94,12 +94,18 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 #sc = ax.scatter(*points_SIMxyz.T*1000, c=np.linalg.norm(fields_SIMxyz, axis=1), cmap='viridis', marker='o')
 sc = ax.scatter(*points_CADxyz.T, c=np.linalg.norm(fields_CADxyz, axis=1), cmap='viridis', marker='o')
+xs = np.linspace(-720, 720, 1000)
+ax.plot(xs, np.sqrt(720**2 - xs**2))
+ax.plot(xs, -np.sqrt(720**2 - xs**2))
 ax.set_xlabel('X (mm)')
 ax.set_ylabel('Y (mm)')
 ax.set_zlabel('Z (mm)')
-plt.title('HIDRA B-field points in Cartesian coordinates')
+plt.title('HIDRA B-field points in Cartesian coordinates (+X: North, +Y: East)')
 plt.colorbar(sc, label='B-field magnitude (T)', shrink=0.8)
 plt.tight_layout()
+#elevation=2212150; azimuthal=221225; roll=0
+ax.view_init(elev=-157, azim=-44, roll=0)
+
 # Save the figure
 plt.show()
-simIO.saveFig(OUTPUT_FILE_NAME+'.png', dpi=300)
+#simIO.saveFig(OUTPUT_FILE_NAME+'.png', dpi=300)
