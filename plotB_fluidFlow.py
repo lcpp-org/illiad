@@ -40,7 +40,7 @@ DATA_FILE = 'input_files/cad_corners.csv'
 #DATA_FILE = 'input_files/small_box.csv'
 
 OUTPUT_DIRECTORY_NAME = "BFIELDS_092325"
-OUTPUT_FILE_NAME = '35000-IT_6300-IH_corners_box'
+OUTPUT_FILE_NAME = '35000-IT_6300-IH_corners_expanded_box'
 
 ## SET UP RUN DIRECTORY
 simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
@@ -83,6 +83,7 @@ sinphi_plate = np.sin(np.radians(phi_plate))
 plateMatrix = np.array([[cosphi_plate,  sinphi_plate,  0.0],
                         [-sinphi_plate,  cosphi_plate,   0.0],
                         [0.0,                    0.0,   1.0]])
+plateMatrixInv = np.linalg.inv(plateMatrix)
 
 #inclination of the plate, high at the high field side and low at the low field side
 theta_plate=5
@@ -91,34 +92,41 @@ sintheta_plate = np.sin(np.radians(theta_plate))
 thetaMatrix = np.array([[costheta_plate, 0, sintheta_plate],
                         [0, 1, 0],
                         [-sintheta_plate, 0, costheta_plate]])
+thetaMatrixInv = np.linalg.inv(thetaMatrix)
 
-#convert to RTP coordinates using coordtrans.
+
 points_SIMxyz = np.zeros_like(points_CADxyz)
-fields_SIMxyz = np.zeros_like(points_CADxyz)
-fields_CADxyz = np.zeros_like(points_CADxyz)
-
-fields_PLATExyz = np.zeros_like(points_CADxyz)
 points_PLATExyz = np.zeros_like(points_CADxyz)
-fields_FLUIDxyz = np.zeros_like(points_CADxyz)
 points_FLUIDxyz = np.zeros_like(points_CADxyz)
-
 for i, point_cad in enumerate(points_CADxyz):
-    points_SIMxyz[i] = np.dot(xFormMatrix, point_cad/1000)  #convert from mm to m
-    
     points_PLATExyz[i] = np.dot(plateMatrix, point_cad)
     points_FLUIDxyz[i] = np.dot(thetaMatrix, points_PLATExyz[i])
-    
-    fields_SIMxyz[i] = b_hidra.interpField(points_SIMxyz[i], Cart=True)[0]
-    fields_CADxyz[i] = np.dot(xFormMatrix, fields_SIMxyz[i])  # apply inverse rotation
-    
-    fields_PLATExyz[i] = np.dot(plateMatrix, fields_CADxyz[i]) 
-    fields_FLUIDxyz[i] = np.dot(thetaMatrix, fields_PLATExyz[i])
-#print(f'{points_SIMxyz[:, 0]=}')
 
+numPoints = 8
+xmax, ymax, zmax = points_FLUIDxyz[0]
+xmin, ymin, zmin = points_FLUIDxyz[-1]
+xs = np.linspace(xmin, xmax, numPoints)
+ys = np.linspace(ymin, ymax, numPoints)
+zs = np.linspace(zmin, zmax, int(numPoints/2))
+interp_points = []
+for x in xs:
+    for y in ys:
+        for z in zs:
+            interp_points.append([x,y,z])
+points_FLUIDxyz = np.array(interp_points)
+
+points_CADxyz = np.zeros_like(points_FLUIDxyz)
+fields_SIMxyz = np.zeros_like(points_FLUIDxyz)
+fields_FLUIDxyz = np.zeros_like(points_FLUIDxyz)
+
+for i, point in enumerate(points_FLUIDxyz):
+    points_CADxyz[i] = np.dot(plateMatrixInv, np.dot(thetaMatrixInv, point))
+    point_SIM = np.dot(xFormMatrix, points_CADxyz[i])
+    fields_SIMxyz[i] = b_hidra.interpField(point_SIM, Cart=True)[0]
+    fields_FLUIDxyz[i] = np.dot(thetaMatrix, np.dot(plateMatrix, np.dot(xFormMatrix, fields_SIMxyz[i])))
 
 #save output as a csv with header x,y,z,bx,by,bz anddata from points_CADxyz and fields_CADxyz
-#output_data = np.hstack((points_CADxyz, fields_CADxyz))
-output_data = np.hstack((points_CADxyz, fields_PLATExyz))
+output_data = np.hstack((points_CADxyz, fields_FLUIDxyz))
 #np.savetxt(OUTPUT_FILE_NAME+'.csv', output_data, delimiter=',', header='x,y,z,bx,by,bz', comments='')
 simIO.saveCSV(output_data, OUTPUT_FILE_NAME+'.csv', header='x,y,z,bx,by,bz')
 
@@ -137,15 +145,6 @@ def fit():
         print(f"Equation for {i}: {fit_coeffs[0]:0.2e} + {fit_coeffs[1]:0.2e}(x+x0) + {fit_coeffs[2]:0.2e}(y+y0) + {fit_coeffs[3]:0.2e}(z+z0) + {fit_coeffs[4]:0.2e}(x+x0)^2 + {fit_coeffs[5]:0.2e}(x+x0)(y+y0) + {fit_coeffs[6]:0.2e}(x+x0)(z+z0) + {fit_coeffs[7]:0.2e}(y+y0)^2 + {fit_coeffs[8]:0.2e}(y+y0)(z+z0) + {fit_coeffs[9]:0.2e}(z+z0)^2")
     BFit = np.array(BFit)
 
-interpPoints = True
-numPoints = 8
-if interpPoints: #if the points passed are just corners for a box
-    xmax, ymax, zmax = points_FLUIDxyz[0]
-    xmin, ymin, zmin = points_FLUIDxyz[-1]
-    xs = np.linspace(xmin, xmax, numPoints)
-    ys = np.linspace(ymin, ymax, numPoints)
-    zs = np.linspace(zmin, zmax, int(numPoints/2))
-    interpolated_points = []
 
 
 def points(): 
@@ -174,6 +173,7 @@ def points():
     plt.show()
     #simIO.saveFig(OUTPUT_FILE_NAME+'.png', dpi=300)
 
+
 #points()
 def vectors():
     magnitudes = []
@@ -181,32 +181,34 @@ def vectors():
         #print(i)
         Bx, By, Bz = i
         magnitudes.append(np.sqrt(Bx**2 + By**2 + Bz**2))
-
+        #magnitudes.append(By)
+    print(magnitudes)
     colormap = cm.viridis
     norm = Normalize()
     norm.autoscale(magnitudes)
     colors = colormap(norm(magnitudes))
-
-    
-        
-    
     # plot the points in 3D, with the vectors pointing in the direction of the B-field
-    
-    zpoints = 1
+    zpoints = 4
     for j in range(zpoints):
         slice_FLUIDxyz = points_FLUIDxyz[j::zpoints]
-        colors_FLUID = colors[j::zpoints]
+        fields_FLUID = fields_FLUIDxyz[j::zpoints]
+        #print(fields_FLUID[:][1])
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        for i, point in enumerate(slice_FLUIDxyz):
-            x_0,y_0,z_0 = point
-            Bx, By, Bz = fields_FLUIDxyz[i]
-            Bstrength = 0.02*np.sqrt(Bx**2 + By**2 + Bz**2)
-            ax.quiver(x_0, y_0, (Bx/Bstrength), (By/Bstrength), color=colors_FLUID[i])
+        
+        sc = ax.scatter(slice_FLUIDxyz.T[0, :], slice_FLUIDxyz.T[1, :], c=fields_FLUID[:, 1], cmap='viridis', marker='o')
+        '''
+        x_0,y_0,z_0 = point
+        Bx, By, Bz = fields_FLUIDxyz[i]
+        Bstrength = 0.02*np.sqrt(Bx**2 + By**2 + Bz**2)
+        sc = ax.scatter(x_0, y_0, ,marker='o', color=colors_FLUID[i])
+        '''
+        
+        plt.colorbar(sc, shrink=0.8)
         ax.set_xlabel('X (mm)')
         ax.set_ylabel('Y (mm)')
         #ax.set_zlabel('Z (mm)')
-        plt.title('HIDRA B-field points in FLUID coordinates (+X: width of plate, +Y: lenght of plate)')
+        plt.title(f'HIDRA B-field points in FLUID coordinates (+X: width of plate, +Y: lenght of plate, Z = {slice_FLUIDxyz[0][2]:0.2f}mm)')
         plt.tight_layout()
         #ax.view_init(elev=-34, azim=-125, roll=179)
         plt.show()
