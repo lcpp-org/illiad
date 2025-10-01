@@ -34,13 +34,13 @@ HELICAL_CURRENT = 6.30 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
-DATA_FILE = 'input_files/cad_corners.csv'
+DATA_FILE = 'input_files/Full_Magnetic_Field_Bounding_Box.csv'
 #DATA_FILE = 'input_files/new_pfc_loc_coords.csv'
 #DATA_FILE = 'input_files/large_box.csv'
 #DATA_FILE = 'input_files/small_box.csv'
 
-OUTPUT_DIRECTORY_NAME = "BFIELDS_092325"
-OUTPUT_FILE_NAME = '35000-IT_6300-IH_corners_box'
+OUTPUT_DIRECTORY_NAME = "BFIELDS_093025"
+OUTPUT_FILE_NAME = '35000-IT_6300-IH_full_box'
 
 ## SET UP RUN DIRECTORY
 simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
@@ -136,17 +136,7 @@ def fit():
         BFit.append(np.dot(X_poly, fit_coeffs))
         print(f"Equation for {i}: {fit_coeffs[0]:0.2e} + {fit_coeffs[1]:0.2e}(x+x0) + {fit_coeffs[2]:0.2e}(y+y0) + {fit_coeffs[3]:0.2e}(z+z0) + {fit_coeffs[4]:0.2e}(x+x0)^2 + {fit_coeffs[5]:0.2e}(x+x0)(y+y0) + {fit_coeffs[6]:0.2e}(x+x0)(z+z0) + {fit_coeffs[7]:0.2e}(y+y0)^2 + {fit_coeffs[8]:0.2e}(y+y0)(z+z0) + {fit_coeffs[9]:0.2e}(z+z0)^2")
     BFit = np.array(BFit)
-
-interpPoints = True
-numPoints = 8
-if interpPoints: #if the points passed are just corners for a box
-    xmax, ymax, zmax = points_FLUIDxyz[0]
-    xmin, ymin, zmin = points_FLUIDxyz[-1]
-    xs = np.linspace(xmin, xmax, numPoints)
-    ys = np.linspace(ymin, ymax, numPoints)
-    zs = np.linspace(zmin, zmax, int(numPoints/2))
-    interpolated_points = []
-
+fit()
 
 def points(): 
     # plot the points in 3D, with the markers colored by the B-field magnitude
@@ -181,7 +171,7 @@ def vectors():
         #print(i)
         Bx, By, Bz = i
         magnitudes.append(np.sqrt(Bx**2 + By**2 + Bz**2))
-
+    #print(magnitudes)
     colormap = cm.viridis
     norm = Normalize()
     norm.autoscale(magnitudes)
@@ -235,7 +225,7 @@ def vectors():
     '''
     
     #simIO.saveFig(OUTPUT_FILE_NAME+'.png', dpi=300)
-vectors()
+#vectors()
 
 
 """
