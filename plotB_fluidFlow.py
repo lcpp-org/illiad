@@ -30,7 +30,7 @@ from sklearn.metrics import r2_score
 
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.0 #[kA]
-HELICAL_CURRENT = 6.3 #[kA]
+HELICAL_CURRENT = 0.0 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
@@ -39,8 +39,8 @@ DATA_FILE = 'input_files/cad_corners.csv'
 #DATA_FILE = 'input_files/large_box.csv'
 #DATA_FILE = 'input_files/small_box.csv'
 
-OUTPUT_DIRECTORY_NAME = "BFIELDS_093025"
-OUTPUT_FILE_NAME = '0000-IT_6300-IH_corners_expanded_box'
+OUTPUT_DIRECTORY_NAME = "BFIELDS_100725"
+OUTPUT_FILE_NAME = '3500-IT_6300-IH_corners_expanded_box'
 
 ## SET UP RUN DIRECTORY
 simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
@@ -108,6 +108,7 @@ xmin, ymin, zmin = points_FLUIDxyz[-1]
 xs = np.linspace(xmin, xmax, numPoints)
 ys = np.linspace(ymin, ymax, numPoints)
 zs = np.array([zmax, zmax-0.0015, zmax-0.003])#substrate level, 1.5 mm above and 3 mm above
+
 interp_points = []
 for x in xs:
     for y in ys:
@@ -140,19 +141,31 @@ def fit():
     test = Magnetic_function_fitter(f"output/{OUTPUT_DIRECTORY_NAME}/data/{OUTPUT_FILE_NAME}.csv")
     fields = ['bx', 'by', 'bz']
     BFit = []
+    
+    # old fit coefficients
+    #df35_00_CAD = {"bx": [-6.48e-01, 1.46e-03, -9.72e-04, 4.29e-04, -7.16e-07, 5.96e-08, -4.90e-07, 8.67e-07, -3.08e-07, 1.94e-09], "by": [1.16e+00, -7.81e-04, -1.48e-03, -7.69e-04, -9.63e-08, 1.44e-06, 8.87e-07, -3.18e-08, 5.27e-07, 1.47e-08]}
+    #df35_63_CAD = {"bx": [-1.89e-01, 9.72e-04, -1.74e-03, -1.75e-04, -5.01e-07, -2.62e-08, 1.25e-06, 1.19e-06, -1.73e-07, -1.11e-06], "by": [1.30e+00, -1.16e-03, -4.23e-04, -1.43e-04, -3.17e-07, 1.73e-06, 2.58e-06, -2.23e-06, -2.59e-06, -8.32e-07], "bz": [-8.90e-01, -1.10e-04, 4.16e-03, 1.44e-03, 7.62e-07, -9.81e-07, -1.56e-06, -4.55e-06, 1.60e-06, -1.90e-06]}
+    #df_35_63_FLUID_new = {"bx":[8.83e-01, -1.96e+00, -6.31e-01, 9.34e-01, 9.68e-01, 1.93e+00, 1.73e+00, -2.11e+00, -4.59e+00, 1.04e+00], "by": [6.93e-01, -1.43e+00, 2.89e+00, 3.80e+00, 8.76e-01, -8.04e-01, -4.18e+00, -3.99e+00, -4.11e+00, 3.09e+00], "bz": [-5.89e-01, -6.29e-01, 3.75e+00, -1.09e+00, 1.66e+00, -2.89e+00, -1.22e+00, -2.78e+00, 6.89e+00, 1.19e+00]}
+
+    fitCoeffs = []
     for i in fields:
         #print(i)
         deg = 2
         cart_cord, X_poly, fit_coeffs = test.fitter(deg, i)
         #test.fit_tester(fit_bx, i)
-        #BFit.append(fit_b)     
+        #BFit.append(fit_b)
+        #fit_coeffs = np.array(df35_63_CAD[i]) # to demonstrate old fits
+        #fit_coeffs[1:4] = fit_coeffs[1:4]*1000
+        #fit_coeffs[4:] = fit_coeffs[4:]*1000*1000
         BFit.append(np.dot(X_poly, fit_coeffs))
         print(f"Equation for {i}: {fit_coeffs[0]:0.2e} + {fit_coeffs[1]:0.2e}(x+x0) + {fit_coeffs[2]:0.2e}(y+y0) + {fit_coeffs[3]:0.2e}(z+z0) + {fit_coeffs[4]:0.2e}(x+x0)^2 + {fit_coeffs[5]:0.2e}(x+x0)(y+y0) + {fit_coeffs[6]:0.2e}(x+x0)(z+z0) + {fit_coeffs[7]:0.2e}(y+y0)^2 + {fit_coeffs[8]:0.2e}(y+y0)(z+z0) + {fit_coeffs[9]:0.2e}(z+z0)^2")
         print(f"The R2 score is {r2_score(np.dot(X_poly, fit_coeffs), test.magnetic_data[i]):0.5f}")
-    BFit = np.array(BFit)
-    return BFit.T
+        fitCoeffs.append(np.array(fit_coeffs))
 
-BFit = fit()
+    BFit = np.array(BFit)
+    return BFit.T, np.array(fitCoeffs).T
+
+BFit, fit_coeffs = fit()
 
 def fitVectors():
     magnitudes = []
@@ -186,7 +199,43 @@ def fitVectors():
         plt.tight_layout()
         plt.show()
 
-fitVectors()
+#fitVectors()
+
+radii = np.array([654.5, 662.5, 670.5, 678.5, 686.5, 694.5, 702.4, 710.4, 718.4, 726.4, 734.4, 742.4])
+theta = np.deg2rad(27)
+poloidal = np.deg2rad(np.array([8.78, 8.73, 8.69, 8.64, 8.60, 8.56, 8.52, 8.48, 8.44, 8.4, 8.37, 8.33]))
+
+plate_points = []
+field_Fluid_exact = []
+field_Fluid_equation = []
+for i, r in enumerate(radii):
+    z = r*np.sin(poloidal[i])
+    xy = r*np.cos(poloidal[i])
+    x = xy*np.cos(theta)
+    y = xy*np.sin(theta)
+    #Trying to get everything into CAD coordinates from whatever it was before
+    mmtom = 10**(-3)
+    point_cad = np.array([x, y, z])/1000
+    expanded = np.array([1, x*mmtom, y*mmtom, z*mmtom, x**2*mmtom*mmtom, x*y*mmtom*mmtom, x*z*mmtom*mmtom, y**2*mmtom*mmtom, y*z*mmtom*mmtom, z**2*mmtom*mmtom])
+    point_SIM = np.dot(xFormMatrix, point_cad)
+    field_SIM = b_hidra.interpField(point_SIM, Cart=True)[0]
+    field_CAD = np.dot(xFormMatrix, field_SIM)
+    field_PLATE = np.dot(plateMatrix, field_CAD)
+    field_FLUID = np.dot(thetaMatrix, field_PLATE)
+    field_Fluid_exact.append(field_FLUID)
+    field_Fluid_equation.append(np.linalg.matmul(expanded, fit_coeffs))
+    plate_points.append(point_cad)
+
+field_Fluid_exact = np.array(field_Fluid_exact).T
+field_Fluid_equation = np.array(field_Fluid_equation).T
+#print(np.array(plate_points))
+df = pd.DataFrame({"Interpx": field_Fluid_exact[0], "Interpy": field_Fluid_exact[1], "Interpz": field_Fluid_exact[2],"Equationx": field_Fluid_equation[0], "Equationy": field_Fluid_equation[1], "Equationz": field_Fluid_equation[2]})
+df2 = pd.DataFrame({"fit_coeffs bx":fit_coeffs.T[0],"fit_coeffs by":fit_coeffs.T[1],"fit_coeffs bz":fit_coeffs.T[2]})
+
+with pd.ExcelWriter('output.xlsx',  if_sheet_exists="overlay", mode="a") as writer:
+    df.to_excel(writer, sheet_name=f'It_{TOROIDAL_CURRENT},Ih_{HELICAL_CURRENT}', index=False)
+    df2.to_excel(writer, sheet_name=f"It_{TOROIDAL_CURRENT},Ih_{HELICAL_CURRENT}", startrow=16, index=False)
+
 
 def points(): 
     # plot the points in 3D, with the markers colored by the B-field magnitude
