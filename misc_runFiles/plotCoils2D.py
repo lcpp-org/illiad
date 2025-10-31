@@ -116,8 +116,8 @@ def main():
     
     plt.grid(True)
     plt.margins(0.05)
-    #plt.savefig('HIDRA_mesh.png', bbox_inches='tight', dpi=600)
-    plt.show()
+    plt.savefig('HIDRA_coil_schematic2D.png', bbox_inches='tight', dpi=600)
+    #plt.show()
 
 
 if __name__ == '__main__':
