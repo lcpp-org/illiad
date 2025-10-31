@@ -1,37 +1,38 @@
-
 import numpy as np
 import utility.Flux_Calculator as fc
 
+# fc.ANLYS_DIR = "LSODA-2p49e8_Iota4FWD_1200spins_320Lines"
+# fc.ANLYS_SUBDIR = "LCFS100_4x360x180mesh_tole1e2_LOMEM"
 
-fc.ANLYS_DIR = "LSODA-2p49e8_Iota4FWD_1200spins_320Lines"
-fc.ANLYS_SUBDIR = "LCFS100_4x36x360mesh_histogram_7"
+fc.ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
+fc.ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
+
 
 ## DEFINE FIELDS
-fc.FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-fc.FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+fc.FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
+fc.FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
 fc.CURRENT_TOR = 0.486 #[kA]
 fc.CURRENT_HEL = 0.790 #[kA]
 fc.CONFIG_TOR = 'default_toroidal'
-fc.CONFIG_HEL = 'default_helical_rev'
+fc.CONFIG_HEL = 'default_helical'
 
 ## DEFINE LCFS AND ANGLES TO EVALUATE
-fc.LCFS_INDEX = 100 #40 #22 #29?
-fc.NPHI = 36
-fc.NTHETA = 360
+fc.LCFS_INDEX = 35 #100  #1f00 #40 #22 #29?
+fc.NPHI = 360
+fc.NTHETA = 90
 fc.PHI_GENs = np.linspace(360//fc.NPHI, 360, fc.NPHI)
 
 ## FLUX INTEGRATION PARAMETERS
 fc.MAX_SUBSETS = 4
-fc.SMOOTH_FCTR = 1e-5 #7.5e-6 #baseline 1e-6
-# INTEGRATE_EPSABS=1e-5 #1.49e-5
-# INTEGRATE_EPSREL=1e-3 #4.49e-3
-fc.INTEGRATE_EPSABS=1e-3
-fc.INTEGRATE_EPSREL=1e-2
+fc.SMOOTH_FCTR = 7.5e-6 #baseline 1e-6
+fc.INTEGRATE_EPSABS=5e-1
+fc.INTEGRATE_EPSREL=5e-2
 
 ## PLOTTING FLAG
 fc.ISLAND_ALGORITHM = 'histogram' # 'kmeans', 'spectral'
 fc.HIST_BINS = 120
-fc.PLOT_ALL = True
+fc.PLOT_ALL = False
+fc.BIG_MESH = False
 
 ## RUN ANALYSIS
 fc.fluxCalculator()

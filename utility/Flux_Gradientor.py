@@ -36,11 +36,12 @@ def main():
     big_flux_Lingrad_radial = -big_flux_Lingrad[2]  # E = -grad[V]
     big_flux_Lingrad_poloidal = np.zeros_like(big_flux_Lingrad[1])
     big_flux_Lingrad_poloidal[:,:,1:] = -big_flux_Lingrad[1][:,:,1:] / grid_rad[:,1:]
+    #big_flux_Lingrad_poloidal[:,:,0] = big_flux_Lingrad_poloidal[:,:,1]
     big_flux_Lingrad_toroidal = -big_flux_Lingrad[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
     print(f'{big_flux_Lingrad_radial.shape=}')
 
     # Load LCFS file:
-    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX+1))
+    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX))
     lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
     
     # set all points outside the LCFS to zero
@@ -48,7 +49,7 @@ def main():
         lcfs_points = lcfs_points_full[phi_index]
         # keep only 1st subset of points (360 points)
         lcfs_points= lcfs_points[:360].T
-        print(f'{phi_index=}')
+        #print(f'{phi_index=}')
 
         for theta_index, this_theta in enumerate(THETAS):
             # find the index of the value in lcfs_points[0] closest to this_theta
@@ -92,7 +93,7 @@ def main():
     Efield_xyzArray_linear[0] = Ex_linear.reshape(Efield_xyzArray_linear[0].shape)
     Efield_xyzArray_linear[1] = Ey_linear.reshape(Efield_xyzArray_linear[1].shape)
     Efield_xyzArray_linear[2] = Ez_linear.reshape(Efield_xyzArray_linear[2].shape)
-    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '\\' + OUTPUT_FILE_NAME + '.npy')
+    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/' + OUTPUT_FILE_NAME + '.npy')
 
     ## LOOP THROUGH PHI ANGLES forplotting
     #colortest = 'seismic'
@@ -133,32 +134,30 @@ if __name__ == '__main__':
 
     #ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = ""
-
     # ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
     # ANLYS_SUBDIR = "LCFS40_3x360x360mesh_UPDATED"
-
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_CORRECTCURR_lotol'
 
-    ANLYS_DIR = "ChangetoIota4_1500spins_atole-8_eng"
-    ANLYS_SUBDIR = "LCFS39_4x360x360mesh_loTol"
-
+    ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
+    ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
     ## DEFINE FIELDS
-    FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-    FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+    FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
+    FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
     CURRENT_TOR = 0.486 #[kA]
     CURRENT_HEL = 0.790 #[kA]
     CONFIG_TOR = 'default_toroidal'
-    CONFIG_HEL = 'default_helical_rev'
+    CONFIG_HEL = 'default_helical'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INDEX = 39 #40 #22 #29?
+    LCFS_INDEX = 35 #100  #1f00 #40 #22 #29?
     NPHI = 360
-    NTHETA = 360
+    NTHETA = 180
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
 
     ## FLUX INTEGRATION PARAMETERS
     MAX_SUBSETS = 4
-    SMALLEST_ISLAND_INDEX = 54 #47 #53 #39
-    OUTPUT_FILE_NAME = 'Efield_ChangeToIota4'
+    SMALLEST_ISLAND_INDEX = 53 #47 #53 #39
+
+    OUTPUT_FILE_NAME = 'Efield_AcceptedIota4_lcfs25'
     main()
