@@ -34,7 +34,7 @@ He_mass = 4.002602 #amu
 ## SET SIMULATION INPUTS:
 # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-TAG = "EXAMPLE"
+TAG = "APS25_He-1ms"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
 HELICAL_CURRENT = 0.900 #[kA]
@@ -43,17 +43,17 @@ CONFIG_HEL = 'default_helical'
 # ELECTRIC FIELD
 #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
 FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 100.0 # [Volts]
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 # ION PROPERTIES
-ION_MASS = Li_mass # [amu]
-ION_TEMP = 5.0 # [eV]
+ION_MASS = He_mass # [amu]
+ION_TEMP = 1.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
 LCFS_INDEX = 37 #30 #29 #40 (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
-NPHI = 60
+NPHI = 120
 NTHETA = 72
-NPARTICLES_PER_EMITTER = 100
+NPARTICLES_PER_EMITTER = 500
 # SIMULATION PARAMETERS
 DT = 1e-8 # [s]
 TMAX = 0.001 # [s]
@@ -104,14 +104,24 @@ def main():
     output_array, energy_output, depo_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
-    ## COORDINATE FLIPPING & CONVERSION
-    phi_plot = 2*np.pi - output_array[2] # flip phi for the perspective outside the vacuum vessel
-    phi_adder_ccw = -18. # degrees, phi_comp is 18 CW from south-side split
+    # ## COORDINATE FLIPPING & CONVERSION
+    # phi_plot = 2*np.pi - output_array[2] # flip phi for the perspective outside the vacuum vessel
+    # phi_adder_ccw = -18. # degrees, phi_comp is 18 CW from south-side split
     
+    # theta_plot = output_array[1]
+    # theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
+    # phi_plot_deg = (phi_plot*(180/np.pi) + phi_adder_ccw) % 360.
+    # theta_plot_deg = theta_plot*(180/np.pi)
+
+    # COORDINATE FLIIPING & CONVERSION
+    phi_plot = output_array[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
+    a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
+    phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
+
     theta_plot = output_array[1]
     theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-    phi_plot_deg = (phi_plot*(180/np.pi) + phi_adder_ccw) % 360.
     theta_plot_deg = theta_plot*(180/np.pi)
+
 
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
