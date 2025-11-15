@@ -211,10 +211,13 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=No
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
 
-    init_conds = sim_in.loadNumpyData(init_file)
-    v0s = init_conds[:,0:3].T
+    if sim_in:
+        init_conds = sim_in.loadNumpyData(init_file)
+    else:
+        init_conds = simIO.loadNumpyData(init_file)
 
-    ## calculate initial energies in eV
+    # extract initial velocities, calculate initial energies in eV
+    v0s = init_conds[:,0:3].T
     E0s = 0.5 * mass * kg_per_amu * (v0s[0]**2 + v0s[1]**2 + v0s[2]**2) / kboltz #eV
 
     ## create a 1d histogram of initial energies using numpy hist
@@ -222,7 +225,7 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=No
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
-    startfit_i = np.where(dist == np.max(dist))[0][0] + 70 # start fitting 25 bins after the maximum for a better slope fit
+    startfit_i = np.where(dist == np.max(dist))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
     stopfit_i = np.where(dist < 1)[0][0]
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
@@ -235,7 +238,7 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=No
     plt.hist(E0s, bins=500, density=False, color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], zorder=2)  # histtype='step',
     plt.xlabel('Initial Energy (eV)', fontsize=12)
     plt.ylabel('# of Particles', fontsize=12)
-    plt.xlim(0, min(Te_calc*5,5000)) # limit x-axis to 5 times the calculated temperature
+    plt.xlim(0, min(Te_calc*6,5000)) # limit x-axis to 6 times the calculated temperature
     plt.xticks(fontsize=12)  # Increase x-tick label size
     ax = plt.gca()
     ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x/1000)}k' if x >= 1000 else f'{int(x)}'))
