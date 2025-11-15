@@ -139,25 +139,29 @@ if __name__ == '__main__':
     # ANLYS_DIR = "ChangeToIota3_1500spins_atole-9"
     # ANLYS_SUBDIR = 'LCFS29_3x360x360mesh_CORRECTCURR_lotol'
 
-    ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
-    ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
+    # ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
+    # ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
+
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = "LCFS19_360x180_tol_5e1_5e2_APS2025"
+
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
     CURRENT_TOR = 0.486 #[kA]
-    CURRENT_HEL = 0.790 #[kA]
+    CURRENT_HEL = 0.900 #[kA]
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INDEX = 35 #100  #1f00 #40 #22 #29?
+    LCFS_INDEX = 19 #100  #1f00 #40 #22 #29?
     NPHI = 360
     NTHETA = 180
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
 
     ## FLUX INTEGRATION PARAMETERS
-    MAX_SUBSETS = 4
-    SMALLEST_ISLAND_INDEX = 53 #47 #53 #39
+    MAX_SUBSETS = 3
+    SMALLEST_ISLAND_INDEX = 47 #53 #39
 
-    OUTPUT_FILE_NAME = 'Efield_AcceptedIota4_lcfs25'
+    OUTPUT_FILE_NAME = 'Efield_AcceptedIota3_lcfs19'
     main()

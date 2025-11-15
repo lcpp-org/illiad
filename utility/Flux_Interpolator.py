@@ -33,7 +33,7 @@ def main():
     # LOAD VALID SURFACE DATA
     validSurf_name = filepath + 'ValidSurfaces.npy'
     valid_surface = simIO.loadNumpyData(validSurf_name)
-    #valid_surface[LCFS_INDEX:] = True # manually set some surfaces to valid
+    valid_surface[LCFS_INDEX] = True # manually set some surfaces to valid
     valid_surface[:LCFS_INDEX] = False # manually set some surfaces to invalid
 
     # Load Magnetic Axis point:
@@ -51,7 +51,7 @@ def main():
     # CHOOSING ONE 'WELL-BEHAVED' ANGLE FOR THE CALCULATION (NO FAILED CALCULATIONS)
     # sum flux_norm_array along first axis and find index of max value
     sum_flux = np.nansum(flux_norm_array, axis=0)
-    best_phi_index = np.argsort(sum_flux)[-2]
+    best_phi_index = np.argsort(sum_flux)[-5]
     linear_flux_array = flux_norm_array[:, best_phi_index]
     profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(int(PHI_GENs[best_phi_index]))
     print(profile_select_str)
@@ -61,9 +61,11 @@ def main():
     ## DEBUG plot filtered_flux_array with matplotlib
     if DEBUG:
         fig, ax = plt.subplots()
-        ax.plot(valid_indices, linear_flux_array[valid_indices])
+        #ax.plot(valid_indices, linear_flux_array[valid_indices])
+        ax.plot(linear_flux_array)
         ax.set_xlabel('Surface Index')
         ax.set_ylabel('Flux')
+        #ax.set_yscale('log')  # Set y-axis to log scale
         ax.grid(True)
         ax.set_title(profile_select_str)
         plt.show()
@@ -81,8 +83,8 @@ def main():
         points[0] = axis_array[phi_index][0]
         points[1:] = island_axis_array[phi_index]
 
-        print(f'Central axis point: {axis_array[phi_index][0]}')
-        print(f'Island axis points: {points}')
+        # print(f'Central axis point: {axis_array[phi_index][0]}')
+        # print(f'Island axis points: {points}')
         
         # linear values for the axes points
         flux_norm = np.ones([MAX_SUBSETS+1])
@@ -190,26 +192,29 @@ if __name__ == '__main__':
     # ANLYS_DIR = "ChangetoIota4_1500spins_atole-8_eng"
     # ANLYS_SUBDIR = "LCFS39_4x360x360mesh_loTol"
 
+    # ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
+    # ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
 
-    ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
-    ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
+    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    ANLYS_SUBDIR = "LCFS19_360x180_tol_5e1_5e2_APS2025"
+
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
     CURRENT_TOR = 0.486 #[kA]
-    CURRENT_HEL = 0.790 #[kA]
+    CURRENT_HEL = 0.900 #[kA]
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INDEX = 35 #100  #1f00 #40 #22 #29?
+    LCFS_INDEX = 19 #100  #1f00 #40 #22 #29?
     NPHI = 360
     NTHETA = 180
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
 
     ## FLUX INTEGRATION PARAMETERS
-    MAX_SUBSETS = 4
-    SMALLEST_ISLAND_INDEX = 53 #47 #53 #39
+    MAX_SUBSETS = 3
+    SMALLEST_ISLAND_INDEX = 47 #53 #39
     # Stop for flux profile selection
     DEBUG = True
     main()
