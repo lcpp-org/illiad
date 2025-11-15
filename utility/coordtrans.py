@@ -137,14 +137,14 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
 
     return rotated_XYZ
 
-def RTP_XYZ_JAC(p_rtp, vec_xyz, form='xyz2rtp'):
+def RTP_XYZ_JAC(p_rtp, vec_in, form='xyz2rtp'):
     """
     Converts a vector between Cartesian (XYZ) and r-theta-phi (RTP) coordinates.
 
     Args:
         p_rtp (array-like): The r-theta-phi coordinates [r, theta, phi] of the point.
-        vec_xyz (array-like): The vector to be transformed.
-        form (str, optional): Transformation direction. 
+        vec_in (array-like): The vector to be transformed.
+        c (str, optional): Transformation direction. 
             'xyz2rtp' converts from Cartesian to RTP.
             'rtp2xyz' converts from RTP to Cartesian.
             Defaults to 'xyz2rtp'.
@@ -164,13 +164,13 @@ def RTP_XYZ_JAC(p_rtp, vec_xyz, form='xyz2rtp'):
         XformTranspose = np.array([[ctheta*cphi, -stheta*cphi, -sphi],
                                   [-ctheta*sphi,  stheta*sphi, -cphi],
                                   [      stheta,       ctheta,     0]])
-        return np.dot(XformTranspose, vec_xyz)
+        return np.dot(XformTranspose, vec_in)
     
     elif form == 'xyz2rtp':
         Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
                          [-stheta*cphi,  stheta*sphi, ctheta],
                          [       -sphi,        -cphi,     0]])
-        return np.dot(Xform, vec_xyz)
+        return np.dot(Xform, vec_in)
     else:
         raise ValueError("form must be 'rtp2xyz' or 'xyz2rtp'")
 

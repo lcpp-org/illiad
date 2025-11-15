@@ -178,7 +178,7 @@ class Mesh:
             self.By += (By_ * total_mult)
             self.Bz += (Bz_ * total_mult)
 
-    def setErrorField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
+    def setErrorField(self, mag=1.5654e-4, dir_deg=271.5*np.pi/180):
         """Sets the magnitude and direction of the non-periodic error field.
 
         The direction is measured from phi_c=0 (i.e., 18 degrees clockwise from the South Split).
@@ -188,10 +188,10 @@ class Mesh:
             err_mag (float, optional): Magnitude of the error field. Defaults to 1.5654e-4.
             err_dir (float, optional): Direction of the error field in radians. Defaults to 271.5*np.pi/180.
         """
-        self.err_mag = err_mag
-        self.err_dir = err_dir
-        self.cos_err_dir = np.cos(err_dir)
-        self.sin_err_dir = np.sin(err_dir)
+        self.err_mag = mag
+        self.err_dir = dir_deg
+        self.cos_err_dir = np.cos(dir_deg)
+        self.sin_err_dir = np.sin(dir_deg)
         self.xerr_adder = self.err_mag * self.cos_err_dir
         self.yerr_adder = -1 * self.err_mag * self.sin_err_dir
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64).T
