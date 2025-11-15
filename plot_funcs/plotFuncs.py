@@ -71,20 +71,22 @@ def plotWallHist(wallPtArray, runString, simIO):
     
     plt.colorbar(location='bottom', shrink=0.6)
     
-    ax.set_xlabel('Toroidal Angle (+CCW from South-Side Split), $\phi[\degree]$')
+    ax.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
     ax.set_xlim(0, 360)
-    ax.set_xticks(np.linspace(9, 360, 40))
-    ax.xaxis.set_tick_params(labelsize=6)
+    xticks = np.linspace(9, 351, 39)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+    ax.xaxis.set_tick_params(labelsize=10)
 
-    ax.set_ylabel('Poloidal Location')
+    ax.set_ylabel('Poloidal Location', fontsize=12)
     ax.set_ylim(-180, 180)
     ax.set_yticks(np.linspace(-180, 180, 5))
-    ax.set_yticklabels(['Inner   \nMidplane', 'Bottom', 'Outer   \nMidplane', 'Top', 'Inner   \nMidplane'])
-    ax.yaxis.set_tick_params(labelsize=5)
+    ax.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
+    ax.yaxis.set_tick_params(labelsize=8, labelrotation=45)
     plt.tight_layout()
 
     plotname = 'Wall_Histogram_' + runString + '.png'
-    simIO.saveFig(plotname, dpi=200)
+    simIO.saveFig(plotname, dpi=400)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
@@ -202,13 +204,14 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     plt.close()
     #plt.show()
 
-def plotInitEnergies(init_file, mass, runString='default', simIO=None):
+#def plotInitEnergies(init_file, mass, runString='default', simIO=None):
+def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
     """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
 
-    init_conds = simIO.loadNumpyData(init_file)
+    init_conds = sim_in.loadNumpyData(init_file)
     v0s = init_conds[:,0:3].T
 
     ## calculate initial energies in eV
@@ -230,10 +233,15 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     plt.figure()
     plt.grid(which='both', zorder=0)
     plt.hist(E0s, bins=500, density=False, color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], zorder=2)  # histtype='step',
-    plt.xlabel('Initial Energy (eV)')
-    plt.ylabel('Number of Particles')
-    plt.xlim(0, min(Te_calc*4,5000)) # limit x-axis to 5 times the calculated temperature
+    plt.xlabel('Initial Energy (eV)', fontsize=12)
+    plt.ylabel('# of Particles', fontsize=12)
+    plt.xlim(0, min(Te_calc*5,5000)) # limit x-axis to 5 times the calculated temperature
+    plt.xticks(fontsize=12)  # Increase x-tick label size
+    ax = plt.gca()
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x/1000)}k' if x >= 1000 else f'{int(x)}'))
+    plt.yticks(fontsize=12)
     #plt.yscale('log')
+
     plt.title('Initial Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
     plt.tight_layout()
 
@@ -344,16 +352,19 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
 
     axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
 
-    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
+    axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
     axWall.set_xlim(0, 360)
-    axWall.set_xticks(np.linspace(9, 351, 39))
+    xticks = np.linspace(9, 351, 39)
+    axWall.set_xticks(xticks)
+    axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
     axWall.xaxis.set_tick_params(labelsize=10)
 
-    axWall.set_ylabel('Poloidal Location', fontsize=14)
+    axWall.set_ylabel('Poloidal Location', fontsize=12)
     axWall.set_ylim(-180, 180)
-    axWall.set_yticks(np.linspace(-90, 90, 3))
-    axWall.set_yticklabels(['Bottom', 'Outer\nMidplane', 'Top'])
-    axWall.yaxis.set_tick_params(labelsize=12)
+    axWall.set_yticks(np.linspace(-180, 180, 5))
+    axWall.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
+    axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
+
 
     n, bins, patches = axDist.hist(data, bins=90, range=colorRange, density=False, linewidth=0.3, zorder=2)
     # Color each bar
@@ -364,7 +375,7 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
 
     axDist.grid(which='both', zorder=0)
     axDist.set_xlabel(colorLabel, fontsize=12)
-    axDist.xaxis.set_tick_params(labelsize=10)
+    axDist.xaxis.set_tick_params(labelsize=12)
     axDist.set_yticklabels([])
     axDist.yaxis.set_tick_params(color='white')
 
@@ -482,8 +493,10 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
     axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
     axWall.set_xlim(0, 360)
-    axWall.set_xticks(np.linspace(9, 351, 39))
-    axWall.xaxis.set_tick_params(labelsize=10)
+    xticks = np.linspace(9, 351, 39)
+    axWall.set_xticks(xticks)
+    axWall.set_xticklabels([f'{int(tick)}' if i % 2 == 0 else '' for i, tick in enumerate(xticks)])
+    axWall.xaxis.set_tick_params(labelsize=12)
 
     axWall.set_ylabel('Poloidal Location', fontsize=14)
     axWall.set_ylim(-180, 180)
