@@ -126,7 +126,7 @@ def main():
     #i_fitpoints = [8,9,10]                  #r=10cm HF
     #i_fitpoints = [4,5,6,7]                 #r=10cm LF
 
-    plot_name = "Mar29Fit_r0-LF_dBdr-1mm_noHEL-tor_USETHIS.png"
+    plot_name = "Mar29Fit_r0-LF_dBdr-1mm_noHEL-tor_USETHISwTITLE.png"
     #plot_title = "Fitting only r=0 points:"
     #plot_title = "Fitting All Measurement points:"
     plot_title = "Fitting r=0 and LF points:"
@@ -227,7 +227,7 @@ def main():
 
 
     fig = plt.figure()
-    #fig.suptitle(plot_title+'\n'+resultString, fontsize=4)
+    fig.suptitle(plot_title+'\n'+resultString, fontsize=4)
 
     ax1 = fig.add_subplot(221)
     ax1.plot(PHI_PLOT, np.sqrt( B_rtp_ideal[:,0]**2 + B_rtp_ideal[:,1]**2 + B_rtp_ideal[:,2]**2), '--b', label='Ideal B-field (on-axis)', zorder=4)
