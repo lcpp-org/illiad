@@ -48,9 +48,9 @@ def XYZ_to_RTP(p_XYZ, Rmajor=0.72):
     """
     x, y, z = p_XYZ[:3]
     x2plusy2 = x*x + y*y
-    z2 = z*z
+    #z2 = z*z
     R = np.sqrt(x2plusy2)
-    r = np.sqrt(x2plusy2 + z2 + Rmajor*Rmajor - 2*Rmajor*R)
+    r = np.sqrt(x2plusy2 + z*z + Rmajor*Rmajor - 2*Rmajor*R)
 
     den = R - Rmajor
     theta = np.arctan2(z, den)
@@ -94,10 +94,10 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     x, y, z = p_XYZ.T
     x2 = x*x
     y2 = y*y
-    z2 = z*z
+    #z2 = z*z
     R = torch.sqrt(x2 + y2)
 
-    p_RTP.T[0] = torch.sqrt( x2 + y2 + z2 + Rmajor*Rmajor - 2*Rmajor*R )
+    p_RTP.T[0] = torch.sqrt( x2 + y2 + z*z + Rmajor*Rmajor - 2*Rmajor*R )
 
     den = R - Rmajor
     theta = torch.arctan2(z,den) # arctan2 returns radians from (-pi to +pi)
@@ -173,6 +173,47 @@ def RTP_XYZ_JAC(p_rtp, vec_in, form='xyz2rtp'):
         return np.dot(Xform, vec_in)
     else:
         raise ValueError("form must be 'rtp2xyz' or 'xyz2rtp'")
+    
+def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
+    """
+    Converts a vector between Cartesian (XYZ) and r-theta-phi (RTP) coordinates using torch
+
+    Args:
+        p_rtp (torch tensor): The r-theta-phi coordinates [r, theta, phi] of the point. (N,3)
+        vec_in (torch tensor): The vector to be transformed. (3,N)
+        form (str, optional): Transformation direction. 
+            'xyz2rtp' converts from Cartesian to RTP.
+            'rtp2xyz' converts from RTP to Cartesian.
+            Defaults to 'xyz2rtp'.
+
+    Returns:
+        torch.Tensor: The transformed vector. (N,3)
+
+    Raises:
+        ValueError: If `form` is not 'rtp2xyz' or 'xyz2rtp'.
+    """
+    # p_rtp: (N,3), vec_in: (N,3)
+    ctheta = torch.cos(p_rtp[:,1])
+    stheta = torch.sin(p_rtp[:,1])
+    cphi = torch.cos(p_rtp[:,2])
+    sphi = torch.sin(p_rtp[:,2])
+
+    Xform = torch.stack([
+        torch.stack([ctheta*cphi, -stheta*cphi, -sphi], dim=1),
+        torch.stack([-ctheta*sphi,  stheta*sphi, -cphi], dim=1),
+        torch.stack([      stheta,       ctheta,     torch.zeros_like(ctheta)], dim=1)
+    ], dim=1)  
+
+    if form == 'rtp2xyz':
+        result = torch.einsum('nij,jn->in', Xform, vec_in)  # (N,3)
+        return result
+    elif form == 'xyz2rtp':
+        result = torch.einsum('nji,jn->in', Xform, vec_in)  # (N,3)
+        return result
+    else:
+        raise ValueError("form must be 'rtp2xyz' or 'xyz2rtp'")
+
+
 
 def axisShift(theta, radius, d_theta, d_radius): 
     """

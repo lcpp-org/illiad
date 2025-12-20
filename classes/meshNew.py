@@ -192,6 +192,7 @@ class Mesh:
             err_mag (float, optional): Magnitude of the error field. Defaults to 1.5654e-4.
             err_dir (float, optional): Direction of the error field in radians. Defaults to 271.5*np.pi/180.
         """
+        self.errField = True
         self.err_mag = err_mag
         self.err_dir = err_dir
         self.cos_err_dir = np.cos(err_dir)
@@ -235,9 +236,10 @@ class Mesh:
         rotated_XYZ[1] = sin_phi*vec_XYZ[0] + cos_phi*vec_XYZ[1]
         rotated_XYZ[2] = vec_XYZ[2]
 
+        # mismatch in sign between 'Mesh' and 'eshNew' inmplementations?
         return rotated_XYZ
 
-    def interpField(self, point_XYZ, Cart=True):
+    def interpField(self, point_INPUT, Cart=True, basis='physical'):
         """
         Returns the interpolated field values at a point defined in Cartesian coordinates.
 
@@ -250,7 +252,7 @@ class Mesh:
             phi: dphi to phi_max (2pi / Nperiods)
 
         Args:
-            point_XYZ (torch.Tensor): Input point(s) in Cartesian coordinates.
+            point_INPUT (torch.Tensor): Input point(s) in Cartesian coordinates. (N,3) if multiple points.
             Cart (bool): If True, input is in Cartesian coordinates; otherwise, RTP coordinates.
 
         Returns:
@@ -263,26 +265,26 @@ class Mesh:
         #point_XYZ = torch.tensor([point_XYZ], dtype=torch.float64).to(device)
         #print(f'{point_XYZ.shape=}')
         Npts = torch.int64
-        if len(point_XYZ.shape) < 2:
+        if len(point_INPUT.shape) < 2:
             Npts = 1
         else:
-            Npts = point_XYZ.shape[0]
+            Npts = point_INPUT.shape[0]
 
         if Cart:
-            point_RTP = XYZ_to_RTP2(point_XYZ, self.R0).to(device)
+            point_RTP = XYZ_to_RTP2(point_INPUT, self.R0).to(device)
         else:
-            point_RTP = point_XYZ.to(device)
+            point_RTP = point_INPUT.to(device)
 
         point_RTP = point_RTP.permute(*torch.arange(point_RTP.ndim - 1, -1, -1)) #= point_RTP.T throws a warning
 
+        # Is there proper handling of rho< 0.0 cases? does there need to be? (not for point_XYZ cases)
         r_local  = point_RTP[0]
-
         th_local = torch.remainder(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
-
-        ph_localN = torch.div(point_RTP[2], self.phi_max, rounding_mode='floor') # keep phi within 0 and phi_max!  #floor?
+        # pytorch has no built-in divmod function?
         ph_local = torch.remainder(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
+        ph_localN = torch.div(point_RTP[2], self.phi_max, rounding_mode='floor') # keep phi within 0 and phi_max!  #floor?
 
-        vecXYZ = torch.zeros([3,Npts], dtype=torch.float64).to(device)
+        vecOUT = torch.zeros([3,Npts], dtype=torch.float64).to(device)
 
         rindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
         thindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
@@ -335,32 +337,62 @@ class Mesh:
         Bvec6 = torch.stack([ self.Bx[ir_lo, ith_hi, iph_lo], self.By[ir_lo, ith_hi, iph_lo], self.Bz[ir_lo, ith_hi, iph_lo] ], dim = 0)
         Bvec7 = torch.stack([ self.Bx[ir_hi, ith_lo, iph_lo], self.By[ir_hi, ith_lo, iph_lo], self.Bz[ir_hi, ith_lo, iph_lo] ], dim = 0)
         Bvec8 = torch.stack([ self.Bx[ir_lo, ith_lo, iph_lo], self.By[ir_lo, ith_lo, iph_lo], self.Bz[ir_lo, ith_lo, iph_lo] ], dim = 0)
-        # have to perform vector rotation if wrapping around in phi direction
 
+        # perform vector rotation if wrapping around in phi direction
         if Npts > 1:
-            toRotate = torch.where( iph_hi >= self.nphi)[0]
-            if len(toRotate) > 0:
+            toRotate = torch.where(iph_hi == 0)[0]
+            #toRotate = torch.where(iph_hi >= self.phi_max)[0]
+            if toRotate.numel() > 0:
                 Bvec5[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec5[:,toRotate], self.phi_max )
                 Bvec6[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec6[:,toRotate], self.phi_max )
                 Bvec7[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec7[:,toRotate], self.phi_max )
                 Bvec8[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec8[:,toRotate], self.phi_max )
         else:
-            if iph_hi >= self.nphi:
+            if iph_hi == 0:
+            #if iph_hi >= self.phi_max:
                 Bvec5 = self.rot_vecXYZ_byPHI( Bvec5, self.phi_max )
                 Bvec6 = self.rot_vecXYZ_byPHI( Bvec6, self.phi_max )
                 Bvec7 = self.rot_vecXYZ_byPHI( Bvec7, self.phi_max )
                 Bvec8 = self.rot_vecXYZ_byPHI( Bvec8, self.phi_max )
 
         # sum of vectors, weighted by 'anti-node' volume
-        vecXYZ = (Bvec1*A1 + Bvec2*A2 + Bvec3*A3 + Bvec4*A4 + Bvec5*A5 + Bvec6*A6 + Bvec7*A7 + Bvec8*A8) / (A1+A2+A3+A4+A5+A6+A7+A8)
+        total_vol = A1 + A2 + A3 + A4 + A5 + A6 + A7 + A8
+        vecOUT = (Bvec1*A1 + Bvec2*A2 + Bvec3*A3 + Bvec4*A4 + Bvec5*A5 + Bvec6*A6 + Bvec7*A7 + Bvec8*A8) / total_vol
 
         # if the mesh is defined with periodic symmetry, we must 
         # perform a rotational transform based on which 'period' of the mesh the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
         phi_rotation = ph_localN * self.phi_max  # angle of transform
-        vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, -phi_rotation)
+        vecOUT = self.rot_vecXYZ_byPHI(vecOUT, -phi_rotation)
 
         if self.errField:
-            vecXYZ += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
+            if basis == 'physical':
+                vecOUT += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
+            elif basis == 'contravariant':
+                # convert error field to contravariant basis before adding
+                bxerr = self.err_adder[0]
+                byerr = self.err_adder[1]
 
-        return vecXYZ
+                rho = point_RTP[0]
+                sin_theta = torch.sin(point_RTP[1])
+                cos_theta = torch.cos(point_RTP[1])
+                sin_phi = torch.sin(point_RTP[2])
+                cos_phi = torch.cos(point_RTP[2])
+
+                R_cyl = self.R0 + rho * cos_theta
+                term = (bxerr*cos_phi - byerr*sin_phi)
+
+                err_adder_rho = term * cos_theta
+                err_adder_theta = term * (-sin_theta) / torch.clamp(rho, min=self.dr/2)
+                err_adder_phi = -(bxerr*sin_phi + byerr*cos_phi) / R_cyl
+
+                err_adder_contra = torch.stack([err_adder_rho, err_adder_theta, err_adder_phi], dim=0)
+                vecOUT += err_adder_contra
+                # if Npts > 1:
+                #     vecOUT += err_adder_contra.unsqueeze(-1) 
+                # else:
+                #     vecOUT += err_adder_contra
+            else:   
+                print(f"{self}: BASIS TYPE NOT RECOGNIZED FOR ERROR FIELD ADDITION!!")
+
+        return vecOUT

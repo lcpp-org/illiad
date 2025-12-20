@@ -1,6 +1,6 @@
 import numpy as np
 import os as os
-from utility.coordtrans import XYZ_to_RTP #, rot_vecXYZ_byPHI
+from utility.coordtrans import XYZ_to_RTP
 
 
 class Mesh:
@@ -243,6 +243,7 @@ class Mesh:
 
         rotated_XYZ = np.dot(vec_XYZ, xFormMatrix)
 
+        # mismatch in sign between 'Mesh' and 'eshNew' inmplementations?
         return rotated_XYZ
 
     def interpField(self, point_XYZ, Cart=True):
@@ -273,8 +274,16 @@ class Mesh:
         
         # periodic boundarys
         r_local  = point_RTP[0]
+        if r_local < 0.0:
+            #print(f"WARNING: r_local < 0.0 : {r_local} !! Setting r_local = 0.0")
+            #exit()
+            r_local *= -1.0
+            point_RTP[1] += np.pi
+
         th_local = np.remainder(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
         ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
+
+
 
         vecXYZ = np.zeros([3,Npts], dtype=np.float64) 
         rindex : np.int16
@@ -341,7 +350,8 @@ class Mesh:
         Bvecs[:, 2] = self.Bz[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
 
         # have to perform vector rotation if wrapping around in phi direction
-        if iph_lo < 0: Bvecs[4:] = self.rot_vecXYZ_byPHI( Bvecs[4:], -self.phi_max )
+        #if iph_lo < 0: Bvecs[4:] = self.rot_vecXYZ_byPHI( Bvecs[4:], -self.phi_max )
+        if iph_hi == 0: Bvecs[4:] = self.rot_vecXYZ_byPHI( Bvecs[4:], -self.phi_max )
 
         # result is sum of B field vectors weighted with sub-element volumes
         vecXYZ = np.dot(Areas, Bvecs) / np.sum(Areas)

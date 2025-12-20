@@ -167,3 +167,6 @@ output/*
 *.sbatch
 NPR598/*
 Miniforge3-Linux-x86_64.sh
+
+# Large generated field dumps (keep out of git; use LFS or external storage if needed)
+Bfield_RTP_contravariant*.npy
