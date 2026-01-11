@@ -43,17 +43,13 @@ def main():
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
     # Create coordinate arrays
-    rho = torch.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr, 
-                         dtype=torch.float64, device=device)
-    theta = torch.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta, 
-                           dtype=torch.float64, device=device)
+    rho = torch.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr, dtype=torch.float64, device=device)
+    theta = torch.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta, dtype=torch.float64, device=device)
     phi_period = b_hidra.periodicity[2]
-    phi = torch.linspace(b_hidra.phi_min, b_hidra.phi_max*phi_period, b_hidra.nphi*phi_period, 
-                         dtype=torch.float64, device=device)
+    phi = torch.linspace(b_hidra.phi_min, b_hidra.phi_max*phi_period, b_hidra.nphi*phi_period, dtype=torch.float64, device=device)
     
-    RHO_grid, THETA_grid, PHI_grid = torch.meshgrid(rho, theta, phi, indexing='ij')
-
     # Create RTP points array
+    RHO_grid, THETA_grid, PHI_grid = torch.meshgrid(rho, theta, phi, indexing='ij')
     rtp_points = torch.stack([RHO_grid, THETA_grid, PHI_grid], dim=-1)
     simIO.log.info(f"RTP points shape: {rtp_points.shape}")
     mesh_shape = rtp_points.shape[:-1]

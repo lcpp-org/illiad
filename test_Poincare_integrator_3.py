@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.interpolate import RegularGridInterpolator
+#from scipy.interpolate import RegularGridInterpolator
 from time import perf_counter
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
@@ -55,8 +55,7 @@ def poincare_intersections_multi_planes_single_line_local(
         fun=rhs_func, t_span=(phi_start, phi_end), y0=[rho0, theta0],
         method=solver, rtol=rtol, atol=atol,
         t_eval=phi_eval, dense_output=False,
-        events=stop_integration_on_rho_limit,
-    )
+        events=stop_integration_on_rho_limit)
     # If integration failed, return empties for all planes
     if not sol.success or sol.t.size == 0:
         return {p: (np.array([]), np.array([]), np.array([])) for p in plane_to_phi_cross.keys()}
@@ -68,22 +67,19 @@ def poincare_intersections_multi_planes_single_line_local(
     results = {}
     for p, phi_cross in plane_to_phi_cross.items():
         if phi_cross.size == 0:
-            results[p] = (np.array([]), np.array([]), np.array([]))
+            results[p] = (np.array([]), np.array([]))
             continue
-
         idx = np.searchsorted(t, phi_cross)
         valid = (idx < t.size)
         # Guard against early termination and any float mismatch
         valid &= np.isclose(t[idx.clip(max=t.size-1)], phi_cross, rtol=0.0, atol=1e-12)
         idx = idx[valid]
         if idx.size == 0:
-            results[p] = (np.array([]), np.array([]), np.array([]))
+            results[p] = (np.array([]), np.array([]))
             continue
-
-        phi_out = t[idx]
         rho_out = rho[idx]
         theta_out = wrap_angle(theta[idx])
-        results[p] = (phi_out, rho_out, theta_out)
+        results[p] = (rho_out, theta_out)
 
     return results
 
@@ -131,7 +127,7 @@ def _trace_single_surface_multi(rho0, theta_start, phi0, phi_planes,
         if abs(Bp) < eps_Bp: Bp = np.copysign(eps_Bp, Bp if Bp != 0.0 else 1.0)
 
         if abs(rho) < eps_rho:
-            fBt *= 0.0
+            Bt *= 0.0
             #Bt = Bp * np.pi
             #Br = np.abs(Br)
         return [Br/Bp, Bt/Bp]
@@ -144,7 +140,7 @@ def _trace_single_surface_multi(rho0, theta_start, phi0, phi_planes,
     )
 
     by_plane = {}
-    for p, (phi_cross, rho_cross, theta_cross) in plane_results.items():
+    for p, (rho_cross, theta_cross) in plane_results.items():
         if rho_cross.size == 0:
             by_plane[p] = {'rho': np.array([]), 'theta': np.array([])}
         else:
@@ -161,11 +157,9 @@ def compute_poincare_surfaces_parallel_multi(num_surfaces=16, num_turns=300, phi
     Compute Poincaré intersections for many flux surfaces and multiple φ planes.
     Returns a list where each item is {'rho0': float, 'by_plane': {phi: {...}}}
     """
-    
     phi_planes_deg = np.arange(0, 360, phi_step_deg)
     phi_planes = np.deg2rad(phi_planes_deg)
     rho_starts = np.linspace(rho_min, rho_max, num_surfaces)
-
     surfaces = Parallel(n_jobs=n_jobs)(
         delayed(_trace_single_surface_multi)(
             rho0=rho0, theta_start=theta_start, phi0=phi_start,
