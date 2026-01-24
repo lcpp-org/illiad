@@ -161,6 +161,7 @@ cython_debug/
 
 input_files/*.npy
 input_files/*.txt
+input_files/*
 output/*
 *.o4*
 *.e4*
