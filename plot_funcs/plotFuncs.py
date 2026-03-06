@@ -205,28 +205,29 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     #plt.show()
 
 #def plotInitEnergies(init_file, mass, runString='default', simIO=None):
-def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
+#def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
+def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
 
-    if sim_in:
-        init_conds = sim_in.loadNumpyData(init_file)
-    else:
-        init_conds = simIO.loadNumpyData(init_file)
+    # if simIO:
+    #     init_conds = simIO.loadNumpyData(init_file)
+    # else:
+    init_conds = simIO.loadNumpyData(init_file)
 
     # extract initial velocities, calculate initial energies in eV
     v0s = init_conds[:,0:3].T
     E0s = 0.5 * mass * kg_per_amu * (v0s[0]**2 + v0s[1]**2 + v0s[2]**2) / kboltz #eV
 
     ## create a 1d histogram of initial energies using numpy hist
-    dist, bin_edges= np.histogram(E0s, bins=500, density=False)
+    counts, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
-    startfit_i = np.where(dist == np.max(dist))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
-    stopfit_i = np.where(dist < 1)[0][0]
+    lnE = np.log(counts[counts > 0])  # take log of only positive values to avoid log(0)
+    startfit_i = np.where(counts == np.max(counts))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
+    stopfit_i = np.where(counts < 1)[0][0]
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
     else:
@@ -256,19 +257,19 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=No
 def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     """Plots the final energy distribution of particles."""
     ## create a 1d histogram of initial energies using numpy hist
-    dist, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
+    counts, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    startfit_i = np.where(dist == np.max(dist))[0][0]
-    # find the first index where dist is less than 1
+    startfit_i = np.where(counts == np.max(counts))[0][0]
+    # find the first index where counts is less than 1
      # if there are no values less than 1, we stop at the end of the distribution    
-    if np.any(dist < 1):
-        stopfit_i = np.where(dist < 1)[0][0]
+    if np.any(counts < 1):
+        stopfit_i = np.where(counts < 1)[0][0]
     else:
-        stopfit_i = len(dist) - 1
+        stopfit_i = len(counts) - 1
 
     # take log of only positive values to avoid log(0)
-    lnE = np.log(dist, out=np.zeros_like(dist, dtype=np.float64), where=(dist > 0))  
+    lnE = np.log(counts, out=np.zeros_like(counts, dtype=np.float64), where=(counts > 0))  
 
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
@@ -396,33 +397,51 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
     # Calculate the number of particles running over time (efficiently)
     time_steps = np.arange(0, tmax, dt)
     maxTime_array = maxN_array * dt
-    # Sort maxTime_array once
     sorted_maxTime = np.sort(maxTime_array)
+
     # Use searchsorted to find how many particles have maxTime > t for each t
     particles_running = len(maxTime_array) - np.searchsorted(sorted_maxTime, time_steps, side='right')
-    pct_running = 100 * particles_running / tot_particles
-    pct_running += 100 - pct_running[0]
+    frac_running = particles_running / tot_particles
+    frac_running += 1 - frac_running[0]  # adjust so that it starts at 100% at t=0
+    pct_running = 100 * frac_running
+
+    # Estimate residence time using trapezoidal integration of the fraction running over time
+    tau_res = np.trapz(frac_running, dx=dt)
+    if frac_running[-1] > 0:
+        slope = (np.log(frac_running[-1]) - np.log(frac_running[-101])) / 100 / dt # use wider range for slope to reduce noise
+        slope = min(slope, -1e-1)  # prevent division by zero or very small slope
+        tau_res_corr = -frac_running[-1] / slope
+    else:
+        tau_res_corr = 0.0
+
+
     # Plot the number of particles running over time
     plt.figure(figsize=(10, 6))
-    plt.plot(time_steps, pct_running, label='Particles Running')
-    plt.xlabel('Time (s)')
+    plt.fill_between(time_steps*1000, pct_running, color=UIUC['il_blue'], alpha=0.3)
+    plt.plot(time_steps*1000, pct_running, color=UIUC['il_blue'], label='Particles Running', linewidth=1.5)    
+    plt.xlabel('Time (ms)')
     plt.ylabel('Percent of Particles')
-    plt.title('Particles Running Over Time')
+    plt.title('Particles Running Over Time, S(t)\nEstimated Residence Time = {:.3f}ms (+{:.3f}ms Correction)'
+              .format(tau_res*1000, tau_res_corr*1000))
     # Set major ticks every 0.0001 and minor ticks every 0.00005 on the x-axis
     ax = plt.gca()
-    ax.xaxis.set_major_locator(plt.MultipleLocator(0.0001))
-    ax.xaxis.set_minor_locator(plt.MultipleLocator(0.00005))
-    ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
+    ax.set_xlim(0, tmax*1000)    
+    ax.xaxis.set_major_locator(plt.MultipleLocator(0.1))
+    ax.xaxis.set_minor_locator(plt.MultipleLocator(0.05))
+    # ax.set_ylim(bottom=0)
+    # ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
+    # set semilog scale for y-axis
+    ax.set_yscale('log')
+
     # Set minor tick gridlines to be dashed and smaller width
     ax.grid(which='minor', linestyle=':', linewidth=0.5)
     ax.grid(which='major', linestyle='-', linewidth=1)
-    ax.set_xlim(0, tmax)
     plt.tight_layout()
 
     plotname = 'IonsVtime_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
-    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
-    #plt.savefig(simIO.outputDir + '/ParticlesRunningOverTime_' + cond_string + TAG + '.png')
+    simIO.log.info('OUTPUT PLOT: {}, residence time = {:.3f}ms, corr = {:.3f}ms, slope = {:.3f}'
+                   .format(plotname, tau_res*1000, tau_res_corr*1000, slope))
     plt.close()
 
 def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):

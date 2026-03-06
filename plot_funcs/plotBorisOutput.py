@@ -17,46 +17,42 @@ Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
 
 
-
 ############################
 ## SET SIMULATION INPUTS: ##
 ############################
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
-FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_TOR = 0.9448
-FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
-ERRFIELD_MAG = 1.5654e-4 # [Tesla]
-ERRFIELD_DIR_DEG = 271.5 # [degrees]
+# FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
+# FIELD_SCALE_TOR = 0.9448
+# FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
+# FIELD_SCALE_HEL = -0.955 * FIELD_SCALE_TOR
+# ERRFIELD_MAG = 1.5654e-4 # [Tesla]
+# ERRFIELD_DIR_DEG = 271.5 # [degrees]
 
 # ELECTRIC FIELD
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
-FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
+# FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
+# FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 
 # ION PROPERTIES
-ION_TEMP = 2.0 #eV 
-ION_MASS = Li_mass #amu
-CHARGE_NUM = 1 # Z
-
+ION_MASS = Li_mass # [amu]
+ION_TEMP = 5.0 # [eV]
+CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
-NPHI = 60
-NTHETA = 72 #90
-DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 15 #300
-
+LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
+DELTRS = [0.000] # [m]
+NPHI = 120
+NTHETA = 60
+NPARTICLES_PER_EMITTER = 50
 # SIMULATION PARAMETERS
-DT = 1e-8
-TMAX = 0.0006
+DT = 1e-8 # [s]
+TMAX = 0.00075 #0.0010 # [s]
 NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
-TAG= '60V_Z1_TraceTest'
-#TAG= 'PlotTest_newestE'
-OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
+TAG = "Lithium_FS40_tauRes_1p0ms_PHANGLE_2"
 
 
 #####################
@@ -104,24 +100,27 @@ simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV
     np.min(energy_output), np.max(energy_output), np.mean(energy_output)))
 
 ## CALCULATE ANGLE FROM NORMAL
-unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
+vf_hat_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
 radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
-deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
+deposition_angles = np.arccos(np.einsum('ij,ij->i', vf_hat_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
 deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
+
+vf_hat_rtp = np.asarray( [RTP_XYZ_JAC(wall_point, vf_hat_xyz[i], form='xyz2rtp') for i, wall_point in enumerate(wallPtArray.T)] ) # Convert velocity unit vector to RTP coordinates
+theta_phi_angle_rad = np.atan2(vf_hat_rtp[:, 1], vf_hat_rtp[:, 2]) # angle in the theta-phi plane
 
 simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
     np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
 
 
 # COORDINATE FLIIPING & CONVERSION
-#phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
 phi_plot = wallPtArray[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-theta_plot = wallPtArray[1]
-theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-
 a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
+
+theta_plot = wallPtArray[1]
+theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 theta_plot_deg = theta_plot*(180/np.pi)
+
 
 # ##############
 # ## PLOTTING ##
@@ -156,6 +155,17 @@ plotFuncs.plotTracesPoincare(ion_traces, b_hidra, runString=cond_string+TAG, sim
 # # PLOT DEPOSITION ANGLE DISTRIBUTION
 # plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+                            colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                            runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output,
+                            colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                            runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+
+
+plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, np.abs(theta_phi_angle_rad)*(180/np.pi), colorRange=[0, 180], 
+                            colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
+                            runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO)
 
 # plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
 #                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
