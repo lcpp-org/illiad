@@ -90,8 +90,10 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     """
     #p_XYZ = torch.tensor(p_XYZ).to(device)
     p_XYZ = p_XYZ.clone().detach().to(device)
+    
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
-    x, y, z = p_XYZ.T
+    #x, y, z = p_XYZ.T
+    x, y, z = p_XYZ.permute(*torch.arange(p_XYZ.ndim - 1, -1, -1))
     x2 = x*x
     y2 = y*y
     #z2 = z*z
@@ -251,17 +253,19 @@ def align_z_to_vector(v):
 
     Returns:
         np.ndarray: A 3x3 rotation matrix that rotates the z-axis to align with `v`.
-
-    Raises:
-        ValueError: If `v` is not a 3-element array.
-
-    Notes:
-        - If `v` is already aligned with the z-axis, the identity matrix is returned.
-        - If `v` is anti-aligned with the z-axis, a 180-degree rotation matrix is returned.
     """
-    # helper function to align the z-axis to a given vector
-    z_axis = np.array([0, 0, 1])
-    #v = v / np.linalg.norm(v)
+    # Helper function to align the z-axis to a given vector.
+    # This is used with surface normals; guard against zero / non-finite vectors.
+    z_axis = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+    if v.shape != (3,) or (not np.all(np.isfinite(v))):
+        return np.eye(3)
+
+    v_norm = np.linalg.norm(v)
+    if (not np.isfinite(v_norm)) or v_norm < 1e-15:
+        return np.eye(3)
+    v = v / v_norm
+
     if np.allclose(v, z_axis):
         return np.eye(3)
     if np.allclose(v, -z_axis):
@@ -270,7 +274,10 @@ def align_z_to_vector(v):
                          [ 0, -1,  0],
                          [ 0,  0,  1]])
     axis = np.cross(z_axis, v)
-    axis /= np.linalg.norm(axis)
+    axis_norm = np.linalg.norm(axis)
+    if (not np.isfinite(axis_norm)) or axis_norm < 1e-15:
+        return np.eye(3)
+    axis /= axis_norm
     angle = np.arccos(np.dot(z_axis, v))
     K = np.array([[0, -axis[2], axis[1]],
                   [axis[2], 0, -axis[0]],
