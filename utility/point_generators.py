@@ -91,6 +91,35 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         seedPts_0 = splev(theta_evals, fSurface_splineParms)
         derivs =  splev(theta_evals, fSurface_splineParms, der=1)
 
+        # Geometry-based surface normals (fallback when E-field normals are zero/invalid).
+        # LCFS in poloidal plane is parameterized by r(θ). In the cross-section (x,z):
+        #   x(θ) = r cosθ, z(θ) = r sinθ
+        # tangent t = d/dθ[x,z], normal n = [dz/dθ, -dx/dθ]. Choose outward via dot(n, e_r)>0.
+        r0 = np.asarray(seedPts_0, dtype=np.float64)
+        drdth = np.asarray(derivs, dtype=np.float64)
+        th = np.asarray(theta_evals, dtype=np.float64)
+        dx_dth = drdth * np.cos(th) - r0 * np.sin(th)
+        dz_dth = drdth * np.sin(th) + r0 * np.cos(th)
+        nx = dz_dth
+        nz = -dx_dth
+        # Enforce outward direction
+        erx = np.cos(th)
+        erz = np.sin(th)
+        outward = (nx * erx + nz * erz) >= 0
+        nx = np.where(outward, nx, -nx)
+        nz = np.where(outward, nz, -nz)
+        n2_norm = np.sqrt(nx * nx + nz * nz)
+        # Avoid divide-by-zero; will be handled at point-use if still degenerate
+        n2_norm = np.where(n2_norm > 0, n2_norm, 1.0)
+        nxu = nx / n2_norm
+        nzu = nz / n2_norm
+        # Rotate cross-section normal into XYZ at this phi (note sign convention matches RTP_to_XYZ)
+        geom_normals = np.stack([
+            nxu * np.cos(phi_rad),
+            (-1.0) * nxu * np.sin(phi_rad),
+            nzu,
+        ], axis=1)
+
         ## START FIGURE FOR PLOTTING
         fig = plt.figure()
         ax = fig.add_subplot(111, polar=True)
@@ -109,6 +138,9 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         plot_norm_rtp_REF = np.zeros((Ntheta, 3))
         outData = []
         outNormals = []
+        n_invalid_normals = 0
+        n_geom_fallback = 0
+        n_default_fallback = 0
         tensor_ind_XYZ = torch.zeros((Ntheta, 3), dtype=torch.float32, device=device)
         vec_norm = 1.0
 
@@ -130,11 +162,22 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
 
                 # HERE WE CAN GENERATE UNIT VECTOR NORMALS(in Cartesian)
                 if genNormals:
-                    output_ind_normal[i] = Efield.interpField(tensor_ind_XYZ[i], Cart=True).cpu().numpy()
-                    vec_norm_temp = np.linalg.norm(output_ind_normal[i])
-                    if vec_norm_temp != 0:
+                    vec = Efield.interpField(tensor_ind_XYZ[i], Cart=True).cpu().numpy()
+                    vec_norm_temp = np.linalg.norm(vec)
+                    if np.isfinite(vec_norm_temp) and vec_norm_temp > 0:
+                        output_ind_normal[i] = vec / vec_norm_temp
                         vec_norm = vec_norm_temp
-                    output_ind_normal[i] /= vec_norm
+                    else:
+                        # Direction undefined (E=0 or invalid). Fall back to geometry-based LCFS normal.
+                        g = geom_normals[i]
+                        g_norm = np.linalg.norm(g)
+                        if np.isfinite(g_norm) and g_norm > 0:
+                            output_ind_normal[i] = g / g_norm
+                            n_geom_fallback += 1
+                        else:
+                            output_ind_normal[i] = np.array([0.0, 0.0, 1.0])
+                            n_default_fallback += 1
+                        n_invalid_normals += 1
 
             ## PLOTTING THE SEED POINTS
             ax.plot(*output_ind_geo.T[:2], '--ok', linewidth=0.25, markersize=2)
@@ -143,6 +186,11 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
                 outNormals.extend(np.copy(output_ind_normal))
 
         if genNormals:
+            if n_invalid_normals > 0:
+                outputHandler.log.warning(
+                    f"{filename}: {n_invalid_normals}/{Ntheta*len(drList)} seed-point normals were zero/invalid at phi={phi_deg} deg; "
+                    f"using geometry fallback for {n_geom_fallback} and default [0,0,1] for {n_default_fallback}"
+                )
             # CONVERT NORMAL VECTORS TO RTP FOR PLOTTING
             for i in range(len(output_ind_normal)):
                 plot_norm_rtp[i] = RTP_XYZ_JAC(output_ind_geo[i], output_ind_normal[i], form='xyz2rtp')
@@ -251,11 +299,23 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     velocity_array *= initSpeeds[:, None]
 
     # ROTATE TO ALIGN POLE WITH NORMAL VECTOR
+    n_bad_normals = 0
     for i, normal in enumerate(normals_list):
-        Rotater = align_z_to_vector(normal)
+        normal = np.asarray(normal, dtype=np.float64)
+        if normal.shape != (3,) or (not np.all(np.isfinite(normal))) or np.linalg.norm(normal) < 1e-15:
+            Rotater = np.eye(3)
+            n_bad_normals += 1
+        else:
+            Rotater = align_z_to_vector(normal)
         start_idx = i * nparticles_per_emitter
         end_idx = start_idx + nparticles_per_emitter
         velocity_array[start_idx:end_idx] = velocity_array[start_idx:end_idx] @ Rotater.T
+
+    if n_bad_normals > 0:
+        outputHandler.log.warning(
+            f"generate_MB_velocities: {n_bad_normals}/{len(normals_list)} normals were zero/invalid; "
+            "skipped rotation (used identity) for those emitters"
+        )
 
     return velocity_array
 
