@@ -8,25 +8,10 @@ import matplotlib.cm as cm
 
 # import classes.class_outputHandler as out
 from classes.iohandler import IOHandler
-#from classes.mesh import *
 from classes.mesh import Mesh
 from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 from magnetic_fiel_function_fitter import Magnetic_function_fitter
 from sklearn.metrics import r2_score
-
-
-# #FIELD_FILE_TOR = 'input_files/It486_Ih000_Iv000_1p000_1p000_64bit.npy'
-# FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
-# FIELD_SCALE_TOR = 0.9448
-# INPUT_CURR_TOR = 3500. #486
-
-# #FIELD_FILE_HEL = 'input_files/It000_Ih900_Iv000_1p000_1p000_64bit.npy'
-# FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
-# FIELD_SCALE_HEL = 0.955 * FIELD_SCALE_TOR
-# INPUT_CURR_HEL = 0. #6300. #3150
-
-# ERRFIELD_MAG = 1.5654e-4 #[Tesla]
-# ERRFIELD_DIR_DEG = 271.5 #[degrees]
 
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 3.50 #[kA]
@@ -45,21 +30,11 @@ OUTPUT_FILE_NAME = '35000-IT_6300-IH_full_box'
 ## SET UP RUN DIRECTORY
 simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-
 ## DEFINE MESH AND LOAD FIELD
-# tor_mult_total = FIELD_SCALE_TOR * INPUT_CURR_TOR/1000.
-# hel_mult_total = FIELD_SCALE_HEL * INPUT_CURR_HEL/1000.
-# b_hidra = Mesh(R0=0.72, a=0.19)
-# b_hidra.loadCartesianField(FIELD_FILE_TOR, att_mult=tor_mult_total, errField=True )
-# b_hidra.addFieldPerturbation(FIELD_FILE_HEL, att_mult=hel_mult_total)
-# b_hidra.set_nonPer_errField(ERRFIELD_MAG, ERRFIELD_DIR_DEG*np.pi/180.)
-
 b_hidra = Mesh(R0=0.72, a=0.19)
 b_hidra.setErrorField()
 b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
 b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
-
-
 
 ## LOAD MESH OF DESIRED POINTS FROM CSV
 ## Data given in XYZ coords,
@@ -68,26 +43,26 @@ points_CADxyz = simIO.loadCSV(DATA_FILE)
 simIO.log.info(f'{points_CADxyz.shape=}')
 
 ## ROTATION TRANSFORM MATRIX:
-# Rotates the basis 180 CCW about Y-, then -18 about Z-axis
-phi_xform = -18
-cosphi_xform = np.cos(np.radians(phi_xform))
-sinphi_xform = np.sin(np.radians(phi_xform))
+# Rotates the basis 180 CCW about Y-, then -18deg about Z-axis
+phi_xform = np.radians(-18)
+cosphi_xform = np.cos(phi_xform)
+sinphi_xform = np.sin(phi_xform)
 xFormMatrix = np.array([[-cosphi_xform, -sinphi_xform, 0.0],
                        [-sinphi_xform,  cosphi_xform, 0.0],
                        [0.0,           0.0,          -1.0]])
 
 # Rotates the basis 27 degrees CW around the Z axis
-phi_plate = 27
-cosphi_plate = np.cos(np.radians(phi_plate))
-sinphi_plate = np.sin(np.radians(phi_plate))
+phi_plate = np.radians(27)
+cosphi_plate = np.cos(phi_plate)
+sinphi_plate = np.sin(phi_plate)
 plateMatrix = np.array([[cosphi_plate,  sinphi_plate,  0.0],
                         [-sinphi_plate,  cosphi_plate,   0.0],
                         [0.0,                    0.0,   1.0]])
 
 #inclination of the plate, high at the high field side and low at the low field side
-theta_plate=5
-costheta_plate = np.cos(np.radians(theta_plate))
-sintheta_plate = np.sin(np.radians(theta_plate))
+theta_plate = np.radians(5)
+costheta_plate = np.cos(theta_plate)
+sintheta_plate = np.sin(theta_plate)
 thetaMatrix = np.array([[costheta_plate, 0, sintheta_plate],
                         [0, 1, 0],
                         [-sintheta_plate, 0, costheta_plate]])
@@ -115,11 +90,8 @@ for i, point_cad in enumerate(points_CADxyz):
     fields_FLUIDxyz[i] = np.dot(thetaMatrix, fields_PLATExyz[i])
 #print(f'{points_SIMxyz[:, 0]=}')
 
-
-#save output as a csv with header x,y,z,bx,by,bz anddata from points_CADxyz and fields_CADxyz
-#output_data = np.hstack((points_CADxyz, fields_CADxyz))
+#save output as a csv with header x,y,z,bx,by,bz and data from points_CADxyz and fields_PLATExyz
 output_data = np.hstack((points_CADxyz, fields_PLATExyz))
-#np.savetxt(OUTPUT_FILE_NAME+'.csv', output_data, delimiter=',', header='x,y,z,bx,by,bz', comments='')
 simIO.saveCSV(output_data, OUTPUT_FILE_NAME+'.csv', header='x,y,z,bx,by,bz')
 
 def fit():
@@ -132,7 +104,7 @@ def fit():
         cart_cord, X_poly, fit_coeffs = test.fitter(deg, i)
         #test.fit_tester(fit_bx, i)
         print(f"The R2 score is {r2_score(np.dot(X_poly, fit_coeffs), test.magnetic_data[i]):0.5f}")
-        #BFit.append(fit_b)     
+        #BFit.append(fit_b)
         BFit.append(np.dot(X_poly, fit_coeffs))
         print(f"Equation for {i}: {fit_coeffs[0]:0.2e} + {fit_coeffs[1]:0.2e}(x+x0) + {fit_coeffs[2]:0.2e}(y+y0) + {fit_coeffs[3]:0.2e}(z+z0) + {fit_coeffs[4]:0.2e}(x+x0)^2 + {fit_coeffs[5]:0.2e}(x+x0)(y+y0) + {fit_coeffs[6]:0.2e}(x+x0)(z+z0) + {fit_coeffs[7]:0.2e}(y+y0)^2 + {fit_coeffs[8]:0.2e}(y+y0)(z+z0) + {fit_coeffs[9]:0.2e}(z+z0)^2")
     BFit = np.array(BFit)
@@ -146,7 +118,6 @@ def points():
     sc = ax.scatter(*points_CADxyz.T, c=np.linalg.norm(fields_CADxyz, axis=1), cmap='viridis', marker='o')
     #Overall B Strength
     #sc = ax.scatter(*points_CADxyz.T, c=np.abs((np.linalg.norm(fields_CADxyz, axis=1)-np.linalg.norm(BFit.T, axis=1))/np.linalg.norm(fields_CADxyz, axis=1)), cmap='viridis', marker='o')
-    
     #sc = ax.scatter(*points_CADxyz.T, c=np.abs((fields_CADxyz[:, 2]-BFit[2])/np.linalg.norm(fields_CADxyz, axis=1)), cmap='viridis', marker='o')
     xs = np.linspace(-720, 720, 1000)
     ax.plot(xs, np.sqrt(720**2 - xs**2))
@@ -177,11 +148,7 @@ def vectors():
     norm.autoscale(magnitudes)
     colors = colormap(norm(magnitudes))
 
-    
-        
-    
     # plot the points in 3D, with the vectors pointing in the direction of the B-field
-    
     zpoints = 1
     for j in range(zpoints):
         slice_FLUIDxyz = points_FLUIDxyz[j::zpoints]
@@ -230,14 +197,6 @@ def vectors():
 
 """
 df = pd.read_csv(f"output/{OUTPUT_DIRECTORY_NAME}/data/{OUTPUT_FILE_NAME}.csv")
-
-
-
-
-
-
-
-
 
 
 #BFit = (np.array(BFit).T).tolist()

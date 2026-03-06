@@ -18,21 +18,21 @@ def rlp_data_loader(root=None):
         "6140": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 12.0, "COND": "iota3_rev"},
         "6139": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
         "6138": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
-        "6137": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
+        "6137": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"}, #12
         "6136": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 12.0, "COND": "iota4_rev"},
         "6135": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 14.0, "COND": "iota4_rev"},
         "6134": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0, "COND": "iota4_rev"},
         "6133": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0, "COND": "iota4_rev"},
-        "6132": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
-        "6131": {"I_Hel": 1580, "I_Tor": 972, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "n/a"},
+        #"6132": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
+       # "6131": {"I_Hel": 1580, "I_Tor": 972, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "n/a"},
         "6130": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "iota4_dflt"},
         "6129": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 14.0, "COND": "iota4_dflt"},
         "6128": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 12.0, "COND": "iota4_dflt"},
-        "6127": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": None, "COND": "n/a"},
-        "6126": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 12.0, "COND": "iota3_dflt"},
+        "6126": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": None, "COND": "n/a"}, #12
         "6125": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 12.0, "COND": "iota3_dflt"},
         "6124": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 18.0, "COND": "iota3_dflt"},
         "6123": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "iota3_dflt"},
+        "6122": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "iota3_dflt"},
     }
     SHOT_RE = re.compile(r"(\d{4})")
     REP_RE = re.compile(r"_(\d+)\.[Cc][Ss][Vv]$")
@@ -64,7 +64,8 @@ def rlp_data_loader(root=None):
 
         # If start is unknown, keep total distance as NaN
         df[TOTAL_POS_COL] = df[POS_COL] + float(start) if start is not None else np.nan
-        df[TOTAL_POS_COL] =  df[TOTAL_POS_COL] - 4.0  # adjust for something
+        # RLP 'starting position' in shot summary in NOT the same as the position in the CSV files (-4 cm)
+        df[TOTAL_POS_COL] =  df[TOTAL_POS_COL] - 4.0
 
         return df[[TOTAL_POS_COL, NE_COL, "Shot", "COND", "StartPos_cm"]]
 
@@ -126,7 +127,7 @@ def main():
         iota4_dflt_profile[i] = psi_iota4_dflt.interpScalarField(rtp_point, Cart=False)[0]
         iota4_rev_profile[i] = psi_iota4_rev.interpScalarField(rtp_point, Cart=False)[0]
 
-    # plotting
+    # Loop through each set of coil conditione/currents
     for cond in CONDITIONS:
         if cond == 'iota3_dflt':
             this_profile = iota3_dflt_profile
@@ -150,22 +151,25 @@ def main():
         plt.figure()
         for shot, shot_df in this_data.groupby("Shot"):
             shot_df = shot_df.sort_values(TOTAL_POS_COL)
-            pos = shot_df[TOTAL_POS_COL].to_numpy()
+            position = shot_df[TOTAL_POS_COL].to_numpy()
             ne = shot_df[NE_COL].to_numpy()
-            plt.plot(pos, ne, ':x', color='lightgrey', markersize=2.0, linewidth=0.5, label=f'RLP Data (Shot {shot})')
-            
-            p = Polynomial.fit(pos, ne, 9)
-            ne_fit = p(pos)
-            plt.plot(pos, ne_fit, linewidth=1, label=f'Poly Fit (Shot {shot})')
+            # plot measurement data
+            plt.plot(position, ne, ':x', color='lightgrey', markersize=2.0, linewidth=0.5, label=f'RLP Data (Shot {shot})')
+            # plot polynomial fit to measurement data
+            polyfit = Polynomial.fit(position, ne, 7)
+            ne_data_fit = polyfit(position)
+            plt.plot(position, ne_data_fit, linewidth=1, label=f'Poly Fit (Shot {shot})')
 
-            peak_ne = max(peak_ne, float(np.max(ne_fit)))
-
+            peak_ne = max(peak_ne, float(np.max(ne_data_fit)))
+        # scale prediction to peak data and plot 
         print(f'{peak_ne=}')
         scaled_profile = reshaped_psi * peak_ne
         plt.plot(DIST_PLOT * 100, scaled_profile, ':b', linewidth=1.5, label=this_label)
 
-        plt.xticks(np.arange(0, 39, 2))
+        plt.xticks(np.arange(1, 38, 2))
+        plt.xlim(0, 38)        
         plt.xlabel('Distance from Outer Wall [cm]', fontsize=10)
+
         plt.ylabel('$n_e$ [m$^{-3}$]', fontsize=10)
         plt.legend(loc='upper right', fontsize=8)
         plt.grid(which='both')
@@ -180,8 +184,8 @@ if __name__ == "__main__":
     NE_COL = "ne (m-3)"
     TOTAL_POS_COL = "Total distance (cm)"
 
-    INPUT_ALPHA =1.0 # manual value of alpha psi profile scaling exponent
-    OUTPUT_DIRECTORY_NAME = "RLP_FITTING_ALL"
-    TAG = 'alpha1p0'
+    INPUT_ALPHA = 0.85 # manual value of alpha psi profile scaling exponent
+    OUTPUT_DIRECTORY_NAME = "RLP_FITTING_ALL_CORRECTED"
+    TAG = 'alpha0p85'
 
     main()

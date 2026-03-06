@@ -13,7 +13,7 @@ from utility.coordtrans import RTP_XYZ_JAC
 
 def main():
     ## SET UP RUN DIRECTORY (DATA AND PLOTS *WILL* BE OVERWRITTEN IF DIR ALREADY EXISTS!!)
-    simIO = out.IOHandler("REVERSED_HELICAL_CURRENT")
+    simIO = out.IOHandler("BFIELD_VALIDATION_PLOTS")
     simIO.startLog()
     anlys_dir = 'It486_Ih900_Iv000'
     simIO.createSubDir(anlys_dir)
@@ -296,6 +296,25 @@ def main():
     simIO.saveFig(plot_name)
 
 
+    fig = plt.figure()
+    fig.suptitle(plot_title+'\n'+resultString, fontsize=4)
+    axSolo = fig.add_subplot()
+    axSolo.plot(PHI_PLOT, np.sqrt( B_rtp_ideal[:,0]**2 + B_rtp_ideal[:,1]**2 + B_rtp_ideal[:,2]**2), '--b', label='Ideal B-field (on-axis)', zorder=4)
+    axSolo.plot(PHI_PLOT, np.sqrt( B_rtp[:,0]**2 + B_rtp[:,1]**2 + B_rtp[:,2]**2), 'b', label='w/ fitted error field (on-axis)', zorder=5)
+    axSolo.plot(PHI_PLOT, np.sqrt( B_rtp_plus[:,0]**2 + B_rtp_plus[:,1]**2 + B_rtp_plus[:,2]**2), 'g', label='w/ fitted error field (10cm LF)', zorder=5)
+    #ax1.plot(PHI_PLOT, np.sqrt( B_rtp_HF[:,0]**2 + B_rtp_HF[:,1]**2 + B_rtp_HF[:,2]**2), 'r', label='With fitted error field (10cm HF)', zorder=5)
+    axSolo.errorbar( np.degrees(ind_measured[:,1]), dep_measured, yerr=sigma_fitPts,
+                  fmt='s', markersize=0.0, color='k', capsize=2, ecolor='k', zorder=5, label='Measurements')
+    axSolo.set_ylabel('$|\mathbf{B}|\:[G]$')
+    axSolo.grid(which='both')
+    axSolo.legend(loc='upper left', fontsize=6, ncol=2)
+
+    axSolo.set_xlim(0, 360)
+    axSolo.set_xticks(np.arange(0, 361, 90))
+    #axSolo.xaxis.set_major_formatter(StrMethodFormatter(u"$\\mathbf{{{x:.0f}°}}$"))
+    axSolo.set_xticklabels([])
+    simIO.saveFig('solo_' + plot_name)
+    
     '''UNUSED FUNCTIONS
     def return_Btor(independents, errMag=0.0, errDir=0.0, torMult=1.0, helMult=1.0):
         a_phi =  162. *np.pi/180. # assuming phi_c = 0 @ 18deg CW from South Split, #a_phi =   18., 90.,  -54.,  -126.,
