@@ -61,10 +61,8 @@ def main():
     tau_coll_ne17_z2He_ms = 1e3 / f_coll_ne17_z2He
 
     # extract the value of tau_coll_ne18_ms at Ti = 2 eV
-
     typical_ionTemp_lo = 1.0 # eV
     typical_ionTemp_hi = 7.0 # eV
-
 
     tau_coll_lo = tau_coll_ne18_ms[np.argmin(np.abs(Ti_ev - typical_ionTemp_lo))]
     print(f'Collision time at Ti={typical_ionTemp_lo} eV and ne=1e18 m^-3: {tau_coll_lo:.2e} ms')
@@ -73,6 +71,7 @@ def main():
     tau_coll_hi = tau_coll_ne17_ms[np.argmin(np.abs(Ti_ev - typical_ionTemp_hi))]
     print(f'Collision time at Ti={typical_ionTemp_hi} eV and ne=1e17 m^-3: {tau_coll_hi:.2e} ms')
     print(f'Collision frequency at Ti={typical_ionTemp_hi} eV and ne=1e17 m^-3: {f_coll_ne17[np.argmin(np.abs(Ti_ev - typical_ionTemp_hi))]:.2e} s^-1')
+
 
     plt.figure()
     plt.plot(Ti_ev, tau_coll_ne18_ms, marker='none', linewidth=2,
