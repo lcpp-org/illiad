@@ -56,7 +56,7 @@ def main():
     sim_IN = IOHandler(INPUT_DIR_NAME)
 
     # ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-    plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=IC_filename+TAGOUT, simIO=simIO, sim_in=sim_IN)
+    plotFuncs.boris_plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=IC_filename+TAGOUT, simIO=simIO, sim_in=sim_IN)
 
 
 
