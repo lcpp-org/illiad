@@ -15,7 +15,7 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from utility.coordtrans import XYZ_to_RTP, RTP_XYZ_JAC#, RTP_to_XYZ
-from plot_funcs import plotFuncs
+#from plot_funcs import plotFuncs
 
 
 class Boris():
@@ -32,7 +32,11 @@ class Boris():
         for name in dir(plotFuncs):
                     func = getattr(plotFuncs, name)
                     if callable(func) and not name.startswith("__"):
-                        setattr(self, name, func)  # Attach to the instance
+                        if name.startswith("global_"):
+                            new_name = name.replace("global_", "")  # Remove prefix
+                        elif name.startswith("boris_"):
+                            new_name = name.replace("boris_", "")  # Remove prefix
+                            setattr(self, new_name, func)  # Attach to the instance with the new name
 
         self.IO = io_handler
         self.anlys_name = anlys_name

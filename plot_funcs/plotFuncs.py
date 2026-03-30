@@ -16,7 +16,7 @@ UIUC = {
     }
 
 ## PORT PLOTTING CONVENIENCE FUNCTION
-def plotPorts(ax_, simIO):
+def global_plotPorts(ax_, simIO):
     """Plots the ports on the given axis."""
     # Import data on HIDRA port size/locations for plotting
     ports = simIO.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
@@ -25,7 +25,7 @@ def plotPorts(ax_, simIO):
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
 
-def plotWallHist(wallPtArray, runString, simIO):
+def boris_plotWallHist(wallPtArray, runString, simIO):
     """ Plots a histogram of wall intersection points from the simulation."""
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
 
@@ -90,7 +90,7 @@ def plotWallHist(wallPtArray, runString, simIO):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
+def boris_plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
     """Plots the discrete wall intersection points from the simulation."""
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
@@ -135,7 +135,7 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=Non
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
+def boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     """Plots the discrete wall intersection points in 3D."""
     #log = logging.getLogger()
     #simIO.log.info('Attempting 3D plot...')
@@ -204,9 +204,9 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     plt.close()
     #plt.show()
 
-#def plotInitEnergies(init_file, mass, runString='default', simIO=None):
-#def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
-def plotInitEnergies(init_file, mass, runString='default', simIO=None):
+#def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
+#def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
+def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
@@ -254,7 +254,7 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
+def boris_plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     """Plots the final energy distribution of particles."""
     ## create a 1d histogram of initial energies using numpy hist
     counts, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
@@ -297,7 +297,7 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotDepoAngles(angle_array, runString='default', simIO=None):
+def boris_plotDepoAngles(angle_array, runString='default', simIO=None):
     """Plots the distribution of deposition angles from the simulation."""
     plt.figure()
     plt.grid(which='both', zorder=0)
@@ -315,7 +315,7 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
+def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
     """Plots the combined 2D histogram and 1D statistical distribution of the given data."""
     plt.rcParams.update({'font.size': 6})
     #plt.rcParams.update({'figure.autolayout':True})
@@ -390,7 +390,7 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
+def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     """Plots the percent of particles running over time."""
     # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
 
@@ -444,7 +444,7 @@ def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='defaul
                    .format(plotname, tau_res*1000, tau_res_corr*1000, slope))
     plt.close()
 
-def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
+def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
     """Plots a combined histogram of wall intersection points and the percent of particles running over time."""
     simIO.log.info('Plotting Combined Histogram...')
 
@@ -557,7 +557,7 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
+def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     """Plots the ion traces in 3D."""
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -604,7 +604,7 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
+def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
     """Plots the ion traces in polar coordinates (Poincare plot)."""
     print('ion_traces shape:', ion_traces.shape)
     fig = plt.figure()
