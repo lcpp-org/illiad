@@ -222,8 +222,8 @@ def main():
         "axes.titlesize": 10,
         "axes.labelsize": 12,
         "axes.labelweight": "bold",
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
         "lines.linewidth": 1.0,
     })
 
@@ -313,8 +313,8 @@ def main():
     r0_fit, = axSolo.plot(PHI_PLOT, np.sqrt( B_rtp[:,0]**2 + B_rtp[:,1]**2 + B_rtp[:,2]**2),
                            'b', label='w/ scalars & $\mathbf{B}_{err}$', zorder=5)
     r0_data = axSolo.errorbar( np.degrees(ind_measured[i_r0_points,1]), dep_measured[i_r0_points], yerr=sigma_measured[i_r0_points],
-                                fmt='o', markersize=2, color='k', fillstyle='none',
-                                capsize=2, ecolor='k', zorder=5, label='Measurements')
+                                fmt='s', markersize=2, color='k', fillstyle='none',
+                                capsize=3, ecolor='k', zorder=5, label='Measurements')
 
     axSolo.set_xlabel('$\phi \: [ \degree CW\,from\:North\:Split] $')
     axSolo.set_ylabel('$\| \mathbf{B} \| \:[G]$')
@@ -337,8 +337,8 @@ def main():
     lf_fit, = axSolo.plot(PHI_PLOT, np.sqrt( B_rtp_LF[:,0]**2 + B_rtp_LF[:,1]**2 + B_rtp_LF[:,2]**2),
                            'g', label='w/ scalars & $\mathbf{B}_{err}$', zorder=5)
     lf_data = axSolo.errorbar( np.degrees(ind_measured[i_lf_points,1]), dep_measured[i_lf_points], yerr=sigma_measured[i_lf_points],
-                                fmt='o', markersize=2, color='k', fillstyle='none',
-                                capsize=2, ecolor='k', zorder=5, label='Measurements')
+                                fmt='s', markersize=2, color='k', fillstyle='none',
+                                capsize=3, ecolor='k', zorder=5, label='Measurements')
 
     axSolo.set_xlabel('$\phi \: [ \degree CW\,from\:North\:Split] $')
     axSolo.set_ylabel('$\| \mathbf{B} \| \:[G]$')
