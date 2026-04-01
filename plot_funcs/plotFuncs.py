@@ -62,7 +62,7 @@ def boris_plotWallHist(wallPtArray, runString, simIO):
     ax = fig.add_subplot(polar=False, aspect=0.2)
 
     plt.grid(which='both', linewidth=0.25)
-    plotPorts(ax, simIO)
+    global_plotPorts(ax, simIO)
 
     plt.imshow( H, interpolation='nearest', origin='lower',
                 extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
@@ -97,7 +97,7 @@ def boris_plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRan
     #plt.rcParams.update({'figure.autolayout':True})
     fig = plt.figure()
     ax = fig.add_subplot(polar=False, aspect=0.2)
-    plotPorts(ax, simIO)
+    global_plotPorts(ax, simIO)
 
     # plot wall event locations
     #plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
@@ -204,8 +204,6 @@ def boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, sim
     plt.close()
     #plt.show()
 
-#def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
-#def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
 def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
@@ -338,7 +336,7 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
     axWall.set_aspect(0.2)  # height/width
 
     axDist = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
-    plotPorts(axWall, simIO)
+    global_plotPorts(axWall, simIO)
 
     if colorRange is None:
         colorRange = np.array([0, 3*np.mean(data)])  # default color range if not provided
@@ -503,7 +501,7 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
     fig = plt.figure(figsize=(24, 4))
     axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
     axWall.set_aspect(0.2)  # height/width
-    plotPorts(axWall, simIO)
+    global_plotPorts(axWall, simIO)
     # axRight = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
 
     axWall.imshow( H, interpolation='nearest', origin='lower',
@@ -631,3 +629,45 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
     #plt.show()
+
+# POINCARE PLOT FUNCTIONS:
+def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None):
+    """Plots a black and white Poincare plot of the magnetic field lines."""
+
+    rho_max = b_hidra.a
+    num_sets = len(radtheta_pts)
+
+    plt.rcParams.update({'font.size': 10})
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, polar=True)
+    for i in range(num_sets):
+        plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
+                     marker='.', s=1.00, c='k', linewidths=0.0)
+    ax.set_rmax(rho_max)
+    # ax.set_rticks(np.arange(0.0, rho_max, 0.02))
+    # ax.yaxis.set_tick_params(labelsize=5)
+    ax.grid(linewidth = 0.25, linestyle=':', c='k')
+ 
+    ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
+                labels=['', '', '', '', '', '', ''], angle=0, fontsize=4)
+
+    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
+                    #labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=12)
+                    labels=['', '', '', '', '', '', '', ''], fontsize=12)
+
+    #ax.grid(False)
+
+
+    phi_phys_deg = (phi_deg + 198.) % 360.
+    phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
+    phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
+    #ax.set_title(phi_phy_string + phy_comp_string, loc='left')
+
+    plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
+    plt.tight_layout()
+    simIO.saveFig(plot_name, dpi=400)
+    plt.close(fig)
+    #del fig, ax, radtheta_pts, xyz_list
+    #gc.collect()
+
+    simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
