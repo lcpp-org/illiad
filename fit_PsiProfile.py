@@ -19,10 +19,10 @@ def rlp_data_loader(root=None):
         "6139": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
         "6138": {"I_Hel": 900,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
         "6137": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"}, #12
-        "6136": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 12.0+1, "COND": "iota4_rev"},
-        "6135": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 14.0+1, "COND": "iota4_rev"},
-        "6134": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0+1, "COND": "iota4_rev"},
-        "6133": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0+1, "COND": "iota4_rev"},
+        "6136": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 12.0, "COND": "iota4_rev"},
+        "6135": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 14.0, "COND": "iota4_rev"},
+        "6134": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0, "COND": "iota4_rev"},
+        "6133": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": 16.0, "COND": "iota4_rev"},
         #"6132": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "REV", "StartPos_cm": None, "COND": "n/a"},
        # "6131": {"I_Hel": 1580, "I_Tor": 972, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "n/a"},
         "6130": {"I_Hel": 790,  "I_Tor": 486, "FWD_REV": "FWD", "StartPos_cm": 16.0, "COND": "iota4_dflt"},
@@ -87,6 +87,16 @@ def rlp_data_loader(root=None):
 
     return total_dataframe
 
+###
+def profile_shaper(dist, original_profile, scaling_factor, alpha):
+    """Apply shaping to the original profile based on distance, scaling factor, and alpha parameter.
+    The shaping is designed to create a smooth transition from the original profile to a scaled version of the profile, with an exponential decay outside of the LCFS.
+    """
+    # Find the index of the LCFS (where profile first becomes positive)
+    i_lcfs = np.where(original_profile > 0.0)[0]
+    if i_lcfs.size > 0:
+        i_lcfs = i_lcfs[0] 
+
 
 def main():
     ## SET UP RUN DIRECTORY AND LOGGING
@@ -131,28 +141,24 @@ def main():
     for cond in CONDITIONS:
         if cond == 'iota3_dflt':
             this_profile = iota3_dflt_profile
-            #this_label = 'iota3_dflt Psi Profile'
-            this_label = 'Sim Profile: $\iota=\\frac{1}{3}$'
+            this_label = 'iota3_dflt Psi Profile'
         elif cond == 'iota3_rev':
             this_profile = iota3_rev_profile
-            #this_label = 'iota3_rev Psi Profile'
-            this_label = 'Sim Profile: $\iota=\\frac{1}{3}(reversed)$'
+            this_label = 'iota3_rev Psi Profile'
         elif cond == 'iota4_dflt':
             this_profile = iota4_dflt_profile
-            #this_label = 'iota4_dflt Psi Profile'
-            this_label = 'Sim Profile: $\iota=\\frac{1}{4}$'
+            this_label = 'iota4_dflt Psi Profile'
         elif cond == 'iota4_rev':
             this_profile = iota4_rev_profile
-            #this_label = 'iota4_rev Psi Profile'
-            this_label = 'Sim Profile: $\iota=1/4~(reversed)$'
+            this_label = 'iota4_rev Psi Profile'
 
         # add exponential decay to profile outside of LCFS and smooth transition to inside of LCFS
         i_lcfs = np.where(this_profile>0.0)[0]
         if i_lcfs.size > 0:
             i_lcfs = i_lcfs[0]
         lcfs_distance = DIST_PLOT[i_lcfs]
-        this_profile[i_lcfs:] = 0.15 + 0.85*this_profile[i_lcfs:]
-        this_profile[:i_lcfs] = 0.15 * np.exp(-15*(lcfs_distance - DIST_PLOT[:i_lcfs])/lcfs_distance)
+        this_profile[i_lcfs:] = 0.1 + 0.9*this_profile[i_lcfs:]
+        this_profile[:i_lcfs] = 0.1 * np.exp(-20*(lcfs_distance - DIST_PLOT[:i_lcfs])/lcfs_distance)
 
         # Use ALPHA (shpaing parameter) to adjust how peaked the profile is, and scale to peak data value
         peak_ne = 1.0
@@ -160,104 +166,88 @@ def main():
         #print(f'{reshaped_psi=}' )
         this_data = ALL_RLP_DATA[ALL_RLP_DATA['COND'] == cond]
 
-        plt.figure()
         # Loop through each Shot within this condition
-        first_flag = True
         for shot, shot_df in this_data.groupby("Shot"):
-            #plt.figure()
+            plt.figure()
             shot_df = shot_df.sort_values(TOTAL_POS_COL)
             position = shot_df[TOTAL_POS_COL].to_numpy()
             ne = shot_df[NE_COL].to_numpy()
             
+            ## Plot measurement data
+            plt.plot(position, ne, 'o', color='k', markersize=2.0, linewidth=1, label=f'RLP Data (Shot {shot})')
+            
+
             # Fit poly to measurement data
             polyfit_order = 7
             polyfit = Polynomial.fit(position, ne, polyfit_order)
             ne_data_fit = polyfit(position)
-            peak_ne = max(peak_ne, float(np.max(ne_data_fit)))
-
             # Smooth x-grid for plotting the fitted curve and confidence band
             x_plot = np.linspace(np.min(position), np.max(position), 300)
-
             # Bootstrap confidence interval
             n_boot = 1000   # increase if you want a smoother CI
             boot_curves = []
+            position = np.asarray(position)
+            ne = np.asarray(ne)
             for _ in range(n_boot):
                 # Resample indices with replacement, fit polynomial to bootstrap sample
                 idx = np.random.choice(len(position), size=len(position), replace=True)
                 boot_fit = Polynomial.fit(position[idx], ne[idx], polyfit_order)
                 boot_curves.append(boot_fit(x_plot))
-
             boot_curves = np.array(boot_curves)
             # 95% bootstrap confidence interval
-            ne_lower = np.percentile(boot_curves, 2.5, axis=0)
-            ne_upper = np.percentile(boot_curves, 97.5, axis=0)
+            ne_lower = np.percentile(boot_curves, 0.001, axis=0)
+            ne_upper = np.percentile(boot_curves, 99.999, axis=0)
 
-
-            ### Plot measurement data
-            #plt.plot(position, ne, 'o', markersize=2.0, linewidth=1, label=f'RLP Data (Shot {shot})')
-            ## PLOT polyfit
             #plt.plot(position, ne_data_fit, '-g', linewidth=1.5, label=f'Poly Fit (Shot {shot})')
-            ## PLOT CI
-            if first_flag:
-                plt.fill_between(x_plot, ne_lower, ne_upper,
-                    color='gray', alpha=0.5, label='95% CI', zorder=1)
-            else:
-                plt.fill_between(x_plot, ne_lower, ne_upper,
-                    color='gray', alpha=0.5, zorder=1)
-                
-            ## Plot measurement data
-            plt.plot(position, ne, 'o', markersize=2.0, linewidth=1, label=f'RLP Data (Shot #{shot})')
+            plt.fill_between(x_plot, ne_lower, ne_upper,
+                color='green', alpha=0.5, label='95% Bootstrap CI', zorder=1)
 
-            first_flag = False
-            if PLOT_SINGLE_SHOTS:
-                # plot sim data
-                peak_ne = max(peak_ne, float(np.max(ne_data_fit)))
-                scaled_profile = reshaped_psi * peak_ne
-                plt.plot(DIST_PLOT * 100, scaled_profile, '-b', linewidth=1.5, label=this_label)
-                plt.xlim(0, 26)
-                plt.xticks(np.arange(1, 26, 2))
-                plt.xlabel('Distance from Outer Wall [cm]', fontsize=12)
 
-                plt.ylabel('$n_e~[m^{-3}$]', fontsize=12)
-                plt.legend(loc='upper left', fontsize=12)
-                plt.grid(which='both')
-                plt.tick_params(axis='both', labelsize=12)
-                #plt.show()
-                simIO.saveFig(cond+'_'+shot+'_' + TAG + '_psi_profile.png', dpi=300)
-        ## PLOT CI
-        # plt.fill_between(x_plot, ne_lower, ne_upper,
-        #         color='gray', alpha=0.5, label='95% Bootstrap CI')#, zorder=1)
+            # plot sim data
+            peak_ne = max(peak_ne, float(np.max(ne_data_fit)))
+            scaled_profile = reshaped_psi * peak_ne
+            plt.plot(DIST_PLOT * 100, scaled_profile, '-b', linewidth=1.5, label=this_label)
+            plt.xlim(0, 26)
+            plt.xticks(np.arange(1, 26, 2))
+   
+            plt.xlabel('Distance from Outer Wall [cm]', fontsize=12)
+
+            plt.ylabel('$n_e~[m^{-3}$]', fontsize=12)
+            plt.legend(loc='upper left', fontsize=12)
+            plt.grid(which='both')
+            plt.tick_params(axis='both', labelsize=12)
+            #plt.show()
+            simIO.saveFig(cond+'_'+shot+'_' + TAG + '_psi_profile.png', dpi=300)
+
 
         # scale prediction to peak data and plot 
-        # peak_ne = max(peak_ne, float(np.max(ne_data_fit)))
         print(f'{peak_ne=}')
-        scaled_profile = reshaped_psi * (peak_ne * 0.975)
-        plt.plot(DIST_PLOT * 100, scaled_profile, 'b', linewidth=2, label=this_label)
+        # scaled_profile = reshaped_psi * peak_ne
+        # plt.plot(DIST_PLOT * 100, scaled_profile, ':b', linewidth=1.5, label=this_label)
 
-        plt.xticks(np.arange(1, 24, 2))
-        plt.xlim(8, 24)        
-        plt.xlabel('Distance from Outer Wall [cm]', fontsize=12)
-        plt.ylim(0,8e17)
-        plt.ylabel('$n_e$ [m$^{-3}$]', fontsize=12)
-        plt.legend(loc='upper left', fontsize=10)
-        plt.grid(which='both')
-        plt.tick_params(axis='both', labelsize=12)
-        simIO.saveFig(cond + '_' + TAG + '_psi_profile.png', dpi=300)
+        # plt.xticks(np.arange(1, 38, 2))
+        # plt.xlim(0, 38)        
+        # plt.xlabel('Distance from Outer Wall [cm]', fontsize=10)
+
+        # plt.ylabel('$n_e$ [m$^{-3}$]', fontsize=10)
+        # plt.legend(loc='upper right', fontsize=8)
+        # plt.grid(which='both')
+        # plt.tick_params(axis='both', labelsize=8)
+        # simIO.saveFig(cond + '_' + TAG + '_psi_profile.png', dpi=300)
+
 
 
 if __name__ == "__main__":
     ## SET SIMULATION INPUTS:
-    CONDITIONS = ['iota3_dflt', 'iota3_rev', 'iota4_dflt', 'iota4_rev']
-    #CONDITIONS = ['iota3_dflt', 'iota4_dflt']
+    #CONDITIONS = ['iota3_dflt', 'iota3_rev', 'iota4_dflt', 'iota4_rev']
+    CONDITIONS = ['iota3_dflt', 'iota4_dflt']
     DATA_PATH = Path("input_files") / "RLP_Results"
     POS_COL = "Position (cm)"
     NE_COL = "ne (m-3)"
     TOTAL_POS_COL = "Total distance (cm)"
 
-    INPUT_ALPHA = 0.80 # manual value of alpha psi profile scaling exponent
+    INPUT_ALPHA = 1.0 # manual value of alpha psi profile scaling exponent
     OUTPUT_DIRECTORY_NAME = "RLP_FITTING_ALL_CORRECTED"
-    TAG = 'ALPHA0p80'
-
-    PLOT_SINGLE_SHOTS = False
+    TAG = 'ALPHA1p0'
 
     main()

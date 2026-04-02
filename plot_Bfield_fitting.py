@@ -134,7 +134,6 @@ def main():
     simIO.log.info('ind_measured: {}'.format(ind_measured[i_fitpoints]))
     simIO.log.info('dep_measured: {}'.format(dep_measured[i_fitpoints]))
 
-    ##########
     ## FITTING
     ##########
     # initial guesses
@@ -155,31 +154,25 @@ def main():
     popt, pcov = curve_fit(return_Bnorm, ind_measured[i_fitpoints], dep_measured[i_fitpoints],
                     sigma=sigma_measured[i_fitpoints], absolute_sigma=True,
                     p0=[mag_guess, dir_guess, s_tor_guess, s_hel_guess], 
-                    bounds=( [5e-5,   0.0, 0.80, 0.90],# 
-                             [1.5646e-4, 2.*np.pi, 0.9448, 1.0] ),
+                    bounds=([5e-5,   0.0, 0.80, 0.90],
+                            [1.5646e-4, 2.*np.pi, 0.9448, 1.0]),
                     max_nfev=1e4, method='dogbox', x_scale=[1e-4, 1, 1e-1, 1e-1]) #'dogbox'
 
     # FITTED VALUES
-    # calc_errMag = 1.5654e-4 #popt[0] 
-    # #calc_errDir = (271.5 + 162.) % 360.  #popt[1]
-    # calc_errDir = 271.5 * np.pi/180.  #popt[1]
-    # calc_errDir_deg = calc_errDir*180./np.pi # convert to degrees
-    # calc_torMult = 0.9448 #popt[2]
-    # calc_helMult = 1.0 * 0.9448 #popt[2] # popt[3]
-
-    # FITTED VALUES
+    # calc_errMag = 1.5654e-4 #popt[0] # calc_errDir = 271.5 * np.pi/180.  #popt[1]# calc_errDir_deg = calc_errDir*180./np.pi # convert to degrees
+    # # calc_torMult = 0.9448 #popt[2]# calc_helMult = 1.0 * 0.9448 #popt[2] # popt[3]
     calc_errMag = popt[0] 
     calc_errDir = popt[1]
-    calc_errDir_deg = calc_errDir*180./np.pi # convert to degrees
     calc_torMult = popt[2]
     calc_helMult = popt[3]
+    calc_errDir_deg = calc_errDir*180./np.pi # convert to degrees
 
     perr = np.sqrt(np.diag(pcov))   
     condition_num = np.linalg.cond(pcov)
 
     simIO.log.info('\n** RESULTS ** :')
     simIO.log.info('calc_errMag: {}'.format(calc_errMag))
-    simIO.log.info('calc_errDir: {}'.format(calc_errDir*180./np.pi ))    
+    simIO.log.info('calc_errDir: {}'.format(calc_errDir_deg))
     simIO.log.info('calc_torMult: {}'.format(calc_torMult))
     simIO.log.info('calc_helMult: {}'.format(calc_helMult))
     simIO.log.info('perr: {}'.format(perr))
@@ -226,7 +219,6 @@ def main():
         "ytick.labelsize": 12,
         "lines.linewidth": 1.0,
     })
-
 
 
     """fig = plt.figure()
@@ -297,7 +289,6 @@ def main():
     plt.subplots_adjust(wspace=0.3, hspace=0.15)
     #plt.tight_layout()
     simIO.saveFig(plot_name)"""
-
 
 
     ### ARTICLE PLOT 1 ###
