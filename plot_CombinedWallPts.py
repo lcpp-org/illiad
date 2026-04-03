@@ -97,8 +97,8 @@ cond_string2 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int
 
 
 # UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "Test_Output"
-TAGOUT = 'APS25_Li'
+OUTPUT_DIRECTORY_NAME = "TEST_HISTOGRAM"
+TAGOUT = 'article'
 
 
 #####################
@@ -182,11 +182,10 @@ theta_plot_deg = theta_plot*(180/np.pi)
 # ## PLOTTING ##
 # ##############
 ## PLOT HISTOGRAM OF WALL POINTS
-plotFuncs.plotWallHist(wallPtArray, TAGOUT, simIO=simIO)
+plotFuncs.boris_plotWallHist(wallPtArray, TAGOUT, simIO=simIO)
+
 ## PLOT *3D* HISTOGRAM
-plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, TAGOUT, simIO=simIO)
-
-
+# plotFuncs.boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, TAGOUT, simIO=simIO)
 
 # ## PLOT DISCRETE WALL POINTS
 # plotFuncs.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
@@ -198,7 +197,7 @@ plotFuncs.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, TAGOUT, simIO=
 #                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 # ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAGOUT, simIO=simIO, sim_in=sim_IN1)
+# plotFuncs.boris_plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAGOUT, simIO=simIO, sim_in=sim_IN1)
 # # PLOT FINAL ENERGY DISTRIBUTION
 # plotFuncs.plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO) 
 # # Plot # of perticles running over time
@@ -207,10 +206,10 @@ plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+T
 # plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
 
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+# plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
 #                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
 #                             runString=cond_string+TAGOUT+'_AngleCombined', simIO=simIO)
-# plotFuncs.plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+# plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
 #                             colorLabel='Ion Deposition Energy (eV)', myColormap='viridis',
 #                             runString=cond_string+TAGOUT+'_EnergyCombined', simIO=simIO)
 

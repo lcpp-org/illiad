@@ -29,64 +29,63 @@ def boris_plotWallHist(wallPtArray, runString, simIO):
     """ Plots a histogram of wall intersection points from the simulation."""
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
 
-    # extract theta and phi
+    phi_plot = wallPtArray[2]*(-1) + 2*np.pi # convert to phi= +CCW (viewing from outside VV)
     theta_plot = wallPtArray[1]
-    # convert to phi= +CCW (as if viewing from outside the vaccum vessel)
-    phi_plot = wallPtArray[2]*(-1) + 2*np.pi
-
-    # shift theta domain to -180 to 180
-    # for i in range(len(theta_plot)):
-    #     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
     theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
-    # convert to degrees
-    # shift to physical phi=0 at at the South-side split
-    a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+    # shift to physical phi=0 at at the South-side split, convert to deg.
+    a_phi = 18. # (deg), phi_comp 18 CW from south-split
     phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
     theta_plot_deg = theta_plot*(180/np.pi)
 
     # define bin edges for 2d histogram
     phi_edges = np.linspace(0, 360, 361)
     theta_edges = np.linspace(-180, 180, 181)
-
-    ## CREATE HISTOGRAM
     H, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=True)
     H = H.T # histogram reverse axes for some reason; transpose
 
     ## PLOT HISTOGRAM
     plt.rcParams.update({'font.size': 8})
-    #plt.rcParams.update({'figure.autolayout':True})
-
-    w, h = plt.figaspect(0.4)
+    w, h = plt.figaspect(0.40)
     fig = plt.figure(figsize=(w, h))
     ax = fig.add_subplot(polar=False, aspect=0.2)
 
-    plt.grid(which='both', linewidth=0.25)
+    plt.grid(which='both', linewidth=0.5)
     global_plotPorts(ax, simIO)
 
     plt.imshow( H, interpolation='nearest', origin='lower',
                 extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
-                cmap='Blues', norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
+                cmap=plt.get_cmap('Blues', 6), norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
                 aspect=0.2 )
-    
-    plt.colorbar(location='bottom', shrink=0.6)
-    
-    ax.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+ 
+    #cbar = plt.colorbar(boundaries=levels, location='top', shrink=0.6)
+    cbar = plt.colorbar(location='top', shrink=0.6)
+    cbar.ax.tick_params( labelsize=12)
+    cbar.set_label('$\\hat{\\Gamma}_{depo}=\\frac{N_{depo}}{N_{total}}$', fontsize=12)
+ 
+    ax.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=14)
+    ax.set_ylabel('Poloidal Location', fontsize=14)   
     ax.set_xlim(0, 360)
-    xticks = np.linspace(9, 351, 39)
+    ax.set_ylim(-180, 180)
+
+    phi_spacing = 18. # degrees
+    xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
     ax.set_xticks(xticks)
     ax.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-    ax.xaxis.set_tick_params(labelsize=10)
+    ax.xaxis.set_tick_params(labelsize=12)
 
-    ax.set_ylabel('Poloidal Location', fontsize=12)
-    ax.set_ylim(-180, 180)
     ax.set_yticks(np.linspace(-180, 180, 5))
-    ax.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
-    ax.yaxis.set_tick_params(labelsize=8, labelrotation=45)
-    plt.tight_layout()
+    ax.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+    ax.yaxis.set_tick_params(labelsize=12, labelrotation=0)
 
+    
+
+
+
+
+    plt.tight_layout()
     plotname = 'Wall_Histogram_' + runString + '.png'
-    simIO.saveFig(plotname, dpi=400)
+    simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
@@ -390,18 +389,22 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
 
 def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     """Plots the percent of particles running over time."""
-    # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
+    # maxN_array is an array of maximum timestep for each particle. 
+    # create a plot showing the number of particles running over time
 
     # Calculate the number of particles running over time (efficiently)
     time_steps = np.arange(0, tmax, dt)
-    maxTime_array = maxN_array * dt
-    sorted_maxTime = np.sort(maxTime_array)
+    time_ms = time_steps * 1000
+    sorted_maxTime = np.sort(maxN_array) * dt
 
     # Use searchsorted to find how many particles have maxTime > t for each t
-    particles_running = len(maxTime_array) - np.searchsorted(sorted_maxTime, time_steps, side='right')
+    particles_running = len(sorted_maxTime) - np.searchsorted(sorted_maxTime, time_steps, side='right')
     frac_running = particles_running / tot_particles
     frac_running += 1 - frac_running[0]  # adjust so that it starts at 100% at t=0
-    pct_running = 100 * frac_running
+
+    unnormalized_frac_running = particles_running / tot_particles
+    frac_running = unnormalized_frac_running + 1 - unnormalized_frac_running[0]  # adjust so that it starts at 100% at t=0
+
 
     # Estimate residence time using trapezoidal integration of the fraction running over time
     tau_res = np.trapz(frac_running, dx=dt)
@@ -412,29 +415,32 @@ def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='
     else:
         tau_res_corr = 0.0
 
+    tau_res_est = tau_res + tau_res_corr
+    frac_at_tau_res = frac_running[np.argmin(np.abs(time_steps - tau_res_est))]
 
     # Plot the number of particles running over time
-    plt.figure(figsize=(10, 6))
-    plt.fill_between(time_steps*1000, pct_running, color=UIUC['il_blue'], alpha=0.3)
-    plt.plot(time_steps*1000, pct_running, color=UIUC['il_blue'], label='Particles Running', linewidth=1.5)    
-    plt.xlabel('Time (ms)')
-    plt.ylabel('Percent of Particles')
-    plt.title('Particles Running Over Time, S(t)\nEstimated Residence Time = {:.3f}ms (+{:.3f}ms Correction)'
-              .format(tau_res*1000, tau_res_corr*1000))
-    # Set major ticks every 0.0001 and minor ticks every 0.00005 on the x-axis
-    ax = plt.gca()
-    ax.set_xlim(0, tmax*1000)    
-    ax.xaxis.set_major_locator(plt.MultipleLocator(0.1))
-    ax.xaxis.set_minor_locator(plt.MultipleLocator(0.05))
-    # ax.set_ylim(bottom=0)
-    # ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
-    # set semilog scale for y-axis
-    ax.set_yscale('log')
+    plt.figure(figsize=(8, 5))
 
-    # Set minor tick gridlines to be dashed and smaller width
-    ax.grid(which='minor', linestyle=':', linewidth=0.5)
-    ax.grid(which='major', linestyle='-', linewidth=1)
-    plt.tight_layout()
+    plt.plot(time_ms, frac_running, color=UIUC['il_blue'], label='Particles Running', linewidth=1.5)
+
+    plt.fill_between(time_ms, frac_running, color=UIUC['il_blue'], alpha=0.3)
+
+    plt.plot(tau_res_est*1000, frac_at_tau_res, 'ro', label='Estimated Residence Time Point')
+
+    plt.axvline(tau_res_est*1000, 0.0, frac_at_tau_res,
+                 color='k', linestyle='--', label='Estimated Residence Time', zorder=0)
+
+    plt.xlabel('$t~[ms]$', fontsize=12)
+    plt.ylabel('$\\dfrac{N_{active}}{N_{total}}$', fontsize=12, rotation=0, labelpad=22)
+    plt.title('Estimated Residence Time = {:.3f}$\\mathit{{(+{:.3f}ms~correction) }}$'
+              .format(tau_res_corr*1000, tau_res_corr*1000), fontsize=12)
+    
+    plt.xlim(0, time_ms[-1])    
+    plt.ylim(0, 1.05)
+    plt.xticks(np.arange(0, time_ms[-1]+0.1, 0.1), fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(which='both')#, linestyle=':', linewidth=0.5)
+    #plt.tight_layout()
 
     plotname = 'IonsVtime_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)

@@ -83,7 +83,7 @@ cond_string2 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int
 
 
 # UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "Test_Output"
+OUTPUT_DIRECTORY_NAME = "TEST HISTOGRAM"
 TAGOUT = 'TESTING_i3_60V_1eV-Z1_Li-He_Union'
 
 
@@ -174,9 +174,30 @@ plotPorts(ax, simIO)
 
 plt.imshow(H, interpolation='nearest', origin='lower',
             extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
-            cmap='Purples', norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
+            cmap=plt.get_cmap('Purples', 6), norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
             aspect=0.2 )
-plt.colorbar(location='bottom', shrink=0.6)
+
+cbar = plt.colorbar(location='top', shrink=0.6)
+cbar.ax.tick_params( labelsize=12)
+cbar.set_label('$\\hat{\\Gamma}_{depo}=\\frac{N_{depo}}{N_{total}}$', fontsize=12)
+
+ax.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=14)
+ax.set_ylabel('Poloidal Location', fontsize=14)   
+
+ax.set_xlim(0, 360)
+ax.set_ylim(-180, 180)
+
+phi_spacing = 18. # degrees
+xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
+ax.set_xticks(xticks)
+ax.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+ax.xaxis.set_tick_params(labelsize=14)
+
+ax.set_yticks(np.linspace(-180, 180, 5))
+ax.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+ax.yaxis.set_tick_params(labelsize=12, labelrotation=0)
+
+"""plt.colorbar(location='bottom', shrink=0.6)
 
 ax.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
 ax.set_xlim(0, 360)
@@ -190,7 +211,11 @@ ax.set_ylim(-180, 180)
 ax.set_yticks(np.linspace(-180, 180, 5))
 ax.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
 ax.yaxis.set_tick_params(labelsize=8, labelrotation=45)
-plt.tight_layout()
+plt.tight_layout()"""
+
+
+
+
 
 plotname = 'Wall_Histogram_' + TAGOUT + '.png'
 simIO.saveFig(plotname, dpi=400)
