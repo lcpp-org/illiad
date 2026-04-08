@@ -95,8 +95,8 @@ def main():
     ## 'operating' domain
     tau_residence_hi_ms = 0.3 # E ms
     tau_residence_lo_ms = 0.1 # E ms
-    typical_ionTemp_lo = 0.5 # eV
-    typical_ionTemp_hi = 7.0 # eV
+    typical_ionTemp_lo = 1.0 # eV
+    typical_ionTemp_hi = 5.0 # eV
     transition_temp_lo = Ti_ev[tau_coll_ne17_ms >= tau_residence_lo_ms][0]
     transition_temp_hi = Ti_ev[tau_coll_ne17_ms >= tau_residence_hi_ms][0]
 
@@ -110,11 +110,15 @@ def main():
     print(f'Collision time at Ti={typical_ionTemp_hi} eV and ne=1e17 m^-3: {tau_coll_hi:.2e} ms')
     #print(f'Collision frequency at Ti={typical_ionTemp_hi} eV and ne=1e17 m^-3: {f_coll_ne17[np.argmin(np.abs(Ti_ev - typical_ionTemp_hi))]:.2e} s^-1')
 
-    f_ionNeutral_coll = ion_neutral_collision_freq(3e17, Ti_ev)  # Example neutral density of 1e19 m^-3
+    f_ionNeutral_coll = ion_neutral_collision_freq(3e17, Ti_ev)  # Example neutral density of 3e17 m^-3
     tau_ionNeutral_coll_ms = 1e3 / f_ionNeutral_coll
     #print(f'Ion-neutral collision frequency at Ti={typical_ionTemp_lo} eV and ng=3e17 m^-3: {f_ionNeutral_coll[np.argmin(np.abs(Ti_ev - typical_ionTemp_lo))]:.2e} s^-1')
     print(f'Ion-neutral collision time at Ti={typical_ionTemp_lo} eV and ng=3e17 m^-3: {tau_ionNeutral_coll_ms[np.argmin(np.abs(Ti_ev - typical_ionTemp_lo))]:.2e} ms') 
     print(f'Ion-neutral collision time at Ti={typical_ionTemp_hi} eV and ng=3e17 m^-3: {tau_ionNeutral_coll_ms[np.argmin(np.abs(Ti_ev - typical_ionTemp_hi))]:.2e} ms') 
+
+    f_ionNeutral_coll_18 = ion_neutral_collision_freq(3e18, Ti_ev)  # Example neutral density of 3e18 m^-3
+    tau_ionNeutral_coll_ms_18 = 1e3 / f_ionNeutral_coll_18
+
 
     tau_star_lo_lowTemp = tau_residence_lo_ms / tau_coll_lo
     tau_star_hi_lowTemp = tau_residence_hi_ms / tau_coll_lo
@@ -129,37 +133,41 @@ def main():
 
     plt.figure()
     plt.plot(Ti_ev, tau_coll_ne18_ms, marker='none', linewidth=2,
-             linestyle='-', color='blue', label='$\\tau_{i\\text{-}i,Core}$')
+             linestyle='--', color='blue', label='$\\tau_{i\\text{-}i},~\\it{Core-Edge~Plasma}$')
              #linestyle='-', color='blue', label='$\\tau_{i\\text{-}i},~n_e=10^{18}$')
     plt.plot(Ti_ev, tau_coll_ne17_ms, marker='none', linewidth=2,
-              linestyle='-', color='black', label='$\\tau_{i\\text{-}i,far~SOL}$')
+              linestyle='-', color='blue', label='$\\tau_{i\\text{-}i},~\\it{Far~SOL}$')
+    
     plt.plot(Ti_ev, tau_ionNeutral_coll_ms, marker='none', linewidth=2,
-              linestyle='-', color='darkorange', label='$\\tau_{i\\text{-}n}$')
+              linestyle='-', color='darkorange', label='$\\tau_{i\\text{-}n},~\\it{Lithium~Evaporation}$')
+              #linestyle='--', color='red', label='$\\tau_{i\\text{-}n}$')
+    plt.plot(Ti_ev, tau_ionNeutral_coll_ms_18, marker='none', linewidth=2,
+              linestyle='--', color='darkorange', label='$\\tau_{i\\text{-}n},~\\it{Typical~Operation}$')
               #linestyle='--', color='red', label='$\\tau_{i\\text{-}n}$')
 
-
-    #collisional_bottom_line = np.maximum(tau_coll_ne17_ms, tau_residence_lo_ms)
-    collisional_bottom_line = tau_coll_ne17_ms
+    collisional_bottom_line = np.maximum(tau_coll_ne17_ms, tau_residence_lo_ms)
+    #collisional_bottom_line = tau_coll_ne17_ms
     collisional_top_line = np.full_like(tau_coll_ne17_ms, tau_residence_hi_ms)
+    #collisional_span = (Ti_ev >= typical_ionTemp_lo) & (Ti_ev <= transition_temp_hi)
     collisional_span = (Ti_ev >= typical_ionTemp_lo) & (Ti_ev <= transition_temp_hi)
     plt.fill_between(Ti_ev[collisional_span],
                         collisional_bottom_line[collisional_span],
                         collisional_top_line[collisional_span],
-                        color='red', alpha=0.25, label='Collisional Regime')
+                        color='red', alpha=0.25, label='$\\it{Collisional~Regime}$')
     
     #collisionless_top_line = np.minimum(tau_coll_ne17_ms, tau_residence_hi_ms)
-    #collisionless_top_line = np.minimum(tau_coll_ne17_ms, tau_ionNeutral_coll_ms)
-    collisionless_top_line = tau_coll_ne17_ms
+    collisionless_top_line = np.minimum(tau_coll_ne17_ms, tau_ionNeutral_coll_ms)
+    #collisionless_top_line = tau_coll_ne17_ms
     collisionless_botom_line = np.full_like(tau_coll_ne17_ms, tau_residence_lo_ms)
     collisionless_span = (Ti_ev <= typical_ionTemp_hi) & (Ti_ev >= transition_temp_lo)
     plt.fill_between(Ti_ev[collisionless_span], 
                         collisionless_botom_line[collisionless_span],
                         collisionless_top_line[collisionless_span],
-                        color='green', alpha=0.25, label='Collisionless Regime')
+                        color='green', alpha=0.25, label='$\\it{Collisionless~Regime}$')
 
 
     plt.axvspan(transition_temp_lo, transition_temp_hi,
-                 color='darkgray', alpha=0.4, label='Collisionless-Collisional Transition Region', zorder=0)
+                 color='darkgray', alpha=0.4, label='$\\it{Collisional/Collisionless~Transition}$', zorder=0)
     plt.axvline(transition_temp_lo, color='gray', linestyle=':')#, label='Typical Operating Range')
     plt.axvline(transition_temp_hi, color='gray', linestyle=':')#, label='Typical Operating Range')
     # plt.axhspan(tau_residence_lo_ms, tau_residence_hi_ms, color='gray', alpha=0.3, label='Residence Time Range')
@@ -169,10 +177,10 @@ def main():
     plt.ylabel('$\\tau~\\text{[ms]}$')#_{i\\text{-}i}~\\text{[ms]}$')
   
     plt.grid(which='both')
-    plt.xlim(0, 8)#ti_plot_high)
+    plt.xlim(0, 7)#ti_plot_high)
     plt.ylim(1e-3, 1e0)#ti_plot_high)
     plt.yscale('log')
-    plt.legend(loc='lower right', fontsize=8, ncol=2)
+    plt.legend(loc='lower right', fontsize=8, ncol=1)
     #plt.tight_layout()
     #plt.show()
     plt.savefig("collision_time_vs_Ti.png", dpi=300)
