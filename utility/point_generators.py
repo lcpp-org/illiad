@@ -198,7 +198,7 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
 
 
             # Plot semicircles with normal as pole
-            semicircle_radius = 0.008  # Adjust size as needed
+            semicircle_radius = 0.009  # Adjust size as needed
             n_circle_points = 12       # Number of points for smooth semicircle
             
             for i in range(len(output_ind_geo)):
@@ -235,16 +235,18 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
                     ax.fill_between(theta_circle[valid_points], r_circle[valid_points], r_lower[valid_points], color='lightblue', alpha=0.8)
 
             ## PLOT NORMAL VECTORS
-            ax.quiver(*output_ind_geo.T[:2], *plot_norm_rtp.T[:2],  color='blue', scale=25, width=0.002, angles='uv')
+            ax.quiver(*output_ind_geo.T[:2], *plot_norm_rtp.T[:2],  color='blue', scale=18, width=0.004, angles='uv')
 
 
         ax.set_rmax(Bfield.a)
         ax.grid(linewidth = 0.25, linestyle=':', c='k')
         ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
-                            labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=8)
+                            labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=14)
+        ax.tick_params(pad=10)
         ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
                         labels=[], angle=0, fontsize=4)
-        plt.title(r'$\phi$={:02.0f}$\degree$'.format(phi_deg), loc='left')
+        #plt.title(r'$\phi$={:02.0f}$\degree$'.format(phi_deg), loc='left')
+        plt.tight_layout()
         plot_name = filename+'/'+'InitConds_phi={:03.0f}.png'.format(phi_deg)
         outputHandler.saveFig(plot_name)
         plt.close()

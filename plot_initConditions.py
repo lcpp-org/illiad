@@ -45,7 +45,7 @@ FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 LCFS_INDEX = 35 # (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
 NPHI = 180
-NTHETA = 20
+NTHETA = 15
 
 
 
