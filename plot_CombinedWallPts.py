@@ -62,6 +62,7 @@ dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
 cond_string1 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                            int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
 
+
 ## INPUT #2 PARAMETERS
 ######################
 # INPUT2_DIRECTORY_NAME = "AcceptedIota4_1500spins_atole-8_eng"
@@ -94,16 +95,12 @@ dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
 cond_string2 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                            int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
 
-
-
 # UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "TEST_HISTOGRAM"
 TAGOUT = 'article'
 
 
-#####################
-## RUN SIMULATION: ##
-#####################
+
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
@@ -112,18 +109,12 @@ simIO.startLog()
 sim_IN1 = out.IOHandler(INPUT1_DIRECTORY_NAME) 
 sim_IN2 = out.IOHandler(INPUT2_DIRECTORY_NAME)
 
-
 ## CALCULATE SOME CONSTANTS
 N_emitters = len(DELTRS) * NTHETA * NPHI
 N_particles = NPARTICLES_PER_EMITTER * N_emitters
 
 ## DEFINE MESH
 b_hidra = Mesh(R0=0.72, a=0.19)
-
-
-# ####################
-# ## PREPARE OUTPUT ##
-# ####################
 
 ## LOAD WALL POINTS
 filename1 = 'Wallpt_OUTPUT_' + cond_string1+TAG1
@@ -151,7 +142,6 @@ IC_filename = 'initVelPos_' + cond_string1+TAG1
 # max_timeStep = np.hstack((outputArray1[6, :], outputArray2[6, :]))  # max time step for each particle
 # print(f'Combined wall point data shape: {wallPtArray.shape=}')
 
-
 ## CALCULATE ENERGY FROM FINAL VELOCITY
 speed_output = np.linalg.norm(velocity_output, axis=1)
 energy_output = 0.5 * ION_MASS * kg_per_amu * speed_output**2 / kboltz #convert speed to energy in eV
@@ -161,12 +151,20 @@ simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV
 ## CALCULATE ANGLE FROM NORMAL
 unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
 radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+toroidal_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([0,0,1]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+
+
 deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
 deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
 
+cos_toroidal_angles = np.einsum('ij,ij->i', unit_vec_xyz, toroidal_vec_xyz)
+toroidal_angles = np.arccos(cos_toroidal_angles)
+toroidal_angles_deg = np.degrees(toroidal_angles)  # Convert angles to degrees
+
+
+
 simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
     np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
-
 
 # COORDINATE FLIIPING & CONVERSION
 #phi_plot = (-1)*wallPtArray[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
@@ -178,11 +176,10 @@ a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
 phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
-# ##############
-# ## PLOTTING ##
-# ##############
+
+
 ## PLOT HISTOGRAM OF WALL POINTS
-plotFuncs.boris_plotWallHist(wallPtArray, TAGOUT, simIO=simIO)
+plotFuncs.boris_plotWallHist(wallPtArray, TAGOUT, simIO=simIO, cond_string=cond_string1)
 
 ## PLOT *3D* HISTOGRAM
 # plotFuncs.boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, TAGOUT, simIO=simIO)
@@ -206,15 +203,21 @@ plotFuncs.boris_plotWallHist(wallPtArray, TAGOUT, simIO=simIO)
 # plotFuncs.plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
 
 
-# plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
-#                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-#                             runString=cond_string+TAGOUT+'_AngleCombined', simIO=simIO)
-# plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
-#                             colorLabel='Ion Deposition Energy (eV)', myColormap='viridis',
-#                             runString=cond_string+TAGOUT+'_EnergyCombined', simIO=simIO)
+plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
+                            colorLabel='$\\theta_{depo}~[\\degree]$', myColormap='viridis',
+                            runString=cond_string+TAGOUT+'_AngleCombined', simIO=simIO, cond_string=cond_string1)
+plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, energy_output, 
+                            colorLabel='$E_{depo}~[eV]$', myColormap='viridis',
+                            runString=cond_string+TAGOUT+'_EnergyCombined', simIO=simIO, cond_string=cond_string1)
+plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles_deg,  colorRange=[0, 180], 
+                            colorLabel='$\\theta_{tor}~[\\degree]$', myColormap='magma',
+                            runString=cond_string+TAGOUT+'_ToroidalAngleCombined', simIO=simIO, cond_string=cond_string1)
 
+plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, cos_toroidal_angles,  colorRange=[-1, 1], 
+                            colorLabel='$\cos(\\theta_{tor})$', myColormap='magma',
+                            runString=cond_string+TAGOUT+'_CosToroidalAngleCombined', simIO=simIO, cond_string=cond_string1)
 # plotFuncs.plotCombined_Hist(wallPtArray, max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
-
+cos_toroidal_angles
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')

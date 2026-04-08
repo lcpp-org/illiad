@@ -25,9 +25,18 @@ def global_plotPorts(ax_, simIO):
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
 
-def boris_plotWallHist(wallPtArray, runString, simIO):
+#def boris_plotWallHist(wallPtArray, runString, simIO):
+def boris_plotWallHist(wallPtArray, runString, simIO, cond_string):
     """ Plots a histogram of wall intersection points from the simulation."""
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
+
+    # cond string decoder
+    parts = cond_string.split('_')
+    dr_mm = parts[0]
+    LCFS_index = parts[1][4:]  # Remove 'LCFS' prefix
+    ion_temp_eV = parts[2][:-2]  # Remove 'eV' suffix
+    electric_field_V = parts[3][:-1]  # Remove 'V' suffix
+    charge_num_Z = parts[4][1:]  # Remove 'Z' prefix
 
     phi_plot = wallPtArray[2]*(-1) + 2*np.pi # convert to phi= +CCW (viewing from outside VV)
     theta_plot = wallPtArray[1]
@@ -60,7 +69,7 @@ def boris_plotWallHist(wallPtArray, runString, simIO):
  
     #cbar = plt.colorbar(boundaries=levels, location='top', shrink=0.6)
     cbar = plt.colorbar(location='top', shrink=0.6)
-    cbar.ax.tick_params( labelsize=12)
+    cbar.ax.tick_params(labelsize=12)
     cbar.set_label('$\\hat{\\Gamma}_{depo}=\\frac{N_{depo}}{N_{total}}$', fontsize=12)
  
     ax.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=14)
@@ -78,8 +87,13 @@ def boris_plotWallHist(wallPtArray, runString, simIO):
     ax.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
     ax.yaxis.set_tick_params(labelsize=12, labelrotation=0)
 
-    
-
+    #ax.text(0.995, 0.975, f'$\\mathrm{{{ion_temp_eV}eV, {electric_field_V}V, Z{charge_num_Z}}}$',
+    #ax.text(0.9955, 0.9755, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    ax.text(0.9945, 0.974, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    transform=ax.transAxes,
+    ha='right', va='top',
+    fontsize=14,
+    bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=0.9))
 
 
 
@@ -312,29 +326,38 @@ def boris_plotDepoAngles(angle_array, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
+def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None, cond_string=None):
     """Plots the combined 2D histogram and 1D statistical distribution of the given data."""
     plt.rcParams.update({'font.size': 6})
     #plt.rcParams.update({'figure.autolayout':True})
 
-    tot_scale = 0.8
+    # cond string decoder
+    parts = cond_string.split('_')
+    dr_mm = parts[0]
+    LCFS_index = parts[1][4:]  # Remove 'LCFS' prefix
+    ion_temp_eV = parts[2][:-2]  # Remove 'eV' suffix
+    electric_field_V = parts[3][:-1]  # Remove 'V' suffix
+    charge_num_Z = parts[4][1:]  # Remove 'Z' prefix
 
-    width_left = 5/6 * tot_scale #fig_height / aspect_left
-    width_right = 1/6 * tot_scale  # or choose a different one
+    height = 0.75
+
+    width_left = 5/6 * height #fig_height / aspect_left
+    width_right = 1/6 * height  # or choose a different one
     h_buffer = 0.01  # horizontal buffer between left and right plots
 
     # Total width for the figure
-    total_width = (width_left + width_right)
+    total_width = width_left + width_right + h_buffer
     left_start = (1 - total_width) / 2
     bottom_start = (1 - total_width) * 2 / 3
     right_start = left_start + width_left + h_buffer
 
     fig = plt.figure(figsize=(24, 4))
+    #fig = plt.figure(figsize=(20, 4))
 
-    axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
+    axWall = fig.add_axes([left_start, bottom_start, width_left, height])
     axWall.set_aspect(0.2)  # height/width
 
-    axDist = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
+    axDist = fig.add_axes([right_start, bottom_start, width_right, height])
     global_plotPorts(axWall, simIO)
 
     if colorRange is None:
@@ -351,21 +374,30 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
     norm = colors.Normalize(vmin=colorRange[0], vmax=colorRange[1])
 
 
-    axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
+    axWall.grid(linewidth = 0.5)#, linestyle=':', c='grey')
 
-    axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+    #axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+    axWall.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=18)
     axWall.set_xlim(0, 360)
-    xticks = np.linspace(9, 351, 39)
+    phi_spacing = 18. # degrees
+    xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
     axWall.set_xticks(xticks)
-    axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-    axWall.xaxis.set_tick_params(labelsize=10)
+    #axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+    axWall.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+    axWall.xaxis.set_tick_params(labelsize=14)
 
-    axWall.set_ylabel('Poloidal Location', fontsize=12)
+    axWall.set_ylabel('Poloidal Location', fontsize=16)
     axWall.set_ylim(-180, 180)
     axWall.set_yticks(np.linspace(-180, 180, 5))
-    axWall.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
-    axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
+    axWall.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+    #axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
+    axWall.yaxis.set_tick_params(labelsize=14, labelrotation=0)
 
+    axWall.text(0.9945, 0.974, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    transform=axWall.transAxes,
+    ha='right', va='top',
+    fontsize=16,
+    bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=0.9))
 
     n, bins, patches = axDist.hist(data, bins=90, range=colorRange, density=False, linewidth=0.3, zorder=2)
     # Color each bar
@@ -375,8 +407,8 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
         patch.set_facecolor(color)
 
     axDist.grid(which='both', zorder=0)
-    axDist.set_xlabel(colorLabel, fontsize=12)
-    axDist.xaxis.set_tick_params(labelsize=12)
+    axDist.set_xlabel(colorLabel, fontsize=18)
+    axDist.xaxis.set_tick_params(labelsize=14)
     axDist.set_yticklabels([])
     axDist.yaxis.set_tick_params(color='white')
 
