@@ -29,16 +29,18 @@ He_mass = 4.002602 #amu
 
 ## SET SIMULATION INPUTS:
 # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "AcceptedIota4_1500spins_atole-8_eng"
-TAG = "IC_PLOT_TEST"
+#OUTPUT_DIRECTORY_NAME = "AcceptedIota4_1500spins_atole-8_eng"
+OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+TAG = "IC_PLOT_IOTA3"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
-HELICAL_CURRENT = 0.790 #[kA]
+HELICAL_CURRENT = 0.900 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
 # ELECTRIC FIELD
-FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota4_lcfs35.npy'
+#FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3_lcfs35.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 # INITIAL CONDITIONS
