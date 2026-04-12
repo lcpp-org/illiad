@@ -34,22 +34,24 @@ He_mass = 4.002602 #amu
 ## SET SIMULATION INPUTS:
 # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-TAG = "APS25_He-1ms"
+TAG = "Li_ARTICLE_Testing"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
 HELICAL_CURRENT = 0.900 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
+ENABLE_ERRFIELD = True
 # ELECTRIC FIELD
 #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
-FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
+#FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3_lcfs19_noIsland1.npy'
+FIELD_SCALE_ELECTRIC = 120.0 # [Volts]
 # ION PROPERTIES
-ION_MASS = He_mass # [amu]
+ION_MASS = Li_mass # [amu]
 ION_TEMP = 1.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 #30 #29 #40 (from Poincare output (simIO.log))
+LCFS_INDEX = 19 #30 #29 #40 (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
 NPHI = 120
 NTHETA = 72
@@ -79,7 +81,7 @@ def main():
     ## DEFINE MESH AND LOAD MAGNETIC AND ELECTRIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.setErrorField()
-    b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
     e_hidra = Mesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
@@ -101,20 +103,12 @@ def main():
     particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
     ion_tracer.setConditions(ion_list, cond_string, DT, TMAX)
-    output_array, energy_output, depo_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
+    output_array, energy_output, depo_angles_deg, toroidal_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
-    # ## COORDINATE FLIPPING & CONVERSION
-    # phi_plot = 2*np.pi - output_array[2] # flip phi for the perspective outside the vacuum vessel
-    # phi_adder_ccw = -18. # degrees, phi_comp is 18 CW from south-side split
-    
-    # theta_plot = output_array[1]
-    # theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-    # phi_plot_deg = (phi_plot*(180/np.pi) + phi_adder_ccw) % 360.
-    # theta_plot_deg = theta_plot*(180/np.pi)
 
     # COORDINATE FLIIPING & CONVERSION
-    phi_plot = output_array[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
+    phi_plot = (-1)*output_array[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
     a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
     phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 
@@ -125,14 +119,19 @@ def main():
 
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
-    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO)
+    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles_deg, colorRange=[0, 90], 
-                                colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
+                                colorLabel='$\\theta_{depo}~[\\degree]$', myColormap='viridis',
+                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_output,
-                                colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
+                                colorLabel='$E_{depo}~[eV]$', myColormap='magma',
+                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO, cond_string=cond_string)
     
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles_deg, colorRange=[0, 180], 
+                                colorLabel='$\\theta_{tor}~[\\degree]$', myColormap='coolwarm',
+                                runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
+
+
     ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
     ion_tracer.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
     ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)

@@ -377,26 +377,26 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
     axWall.grid(linewidth = 0.5)#, linestyle=':', c='grey')
 
     #axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
-    axWall.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=18)
+    axWall.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=20)
     axWall.set_xlim(0, 360)
     phi_spacing = 18. # degrees
     xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
     axWall.set_xticks(xticks)
     #axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
     axWall.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-    axWall.xaxis.set_tick_params(labelsize=14)
+    axWall.xaxis.set_tick_params(labelsize=16)
 
-    axWall.set_ylabel('Poloidal Location', fontsize=16)
+    axWall.set_ylabel('Poloidal Location', fontsize=18)
     axWall.set_ylim(-180, 180)
     axWall.set_yticks(np.linspace(-180, 180, 5))
     axWall.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
     #axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
-    axWall.yaxis.set_tick_params(labelsize=14, labelrotation=0)
+    axWall.yaxis.set_tick_params(labelsize=16, labelrotation=0)
 
     axWall.text(0.9945, 0.974, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
     transform=axWall.transAxes,
     ha='right', va='top',
-    fontsize=16,
+    fontsize=18,
     bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=0.9))
 
     n, bins, patches = axDist.hist(data, bins=90, range=colorRange, density=False, linewidth=0.3, zorder=2)
@@ -407,8 +407,8 @@ def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colo
         patch.set_facecolor(color)
 
     axDist.grid(which='both', zorder=0)
-    axDist.set_xlabel(colorLabel, fontsize=18)
-    axDist.xaxis.set_tick_params(labelsize=14)
+    axDist.set_xlabel(colorLabel, fontsize=20)
+    axDist.xaxis.set_tick_params(labelsize=16)
     axDist.set_yticklabels([])
     axDist.yaxis.set_tick_params(color='white')
 
@@ -549,12 +549,12 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
     
     # axWall.colorbar(location='bottom', shrink=0.6)
     axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
-    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
+    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=16)
     axWall.set_xlim(0, 360)
     xticks = np.linspace(9, 351, 39)
     axWall.set_xticks(xticks)
     axWall.set_xticklabels([f'{int(tick)}' if i % 2 == 0 else '' for i, tick in enumerate(xticks)])
-    axWall.xaxis.set_tick_params(labelsize=12)
+    axWall.xaxis.set_tick_params(labelsize=14)
 
     axWall.set_ylabel('Poloidal Location', fontsize=14)
     axWall.set_ylim(-180, 180)
@@ -574,7 +574,7 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
     axRight.set_xticks(np.linspace(0.0, 1.0, 11))
     #axRight.set_xticks(np.linspace(0.0, 0.001, 11))
     axRight.set_xlim(0, 1.0)
-    axRight.xaxis.set_tick_params(labelsize=10)
+    axRight.xaxis.set_tick_params(labelsize=12)
 
     axRight.set_ylabel('% of Particles Running', fontsize=12)
 

@@ -254,22 +254,28 @@ class Boris():
         wallPtArray = np.asarray( [XYZ_to_RTP(wall_point, Bfield.R0) for wall_point in wallPt_output] ).T
         outputArray = np.vstack((wallPtArray, velocity_output.T, max_timeStep[None, :]))
 
-        ## CALCULATE ANGLE FROM NORMAL
-        vf_hat_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
-        radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert radial unit vector to XYZ coordinates
-        deposition_angles = np.arccos(np.einsum('ij,ij->i', vf_hat_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
-        deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
+        ## CALCULATE UNIT VECTORS
+        unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
+        radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+        toroidal_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([0,0,1]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
 
-        vf_hat_rtp = np.asarray( [RTP_XYZ_JAC(wall_point, vf_hat_xyz[i], form='xyz2rtp') for i, wall_point in enumerate(wallPtArray.T)] ) # Convert velocity unit vector to RTP coordinates
-        theta_phi_angle = np.atan2(vf_hat_rtp[:, 1], vf_hat_rtp[:, 2]) # angle in the theta-phi plane
+        ## CALCULATE ANGLE FROM NORMAL    
+        deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
+        deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
+        ## CALCULATE TOROIDAL ANGLE    
+        cos_toroidal_angles = np.einsum('ij,ij->i', unit_vec_xyz, toroidal_vec_xyz)
+        toroidal_angles = np.arccos(cos_toroidal_angles)
+        toroidal_angles_deg = np.degrees(toroidal_angles)  # Convert angles to degrees
 
 
         self.IO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
             np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
+        self.IO.log.info('toroidal_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
+            np.min(toroidal_angles_deg), np.max(toroidal_angles_deg), np.mean(toroidal_angles_deg)))
         toc = perf_counter()
         self.IO.log.info('OUTPUT SENT TO CPU AND CONVERTED TO RTP IN {}SEC'.format(toc-tic))
 
-        return outputArray, energy_output, deposition_angles_deg, ion_traces, theta_phi_angle
+        return outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces
 
     def save_output(self, outputArray, ion_traces):
         """Saves the output data to files in the specified output directory."""
@@ -294,13 +300,13 @@ class Boris():
                 outputArray (np.ndarray): Array of wall point and velocity data.
                 energy_output (np.ndarray): Array of particle energies at termination (in eV).
                 deposition_angles_deg (np.ndarray): Array of deposition angles (in degrees).
+                toroidal_angles_deg (np.ndarray): Array of toroidal angles (in degrees).
                 ion_traces (np.ndarray): Array of traced particle positions.
-                theta_phi_angle_rad (np.ndarray): Array of angles in the theta-phi plane (in radians).
         """
         solv_out = self.parallel_solver(self.ion_list, Bfield, Efield, trace_IDs=trace_IDs)
 
-        outputArray, energy_output, deposition_angles_deg, ion_traces, theta_phi_angle_rad = self.post_solver(solv_out, Bfield)
+        outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)
 
         self.save_output(outputArray, ion_traces)
 
-        return outputArray, energy_output, deposition_angles_deg, ion_traces, theta_phi_angle_rad
+        return outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces
