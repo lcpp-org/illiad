@@ -44,7 +44,7 @@ def main():
             point_total[i] = np.sum(~np.isnan(these_radtheta_pts).all(axis=0))
         # PLOT POINCARE
         solved_PoinCare.plotPoincareBW(radtheta_pts, point_total, phi_deg,
-                                        solved_PoinCare.field, 'Poincare', simIO)
+                                        solved_PoinCare.field, solved_PoinCare.anlys_name, simIO)
 
 if __name__ == "__main__":
     main()
