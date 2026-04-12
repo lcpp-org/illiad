@@ -22,17 +22,18 @@ from classes.iohandler import IOHandler
 from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 np.set_printoptions(threshold=np.inf)
 
-def fluxCalculator():
-    global ANLYS_DIR, ANLYS_SUBDIR
-    global FIELD_FILE_TOR, FIELD_FILE_HEL, CURRENT_TOR, CURRENT_HEL, CONFIG_TOR, CONFIG_HEL, ENABLE_ERRFIELD
-    global LCFS_INDEX, NPHI, NTHETA, PHI_GENs
-    global MAX_SUBSETS, SMOOTH_FCTR, INTEGRATE_EPSABS, INTEGRATE_EPSREL
-    global PLOT_ALL, BIG_MESH
-
+def fluxCalculator(input_params=None):
+    ## LOAD INPUT PARAMETERS
+    if input_params is not None:
+        print(f'{input_params.keys()=}')
+        for key, value in input_params.items():
+            print(f'{key}: {value}')
+            globals()[str(key)] = value
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = IOHandler(ANLYS_DIR)
     simIO.startLog()
     simIO.createSubDir(ANLYS_SUBDIR)
+
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
@@ -206,6 +207,7 @@ def fluxCalculator():
             filename_pt_mesh = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(surf_index)
             simIO.saveNumpyData(lcfs_flat_point, filename_pt_mesh)
 
+    return smallest_island_index
 
 
 def find_Axis(theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh, alt=False) -> np.ndarray:
@@ -656,6 +658,7 @@ if __name__ == '__main__':
     CURRENT_HEL = 0.790 #[kA]
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical_rev'
+    ENABLE_ERRFIELD = False
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
     LCFS_INDEX = 39 #40 #22 #29?

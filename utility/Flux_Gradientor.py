@@ -9,14 +9,44 @@ import classes.class_outputHandler as out
 from classes.mesh import *
 from utility.coordtrans import RTP_XYZ_JAC
 
-def main():
+#def main():
+def fluxGradientor(input_params=None):
+
+    if input_params is not None:
+        print(f'{input_params.keys()=}')
+        for key, value in input_params.items():
+            print(f'{key}: {value}')
+            globals()[str(key)] = value
+
+        # ANLYS_DIR = input_params['ANLYS_DIR']
+        # ANLYS_SUBDIR = input_params['ANLYS_SUBDIR']
+        # # FIELD_FILE_TOR = input_params['FIELD_FILE_TOR']
+        # # FIELD_FILE_HEL = input_params['FIELD_FILE_HEL']
+        # CURRENT_TOR = input_params['CURRENT_TOR']
+        # CURRENT_HEL = input_params['CURRENT_HEL']
+        # CONFIG_TOR = input_params['CONFIG_TOR']
+        # CONFIG_HEL = input_params['CONFIG_HEL']
+        # ENABLE_ERRFIELD = input_params['ENABLE_ERRFIELD']
+        # LCFS_INDEX = input_params['LCFS_INDEX']
+        # #NPHI = input_params['NPHI']
+        # #NTHETA = input_params['NTHETA']
+        # PHI_GENs = input_params['PHI_GENs']
+        # MAX_SUBSETS = input_params['MAX_SUBSETS']
+        # SMALLEST_ISLAND_INDEX = input_params['SMALLEST_ISLAND_INDEX']
+        # # SMOOTH_FCTR = input_params['SMOOTH_FCTR']
+        # # INTEGRATE_EPSABS = input_params['INTEGRATE_EPSABS']
+        # # INTEGRATE_EPSREL = input_params['INTEGRATE_EPSREL']
+        # # PLOT_ALL = input_params['PLOT_ALL']
+        # # BIG_MESH = input_params['BIG_MESH']
+
+
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
     simIO.createSubDir(ANLYS_SUBDIR)
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
 
@@ -163,5 +193,6 @@ if __name__ == '__main__':
     MAX_SUBSETS = 3
     SMALLEST_ISLAND_INDEX = 47 #53 #39
 
-    OUTPUT_FILE_NAME = 'Efield_AcceptedIota3_lcfs19'
-    main()
+    OUTPUT_FILE_NAME = 'Efield_AcceptedIota3_lcfs19_noIsland'
+
+    fluxGradientor()
