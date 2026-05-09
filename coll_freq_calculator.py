@@ -80,6 +80,14 @@ def plot_collision_times(Ti_ev, tau_coll_ne18_ms, tau_coll_ne17_ms,
     plt.plot(Ti_ev, tau_coll_ne17_ms, marker='none', linewidth=2,
               linestyle='-', color='blue', label='$\\tau_{i\\text{-}i},~\\it{Far~SOL}$')
 
+    # # Text labels directly on the blue ion-ion collision time lines
+    # _lbl_Ti = 3.5
+    # _idx = np.argmin(np.abs(Ti_ev - _lbl_Ti))
+    # plt.text(Ti_ev[_idx], tau_coll_ne18_ms[_idx], 'Core/Edge',
+    #          fontsize=9, color='blue', ha='left', va='bottom')
+    # plt.text(Ti_ev[_idx], tau_coll_ne17_ms[_idx], 'Far SOL',
+    #          fontsize=9, color='blue', ha='left', va='bottom')
+
     plt.plot(Ti_ev, tau_ionNeutral_coll_ms, marker='none', linewidth=2,
               linestyle='-', color='darkorange', label='$\\tau_{i\\text{-}n},~\\it{Lithium~Evaporation}$')
               #linestyle='--', color='red', label='$\\tau_{i\\text{-}n}$')
@@ -140,29 +148,103 @@ def plot_tau_starSOL(Ti_ev, f_typical_edge, f_typical_far, f_evap_edge, f_evap_f
 
     plt.figure()
 
+    z_grid = 1
+    z_lines = 1
+    z_labels = 1
+    z_shading = 5
     # fill between tau_star_typical_edge and tau_star_typical_far
-    plt.fill_between(Ti_ev, tau_star_typical_edge, tau_star_typical_far, color=UIUC['il_blue'], alpha=0.5,  zorder=5,
-                     label='$\\it{Typical~Operation:}$\n$T_e\\sim5\\text{eV},~n_g\\sim10^{18}~\\text{m}^{-3}$')
-    plt.plot(Ti_ev, tau_star_typical_edge, marker='none', linewidth=1.5, linestyle='-', color=UIUC['il_blue'])#, label='$\\tau^*_{\\it{Typical~Edge}}$')
-    plt.plot(Ti_ev, tau_star_typical_far, marker='none', linewidth=1.5, linestyle=':', color=UIUC['il_blue'])#, label='$\\tau^*_{\\it{Typical~Far~SOL}}$')
+    plt.fill_between(Ti_ev, tau_star_typical_edge, tau_star_typical_far, color=UIUC['il_blue'], alpha=0.5,  zorder=z_shading,
+                     label='$\\bf{Typical~Operation}$\n$\\left(T_e~5\\text{eV},~n_g\\sim10^{18}~\\text{m}^{-3}\\right)$')
+    plt.plot(Ti_ev, tau_star_typical_edge, marker='none', linewidth=1.5, linestyle='-', color=UIUC['il_blue'], zorder=z_lines)
+    plt.plot(Ti_ev, tau_star_typical_far, marker='none', linewidth=1.5, linestyle=':', color=UIUC['il_blue'], zorder=z_lines)
+
+    label_Ti_typ = 3.2
+    _idx = np.argmin(np.abs(Ti_ev - label_Ti_typ))
+
+    label_Ti_typ2 = 3.3
+    _idx2 = np.argmin(np.abs(Ti_ev - label_Ti_typ2))
+
+
+    plt.text(Ti_ev[_idx], tau_star_typical_edge[_idx]-1.5, 'Core/Edge',
+             fontsize=7, color=UIUC['il_blue'], weight='bold', style='italic',
+             ha='left', va='center', rotation=-5,
+             backgroundcolor='white', zorder=z_labels)
+    plt.text(Ti_ev[_idx2], tau_star_typical_far[_idx2]+0.22, 'Far SOL',
+             fontsize=7, color=UIUC['il_blue'], weight='bold', style='italic',
+             ha='left', va='center', rotation=1,
+             backgroundcolor='white', zorder=z_labels)
+    
+    label_Ti_typ_ne = 4.5
+    _idx = np.argmin(np.abs(Ti_ev - label_Ti_typ_ne))
+    plt.text(Ti_ev[_idx], tau_star_typical_edge[_idx], '$\\mathbf{n_e\\sim10^{18} ~\\left[m^{-3} \\right]}$',
+             fontsize=6, color=UIUC['il_blue'], weight='bold', style='italic',
+             ha='center', va='center', rotation=-4,
+             backgroundcolor='white', zorder=z_labels)
+    plt.text(Ti_ev[_idx], tau_star_typical_far[_idx], '$\\mathbf{n_e\\sim10^{17}~ \\left[m^{-3} \\right]}$',
+             fontsize=6, color=UIUC['il_blue'], weight='bold', style='italic',
+             ha='center', va='center', rotation=1,
+             backgroundcolor='white', zorder=z_labels)
+
+
+
 
     # fill between tau_star_evap_edge and tau_star_evap_far
-    plt.fill_between(Ti_ev, tau_star_evap_edge, tau_star_evap_far, color=UIUC['il_orange'], alpha=0.5, zorder=5,
-                     label='$\\it{During~Evaporation:}$\n$T_e\\sim40\\text{eV},~n_g\\sim10^{17}~\\text{m}^{-3}$') 
-    plt.plot(Ti_ev, tau_star_evap_edge, marker='none', linewidth=1.5, linestyle='-', color=UIUC['il_orange'])#, label='$\\tau^*_{\\it{Evaporation~Edge}}$')
-    plt.plot(Ti_ev, tau_star_evap_far, marker='none', linewidth=1.5, linestyle=':', color=UIUC['il_orange'])#, label='$\\tau^*_{\\it{Evaporation~Far~SOL}}$')
+    plt.fill_between(Ti_ev, tau_star_evap_edge, tau_star_evap_far, color=UIUC['il_orange'], alpha=0.5, zorder=z_shading,
+                     label='$\\bf{During~Evaporation}$\n$\\left(T_e~40\\text{eV},~n_g\\sim10^{17}~\\text{m}^{-3}\\right)$') 
+    plt.plot(Ti_ev, tau_star_evap_edge, marker='none', linewidth=1.5, linestyle='-', color=UIUC['il_orange'], zorder=z_lines)
+    plt.plot(Ti_ev, tau_star_evap_far, marker='none', linewidth=1.5, linestyle=':', color=UIUC['il_orange'], zorder=z_lines)
+
+    label_Ti_evap = 3.4
+    _idx = np.argmin(np.abs(Ti_ev - label_Ti_evap))
+
+    label_Ti_evap_2 = 2.5
+    _idx2 = np.argmin(np.abs(Ti_ev - label_Ti_evap_2))
+
+    plt.text(Ti_ev[_idx], tau_star_evap_edge[_idx], 'Core/Edge',
+             fontsize=7, color=UIUC['il_orange'], weight='bold', style='italic',
+             ha='center', va='center', rotation=-11,
+             backgroundcolor='white', zorder=z_labels)
+    plt.text(Ti_ev[_idx2], tau_star_evap_far[_idx2], 'Far SOL',
+             fontsize=7, color=UIUC['il_orange'], weight='bold', style='italic',
+             ha='center', va='center', rotation=-11,
+             backgroundcolor='white', zorder=z_labels)
+
+    label_Ti_evap_ne = 4.5
+    _idx = np.argmin(np.abs(Ti_ev - label_Ti_evap_ne))
+
+    label_Ti_evap_ne2 = 4.5
+    _idx2 = np.argmin(np.abs(Ti_ev - label_Ti_evap_ne2))   
+
+    plt.text(Ti_ev[_idx], tau_star_evap_edge[_idx], '$\\mathbf{n_e\\sim10^{18} ~\\left[m^{-3} \\right]}$',
+             fontsize=6, color=UIUC['il_orange'], weight='bold', style='italic',
+             ha='center', va='center', rotation=-8,
+             backgroundcolor='white', zorder=z_labels)
+    plt.text(Ti_ev[_idx2], tau_star_evap_far[_idx2], '$\\mathbf{n_e\\sim10^{17}~ \\left[m^{-3} \\right]}$',
+             fontsize=6, color=UIUC['il_orange'], weight='bold', style='italic',
+             ha='center', va='center', rotation=-6,
+             backgroundcolor='white', zorder=z_labels)
+
+
+
 
     # Add legend entries: black dashed line to  'FarSOL' and solid black line for 'Edge Plasma'
-    plt.plot([], [], marker='none', linestyle='-', color='black', label='$\\it{Edge~Plasma~(n_e\\sim10^{18}~\\text{m}^{-3})}$')
-    plt.plot([], [], marker='none', linestyle=':', color='black', label='$\\it{Far~SOL~(n_e\\sim10^{17}~\\text{m}^{-3})}$')
+    # plt.plot([], [], marker='none', linestyle='-', color='black', label='$n_e\\sim10^{18}~\\text{m}^{-3}$')
+    # plt.plot([], [], marker='none', linestyle=':', color='black', label='$n_e\\sim10^{17}~\\text{m}^{-3}$')
+    # plt.plot([], [], marker='none', linestyle='-', color='black', label='$\\it{Edge~Plasma~(n_e\\sim10^{18}~\\text{m}^{-3})}$')
+    # plt.plot([], [], marker='none', linestyle=':', color='black', label='$\\it{Far~SOL~(n_e\\sim10^{17}~\\text{m}^{-3})}$')
 
     # vertical lines at x=1 and x=5
-    plt.axvline(typical_ionTemp_lo, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
-    plt.axvline(typical_ionTemp_hi, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
+    # plt.axvline(typical_ionTemp_lo, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
+    # plt.axvline(typical_ionTemp_hi, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
 
-    plt.xlabel('$T_i~\\text{[eV]}$', fontsize=14)
-    plt.ylabel('$\\tau^*$', fontsize=14)
-    plt.grid(which='both', zorder=0)
+
+
+
+
+
+    plt.xlabel('$\\bf{T_i}~\\bf{[eV]}$', fontsize=14)
+    plt.ylabel('$\\bf{\\tau^*}$', fontsize=14)
+    plt.grid(which='both', zorder=z_grid, linewidth=0.5, color='k', alpha=0.35)
     plt.xlim(0, 6)#ti_plot_high)
     plt.ylim(3e-2, 3e2)
     plt.yscale('log')
@@ -171,7 +253,7 @@ def plot_tau_starSOL(Ti_ev, f_typical_edge, f_typical_far, f_evap_edge, f_evap_f
     plt.legend(loc='lower center', fontsize=10, ncol=2, framealpha=1)
     #plt.tight_layout()
     #plt.show()
-    plt.savefig("tau_star_vs_Ti.png", dpi=300)  
+    plt.savefig("tau_star_vs_Ti.png", dpi=400)  
 
 
     plt.figure()
