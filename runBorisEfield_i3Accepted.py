@@ -48,10 +48,10 @@ FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3_lcfs19_noIsland1.npy'
 FIELD_SCALE_ELECTRIC = 120.0 # [Volts]
 # ION PROPERTIES
 ION_MASS = Li_mass # [amu]
-ION_TEMP = 1.0 # [eV]
+ION_TEMP = 5.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 19 #30 #29 #40 (from Poincare output (simIO.log))
+LCFS_INDEX = 30 #30 #29 #40 (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
 NPHI = 120
 NTHETA = 72
