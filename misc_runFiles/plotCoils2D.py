@@ -113,6 +113,8 @@ def main():
     ax.set_yticks(np.linspace(-180,180,21))
     ax.vlines([90,180,270], -200, 200, colors= 'k', linestyles="dashed", linewidth= 2)
     ax.hlines(0, -10, 370, colors='k', linestyles='dashed', linewidth=2)
+    ax.text(180, 160, 'Core/Edge', rotation=90, ha='center', va='center')
+    ax.text(355, 0, 'Far SOL', ha='right', va='bottom')
     
     plt.grid(True)
     plt.margins(0.05)
