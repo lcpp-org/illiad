@@ -234,8 +234,8 @@ def plot_tau_starSOL(Ti_ev, f_typical_edge, f_typical_far, f_evap_edge, f_evap_f
     # plt.plot([], [], marker='none', linestyle=':', color='black', label='$\\it{Far~SOL~(n_e\\sim10^{17}~\\text{m}^{-3})}$')
 
     # vertical lines at x=1 and x=5
-    # plt.axvline(typical_ionTemp_lo, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
-    # plt.axvline(typical_ionTemp_hi, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
+    plt.axvline(typical_ionTemp_lo, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
+    plt.axvline(typical_ionTemp_hi, color='k', linestyle='-', zorder=2)#, label='Typical Operating Range')
 
 
 
@@ -270,9 +270,9 @@ def main():
 
     #z_bg = 1.0        # Effective charge state of background species (Helium)
     #ne_m3 = 1e18  # Electron density in m^-3
-    ti_plot_low = 0.5   # Ion temperature in eV
+    ti_plot_low = 0.05   # Ion temperature in eV
     ti_plot_high = 7.0 # Ion temperature in eV
-    Ti_ev = np.linspace(ti_plot_low, ti_plot_high, 1000)   # Ion temperature in eV
+    Ti_ev = np.linspace(ti_plot_low, ti_plot_high, 2000)   # Ion temperature in eV
 
     f_coll_ne18 = ion_ion_collision_freq(1e18, Ti_ev, m_bg_amu, 1.0, m_imp_amu, z_imp, ln_lambda)
     f_coll_ne17 = ion_ion_collision_freq(1e17, Ti_ev, m_bg_amu, 1.0, m_imp_amu, z_imp, ln_lambda)
