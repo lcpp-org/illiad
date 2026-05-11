@@ -93,6 +93,10 @@ class Mesh:
                 att_mult = -0.955 * 0.9448
             elif att_mult =='default_poloidal_rev':
                 att_mult = 0.955 * 0.9448
+            elif att_mult =='ideal_toroidal':
+                att_mult = 1.0
+            elif att_mult =='ideal_poloidal':
+                att_mult = -1.0
             elif isinstance(att_mult, float):
                 att_mult = att_mult
             else:
@@ -166,6 +170,10 @@ class Mesh:
                 att_mult = -0.955 * 0.9448
             elif att_mult =='default_helical_rev':
                 att_mult = 0.955 * 0.9448
+            elif att_mult =='ideal_toroidal':
+                att_mult = 1.0
+            elif att_mult =='ideal_poloidal':
+                att_mult = -1.0
             elif isinstance(att_mult, float):
                 att_mult = att_mult
             else:
