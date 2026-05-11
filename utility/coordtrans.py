@@ -5,9 +5,18 @@
 # """
 
 import numpy as np
-import torch
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+try:
+    import torch
+except ModuleNotFoundError:
+    torch = None
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if torch else None
 #device = torch.device('cpu')
+
+
+def _require_torch():
+    if torch is None:
+        raise ImportError("PyTorch is required for this torch-based coordinate transform.")
 
 def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     """Converts r-theta-phi coordinates to Cartesian coordinates.
@@ -88,6 +97,7 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     Returns:
         torch.Tensor: Transformed point(s) in r-theta-phi coordinates, same shape as input.
     """
+    _require_torch()
     #p_XYZ = torch.tensor(p_XYZ).to(device)
     p_XYZ = p_XYZ.clone().detach().to(device)
     
@@ -194,6 +204,7 @@ def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
     Raises:
         ValueError: If `form` is not 'rtp2xyz' or 'xyz2rtp'.
     """
+    _require_torch()
     # p_rtp: (N,3), vec_in: (N,3)
     ctheta = torch.cos(p_rtp[:,1])
     stheta = torch.sin(p_rtp[:,1])
