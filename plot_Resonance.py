@@ -10,11 +10,6 @@ from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 
 
-REPO_ROOT = Path(__file__).resolve().parent
-
-FIELD_FILE_TOR = "input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy"
-FIELD_FILE_HEL = "input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy"
-
 CURRENT_TOR = 0.581 # [kA]
 CURRENT_HEL = 0.581 #0.790 # [kA]
 CONFIG_TOR = "ideal_toroidal" #"default_toroidal"
@@ -138,11 +133,6 @@ def plotResonance(input_params=None):
             print(f'{key}: {value}')
             globals()[str(key)] = value
 
-    if PHI_COUNT < 1:
-        raise ValueError("PHI_COUNT must be at least 1")
-    if CONTOUR_LEVELS < 2:
-        raise ValueError("CONTOUR_LEVELS must be at least 2")
-
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = IOHandler(ANLYS_DIR)
     simIO.startLog()
@@ -152,9 +142,9 @@ def plotResonance(input_params=None):
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(file_path=REPO_ROOT / FIELD_FILE_TOR, coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
     b_hidra.set_nonPer_errField()
-    b_hidra.addFieldPerturbation(file_path=REPO_ROOT / FIELD_FILE_HEL, coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
+    b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
     mesh_nr = int(b_hidra.nr // 2 + 1)
     mesh_ntheta = int(b_hidra.ntheta / 2)
@@ -183,5 +173,4 @@ def plotResonance(input_params=None):
 
 
 if __name__ == "__main__":
-
     plotResonance()
