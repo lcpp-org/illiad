@@ -19,7 +19,7 @@ import matplotlib.cm as cm
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP
-from magnetic_fiel_function_fitter import Magnetic_function_fitter
+from misc_runFiles.magnetic_fiel_function_fitter import Magnetic_function_fitter
 from sklearn.metrics import r2_score
 
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
