@@ -1,3 +1,11 @@
+import os
+import sys
+# Allow running from any subdirectory: resolve the project root relative to this file
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+os.chdir(_PROJECT_ROOT)
+
 from matplotlib.ticker import StrMethodFormatter
 import numpy as np
 import matplotlib.pyplot as plt
