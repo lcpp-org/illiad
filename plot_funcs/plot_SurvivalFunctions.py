@@ -13,7 +13,7 @@ from time import perf_counter
 
 from classes.iohandler import IOHandler
 from classes.meshNew import *
-from plot_InitEnergies import FIELD_SCALE_ELECTRIC, ION_TEMP
+from plot_funcs.plot_InitEnergies import FIELD_SCALE_ELECTRIC, ION_TEMP
 from utility.coordtrans import *
 from utility.anlys_funcs import *
 from classes.particle import *
