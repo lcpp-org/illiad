@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import gc
 from classes.mesh import *
 
-def main():
+def fluxInterpolator():
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
@@ -246,4 +246,4 @@ if __name__ == '__main__':
     GUESS_PHI_INDEX = -20 #-71
     # Stop for flux profile selection
     DEBUG = True
-    main()
+    fluxInterpolator()
