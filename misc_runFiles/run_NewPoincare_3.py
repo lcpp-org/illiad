@@ -45,9 +45,7 @@ def main():
     rho = torch.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr, dtype=torch.float64, device=device)
     theta = torch.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta, dtype=torch.float64, device=device)
     phi_period = b_hidra.periodicity[2]
-    phi = torch.linspace(
-        b_hidra.phi_min, b_hidra.phi_max*phi_period, b_hidra.nphi*phi_period,
-        dtype=torch.float64, device=device)
+    phi = torch.linspace(b_hidra.phi_min, b_hidra.phi_max*phi_period, b_hidra.nphi*phi_period, dtype=torch.float64, device=device)
     
     # Create RTP points array
     RHO_grid, THETA_grid, PHI_grid = torch.meshgrid(rho, theta, phi, indexing='ij')
