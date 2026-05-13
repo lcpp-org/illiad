@@ -9,14 +9,14 @@ import classes.class_outputHandler as out
 from classes.mesh import *
 from utility.coordtrans import RTP_XYZ_JAC
 
-def main():
+def fluxGradientor():
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
     simIO.createSubDir(ANLYS_SUBDIR)
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
 
@@ -142,26 +142,33 @@ if __name__ == '__main__':
     # ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
     # ANLYS_SUBDIR = "LCFS35_360x90_tol_5e1_5e2_LOMEM"
 
-    ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-    ANLYS_SUBDIR = "LCFS19_360x180_tol_5e1_5e2_APS2025"
+    # ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
+    # ANLYS_SUBDIR = "LCFS19_360x180_tol_5e1_5e2_APS2025"
+
+    # ANLYS_DIR = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
+    # ANLYS_SUBDIR = "LCFS30_360x180_smooth1e-4"
+
+    ANLYS_DIR = "It-0486_Ih-0790_PHI324_1500sp_LSODA2p49e8"
+    ANLYS_SUBDIR = "LCFS15_360x180_smooth1e-4"
 
     ## DEFINE FIELDS
     FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
     FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
     CURRENT_TOR = 0.486 #[kA]
-    CURRENT_HEL = 0.900 #[kA]
+    CURRENT_HEL = 0.790 #[kA]
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
+    ENABLE_ERRFIELD = True
 
     ## DEFINE LCFS AND ANGLES TO EVALUATE
-    LCFS_INDEX = 19 #100  #1f00 #40 #22 #29?
+    LCFS_INDEX = 15 #29 #100  #1f00 #40 #22 #29?
     NPHI = 360
     NTHETA = 180
     PHI_GENs = np.linspace(360//NPHI, 360, NPHI)
 
     ## FLUX INTEGRATION PARAMETERS
-    MAX_SUBSETS = 3
-    SMALLEST_ISLAND_INDEX = 47 #53 #39
+    MAX_SUBSETS = 4
+    SMALLEST_ISLAND_INDEX = None #104 #53 #39
 
-    OUTPUT_FILE_NAME = 'Efield_AcceptedIota3_lcfs19'
-    main()
+    OUTPUT_FILE_NAME = 'Efield_IdealIota3_lcfs30'
+    fluxGradientor()

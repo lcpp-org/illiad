@@ -16,7 +16,7 @@ UIUC = {
     }
 
 ## PORT PLOTTING CONVENIENCE FUNCTION
-def plotPorts(ax_, simIO):
+def global_plotPorts(ax_, simIO):
     """Plots the ports on the given axis."""
     # Import data on HIDRA port size/locations for plotting
     ports = simIO.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
@@ -25,79 +25,92 @@ def plotPorts(ax_, simIO):
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
 
-def plotWallHist(wallPtArray, runString, simIO):
+#def boris_plotWallHist(wallPtArray, runString, simIO):
+def boris_plotWallHist(wallPtArray, runString, simIO, cond_string):
     """ Plots a histogram of wall intersection points from the simulation."""
     simIO.log.info('Plotting wall hits, total events = {}...'.format(wallPtArray[0].size))
 
-    # extract theta and phi
-    theta_plot = wallPtArray[1]
-    # convert to phi= +CCW (as if viewing from outside the vaccum vessel)
-    phi_plot = wallPtArray[2]*(-1) + 2*np.pi
+    # cond string decoder
+    parts = cond_string.split('_')
+    dr_mm = parts[0]
+    LCFS_index = parts[1][4:]  # Remove 'LCFS' prefix
+    ion_temp_eV = parts[2][:-2]  # Remove 'eV' suffix
+    electric_field_V = parts[3][:-1]  # Remove 'V' suffix
+    charge_num_Z = parts[4][1:]  # Remove 'Z' prefix
 
-    # shift theta domain to -180 to 180
-    # for i in range(len(theta_plot)):
-    #     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
+    phi_plot = wallPtArray[2]*(-1) + 2*np.pi # convert to phi= +CCW (viewing from outside VV)
+    theta_plot = wallPtArray[1]
     theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
-    # convert to degrees
-    # shift to physical phi=0 at at the South-side split
-    a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+    # shift to physical phi=0 at at the South-side split, convert to deg.
+    a_phi = 18. # (deg), phi_comp 18 CW from south-split
     phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
     theta_plot_deg = theta_plot*(180/np.pi)
 
     # define bin edges for 2d histogram
     phi_edges = np.linspace(0, 360, 361)
     theta_edges = np.linspace(-180, 180, 181)
-
-    ## CREATE HISTOGRAM
     H, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=True)
     H = H.T # histogram reverse axes for some reason; transpose
 
     ## PLOT HISTOGRAM
     plt.rcParams.update({'font.size': 8})
-    #plt.rcParams.update({'figure.autolayout':True})
-
-    w, h = plt.figaspect(0.4)
+    w, h = plt.figaspect(0.40)
     fig = plt.figure(figsize=(w, h))
     ax = fig.add_subplot(polar=False, aspect=0.2)
 
-    plt.grid(which='both', linewidth=0.25)
-    plotPorts(ax, simIO)
+    plt.grid(which='both', linewidth=0.5)
+    global_plotPorts(ax, simIO)
 
     plt.imshow( H, interpolation='nearest', origin='lower',
                 extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
-                cmap='Blues', norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
+                cmap=plt.get_cmap('Blues', 6), norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
                 aspect=0.2 )
-    
-    plt.colorbar(location='bottom', shrink=0.6)
-    
-    ax.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+ 
+    #cbar = plt.colorbar(boundaries=levels, location='top', shrink=0.6)
+    cbar = plt.colorbar(location='top', shrink=0.6)
+    cbar.ax.tick_params(labelsize=12)
+    cbar.set_label('$\\hat{\\Gamma}_{depo}=\\frac{N_{depo}}{N_{total}}$', fontsize=12)
+ 
+    ax.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=14)
+    ax.set_ylabel('Poloidal Location', fontsize=14)   
     ax.set_xlim(0, 360)
-    xticks = np.linspace(9, 351, 39)
+    ax.set_ylim(-180, 180)
+
+    phi_spacing = 18. # degrees
+    xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
     ax.set_xticks(xticks)
     ax.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-    ax.xaxis.set_tick_params(labelsize=10)
+    ax.xaxis.set_tick_params(labelsize=12)
 
-    ax.set_ylabel('Poloidal Location', fontsize=12)
-    ax.set_ylim(-180, 180)
     ax.set_yticks(np.linspace(-180, 180, 5))
-    ax.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
-    ax.yaxis.set_tick_params(labelsize=8, labelrotation=45)
-    plt.tight_layout()
+    ax.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+    ax.yaxis.set_tick_params(labelsize=12, labelrotation=0)
 
+    #ax.text(0.995, 0.975, f'$\\mathrm{{{ion_temp_eV}eV, {electric_field_V}V, Z{charge_num_Z}}}$',
+    #ax.text(0.9955, 0.9755, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    ax.text(0.9945, 0.974, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    transform=ax.transAxes,
+    ha='right', va='top',
+    fontsize=14,
+    bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=0.9))
+
+
+
+    plt.tight_layout()
     plotname = 'Wall_Histogram_' + runString + '.png'
-    simIO.saveFig(plotname, dpi=400)
+    simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
+def boris_plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=None, colorLabel=None, runString='default', simIO=None):
     """Plots the discrete wall intersection points from the simulation."""
     #log = logging.getLogger()
     plt.rcParams.update({'font.size': 6})
     #plt.rcParams.update({'figure.autolayout':True})
     fig = plt.figure()
     ax = fig.add_subplot(polar=False, aspect=0.2)
-    plotPorts(ax, simIO)
+    global_plotPorts(ax, simIO)
 
     # plot wall event locations
     #plt.scatter(phi_plot_deg, theta_plot_deg, s=0.25, c='k', linewidths=0.0)
@@ -135,7 +148,7 @@ def plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRange=Non
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
+def boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     """Plots the discrete wall intersection points in 3D."""
     #log = logging.getLogger()
     #simIO.log.info('Attempting 3D plot...')
@@ -204,29 +217,28 @@ def plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, simIO):
     plt.close()
     #plt.show()
 
-#def plotInitEnergies(init_file, mass, runString='default', simIO=None):
-def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=None):
+def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     """Plots the initial energy distribution of particles to validate Maxwellian profile and ion temperature."""
     ## SOME PHYSICAL CONSTANTS
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
 
-    if sim_in:
-        init_conds = sim_in.loadNumpyData(init_file)
-    else:
-        init_conds = simIO.loadNumpyData(init_file)
+    # if simIO:
+    #     init_conds = simIO.loadNumpyData(init_file)
+    # else:
+    init_conds = simIO.loadNumpyData(init_file)
 
     # extract initial velocities, calculate initial energies in eV
     v0s = init_conds[:,0:3].T
     E0s = 0.5 * mass * kg_per_amu * (v0s[0]**2 + v0s[1]**2 + v0s[2]**2) / kboltz #eV
 
     ## create a 1d histogram of initial energies using numpy hist
-    dist, bin_edges= np.histogram(E0s, bins=500, density=False)
+    counts, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    lnE = np.log(dist[dist > 0])  # take log of only positive values to avoid log(0)
-    startfit_i = np.where(dist == np.max(dist))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
-    stopfit_i = np.where(dist < 1)[0][0]
+    lnE = np.log(counts[counts > 0])  # take log of only positive values to avoid log(0)
+    startfit_i = np.where(counts == np.max(counts))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
+    stopfit_i = np.where(counts < 1)[0][0]
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
     else:
@@ -253,22 +265,22 @@ def plotInitEnergies(init_file, mass, runString='default', simIO=None, sim_in=No
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
+def boris_plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     """Plots the final energy distribution of particles."""
     ## create a 1d histogram of initial energies using numpy hist
-    dist, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
+    counts, bin_edges= np.histogram(energy_array, bins=500, range=(0., 4000.), density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    startfit_i = np.where(dist == np.max(dist))[0][0]
-    # find the first index where dist is less than 1
+    startfit_i = np.where(counts == np.max(counts))[0][0]
+    # find the first index where counts is less than 1
      # if there are no values less than 1, we stop at the end of the distribution    
-    if np.any(dist < 1):
-        stopfit_i = np.where(dist < 1)[0][0]
+    if np.any(counts < 1):
+        stopfit_i = np.where(counts < 1)[0][0]
     else:
-        stopfit_i = len(dist) - 1
+        stopfit_i = len(counts) - 1
 
     # take log of only positive values to avoid log(0)
-    lnE = np.log(dist, out=np.zeros_like(dist, dtype=np.float64), where=(dist > 0))  
+    lnE = np.log(counts, out=np.zeros_like(counts, dtype=np.float64), where=(counts > 0))  
 
     if stopfit_i > startfit_i:
         slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
@@ -296,7 +308,7 @@ def plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotDepoAngles(angle_array, runString='default', simIO=None):
+def boris_plotDepoAngles(angle_array, runString='default', simIO=None):
     """Plots the distribution of deposition angles from the simulation."""
     plt.figure()
     plt.grid(which='both', zorder=0)
@@ -314,30 +326,39 @@ def plotDepoAngles(angle_array, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None):
+def boris_plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel=None, myColormap='viridis', runString='default', simIO=None, cond_string=None):
     """Plots the combined 2D histogram and 1D statistical distribution of the given data."""
     plt.rcParams.update({'font.size': 6})
     #plt.rcParams.update({'figure.autolayout':True})
 
-    tot_scale = 0.8
+    # cond string decoder
+    parts = cond_string.split('_')
+    dr_mm = parts[0]
+    LCFS_index = parts[1][4:]  # Remove 'LCFS' prefix
+    ion_temp_eV = parts[2][:-2]  # Remove 'eV' suffix
+    electric_field_V = parts[3][:-1]  # Remove 'V' suffix
+    charge_num_Z = parts[4][1:]  # Remove 'Z' prefix
 
-    width_left = 5/6 * tot_scale #fig_height / aspect_left
-    width_right = 1/6 * tot_scale  # or choose a different one
+    height = 0.75
+
+    width_left = 5/6 * height #fig_height / aspect_left
+    width_right = 1/6 * height  # or choose a different one
     h_buffer = 0.01  # horizontal buffer between left and right plots
 
     # Total width for the figure
-    total_width = (width_left + width_right)
+    total_width = width_left + width_right + h_buffer
     left_start = (1 - total_width) / 2
     bottom_start = (1 - total_width) * 2 / 3
     right_start = left_start + width_left + h_buffer
 
     fig = plt.figure(figsize=(24, 4))
+    #fig = plt.figure(figsize=(20, 4))
 
-    axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
+    axWall = fig.add_axes([left_start, bottom_start, width_left, height])
     axWall.set_aspect(0.2)  # height/width
 
-    axDist = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
-    plotPorts(axWall, simIO)
+    axDist = fig.add_axes([right_start, bottom_start, width_right, height])
+    global_plotPorts(axWall, simIO)
 
     if colorRange is None:
         colorRange = np.array([0, 3*np.mean(data)])  # default color range if not provided
@@ -353,21 +374,30 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
     norm = colors.Normalize(vmin=colorRange[0], vmax=colorRange[1])
 
 
-    axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
+    axWall.grid(linewidth = 0.5)#, linestyle=':', c='grey')
 
-    axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+    #axWall.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+    axWall.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=20)
     axWall.set_xlim(0, 360)
-    xticks = np.linspace(9, 351, 39)
+    phi_spacing = 18. # degrees
+    xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
     axWall.set_xticks(xticks)
-    axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-    axWall.xaxis.set_tick_params(labelsize=10)
+    #axWall.set_xticklabels([f'{int(tick)}' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+    axWall.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
+    axWall.xaxis.set_tick_params(labelsize=16)
 
-    axWall.set_ylabel('Poloidal Location', fontsize=12)
+    axWall.set_ylabel('Poloidal Location', fontsize=18)
     axWall.set_ylim(-180, 180)
     axWall.set_yticks(np.linspace(-180, 180, 5))
-    axWall.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
-    axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
+    axWall.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+    #axWall.yaxis.set_tick_params(labelsize=8, labelrotation=45)
+    axWall.yaxis.set_tick_params(labelsize=16, labelrotation=0)
 
+    axWall.text(0.9945, 0.974, f'$\\mathbf{{ T_i = {ion_temp_eV}eV}}$',
+    transform=axWall.transAxes,
+    ha='right', va='top',
+    fontsize=18,
+    bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=0.9))
 
     n, bins, patches = axDist.hist(data, bins=90, range=colorRange, density=False, linewidth=0.3, zorder=2)
     # Color each bar
@@ -377,8 +407,8 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
         patch.set_facecolor(color)
 
     axDist.grid(which='both', zorder=0)
-    axDist.set_xlabel(colorLabel, fontsize=12)
-    axDist.xaxis.set_tick_params(labelsize=12)
+    axDist.set_xlabel(colorLabel, fontsize=20)
+    axDist.xaxis.set_tick_params(labelsize=16)
     axDist.set_yticklabels([])
     axDist.yaxis.set_tick_params(color='white')
 
@@ -389,43 +419,68 @@ def plotCombined(phi_plot_deg, theta_plot_deg, data, colorRange=None, colorLabel
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
+def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='default', simIO=None):
     """Plots the percent of particles running over time."""
-    # maxN_array is an array of maximum timestep for each particle. create a plot showing the number of particles running over time
+    # maxN_array is an array of maximum timestep for each particle. 
+    # create a plot showing the number of particles running over time
 
     # Calculate the number of particles running over time (efficiently)
     time_steps = np.arange(0, tmax, dt)
-    maxTime_array = maxN_array * dt
-    # Sort maxTime_array once
-    sorted_maxTime = np.sort(maxTime_array)
+    time_ms = time_steps * 1000
+    sorted_maxTime = np.sort(maxN_array) * dt
+
     # Use searchsorted to find how many particles have maxTime > t for each t
-    particles_running = len(maxTime_array) - np.searchsorted(sorted_maxTime, time_steps, side='right')
-    pct_running = 100 * particles_running / tot_particles
-    pct_running += 100 - pct_running[0]
+    particles_running = len(sorted_maxTime) - np.searchsorted(sorted_maxTime, time_steps, side='right')
+    frac_running = particles_running / tot_particles
+    frac_running += 1 - frac_running[0]  # adjust so that it starts at 100% at t=0
+
+    unnormalized_frac_running = particles_running / tot_particles
+    frac_running = unnormalized_frac_running + 1 - unnormalized_frac_running[0]  # adjust so that it starts at 100% at t=0
+
+
+    # Estimate residence time using trapezoidal integration of the fraction running over time
+    tau_res = np.trapz(frac_running, dx=dt)
+    if frac_running[-1] > 0:
+        slope = (np.log(frac_running[-1]) - np.log(frac_running[-101])) / 100 / dt # use wider range for slope to reduce noise
+        slope = min(slope, -1e-1)  # prevent division by zero or very small slope
+        tau_res_corr = -frac_running[-1] / slope
+    else:
+        tau_res_corr = 0.0
+
+    tau_res_est = tau_res + tau_res_corr
+    frac_at_tau_res = frac_running[np.argmin(np.abs(time_steps - tau_res_est))]
+
     # Plot the number of particles running over time
-    plt.figure(figsize=(10, 6))
-    plt.plot(time_steps, pct_running, label='Particles Running')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Percent of Particles')
-    plt.title('Particles Running Over Time')
-    # Set major ticks every 0.0001 and minor ticks every 0.00005 on the x-axis
-    ax = plt.gca()
-    ax.xaxis.set_major_locator(plt.MultipleLocator(0.0001))
-    ax.xaxis.set_minor_locator(plt.MultipleLocator(0.00005))
-    ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
-    # Set minor tick gridlines to be dashed and smaller width
-    ax.grid(which='minor', linestyle=':', linewidth=0.5)
-    ax.grid(which='major', linestyle='-', linewidth=1)
-    ax.set_xlim(0, tmax)
-    plt.tight_layout()
+    plt.figure(figsize=(8, 5))
+
+    plt.plot(time_ms, frac_running, color=UIUC['il_blue'], label='Particles Running', linewidth=1.5)
+
+    plt.fill_between(time_ms, frac_running, color=UIUC['il_blue'], alpha=0.3)
+
+    plt.plot(tau_res_est*1000, frac_at_tau_res, 'ro', label='Estimated Residence Time Point')
+
+    plt.axvline(tau_res_est*1000, 0.0, frac_at_tau_res,
+                 color='k', linestyle='--', label='Estimated Residence Time', zorder=0)
+
+    plt.xlabel('$t~[ms]$', fontsize=12)
+    plt.ylabel('$\\dfrac{N_{active}}{N_{total}}$', fontsize=12, rotation=0, labelpad=22)
+    plt.title('Estimated Residence Time = {:.3f}$\\mathit{{(+{:.3f}ms~correction) }}$'
+              .format(tau_res_corr*1000, tau_res_corr*1000), fontsize=12)
+    
+    plt.xlim(0, time_ms[-1])    
+    plt.ylim(0, 1.05)
+    plt.xticks(np.arange(0, time_ms[-1]+0.1, 0.1), fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.grid(which='both')#, linestyle=':', linewidth=0.5)
+    #plt.tight_layout()
 
     plotname = 'IonsVtime_' + runString + '.png'
     simIO.saveFig(plotname, dpi=300)
-    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
-    #plt.savefig(simIO.outputDir + '/ParticlesRunningOverTime_' + cond_string + TAG + '.png')
+    simIO.log.info('OUTPUT PLOT: {}, residence time = {:.3f}ms, corr = {:.3f}ms, slope = {:.3f}'
+                   .format(plotname, tau_res*1000, tau_res_corr*1000, slope))
     plt.close()
 
-def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
+def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runString, simIO):
     """Plots a combined histogram of wall intersection points and the percent of particles running over time."""
     simIO.log.info('Plotting Combined Histogram...')
 
@@ -484,7 +539,7 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     fig = plt.figure(figsize=(24, 4))
     axWall = fig.add_axes([left_start, bottom_start, width_left, tot_scale])
     axWall.set_aspect(0.2)  # height/width
-    plotPorts(axWall, simIO)
+    global_plotPorts(axWall, simIO)
     # axRight = fig.add_axes([right_start, bottom_start, width_right, tot_scale])
 
     axWall.imshow( H, interpolation='nearest', origin='lower',
@@ -494,12 +549,12 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     
     # axWall.colorbar(location='bottom', shrink=0.6)
     axWall.grid(linewidth = 0.25, linestyle=':', c='grey')
-    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=14)
+    axWall.set_xlabel('Toroidal Angle, $\phi$, $[\degree]$', fontsize=16)
     axWall.set_xlim(0, 360)
     xticks = np.linspace(9, 351, 39)
     axWall.set_xticks(xticks)
     axWall.set_xticklabels([f'{int(tick)}' if i % 2 == 0 else '' for i, tick in enumerate(xticks)])
-    axWall.xaxis.set_tick_params(labelsize=12)
+    axWall.xaxis.set_tick_params(labelsize=14)
 
     axWall.set_ylabel('Poloidal Location', fontsize=14)
     axWall.set_ylim(-180, 180)
@@ -519,7 +574,7 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     axRight.set_xticks(np.linspace(0.0, 1.0, 11))
     #axRight.set_xticks(np.linspace(0.0, 0.001, 11))
     axRight.set_xlim(0, 1.0)
-    axRight.xaxis.set_tick_params(labelsize=10)
+    axRight.xaxis.set_tick_params(labelsize=12)
 
     axRight.set_ylabel('% of Particles Running', fontsize=12)
 
@@ -538,7 +593,7 @@ def plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, runStrin
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
+def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     """Plots the ion traces in 3D."""
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -585,7 +640,7 @@ def plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
+def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
     """Plots the ion traces in polar coordinates (Poincare plot)."""
     print('ion_traces shape:', ion_traces.shape)
     fig = plt.figure()
@@ -612,3 +667,45 @@ def plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
     #plt.show()
+
+# POINCARE PLOT FUNCTIONS:
+def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None):
+    """Plots a black and white Poincare plot of the magnetic field lines."""
+
+    rho_max = b_hidra.a
+    num_sets = len(radtheta_pts)
+
+    plt.rcParams.update({'font.size': 10})
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, polar=True)
+    for i in range(num_sets):
+        plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
+                     marker='.', s=1.00, c='k', linewidths=0.0)
+    ax.set_rmax(rho_max)
+    # ax.set_rticks(np.arange(0.0, rho_max, 0.02))
+    # ax.yaxis.set_tick_params(labelsize=5)
+    ax.grid(linewidth = 0.25, linestyle=':', c='k')
+ 
+    ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
+                labels=['', '', '', '', '', '', ''], angle=0, fontsize=4)
+
+    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
+                    #labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=12)
+                    labels=['', '', '', '', '', '', '', ''], fontsize=12)
+
+    #ax.grid(False)
+
+
+    phi_phys_deg = (phi_deg + 198.) % 360.
+    phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
+    phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
+    #ax.set_title(phi_phy_string + phy_comp_string, loc='left')
+
+    plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
+    plt.tight_layout()
+    simIO.saveFig(plot_name, dpi=400)
+    plt.close(fig)
+    #del fig, ax, radtheta_pts, xyz_list
+    #gc.collect()
+
+    simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))

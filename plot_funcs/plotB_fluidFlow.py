@@ -1,4 +1,13 @@
 ## IMPORT
+import os
+import sys
+# Allow running from any subdirectory: resolve the project root relative to this file
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+os.chdir(_PROJECT_ROOT)
+
+
 import pandas as pd
 import numpy as np
 from mpl_toolkits import mplot3d
@@ -11,7 +20,7 @@ from classes.iohandler import IOHandler
 #from classes.mesh import *
 from classes.mesh import Mesh
 from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP
-from magnetic_fiel_function_fitter import Magnetic_function_fitter
+from misc_runFiles.magnetic_fiel_function_fitter import Magnetic_function_fitter
 from sklearn.metrics import r2_score
 
 

@@ -5,60 +5,53 @@ from time import perf_counter
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 import os
-
 from classes.mesh import Mesh
 
 def wrap_angle(a): return np.mod(a, 2.0 * np.pi)
 
-def poincare_intersections_multi_planes_single_line_local(
+def solve_single_fieldline_intersections(
     rho0, theta0, phi0, phi_planes, rhs_func,
-    num_turns=1000, n_steps_per_2pi=400,
-    solver='LSODA', rtol=1e-7, atol=1e-9):
+    num_turns=1000, solver='LSODA', rtol=1e-7, atol=1e-9):
     """
     Trace one field line starting at (ρ0, θ0) on plane φ=phi0 and return
     intersections with multiple planes φ = phi_planes (mod 2π), for the
     specified number of toroNumber of points in polar plot:idal turns.
 
-    Returns a dict mapping each plane value to a tuple (phi_cross, rho_cross, theta_cross).
+    Returns a dict mapping each plane value to a tuple (rho_cross, theta_cross).
     """
     phi_start = phi0
-    phi_end   = phi0 + num_turns * 2.0 * np.pi
-    max_step  = 2.0 * np.pi / n_steps_per_2pi
+    phi_end = phi0 + num_turns * 2.0 * np.pi
 
-    def stop_integration_on_rho_limit(phi, y): return 0.19 - y[0]
-    stop_integration_on_rho_limit.terminal = True
-    stop_integration_on_rho_limit.direction = -1
+    def stop_on_rho_lim(phi, y): return 0.19 - y[0]
+    stop_on_rho_lim.terminal = True
+    stop_on_rho_lim.direction = -1
 
     # Precompute all desired crossing angles across all planes, then evaluate only at those angles.
-    two_pi = 2.0 * np.pi
     plane_to_phi_cross = {}
     all_phi = []
     for p in np.atleast_1d(phi_planes):
         p = float(p)
-        k0 = int(np.ceil((phi_start - p) / two_pi))
-        k1 = int(np.floor((phi_end   - p) / two_pi))
+        k0 = int(np.ceil((phi_start - p) / 2.0 / np.pi))
+        k1 = int(np.floor((phi_end   - p) / 2.0 / np.pi))
         if k1 < k0:
             plane_to_phi_cross[p] = np.array([])
             continue
         ks = np.arange(k0, k1 + 1, dtype=int)
-        phi_cross = p + ks * two_pi
+        phi_cross = p + ks * 2.0 * np.pi
         plane_to_phi_cross[p] = phi_cross
         all_phi.append(phi_cross)
 
     if not all_phi:
-        return {p: (np.array([]), np.array([]), np.array([])) for p in plane_to_phi_cross.keys()}
-
+        return {p: (np.array([]), np.array([])) for p in plane_to_phi_cross.keys()}
     phi_eval = np.unique(np.concatenate(all_phi))
     phi_eval.sort()
 
-    sol = solve_ivp(
-        fun=rhs_func, t_span=(phi_start, phi_end), y0=[rho0, theta0],
-        method=solver, rtol=rtol, atol=atol,
-        t_eval=phi_eval, dense_output=False,
-        events=stop_integration_on_rho_limit)
+    sol = solve_ivp(fun=rhs_func, t_span=(phi_start, phi_end), y0=[rho0, theta0],
+                    method=solver, rtol=rtol, atol=atol,
+                    t_eval=phi_eval, dense_output=False, events=stop_on_rho_lim)
     # If integration failed, return empties for all planes
     if not sol.success or sol.t.size == 0:
-        return {p: (np.array([]), np.array([]), np.array([])) for p in plane_to_phi_cross.keys()}
+        return {p: (np.array([]), np.array([])) for p in plane_to_phi_cross.keys()}
     t = sol.t
     rho, theta = sol.y[:2]
     #theta = sol.y[1]
@@ -83,61 +76,37 @@ def poincare_intersections_multi_planes_single_line_local(
 
     return results
 
-def _trace_single_surface_multi(rho0, theta_start, phi0, phi_planes,
-    num_turns, n_steps_per_2pi, solver, rtol, atol, R0):
+
+def single_surface_wrapper(rho0, theta_start, phi0, phi_planes,
+    num_turns, solver, rtol, atol, R0):
     """Worker for one field line; returns intersections for many φ planes."""
 
-    def fieldline_rhs_local(phi, y):
-        eps_rho =  getattr(b_hidra_RTP, "dr") #5e-4[meter]
-        eps_Bp = 1e-12
-        delt_rho = 0.0
-        delt_theta = 0.0
-        
+    def fieldline_rhs(phi, y):
+        eps_rho =  1e-28 #getattr(b_hidra_RTP, "dr") #5e-4[meter]
+        eps_Bp = 1e-12 # default value[Tesla]
+
         rho, theta = float(y[0]), float(y[1])
         phi = float(phi)
-
         if rho < 0.0:
             rho_eval = -rho
             theta_eval = theta + np.pi
         else:
             rho_eval = rho
             theta_eval = theta
-        
-        # if rho_eval < eps_rho:
-        #     delt_rho = eps_rho - rho_eval
-        #     point_eval = np.array([ eps_rho, theta_eval, phi])
 
-        #     Br, Bt, Bp = b_hidra_RTP.interpField(point_eval, Cart=False)[0]
-        #     if abs(Bp) < eps_Bp: Bp = np.copysign(eps_Bp, Bp if Bp != 0.0 else 1.0)
-
-        #     if Br < 0.0:
-        #         Br = -Br
-        #         delt_theta = np.pi
-            
-        # else:
-        #     point_eval = np.array([ rho_eval, theta_eval, phi])
-        #     Br, Bt, Bp = b_hidra_RTP.interpField(point_eval, Cart=False)[0]
-        #     if abs(Bp) < eps_Bp: Bp = np.copysign(eps_Bp, Bp if Bp != 0.0 else 1.0)
-
-        # return [Br/Bp + delt_rho, Bt/Bp + delt_theta]
-
-        pt = np.array([ rho_eval, theta_eval, phi])
-
+        if rho_eval < (b_hidra_RTP.dr/2):
+            print(f"SCREAM!")
+        # use the maximmum of rho_eval and eps_rho in pt
+        pt = np.array([max(rho_eval, eps_rho), theta_eval, phi])
         Br, Bt, Bp = b_hidra_RTP.interpField(pt, Cart=False)[0]
-        if abs(Bp) < eps_Bp: Bp = np.copysign(eps_Bp, Bp if Bp != 0.0 else 1.0)
+        #if abs(Bp) < eps_Bp: Bp = np.copysign(eps_Bp, Bp if Bp != 0.0 else 1.0)
 
-        if abs(rho) < eps_rho:
-            Bt *= 0.0
-            #Bt = Bp * np.pi
-            #Br = np.abs(Br)
         return [Br/Bp, Bt/Bp]
-    
+
     print(f'Starting surface rho0={rho0:.4f}...')
-    plane_results = poincare_intersections_multi_planes_single_line_local(
-        rho0, theta_start, phi0, phi_planes, fieldline_rhs_local,
-        num_turns=num_turns, n_steps_per_2pi=n_steps_per_2pi,
-        solver=solver, rtol=rtol, atol=atol,
-    )
+    plane_results = solve_single_fieldline_intersections(
+        rho0, theta_start, phi0, phi_planes, fieldline_rhs,
+        num_turns=num_turns, solver=solver, rtol=rtol, atol=atol)
 
     by_plane = {}
     for p, (rho_cross, theta_cross) in plane_results.items():
@@ -149,10 +118,10 @@ def _trace_single_surface_multi(rho0, theta_start, phi0, phi_planes,
     return {'rho0': rho0, 'by_plane': by_plane}
 
 
-def compute_poincare_surfaces_parallel_multi(num_surfaces=16, num_turns=300, phi_step_deg=72, 
-                                            phi_start = 0.0, theta_start=np.pi, rho_min=0.02, rho_max=0.14,
-                                            solver='LSODA', rtol=1e-7, atol=1e-9,
-                                            n_steps_per_2pi=90, R0=0.72, n_jobs=-1 ):
+def compute_poincare_parallel(
+        num_surfaces=16, num_turns=300, phi_step_deg=72, 
+        phi_start = 0.0, theta_start=np.pi, rho_min=0.02, rho_max=0.14,
+        solver='LSODA', rtol=1e-7, atol=1e-9, R0=0.72, n_jobs=-1 ):
     """
     Compute Poincaré intersections for many flux surfaces and multiple φ planes.
     Returns a list where each item is {'rho0': float, 'by_plane': {phi: {...}}}
@@ -161,16 +130,13 @@ def compute_poincare_surfaces_parallel_multi(num_surfaces=16, num_turns=300, phi
     phi_planes = np.deg2rad(phi_planes_deg)
     rho_starts = np.linspace(rho_min, rho_max, num_surfaces)
     surfaces = Parallel(n_jobs=n_jobs)(
-        delayed(_trace_single_surface_multi)(
+        delayed(single_surface_wrapper)(
             rho0=rho0, theta_start=theta_start, phi0=phi_start,
-            phi_planes=phi_planes,
-            num_turns=num_turns,
-            n_steps_per_2pi=n_steps_per_2pi,
-            solver=solver, rtol=rtol,atol=atol,
-            R0=R0,
-        )
+            phi_planes=phi_planes, num_turns=num_turns,
+            solver=solver, rtol=rtol, atol=atol, R0=R0)
         for rho0 in rho_starts
     )
+
     return surfaces
 
 
@@ -178,28 +144,24 @@ if __name__ == "__main__":
     # N,, N+N-1, N+N-1+(N+N-1)-1, ...
     # 11, 21, 41, 81, 161
     # 13, 25, 49, 97, 193
-    NUM_SURFACES = 49 #97 #49 
-    NUM_TURNS    = 500
-    PHI_PLANE    = np.radians(324.) # starting phi for field line tracing
-    PHI_STEP_DEG = 9 # Multi-plane sampling every nth-degree
-    THETA_START  = np.pi #inner midplane
-    RHO_MIN = 0.02
-    RHO_MAX = 0.14
-    SOLVER='LSODA'
-    RTOL = 1e-12
-    ATOL = 5e-7
-    N_STEPS_PER_2PI = 90 #deprecated, remove!
-    TAG = None #"i5-860"
+    NUM_SURFACES = 97 #97 #49 
+    NUM_TURNS    = 800
+    PHI_STEP_DEG = 1 # multi-plane sampling every nth-degree
+    
+    PHI_START    = np.radians(324.) # starting phi for field line tracing
+    THETA_START  = np.pi # inner midplane
+    RHO_MIN      = 0.02
+    RHO_MAX      = 0.14
 
-    #OUT_DIR = f'Poincare_{SOLVER}_rtol{RTOL:.0e}_atol{ATOL:.0e}_n{NUM_SURFACES}x{NUM_TURNS}_{TAG}'
-    #OUT_DIR = f'OG-negRhoTweak_i5-860_epRho-dr'
-    OUT_DIR = f'OG-negRhoTweak_Ih860_copyAll-toRho0-2'
+    SOLVER       = 'LSODA'
+    RTOL         = 1e-12
+    ATOL         = 5e-7
 
-    # DEFINE FIELDS #
-    # CURRENT_TOR = 0.486 #[kA]
-    # CURRENT_HEL = 0.710 #[kA]
-    # CONFIG_TOR = "default_toroidal"
-    # CONFIG_HEL = "default_helical"
+    #FIELD_FILE   = "Bfield_RTP_contravariant_Ih860_Clamp1e12_r0ThetaPhys.npy"
+    FIELD_FILE   = "Bfield_RTPcontra_Ih860_Reglrzd_clamp1e28-28.npy"
+    TAG          = None #"i5-860"
+    OUT_DIR = "Ih860_AllMeanClamp1e28_97-800"
+    #OUT_DIR = "AAAA_WUT"
 
     ## SET UP RUN DIRECTORY 
     full_output_directory = os.path.join('output', OUT_DIR)
@@ -207,21 +169,14 @@ if __name__ == "__main__":
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra_RTP = Mesh(R0=0.72, a=0.19)
-    #b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_i5.npy", period = np.array([0, 1, 1]), att_mult=1.0)
-    #b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_i5-e4avg.npy", period = np.array([0, 1, 1]), att_mult=1.0)
-    #b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_i5-dr.npy", period = np.array([0, 1, 1]), att_mult=1.0)
-    #b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_i5-820.npy", period = np.array([0, 1, 1]), att_mult=1.0)
-    #b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_i5-860.npy", period = np.array([0, 1, 1]), att_mult=1.0)
-
-    b_hidra_RTP.loadCartesianField("Bfield_RTP_contravariant_Ih860_copyAll-toRho0.npy", period = np.array([0, 1, 1]), att_mult=1.0)
+    b_hidra_RTP.loadCartesianField(FIELD_FILE, period = np.array([0, 1, 1]), att_mult=1.0)
 
     # Compute Poincaré surfaces in parallel
     tic = perf_counter()
-    surfaces_multi = compute_poincare_surfaces_parallel_multi(
+    surfaces_multi = compute_poincare_parallel(
         num_surfaces=NUM_SURFACES, num_turns=NUM_TURNS, phi_step_deg=PHI_STEP_DEG, 
-        phi_start=PHI_PLANE, theta_start=THETA_START, rho_min=RHO_MIN, rho_max=RHO_MAX,
-        solver=SOLVER, rtol=RTOL,atol=ATOL,
-        n_steps_per_2pi=N_STEPS_PER_2PI, R0=0.72, n_jobs=-1,
+        phi_start=PHI_START, theta_start=THETA_START, rho_min=RHO_MIN, rho_max=RHO_MAX,
+        solver=SOLVER, rtol=RTOL,atol=ATOL, R0=0.72, n_jobs=-1,
     )
     toc = perf_counter()
     print(f"Computation took {toc - tic:.2f} seconds")

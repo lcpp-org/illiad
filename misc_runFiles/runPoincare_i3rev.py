@@ -6,7 +6,7 @@
 #------------------------------------------------------#
 #  IOTA  |   I_T   |   I_H   |   I_V   |  PHI FWD/REV  #
 #        |  [Amp]  |  [Amp]  |  [Amp]  |     [deg]     #
-#  1/3   |   486   |   900   |    00   |    324/???    #
+#  1/3   |   486   |   900   |    00   |    324/360    #
 #  1/4   |   486   |   790   |    00   |    180/144    #
 #  1/5   |   486   |   710   |    00   |    360/???    #
 #  1/7   |   581   |   581   |    00   |    ???/???    #
@@ -28,30 +28,26 @@ from classes.poincare import Poincare
 
 # DEFINE FIELDS #
 CURRENT_TOR = 0.486 #[kA]
-CURRENT_HEL = 0.790 #[kA]
+CURRENT_HEL = 0.900 #[kA]
 CONFIG_TOR = "default_toroidal"
-CONFIG_HEL = "default_helical"
-ENABLE_ERRFIELD = False
+CONFIG_HEL = "default_helical_rev"
 
 # DEFINE INITIAL CONDITIONS #
-IC_PHI_DEG = 180. #[deg]
+IC_PHI_DEG = 216. #0. #[deg]
 IC_THETA_DEG = 180. #[deg]
-START_RADIUS = 0.150 #[m]
+START_RADIUS = 0.130 #[m]
 END_RADIUS = 0.020 #[m]
-NLINES = 14 + 13 # + 26 + 52 + 104
-SPINS = 2000 # max length, SPIN = 2pi*R0 [meters]
+NLINES = 45 #89
+SPINS = 300 #1500 # max length, SPIN = 2pi*R0 [meters]
 
 # DEFINE SOLVER PARAMETERS #
-SOLVER = "RK45" #'LSODA'
+SOLVER = "LSODA"
 RTOL = 2.49e-12
-ATOL = 1e-8
+ATOL = 1e-7
 NTHREADS = -1
 DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "RK45-1e8_Iota4FWD_2000spins_27Lines"
-
-
-
+OUTPUT_DIR = f"It-{CURRENT_TOR*1000:04.0f}_Ih-{CURRENT_HEL*1000:04.0f}_REV_PHI{int(IC_PHI_DEG):03d}_{SPINS:04d}sp_LSODA2p49e8"
 
 def main():
     """
@@ -63,7 +59,7 @@ def main():
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
     b_hidra.set_nonPer_errField()
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
@@ -85,5 +81,4 @@ def main():
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()

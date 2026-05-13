@@ -15,7 +15,7 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from utility.coordtrans import XYZ_to_RTP, RTP_XYZ_JAC#, RTP_to_XYZ
-from plot_funcs import plotFuncs
+#from plot_funcs import plotFuncs
 
 
 class Boris():
@@ -32,7 +32,11 @@ class Boris():
         for name in dir(plotFuncs):
                     func = getattr(plotFuncs, name)
                     if callable(func) and not name.startswith("__"):
-                        setattr(self, name, func)  # Attach to the instance
+                        if name.startswith("global_"):
+                            new_name = name.replace("global_", "")  # Remove prefix
+                        elif name.startswith("boris_"):
+                            new_name = name.replace("boris_", "")  # Remove prefix
+                            setattr(self, new_name, func)  # Attach to the instance with the new name
 
         self.IO = io_handler
         self.anlys_name = anlys_name
@@ -75,7 +79,7 @@ class Boris():
         # self.IO.log.info(f"| NSTEPS         | {self.nsteps:<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
-    def parallel_solver(self, ions, Bfield, Efield=None, trace_IDs=[]):
+    def parallel_solver(self, ions, Bfield, Efield=None, trace_IDs=[], freq_corr=False):
         """
         Function to take in a particle and field object and solves the particle path until termination event or tmax
         using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
@@ -85,6 +89,7 @@ class Boris():
             -Bfield (object): Magnetic field object providing field interpolation methods.
             -Efield (object, optional): Electric field object providing field interpolation methods. Defaults to None.
             -track_ID (list, optional): List of particle IDs to track. Defaults to [10, 20].
+            -freq_corr (bool, optional): Flag to enable frequency correction. Defaults to False.
         Returns:
             -wallPts (torch.Tensor): XYZ Positions where particles terminate (e.g., hit the wall), shape (Nparticles, 3).
             -wallVelocities (torch.Tensor): Velocities of particles at termination, shape (Nparticles, 3).
@@ -100,8 +105,8 @@ class Boris():
             wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
             wallVelocities = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
             maxStep = torch.zeros(Nparticles, dtype=torch.int, device=device)
-
             tvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
+
             qdt2m = torch.tensor([ion.charge_mass_ratio * self.dt / 2 for ion in ions], dtype=torch.float64, device=device)
             v_k = torch.tensor(np.array([ion.vel0_XYZ for ion in ions]), dtype=torch.float64, device=device)
 
@@ -114,7 +119,15 @@ class Boris():
             else:
                 Evec = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
 
-            tvec = (Bfield.interpField(pos_k) * qdt2m).T
+            if freq_corr:
+                Bvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
+                Bvec = Bfield.interpField(pos_k).T
+                Bmag = torch.linalg.norm(Bvec, axis=-1)
+                Bhat = Bvec / Bmag[:, None]
+                tvec = torch.tan(qdt2m * Bmag)[:, None] * Bhat
+            else:
+                tvec = (Bfield.interpField(pos_k) * qdt2m).T
+
             tmag = torch.linalg.norm(tvec, axis=-1)
 
             vminus = v_k + Evec
@@ -142,7 +155,15 @@ class Boris():
                 for k in pbar:
                     if Efield:
                         Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
-                    tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
+
+                    if freq_corr:
+                        Bvec[running] = Bfield.interpField(pos_k[running]).T
+                        Bmag[running] = torch.linalg.norm(Bvec[running], axis=-1)
+                        Bhat[running] = Bvec[running] / Bmag[running][:, None]
+                        tvec[running] = torch.tan(qdt2m[running] * Bmag[running])[:, None] * Bhat[running]
+                    else:
+                        tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
+
                     tmag[running] = torch.linalg.norm(tvec[running], axis=-1)
 
                     vminus[running] = v_k[running] + Evec[running]
@@ -233,18 +254,28 @@ class Boris():
         wallPtArray = np.asarray( [XYZ_to_RTP(wall_point, Bfield.R0) for wall_point in wallPt_output] ).T
         outputArray = np.vstack((wallPtArray, velocity_output.T, max_timeStep[None, :]))
 
-        ## CALCULATE ANGLE FROM NORMAL
+        ## CALCULATE UNIT VECTORS
         unit_vec_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
         radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+        toroidal_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([0,0,1]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+
+        ## CALCULATE ANGLE FROM NORMAL    
         deposition_angles = np.arccos(np.einsum('ij,ij->i', unit_vec_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
         deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
+        ## CALCULATE TOROIDAL ANGLE    
+        cos_toroidal_angles = np.einsum('ij,ij->i', unit_vec_xyz, toroidal_vec_xyz)
+        toroidal_angles = np.arccos(cos_toroidal_angles)
+        toroidal_angles_deg = np.degrees(toroidal_angles)  # Convert angles to degrees
+
 
         self.IO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
             np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
+        self.IO.log.info('toroidal_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
+            np.min(toroidal_angles_deg), np.max(toroidal_angles_deg), np.mean(toroidal_angles_deg)))
         toc = perf_counter()
         self.IO.log.info('OUTPUT SENT TO CPU AND CONVERTED TO RTP IN {}SEC'.format(toc-tic))
 
-        return outputArray, energy_output, deposition_angles_deg, ion_traces
+        return outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces
 
     def save_output(self, outputArray, ion_traces):
         """Saves the output data to files in the specified output directory."""
@@ -269,12 +300,13 @@ class Boris():
                 outputArray (np.ndarray): Array of wall point and velocity data.
                 energy_output (np.ndarray): Array of particle energies at termination (in eV).
                 deposition_angles_deg (np.ndarray): Array of deposition angles (in degrees).
+                toroidal_angles_deg (np.ndarray): Array of toroidal angles (in degrees).
                 ion_traces (np.ndarray): Array of traced particle positions.
         """
         solv_out = self.parallel_solver(self.ion_list, Bfield, Efield, trace_IDs=trace_IDs)
 
-        outputArray, energy_output, deposition_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)
+        outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)
 
         self.save_output(outputArray, ion_traces)
 
-        return outputArray, energy_output, deposition_angles_deg, ion_traces
+        return outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces

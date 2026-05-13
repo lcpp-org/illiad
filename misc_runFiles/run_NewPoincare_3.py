@@ -17,7 +17,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from classes.iohandler import IOHandler
 from classes.meshNew import Mesh
-from classes.poincare import Poincare
 from utility.coordtrans import RTP_XYZ_JAC, RTP_XYZ_JAC2
 import torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,17 +58,6 @@ def main():
     B_xyz = b_hidra.interpField(rtp_flat, Cart=False) # return (Bx, By, Bz) shape (3, N)
     B_rtp_phys = RTP_XYZ_JAC2(rtp_flat, B_xyz, form='xyz2rtp')
 
-    # Convert to contravariant components
-    # r_flat = rtp_flat[:, 0]
-    # Rcyl = b_hidra.R0 + r_flat * torch.cos(rtp_flat[:, 1])  # R0 + ρ cosθ
-
-    # B_rtp_contra = torch.zeros_like(B_rtp_phys)
-    # B_rtp_contra[0, :] = B_rtp_phys[0, :] # B^r
-    # B_rtp_contra[1, :] = B_rtp_phys[1, :] / torch.clamp(r_flat, min=b_hidra.dr/2.0) #  B^θ
-    # B_rtp_contra[2, :] = B_rtp_phys[2, :] / Rcyl #  B^ϕ
-
-    # B_rtp_contra = B_rtp_contra.reshape(3, *mesh_shape).cpu().numpy()
-
     rho_grid = rtp_points[:,:,:,0]
     theta_grid = rtp_points[:,:,:,1]
     Rcyl = b_hidra.R0 + rho_grid * torch.cos(theta_grid)  # R0 + ρ cosθ
@@ -78,23 +66,41 @@ def main():
     B_rtp_contra = B_rtp_phys.clone()
     B_rtp_contra = B_rtp_contra.reshape(3, *mesh_shape) #.cpu().numpy()
 
-    # Convert to contravariant components on the grid
-    # Brho_contravariant = Brho_physical
-    # Singularity at rho=0 for Btheta_contravariant, keep physical component there for alternate integration method
-    B_rtp_contra[1,1:,:,:] = B_rtp_contra[1,1:,:,:] / torch.clamp(rho_grid[1:,:,:], min=b_hidra.dr/2.0) #  B^θ
-    B_rtp_contra[2,:,:,:] = B_rtp_contra[2,:,:,:] / Rcyl[:,:,:] #  B^ϕ
+    """## CONVERT TO CONTRAVARIANT COMPONENTS ON THE GRID
+    # Singularity at rho=0 for Btheta_contravariant,
+    # keep physical component there for alternate integration method
+    B_rtp_contra[1,:,:,:] = B_rtp_contra[1,:,:,:] / torch.clamp(rho_grid[:,:,:], min=b_hidra.dr/1e12) #B^θ
+    #B_rtp_contra[1,1:,:,:] = B_rtp_contra[1,1:,:,:] / rho_grid[1:,:,:] #B^θ
+    B_rtp_contra[2,:,:,:] = B_rtp_contra[2,:,:,:] / Rcyl[:,:,:] #B^ϕ
 
     # # Average over the theta direction?
     #B_rtp_contra[1, 0, :, :] = torch.mean(B_rtp_contra[1, 1, :, :], dim=0, keepdim=True)
-    B_rtp_contra[:, 0, :, :] = torch.mean(B_rtp_contra[:, 1, :, :], dim=-2, keepdim=True)
+    #B_rtp_contra[:, 0, :, :] = torch.mean(B_rtp_contra[:, 0, :, :], dim=-2, keepdim=True)
+
+    # COPY VALUES TO RHO=0
+    #B_rtp_contra[:, 0, :, :] = B_rtp_contra[:, 1, :, :]"""
+
+    ## RE-TRY ORIGINAL (CHATGPT) METHOD:
+    # Br=0 at r=0 from symmetry
+    # Clamp calculated values at 1e-6?
+    # Btheta must be theta-independent
+    # Bphi must be theta-independent
+    B_rtp_contra[0,0,:,:] = 0.0 #B^ρ
+    #B_rtp_contra[0,0,:,:] = torch.mean(B_rtp_contra[0, 0, :, :], dim=0, keepdim=True) #B^ρ
+
+    B_rtp_contra[1,:,:,:] = B_rtp_contra[1,:,:,:] / torch.clamp(rho_grid[:,:,:], min=1e-28)
+    Rcyl = b_hidra.R0 + torch.clamp(rho_grid[:,:,:], min=1e-28) * torch.cos(theta_grid)  # R0 + ρcosθ
+    B_rtp_contra[2,:,:,:] = B_rtp_contra[2,:,:,:] / Rcyl[:,:,:] #B^ϕ
+
+    B_rtp_contra[1, 0, :, :] = torch.mean(B_rtp_contra[1, 0, :, :], dim=0, keepdim=True)
+    B_rtp_contra[2, 0, :, :] = torch.mean(B_rtp_contra[2, 0, :, :], dim=0, keepdim=True)
+
 
     # check for NaNa or Infs and reshape back to grid
     if torch.isnan(B_rtp_contra).any() or torch.isinf(B_rtp_contra).any():
         print("\tWARNING: NaN or Inf values found in B_rtp_contra!")
-
-    simIO.log.info(f"Saving contravariant B field components, shape: {B_rtp_contra.shape}")
-    np.save("Bfield_RTP_contravariant_Ih860_copyAll-toRho0.npy", B_rtp_contra.cpu().numpy())
-    simIO.log.info('## SIM FINISHED ##\n\n\n\n')
+    np.save("Bfield_RTPcontra_Ih860_Reglrzd_clamp1e28-28.npy", B_rtp_contra.cpu().numpy())
+    simIO.log.info(f'## SIM FINISHED! Saved contravariant B field components, shape: {B_rtp_contra.shape}\n\n')
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from utility.phi_events import *
 from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
 from classes.particle import FieldLine
+from plot_funcs import plotFuncs
 import gc
 
 class Poincare():
@@ -55,7 +56,17 @@ class Poincare():
         self.IO.log.info(f"| THREADS        | {self.workers:<23} |")
         self.IO.log.info("+----------------+-------------------------+")
 
-    def set_conditions(self, init_pos_arr: np.ndarray, spins: int, field: Mesh, events=None):
+        # attach plotting function to class instance
+        for name in dir(plotFuncs):
+                    func = getattr(plotFuncs, name)
+                    if callable(func) and not name.startswith("__"):
+                        if name.startswith("global_"):
+                            new_name = name.replace("global_", "")  # Remove prefix
+                        elif name.startswith("poincare_"):
+                            new_name = name.replace("poincare_", "")  # Remove prefix
+                            setattr(self, new_name, func)  # Attach to the instance with the new name
+
+    def set_conditions(self, init_pos_arr=np.zeros([1, 3]), spins=100, field: Mesh = None, events=None):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
@@ -70,7 +81,9 @@ class Poincare():
         self.IC_rtp_arr = init_pos_arr
         self.nlines = len(init_pos_arr)
         self.spins = spins
-        self.field = field
+        
+        if field: self.field = field
+        else: raise ValueError("Field mesh is required.")
 
         ## CONVERT TO XYZ COORDS
         ICs_XYZ = np.zeros(shape=(self.nlines, 3))
@@ -449,10 +462,13 @@ class Poincare():
             self.plot_angles = np.linspace(np.pi/180., 2*np.pi, 360)
         else:
             self.solver_events = events
+            n_angles = len(events) - 1
+            self.plot_angles = np.linspace(np.pi/180., 2*np.pi, n_angles)
 
         self.IO.log.info("+----------------+-------------------------+")
         self.IO.log.info(f"| NLINES         | {self.nlines:<23} |")
         self.IO.log.info(f"| SPINS          | {self.spins:<23} |")
+        self.IO.log.info(f"| # OF EVENTS    | {len(self.solver_events):<23} |")
         self.IO.log.info("| Initial Conditions (RTP):                |")
         for ic in init_pos_arr:
             self.IO.log.info(f"|     {str(ic):<23}   |")
@@ -660,42 +676,23 @@ class Poincare():
         n, phi = iter
         phi_deg = phi*180/np.pi
 
-        plt.rcParams.update({'font.size': 10})
-        fig = plt.figure(figsize=(6, 6))
-        ax = fig.add_subplot(111, polar=True)
-
         num_sets = len(xyz_list)
         maxLength = max(len(xyz_list[i][n]) for i in range(num_sets))
         radtheta_pts = np.full([num_sets, 2, maxLength], fill_value=np.nan)
+        point_total = np.zeros(num_sets, dtype=int)
         for i in range(num_sets):
             xyz_points = xyz_list[i][n]
-            point_total = max(0, len(xyz_points)-1)
-            for j in range(point_total):
+            point_total[i] = max(0, len(xyz_points)-1)
+            for j in range(point_total[i]):
                 radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], self.field.R0)[:2]
-            plt.scatter(radtheta_pts[i][0][:point_total], radtheta_pts[i][1][:point_total], marker='.', s=1.00, c='k', linewidths=0.0)
+            #plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]], marker='.', s=1.00, c='k', linewidths=0.0)
 
         if saveData:
             fname = self.anlys_name + '_{:03.0f}'.format(phi_deg)
             self.IO.saveNumpyData(radtheta_pts, fname)
 
-        ax.set_rmax(self.field.a)
-        ax.set_rticks(np.arange(0.0, self.field.a, 0.02))
-        ax.yaxis.set_tick_params(labelsize=5)
-        ax.grid(linewidth = 0.25, linestyle=':', c='k')
-
-        phi_phys = (phi + (198 * np.pi/180.)) % (2*np.pi)
-        phi_phys_deg = phi_phys*180/np.pi
-        phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
-        phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
-        ax.set_title(phi_phy_string + phy_comp_string, loc='left')
-
-        plot_name = self.anlys_name +'/'+ self.anlys_name + '_phi={:03.0f}.png'.format(phi_deg)
-        plt.tight_layout()
-        self.IO.saveFig(plot_name, dpi=250)
-        plt.close(fig)
-        del fig, ax, radtheta_pts, xyz_list
-        gc.collect()
-        self.IO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
+        # plotting
+        self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name)#, self.IO)
 
 
     def run(self):

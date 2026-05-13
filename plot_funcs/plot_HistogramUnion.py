@@ -1,4 +1,13 @@
 ## IMPORTS
+import os
+import sys
+# Allow running from any subdirectory: resolve the project root relative to this file
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+os.chdir(_PROJECT_ROOT)
+
+
 import numpy as np
 from time import perf_counter
 
@@ -81,33 +90,24 @@ dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
 cond_string2 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                            int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
 
-
 # UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "Test_Output"
+OUTPUT_DIRECTORY_NAME = "TEST HISTOGRAM"
 TAGOUT = 'TESTING_i3_60V_1eV-Z1_Li-He_Union'
-
-
 
 ## SET UP RUN DIRECTORY AND LOGGING
 ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
 simIO = out.IOHandler(OUTPUT_DIRECTORY_NAME) 
 simIO.startLog()
-
 sim_IN1 = out.IOHandler(INPUT1_DIRECTORY_NAME) 
 sim_IN2 = out.IOHandler(INPUT2_DIRECTORY_NAME)
 
-
-## CALCULATE SOME CONSTANTS
-N_emitters = len(DELTRS) * NTHETA * NPHI
-N_particles = NPARTICLES_PER_EMITTER * N_emitters
+# ## CALCULATE SOME CONSTANTS
+# N_emitters = len(DELTRS) * NTHETA * NPHI
+# N_particles = NPARTICLES_PER_EMITTER * N_emitters
 
 ## DEFINE MESH
 b_hidra = Mesh(R0=0.72, a=0.19)
 
-
-# ####################
-# ## PREPARE OUTPUT ##
-# ####################
 ## LOAD WALL POINTS
 filename1 = 'Wallpt_OUTPUT_' + cond_string1+TAG1
 outputArray1 = sim_IN1.loadNumpyData(filename1+'.npy')
@@ -117,7 +117,6 @@ filename2 = 'Wallpt_OUTPUT_' + cond_string2+TAG2
 outputArray2 = sim_IN2.loadNumpyData(filename2+'.npy')
 print(f'Loaded wall point data: {outputArray1.shape=}, {outputArray2.shape=}')
 wallPtArray2 = outputArray2[:3, :]  # r, theta, phi
-
 
 # COORDINATE FLIIPING & CONVERSION
 a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
@@ -136,30 +135,22 @@ theta_plot2 = wallPtArray2[1]
 theta_plot2[theta_plot2>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 theta_plot_deg2 = theta_plot2*(180/np.pi)
 
-
-# ##############
-# ## PLOTTING ##
-# ##############
-
+## CREATE HISTOGRAMS
 # define bin edges for 2d histogram
 phi_edges = np.linspace(0, 360, 361)
 theta_edges = np.linspace(-180, 180, 181)
-
-## CREATE HISTOGRAMS
 H1, phi_edges, theta_edges = np.histogram2d(phi_plot_deg, theta_plot_deg, bins=[phi_edges, theta_edges], density=True)
 H1 = H1.T # histogram reverse axes for some reason; transpose
-
 H2, phi_edges2, theta_edges2 = np.histogram2d(phi_plot_deg2, theta_plot_deg2, bins=[phi_edges, theta_edges], density=True)
 H2 = H2.T # histogram reverse axes for some reason; transpose
 
-# multiplicative overlay
+# MINIMUM UNION
+H = np.minimum(H1, H2)
+# MULTIPLICATIVE OVERLAY
 #H = H1 * H2
 # logical overlay
 #H = (H1 > 0) & (H2 > 0)
-# minimum union
-H = np.minimum(H1, H2)
-
-# # red-blue overlay
+# # RED-BLUE OVERLAY
 # r = H1 / H1.max()
 # b = H2 / H2.max()
 # H = np.stack([r, np.zeros_like(r), b], axis=-1)
@@ -174,32 +165,40 @@ plotPorts(ax, simIO)
 
 plt.imshow(H, interpolation='nearest', origin='lower',
             extent=[phi_edges[0], phi_edges[-1], theta_edges[0], theta_edges[-1]],
-            cmap='Purples', norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
+            cmap=plt.get_cmap('Purples', 6), norm=colors.LogNorm(vmin=1E-6, vmax=1E-3),
             aspect=0.2 )
-plt.colorbar(location='bottom', shrink=0.6)
 
-ax.set_xlabel('$\phi$ (+CCW from South-Side Split)', fontsize=12)
+cbar = plt.colorbar(location='top', shrink=0.6)
+cbar.ax.tick_params( labelsize=12)
+cbar.set_label('$\\hat{\\Gamma}_{depo}=\\frac{N_{depo}}{N_{total}}$', fontsize=12)
+
+ax.set_xlabel('$\phi~\\mathit{(\\degree CCW~from~South\\text{-}Split)}$', fontsize=14)
+ax.set_ylabel('Poloidal Location', fontsize=14)   
+
 ax.set_xlim(0, 360)
-xticks = np.linspace(9, 351, 39)
+ax.set_ylim(-180, 180)
+
+phi_spacing = 18. # degrees
+xticks = np.arange(phi_spacing, 361-phi_spacing, phi_spacing) 
 ax.set_xticks(xticks)
 ax.set_xticklabels([f'{int(tick)}$\degree$' if i % 2 != 0 else '' for i, tick in enumerate(xticks)])
-ax.xaxis.set_tick_params(labelsize=10)
+ax.xaxis.set_tick_params(labelsize=14)
 
-ax.set_ylabel('Poloidal Location', fontsize=12)
-ax.set_ylim(-180, 180)
 ax.set_yticks(np.linspace(-180, 180, 5))
-ax.set_yticklabels(['', 'Bottom', 'Low-\nField', 'Top', ''])
-ax.yaxis.set_tick_params(labelsize=8, labelrotation=45)
-plt.tight_layout()
+ax.set_yticklabels(['', 'Bottom', 'Outer', 'Top', ''])
+ax.yaxis.set_tick_params(labelsize=12, labelrotation=0)
+
+ax.text(0.995, 0.975, '$\\mathrm{Li~\\bigcup~He}$',
+#ax.text(0.995, 0.975, '$\\mathrm{min(\\Gamma_{Li}, \\Gamma_{He})}$',
+    transform=ax.transAxes,
+    ha='right', va='top',
+    fontsize=12,
+    bbox=dict(boxstyle='square,pad=0.3', facecolor='white', edgecolor='black', linewidth=1.0))
 
 plotname = 'Wall_Histogram_' + TAGOUT + '.png'
 simIO.saveFig(plotname, dpi=400)
 simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
 plt.close()
-
-
-
-
 
 ## END RUN ##
 simIO.log.info('## SIM FINISHED! ##\n\n\n')

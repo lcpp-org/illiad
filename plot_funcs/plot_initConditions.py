@@ -11,6 +11,15 @@ All configuration and physical parameters are expected to be defined in the glob
 """
 
 ## IMPORTS
+import os
+import sys
+# Allow running from any subdirectory: resolve the project root relative to this file
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+os.chdir(_PROJECT_ROOT)
+
+
 import numpy as np
 from time import perf_counter
 
@@ -29,23 +38,25 @@ He_mass = 4.002602 #amu
 
 ## SET SIMULATION INPUTS:
 # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "AcceptedIota4_1500spins_atole-8_eng"
-TAG = "IC_PLOT_TEST"
+#OUTPUT_DIRECTORY_NAME = "AcceptedIota4_1500spins_atole-8_eng"
+OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
+TAG = "IC_PLOT_IOTA3"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
-HELICAL_CURRENT = 0.790 #[kA]
+HELICAL_CURRENT = 0.900 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
 
 # ELECTRIC FIELD
-FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota4_lcfs35.npy'
+#FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3_lcfs35.npy'
+FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
 FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 
 # INITIAL CONDITIONS
 LCFS_INDEX = 35 # (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
 NPHI = 180
-NTHETA = 20
+NTHETA = 15
 
 
 

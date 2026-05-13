@@ -5,9 +5,18 @@
 # """
 
 import numpy as np
-import torch
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+try:
+    import torch
+except ModuleNotFoundError:
+    torch = None
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') if torch else None
 #device = torch.device('cpu')
+
+
+def _require_torch():
+    if torch is None:
+        raise ImportError("PyTorch is required for this torch-based coordinate transform.")
 
 def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     """Converts r-theta-phi coordinates to Cartesian coordinates.
@@ -88,10 +97,13 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     Returns:
         torch.Tensor: Transformed point(s) in r-theta-phi coordinates, same shape as input.
     """
+    _require_torch()
     #p_XYZ = torch.tensor(p_XYZ).to(device)
     p_XYZ = p_XYZ.clone().detach().to(device)
+    
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
-    x, y, z = p_XYZ.T
+    #x, y, z = p_XYZ.T
+    x, y, z = p_XYZ.unbind(-1)
     x2 = x*x
     y2 = y*y
     #z2 = z*z
@@ -192,6 +204,7 @@ def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
     Raises:
         ValueError: If `form` is not 'rtp2xyz' or 'xyz2rtp'.
     """
+    _require_torch()
     # p_rtp: (N,3), vec_in: (N,3)
     ctheta = torch.cos(p_rtp[:,1])
     stheta = torch.sin(p_rtp[:,1])
@@ -251,17 +264,19 @@ def align_z_to_vector(v):
 
     Returns:
         np.ndarray: A 3x3 rotation matrix that rotates the z-axis to align with `v`.
-
-    Raises:
-        ValueError: If `v` is not a 3-element array.
-
-    Notes:
-        - If `v` is already aligned with the z-axis, the identity matrix is returned.
-        - If `v` is anti-aligned with the z-axis, a 180-degree rotation matrix is returned.
     """
-    # helper function to align the z-axis to a given vector
-    z_axis = np.array([0, 0, 1])
-    #v = v / np.linalg.norm(v)
+    # Helper function to align the z-axis to a given vector.
+    # This is used with surface normals; guard against zero / non-finite vectors.
+    z_axis = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+    v = np.asarray(v, dtype=np.float64)
+    if v.shape != (3,) or (not np.all(np.isfinite(v))):
+        return np.eye(3)
+
+    v_norm = np.linalg.norm(v)
+    if (not np.isfinite(v_norm)) or v_norm < 1e-15:
+        return np.eye(3)
+    v = v / v_norm
+
     if np.allclose(v, z_axis):
         return np.eye(3)
     if np.allclose(v, -z_axis):
@@ -270,7 +285,10 @@ def align_z_to_vector(v):
                          [ 0, -1,  0],
                          [ 0,  0,  1]])
     axis = np.cross(z_axis, v)
-    axis /= np.linalg.norm(axis)
+    axis_norm = np.linalg.norm(axis)
+    if (not np.isfinite(axis_norm)) or axis_norm < 1e-15:
+        return np.eye(3)
+    axis /= axis_norm
     angle = np.arccos(np.dot(z_axis, v))
     K = np.array([[0, -axis[2], axis[1]],
                   [axis[2], 0, -axis[0]],

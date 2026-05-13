@@ -33,32 +33,31 @@ He_mass = 4.002602 #amu
 
 ## SET SIMULATION INPUTS:
 # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
-OUTPUT_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
-TAG = "Li_ARTICLE_Testing"
+OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
+TAG = "Lithium_FS40_1p0ms_PHANGLE2"
 # TOROIDAL AND HELICAL MAGNETIC FIELDS
 TOROIDAL_CURRENT = 0.486 #[kA]
 HELICAL_CURRENT = 0.900 #[kA]
 CONFIG_TOR = 'default_toroidal'
 CONFIG_HEL = 'default_helical'
-ENABLE_ERRFIELD = True
+ENABLE_ERRFIELD = False
 # ELECTRIC FIELD
 #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
-#FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3_lcfs19_noIsland1.npy'
-FIELD_SCALE_ELECTRIC = 120.0 # [Volts]
+FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
+FIELD_SCALE_ELECTRIC = 40.0 # [Volts]
 # ION PROPERTIES
 ION_MASS = Li_mass # [amu]
-ION_TEMP = 5.0 # [eV]
+ION_TEMP = 2.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 30 #30 #29 #40 (from Poincare output (simIO.log))
+LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
-NPHI = 120
-NTHETA = 72
-NPARTICLES_PER_EMITTER = 500
+NPHI = 180
+NTHETA = 120
+NPARTICLES_PER_EMITTER = 50
 # SIMULATION PARAMETERS
 DT = 1e-8 # [s]
-TMAX = 0.001 # [s]
+TMAX = 0.0010 # [s]
 NSTEPS = int(TMAX / DT)
 
 
@@ -103,12 +102,11 @@ def main():
     particle_tracker_list = [10,13,20,500,2346, 13130, 29777, 33333, 40266, 50000]
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
     ion_tracer.setConditions(ion_list, cond_string, DT, TMAX)
-    output_array, energy_output, depo_angles_deg, toroidal_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
+    output_array, energy_output, depo_angles_deg, ion_traces, theta_phi_angle_rad = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
-
     # COORDINATE FLIIPING & CONVERSION
-    phi_plot = (-1)*output_array[2] + 2*np.pi # flip phi for the perspective outside the vacuum vessel
+    phi_plot = output_array[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
     a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
     phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 
@@ -116,20 +114,22 @@ def main():
     theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
     theta_plot_deg = theta_plot*(180/np.pi)
 
-
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
-    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO, cond_string=cond_string)
+    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles_deg, colorRange=[0, 90], 
-                                colorLabel='$\\theta_{depo}~[\\degree]$', myColormap='viridis',
-                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO, cond_string=cond_string)
+                                colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_output,
-                                colorLabel='$E_{depo}~[eV]$', myColormap='magma',
-                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO, cond_string=cond_string)
+                                colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
     
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles_deg, colorRange=[0, 180], 
-                                colorLabel='$\\theta_{tor}~[\\degree]$', myColormap='coolwarm',
-                                runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
+    
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, np.abs(theta_phi_angle_rad)*(180/np.pi), colorRange=[0, 180], 
+                                colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
+                                runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO)
+
+
 
 
     ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)

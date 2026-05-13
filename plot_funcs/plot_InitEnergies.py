@@ -1,4 +1,12 @@
 ## IMPORTS
+import os
+import sys
+# Allow running from any subdirectory: resolve the project root relative to this file
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+os.chdir(_PROJECT_ROOT)
+
 import numpy as np
 from time import perf_counter
 
@@ -56,7 +64,7 @@ def main():
     sim_IN = IOHandler(INPUT_DIR_NAME)
 
     # ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-    plotFuncs.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=IC_filename+TAGOUT, simIO=simIO, sim_in=sim_IN)
+    plotFuncs.boris_plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=IC_filename+TAGOUT, simIO=simIO, sim_in=sim_IN)
 
 
 
