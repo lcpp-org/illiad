@@ -103,7 +103,7 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     
     p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
     #x, y, z = p_XYZ.T
-    x, y, z = p_XYZ.permute(*torch.arange(p_XYZ.ndim - 1, -1, -1))
+    x, y, z = p_XYZ.unbind(-1)
     x2 = x*x
     y2 = y*y
     #z2 = z*z
