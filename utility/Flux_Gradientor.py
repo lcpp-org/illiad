@@ -9,7 +9,7 @@ import classes.class_outputHandler as out
 from classes.mesh import *
 from utility.coordtrans import RTP_XYZ_JAC
 
-def main():
+def fluxGradientor():
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
@@ -171,4 +171,4 @@ if __name__ == '__main__':
     SMALLEST_ISLAND_INDEX = None #104 #53 #39
 
     OUTPUT_FILE_NAME = 'Efield_IdealIota3_lcfs30'
-    main()
+    fluxGradientor()
