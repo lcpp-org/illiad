@@ -31,6 +31,7 @@ CURRENT_TOR = 0.486 #[kA]
 CURRENT_HEL = 0.790 #[kA]
 CONFIG_TOR = "default_toroidal"
 CONFIG_HEL = "default_helical"
+ENABLE_ERRFIELD = False
 
 # DEFINE INITIAL CONDITIONS #
 IC_PHI_DEG = 180. #[deg]
@@ -49,8 +50,7 @@ DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
 OUTPUT_DIR = "RK45-1e8_Iota4FWD_2000spins_27Lines"
 
-# DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "RK45-2p49e9_Iota4FWD_1500spins_177Lines"
+
 
 
 def main():
@@ -63,7 +63,7 @@ def main():
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=True, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
     b_hidra.set_nonPer_errField()
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
@@ -85,4 +85,5 @@ def main():
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    main()
