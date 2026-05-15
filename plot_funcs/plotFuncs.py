@@ -649,14 +649,14 @@ def _anim_render_frame(args):
     matplotlib figure, so this is safe to call from a multiprocessing Pool.
     """
     (frame_idx, out_path, traces_xyz, steps_per_frame, trail_length, trail_alphas,
-     line_window, linewidth, linecolor, alpha_line, markersize, markercolor, R0, a_radius, dpi) = args
+     line_window, linewidth, linecolor, alpha_line, markersize, markercolor, R0, a_radius, figsize, dpi) = args
 
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     import numpy as np
 
-    fig = plt.figure(dpi=dpi)
+    fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = fig.add_subplot(111, projection='3d')
 
     # Static torus surface
@@ -684,18 +684,27 @@ def _anim_render_frame(args):
                 ax.plot([pt[0]], [pt[1]], [pt[2]], '.', markersize=markersize,
                         color=markercolor if markercolor else color, markeredgewidth=0, alpha=float(trail_alphas[k]), zorder=6)
 
-    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.61, 0.61])
+    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.41, 0.41])
     ax.set_axis_off()
-    plt.tight_layout()
+    ax.dist = 3
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
     plt.savefig(out_path, dpi=dpi)
     plt.close(fig)
 
+
+_RESOLUTION_MAP = {
+    '480p':  (854,  480),
+    '720p':  (1280, 720),
+    '1080p': (1920, 1080),
+    '1440p': (2560, 1440),
+    '4K':    (3840, 2160),
+}
 
 def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
                         interval=50, skip_indices=None, stride=1, max_frames=None, steps_per_frame=1,
                         linewidth=1.0, linecolor=None, line_alpha=1.0, line_window=None,
                         trail_length=10, markersize=4, markercolor=None,
-                        parallel=True, n_workers=None):
+                        parallel=True, n_workers=None, resolution='1080p'):
     """Animates the ion traces in 3D, growing each trace step by step.
 
     Speed control:
@@ -708,6 +717,8 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
       - parallel (bool): render frames as PNGs in parallel across CPU cores, then
         stitch with ffmpeg. Dramatically faster for large frame counts. Requires ffmpeg.
       - n_workers (int|None): number of worker processes. Defaults to cpu_count().
+      - resolution (str): output resolution preset. One of '480p', '720p', '1080p',
+        '1440p', '4K'. All presets use a 16:9 aspect ratio. Default: '1080p'.
     Trail effect:
       - trail_length (int): number of recent positions shown as scatter dots with
         alpha fading from 0 (oldest) to 1 (newest).
@@ -742,6 +753,9 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
 
     trail_alphas = np.linspace(0.0, 1.0, trail_length + 1)[1:]
     fps = max(1, round(1000 / interval))
+    w_px, h_px = _RESOLUTION_MAP.get(resolution, (1920, 1080))
+    render_dpi = 100
+    figsize = (w_px / render_dpi, h_px / render_dpi)
     plotname_mp4 = 'IonTraceAnim_' + runString + '.mp4'
     plotname_gif = 'IonTraceAnim_' + runString + '.gif'
 
@@ -753,7 +767,7 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
             worker_args = [(f, os.path.join(frame_dir, f'frame_{f:06d}.png'),
                              traces_xyz, steps_per_frame, trail_length, trail_alphas,
                              line_window, linewidth, linecolor, line_alpha, markersize, markercolor,
-                             b_hidra.R0, b_hidra.a, 200)
+                             b_hidra.R0, b_hidra.a, figsize, render_dpi)
                             for f in range(num_frames)]
             n = n_workers or multiprocessing.cpu_count()
             simIO.log.info(f'boris_plotTraceAnim: rendering {num_frames} frames on {n} workers...')
@@ -778,7 +792,7 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
             return
 
     ## ── SERIAL PATH (FuncAnimation) ──────────────────────────────────────────
-    fig = plt.figure(dpi=250)
+    fig = plt.figure(figsize=figsize, dpi=render_dpi)
     ax = fig.add_subplot(111, projection='3d')
 
     nphi = ntheta = 180
@@ -806,9 +820,10 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
             for _ in range(trail_length)
         ])
 
-    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.61, 0.61])
+    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.41, 0.41])
     ax.set_axis_off()
-    plt.tight_layout()
+    ax.dist = 3
+    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     def update_lines(num, traces, lines, trail_dots):
         all_artists = []

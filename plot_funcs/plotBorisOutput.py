@@ -134,11 +134,11 @@ b_hidra = Mesh(R0=0.72, a=0.19)
 
 #plotFuncs.boris_plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
-plotFuncs.boris_plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_22stride12_120_4' , simIO=simIO,
-                              interval=1000/120, stride=12, max_frames=120,
-                              linewidth=0.5, linecolor=UIUC['il_orange'], line_alpha=0.4, line_window=30,
+plotFuncs.boris_plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_28stride13_30f_480p2' , simIO=simIO,
+                              interval=1000/120, stride=13, max_frames=30,
+                              linewidth=0.5, linecolor=UIUC['il_orange'], line_alpha=0.4, line_window=40,
                               trail_length=10, markersize=2, markercolor=UIUC['il_blue'],
-                              parallel=True, n_workers=20)
+                              parallel=True, n_workers=28, resolution='480p')
 
 #plotFuncs.boris_plotTracesPoincare(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
