@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from matplotlib import patches, colors, cm, colormaps
+plt.rcParams['animation.ffmpeg_path'] = '/home/sgula/miniforge/envs/testenv/bin/ffmpeg'
 import copy
 import numpy as np
 import logging
@@ -639,6 +641,214 @@ def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
+
+def _anim_render_frame(args):
+    """Module-level worker for parallel animation frame rendering (must be picklable).
+
+    Renders a single animation frame to a PNG. Each subprocess creates its own
+    matplotlib figure, so this is safe to call from a multiprocessing Pool.
+    """
+    (frame_idx, out_path, traces_xyz, steps_per_frame, trail_length, trail_alphas,
+     line_window, linewidth, linecolor, alpha_line, markersize, markercolor, R0, a_radius, dpi) = args
+
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    fig = plt.figure(dpi=dpi)
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Static torus surface
+    nphi = ntheta = 180
+    ptheta = np.linspace(-np.pi, 0, ntheta // 2)
+    pphi   = np.linspace(0, 2. * np.pi, nphi)
+    ptheta, pphi = np.meshgrid(ptheta, pphi)
+    px = (R0 + a_radius * np.cos(ptheta)) * np.cos(pphi)
+    py = (R0 + a_radius * np.cos(ptheta)) * np.sin(pphi)
+    pz = a_radius * np.sin(ptheta)
+    ax.plot_surface(px, py, pz, rstride=9, cstride=9,
+                    facecolor='lightgrey', edgecolor='k', linewidth=0.1,
+                    alpha=1.0, shade=True, zorder=1)
+
+    for i, trace in enumerate(traces_xyz):
+        end   = min(frame_idx * steps_per_frame + 1, trace.shape[0])
+        start = max(0, end - line_window) if line_window else 0
+        color = linecolor if linecolor else f'C{i % 10}'
+        ax.plot(trace[start:end, 0], trace[start:end, 1], trace[start:end, 2],
+                linewidth=linewidth, color=color, alpha=alpha_line, zorder=5)
+        for k in range(trail_length):
+            pt_idx = end - trail_length + k
+            if pt_idx >= 0:
+                pt = trace[pt_idx]
+                ax.plot([pt[0]], [pt[1]], [pt[2]], '.', markersize=markersize,
+                        color=markercolor if markercolor else color, markeredgewidth=0, alpha=float(trail_alphas[k]), zorder=6)
+
+    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.61, 0.61])
+    ax.set_axis_off()
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=dpi)
+    plt.close(fig)
+
+
+def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
+                        interval=50, skip_indices=None, stride=1, max_frames=None, steps_per_frame=1,
+                        linewidth=1.0, linecolor=None, line_alpha=1.0, line_window=None,
+                        trail_length=10, markersize=4, markercolor=None,
+                        parallel=True, n_workers=None):
+    """Animates the ion traces in 3D, growing each trace step by step.
+
+    Speed control:
+      - steps_per_frame (int): data points advanced per frame; faster playback,
+        no data loss. Prefer over stride.
+      - stride (int): sub-samples stored trace (memory reduction only; loses accuracy).
+      - interval (ms): ms between frames (GIF capped ~20ms; MP4 handles any value).
+      - line_window (int|None): cap displayed line to last N points. Avoids the O(N)
+        data copy per frame that makes later frames slow. None = show full trail.
+      - parallel (bool): render frames as PNGs in parallel across CPU cores, then
+        stitch with ffmpeg. Dramatically faster for large frame counts. Requires ffmpeg.
+      - n_workers (int|None): number of worker processes. Defaults to cpu_count().
+    Trail effect:
+      - trail_length (int): number of recent positions shown as scatter dots with
+        alpha fading from 0 (oldest) to 1 (newest).
+    """
+    import os
+    import math
+
+    if skip_indices is None:
+        skip_indices = []
+
+    ## PRE-PROCESS TRACES: filter zero rows, apply striding, and collect valid traces
+    traces_xyz = []
+    for i in range(ion_traces.shape[1]):
+        if i in skip_indices:
+            continue
+        this_ion = ion_traces[:, i, :]
+        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
+        if stride > 1:
+            this_ion = this_ion[::stride]
+        if this_ion.shape[0] < 2:
+            continue
+        traces_xyz.append(this_ion)  # shape (nsteps_i, 3)
+
+    if len(traces_xyz) == 0:
+        simIO.log.info('boris_plotTraceAnim: no valid traces to animate.')
+        return
+
+    max_data_pts = max(t.shape[0] for t in traces_xyz)
+    num_frames = math.ceil(max_data_pts / steps_per_frame)
+    if max_frames:
+        num_frames = min(num_frames, max_frames)
+
+    trail_alphas = np.linspace(0.0, 1.0, trail_length + 1)[1:]
+    fps = max(1, round(1000 / interval))
+    plotname_mp4 = 'IonTraceAnim_' + runString + '.mp4'
+    plotname_gif = 'IonTraceAnim_' + runString + '.gif'
+
+    ## ── PARALLEL PATH ────────────────────────────────────────────────────────
+    if parallel:
+        import multiprocessing, tempfile, subprocess, shutil
+        frame_dir = tempfile.mkdtemp(prefix='boris_anim_')
+        try:
+            worker_args = [(f, os.path.join(frame_dir, f'frame_{f:06d}.png'),
+                             traces_xyz, steps_per_frame, trail_length, trail_alphas,
+                             line_window, linewidth, linecolor, line_alpha, markersize, markercolor,
+                             b_hidra.R0, b_hidra.a, 200)
+                            for f in range(num_frames)]
+            n = n_workers or multiprocessing.cpu_count()
+            simIO.log.info(f'boris_plotTraceAnim: rendering {num_frames} frames on {n} workers...')
+            ctx = multiprocessing.get_context('fork')   # fork avoids re-importing on Linux
+            with ctx.Pool(n) as pool:
+                pool.map(_anim_render_frame, worker_args)
+
+            save_path = os.path.join(simIO.plot_dir, plotname_mp4)
+            subprocess.run(['ffmpeg', '-y',
+                '-framerate', str(fps),
+                '-i', os.path.join(frame_dir, 'frame_%06d.png'),
+                '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                '-crf', '18', save_path], check=True, capture_output=True)
+            
+            simIO.log.info('OUTPUT PLOT: {} (parallel, steps_per_frame={}, fps={})'.format(plotname_mp4, steps_per_frame, fps))
+        except Exception as e:
+            simIO.log.warning(f'boris_plotTraceAnim parallel path failed ({e}); falling back to serial.')
+            parallel = False   # fall through to serial below
+        finally:
+            shutil.rmtree(frame_dir, ignore_errors=True)
+        if parallel:
+            return
+
+    ## ── SERIAL PATH (FuncAnimation) ──────────────────────────────────────────
+    fig = plt.figure(dpi=250)
+    ax = fig.add_subplot(111, projection='3d')
+
+    nphi = ntheta = 180
+    ptheta = np.linspace(-np.pi, 0, int(np.ceil(ntheta / 2)))
+    pphi = np.linspace(0, 2. * np.pi, nphi)
+    ptheta, pphi = np.meshgrid(ptheta, pphi)
+    px = (b_hidra.R0 + b_hidra.a * np.cos(ptheta)) * np.cos(pphi)
+    py = (b_hidra.R0 + b_hidra.a * np.cos(ptheta)) * np.sin(pphi)
+    pz = b_hidra.a * np.sin(ptheta)
+    ax.plot_surface(px, py, pz, rstride=9, cstride=9,
+                    facecolor='lightgrey', edgecolor='k', linewidth=0.1,
+                    alpha=1.0, shade=True, zorder=1)
+
+    if linecolor:
+        lines = [ax.plot([], [], [], linewidth=linewidth, color=linecolor, alpha=line_alpha, zorder=5)[0] for _ in traces_xyz]
+    else:
+        lines = [ax.plot([], [], [], linewidth=linewidth, alpha=line_alpha, zorder=5)[0] for _ in traces_xyz]
+
+    trail_dots = []
+    for line in lines:
+        color = linecolor if linecolor else line.get_color()
+        trail_dots.append([
+            ax.plot([], [], [], '.', markersize=markersize, markeredgewidth=0,
+                    color=markercolor if markercolor else color, alpha=0.0, zorder=6)[0]
+            for _ in range(trail_length)
+        ])
+
+    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.61, 0.61])
+    ax.set_axis_off()
+    plt.tight_layout()
+
+    def update_lines(num, traces, lines, trail_dots):
+        all_artists = []
+        for line, t_dots, trace in zip(lines, trail_dots, traces):
+            end   = min(num * steps_per_frame + 1, trace.shape[0])
+            start = max(0, end - line_window) if line_window else 0
+            line.set_data_3d(trace[start:end, :].T)
+            all_artists.append(line)
+            for k, dot in enumerate(t_dots):
+                pt_idx = end - trail_length + k
+                if pt_idx < 0:
+                    dot.set_alpha(0.0)
+                    dot.set_data_3d([[0.], [0.], [0.]])
+                else:
+                    pt = trace[pt_idx]
+                    dot.set_data_3d([[pt[0]], [pt[1]], [pt[2]]])
+                    dot.set_alpha(float(trail_alphas[k]))
+                all_artists.append(dot)
+        return all_artists
+
+    ani = animation.FuncAnimation(
+        fig, update_lines, frames=num_frames,
+        fargs=(traces_xyz, lines, trail_dots), interval=interval, blit=True)
+
+    try:
+        writer = animation.FFMpegWriter(fps=fps, bitrate=-1)
+        save_path = os.path.join(simIO.plot_dir, plotname_mp4)
+        ani.save(save_path, writer=writer)
+        simIO.log.info('OUTPUT PLOT: {} (serial, steps_per_frame={}, fps={})'.format(
+            plotname_mp4, steps_per_frame, fps))
+    except Exception:
+        simIO.log.warning('FFMpeg not available; falling back to GIF (fps capped at ~50).')
+        writer = animation.PillowWriter(fps=fps)
+        save_path = os.path.join(simIO.plot_dir, plotname_gif)
+        ani.save(save_path, writer=writer)
+        simIO.log.info('OUTPUT PLOT: {} (serial GIF, steps_per_frame={}, fps={})'.format(
+            plotname_gif, steps_per_frame, fps))
+    plt.close()
+
+
 
 def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
     """Plots the ion traces in polar coordinates (Poincare plot)."""

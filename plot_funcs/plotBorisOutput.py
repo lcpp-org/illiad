@@ -19,7 +19,7 @@ from utility.anlys_funcs import *
 from utility.point_generators import generateSeedShells
 from classes.particle import *
 import plot_funcs.plotFuncs as plotFuncs
-
+from plotFuncs import UIUC
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
 kboltz = 1.602_176_634E-19 # Joules/eV
@@ -41,10 +41,10 @@ He_mass = 4.002602 #amu
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 40.0 # [Volts]
+FIELD_SCALE_ELECTRIC = 80.0 # [Volts]
 # ION PROPERTIES
 ION_MASS = Li_mass # [amu]
-ION_TEMP = 2.0 # [eV]
+ION_TEMP = 5.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
 LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
@@ -59,7 +59,7 @@ NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-TAG = "Lithium_FS40_1p0ms_PHANGLE2"
+TAG = "Lithium_FS40_1p0ms_TRACKMORE3"
 
 
 #####################
@@ -88,43 +88,43 @@ ion_traces = simIO.loadNumpyData(filenameTrac+'.npy')
 tmax = DT*NSTEPS
 IC_filename = 'initVelPos_' + cond_string+TAG
 
-## LOAD WALL POINTS
-filename = 'Wallpt_OUTPUT_' + cond_string+TAG
-outputArray = simIO.loadNumpyData(filename+'.npy')
-wallPtArray = outputArray[:3, :]  # r, theta, phi
-velocity_output = outputArray[3:6, :].T  # velocity vectors
-max_timeStep = outputArray[6, :]  # max time step for each particle
+# ## LOAD WALL POINTS
+# filename = 'Wallpt_OUTPUT_' + cond_string+TAG
+# outputArray = simIO.loadNumpyData(filename+'.npy')
+# wallPtArray = outputArray[:3, :]  # r, theta, phi
+# velocity_output = outputArray[3:6, :].T  # velocity vectors
+# max_timeStep = outputArray[6, :]  # max time step for each particle
 
-## CALCULATE ENERGY FROM FINAL VELOCITY
-speed_output = np.linalg.norm(velocity_output, axis=1)
-energy_output = 0.5 * ION_MASS * kg_per_amu * speed_output**2 / kboltz #convert speed to energy in eV
-simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV'.format(
-    np.min(energy_output), np.max(energy_output), np.mean(energy_output)))
+# """## CALCULATE ENERGY FROM FINAL VELOCITY
+# speed_output = np.linalg.norm(velocity_output, axis=1)
+# energy_output = 0.5 * ION_MASS * kg_per_amu * speed_output**2 / kboltz #convert speed to energy in eV
+# simIO.log.info('Energy output stats: min={:.2f} eV, max={:.2f} eV, avg={:.2f} eV'.format(
+#     np.min(energy_output), np.max(energy_output), np.mean(energy_output)))
 
-## CALCULATE ANGLE FROM NORMAL
-vf_hat_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
-radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
-deposition_angles = np.arccos(np.einsum('ij,ij->i', vf_hat_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
-deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
+# ## CALCULATE ANGLE FROM NORMAL
+# vf_hat_xyz = velocity_output/speed_output[:, None]  # Normalize the velocity vectors to get unit vectors
+# radial_vec_xyz = np.asarray( [RTP_XYZ_JAC(wall_point, np.array([1,0,0]), form='rtp2xyz') for wall_point in wallPtArray.T] )# Convert unit vectors to RTP coordinates
+# deposition_angles = np.arccos(np.einsum('ij,ij->i', vf_hat_xyz, radial_vec_xyz))  # Calculate angles between unit vectors and radial vectors
+# deposition_angles_deg = np.degrees(deposition_angles)  # Convert angles to degrees
 
-vf_hat_rtp = np.asarray( [RTP_XYZ_JAC(wall_point, vf_hat_xyz[i], form='xyz2rtp') for i, wall_point in enumerate(wallPtArray.T)] ) # Convert velocity unit vector to RTP coordinates
+# vf_hat_rtp = np.asarray( [RTP_XYZ_JAC(wall_point, vf_hat_xyz[i], form='xyz2rtp') for i, wall_point in enumerate(wallPtArray.T)] ) # Convert velocity unit vector to RTP coordinates
 
-# This is the angle between the projection of the velocity vector onto the theta-phi plane and the -phi_hat direction (i.e. CCW)
-theta_phi_angle_rad = np.abs(np.atan2(vf_hat_rtp[:, 1], vf_hat_rtp[:, 2])) 
-# shift theta_phi_angle_rad so that 0 degrees is centered on the poloidal direction
-theta_phi_angle_rad -= np.pi/2
+# # This is the angle between the projection of the velocity vector onto the theta-phi plane and the -phi_hat direction (i.e. CCW)
+# theta_phi_angle_rad = np.abs(np.atan2(vf_hat_rtp[:, 1], vf_hat_rtp[:, 2])) 
+# # shift theta_phi_angle_rad so that 0 degrees is centered on the poloidal direction
+# theta_phi_angle_rad -= np.pi/2
 
-simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
-    np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
+# simIO.log.info('deposition_angles_deg min: {:.2f} deg, max: {:.2f} deg, avg: {:.2f} deg'.format(
+#     np.min(deposition_angles_deg), np.max(deposition_angles_deg), np.mean(deposition_angles_deg)))
+# """
+# # COORDINATE FLIIPING & CONVERSION
+# phi_plot = wallPtArray[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
+# a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
+# phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
 
-# COORDINATE FLIIPING & CONVERSION
-phi_plot = wallPtArray[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
-phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
-
-theta_plot = wallPtArray[1]
-theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-theta_plot_deg = theta_plot*(180/np.pi)
+# theta_plot = wallPtArray[1]
+# theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
+# theta_plot_deg = theta_plot*(180/np.pi)
 
 ##############
 ## PLOTTING ##
@@ -132,7 +132,13 @@ theta_plot_deg = theta_plot*(180/np.pi)
 ## DEFINE MESH
 b_hidra = Mesh(R0=0.72, a=0.19)
 
-plotFuncs.boris_plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+#plotFuncs.boris_plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+
+plotFuncs.boris_plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_22stride12_120_4' , simIO=simIO,
+                              interval=1000/120, stride=12, max_frames=120,
+                              linewidth=0.5, linecolor=UIUC['il_orange'], line_alpha=0.4, line_window=30,
+                              trail_length=10, markersize=2, markercolor=UIUC['il_blue'],
+                              parallel=True, n_workers=20)
 
 #plotFuncs.boris_plotTracesPoincare(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
@@ -152,11 +158,11 @@ plotFuncs.boris_plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO
 #                           runString=cond_string+TAG+'_AngleDepo', simIO=simIO)
 
 # ## PLOT INITIAL ENERGY DISTRIBUTION TO VALIDATE MAXWELLIAN PROFILE & ION TEMPERATURE
-plotFuncs.boris_plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
+#plotFuncs.boris_plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # # PLOT FINAL ENERGY DISTRIBUTION
 # plotFuncs.boris_plotFinalEnergies(energy_output, ION_MASS, runString=cond_string+TAG, simIO=simIO)
 # # Plot # of perticles running over time
-plotFuncs.boris_plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
+#plotFuncs.boris_plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
 
 # # PLOT DEPOSITION ANGLE DISTRIBUTION
 # plotFuncs.boris_plotDepoAngles(deposition_angles_deg, runString=cond_string+TAG, simIO=simIO)
@@ -168,9 +174,9 @@ plotFuncs.boris_plotParticlesOverTime(max_timeStep, N_particles, TMAX, DT, runSt
 # #                             colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
 # #                             runString=cond_string+TAG+'_EnergyCombined', simIO=simIO)
 
-plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, theta_phi_angle_rad*(180/np.pi), colorRange=[-90, 90], 
-                            colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\theta}$)', myColormap='cividis',
-                            runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
+#plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, theta_phi_angle_rad*(180/np.pi), colorRange=[-90, 90], 
+#                            colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\theta}$)', myColormap='cividis',
+#                            runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
 
 # plotFuncs.boris_plotCombined(phi_plot_deg, theta_plot_deg, deposition_angles_deg, colorRange=[0, 90], 
 #                             colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
