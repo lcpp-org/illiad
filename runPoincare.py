@@ -25,13 +25,16 @@ import matplotlib.pyplot as plt
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
+import utility.phi_events as phi_event_defs
+
+
 
 # DEFINE FIELDS #
 CURRENT_TOR = 0.486 #[kA]
 CURRENT_HEL = 0.790 #[kA]
 CONFIG_TOR = "default_toroidal"
 CONFIG_HEL = "default_helical"
-ENABLE_ERRFIELD = False
+ENABLE_ERRFIELD = True
 
 # DEFINE INITIAL CONDITIONS #
 IC_PHI_DEG = 180. #[deg]
@@ -39,21 +42,21 @@ IC_THETA_DEG = 180. #[deg]
 START_RADIUS = 0.150 #[m]
 END_RADIUS = 0.020 #[m]
 NLINES = 14 + 13 # + 26 + 52 + 104
-SPINS = 2000 # max length, SPIN = 2pi*R0 [meters]
+SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
+NPLANES = 360
 
 # DEFINE SOLVER PARAMETERS #
-SOLVER = "RK45" #'LSODA'
+SOLVER = "RK45"#"LSODA"#
 RTOL = 2.49e-12
 ATOL = 1e-8
 NTHREADS = -1
 DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = "RK45-1e8_Iota4FWD_2000spins_27Lines"
-
-
+OUTPUT_DIR = f"Iota4FWD_{SPINS}spins_{NLINES}Lines_RK45_1e8_newEvents"
 
 
 def main():
+    
     """
     Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
     """
@@ -76,7 +79,13 @@ def main():
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
     PoinCare = Poincare(simIO, *solver_args)
-    PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
+
+    # # make a list of events 
+    # old_events = [phi_event_defs.inVV]
+    # old_events.extend(getattr(phi_event_defs, f"isphi{i}") for i in range(1, NPLANES + 1))
+    # PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, events=old_events)
+
+    PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, nplanes=NPLANES)
     out_tMax = PoinCare.run()[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE

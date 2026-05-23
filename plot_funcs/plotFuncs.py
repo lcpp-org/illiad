@@ -1,3 +1,5 @@
+import gc
+
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import patches, colors, cm, colormaps
@@ -894,7 +896,7 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
     #plt.show()
 
 # POINCARE PLOT FUNCTIONS:
-def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None):
+def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, title_on=True):
     """Plots a black and white Poincare plot of the magnetic field lines."""
 
     rho_max = b_hidra.a
@@ -924,13 +926,13 @@ def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysi
     phi_phys_deg = (phi_deg + 198.) % 360.
     phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
     phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
-    #ax.set_title(phi_phy_string + phy_comp_string, loc='left')
+    if title_on: ax.set_title(phi_phy_string + phy_comp_string, loc='left')
 
     plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
     plt.tight_layout()
     simIO.saveFig(plot_name, dpi=400)
     plt.close(fig)
-    #del fig, ax, radtheta_pts, xyz_list
-    #gc.collect()
+    del fig, ax, radtheta_pts
+    gc.collect()
 
-    simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
+    #simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))

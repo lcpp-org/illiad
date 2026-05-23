@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from scipy.integrate import solve_ivp
+from scipy.optimize import brentq
 from math import degrees
 
 from functools import partial
@@ -8,11 +9,103 @@ import concurrent.futures as cf
 from time import perf_counter
 import matplotlib.pyplot as plt
 
-from utility.phi_events import *
-from utility.coordtrans import XYZ_to_RTP, RTP_to_XYZ
+#from utility.phi_events import *
+from utility.phi_events import inVV
+from utility.coordtrans import XYZ_to_RTP, XYZ_to_RTP_many, RTP_to_XYZ_many #RTP_to_XYZ
+from classes.mesh import Mesh
 from classes.particle import FieldLine
 from plot_funcs import plotFuncs
 import gc
+
+def _phi_from_xyz(points_xyz):
+    points_xyz = np.asarray(points_xyz, dtype=np.float64)
+    phi = -np.arctan2(points_xyz[..., 1], points_xyz[..., 0])
+    return np.where(phi < 0.0, phi + 2.0 * np.pi, phi)
+
+
+def _unwrap_phi_local(phi_wrapped, phi_ref_wrapped, phi_ref_unwrapped):
+    delta = np.arctan2(
+        np.sin(phi_wrapped - phi_ref_wrapped),
+        np.cos(phi_wrapped - phi_ref_wrapped),
+    )
+    return phi_ref_unwrapped + delta
+
+
+def _crossing_ids(phi0, phi1, plane_spacing):
+    if phi1 > phi0:
+        first_cross = int(np.floor(phi0 / plane_spacing)) + 1
+        last_cross = int(np.floor(phi1 / plane_spacing))
+        if last_cross < first_cross:
+            return ()
+        return range(first_cross, last_cross + 1)
+
+    first_cross = int(np.ceil(phi0 / plane_spacing)) - 1
+    last_cross = int(np.ceil(phi1 / plane_spacing))
+    if first_cross < last_cross:
+        return ()
+    return range(first_cross, last_cross - 1, -1)
+
+
+def _extract_plane_crossings(solution, t_values, xyz_values, plot_angles):
+    nplanes = len(plot_angles)
+    if solution is None or nplanes == 0 or t_values.size < 2:
+        return [np.empty((0, 3), dtype=np.float64) for _ in range(nplanes)]
+
+    plane_spacing = (2.0 * np.pi) / nplanes
+    plane_hits = [[] for _ in range(nplanes)]
+    wrapped_phi = _phi_from_xyz(xyz_values)
+    unwrapped_phi = np.unwrap(wrapped_phi)
+
+    def solve_segment_crossings(t0, t1, xyz0, xyz1, phi0_wrapped, phi1_wrapped, phi0_unwrapped, phi1_unwrapped):
+        delta_phi = phi1_unwrapped - phi0_unwrapped
+        if delta_phi == 0.0:
+            return
+
+        if abs(delta_phi) > (np.pi / 2.0):
+            tm = 0.5 * (t0 + t1)
+            xyz_mid = np.asarray(solution(tm), dtype=np.float64)
+            phi_mid_wrapped = float(_phi_from_xyz(xyz_mid))
+            phi_mid_unwrapped = _unwrap_phi_local(phi_mid_wrapped, phi0_wrapped, phi0_unwrapped)
+            solve_segment_crossings(t0, tm, xyz0, xyz_mid, phi0_wrapped, phi_mid_wrapped, phi0_unwrapped, phi_mid_unwrapped)
+            solve_segment_crossings(tm, t1, xyz_mid, xyz1, phi_mid_wrapped, phi1_wrapped, phi_mid_unwrapped, phi1_unwrapped)
+            return
+
+        for cross_id in _crossing_ids(phi0_unwrapped, phi1_unwrapped, plane_spacing):
+            target_phi = cross_id * plane_spacing
+            plane_index = (cross_id - 1) % nplanes
+
+            def phi_residual(t, target=target_phi, phi_ref_wrapped=phi0_wrapped, phi_ref_unwrapped=phi0_unwrapped):
+                xyz = np.asarray(solution(t), dtype=np.float64)
+                phi_wrapped = float(_phi_from_xyz(xyz))
+                phi_unwrapped = _unwrap_phi_local(phi_wrapped, phi_ref_wrapped, phi_ref_unwrapped)
+                return phi_unwrapped - target
+
+            try:
+                t_cross = brentq(phi_residual, t0, t1, xtol=1e-10, rtol=1e-10, maxiter=50)
+                xyz_cross = np.asarray(solution(t_cross), dtype=np.float64)
+            except ValueError:
+                alpha = (target_phi - phi0_unwrapped) / delta_phi
+                xyz_cross = xyz0 + alpha * (xyz1 - xyz0)
+
+            plane_hits[plane_index].append(xyz_cross)
+
+    for seg_idx in range(t_values.size - 1):
+        solve_segment_crossings(
+            t_values[seg_idx],
+            t_values[seg_idx + 1],
+            xyz_values[seg_idx],
+            xyz_values[seg_idx + 1],
+            wrapped_phi[seg_idx],
+            wrapped_phi[seg_idx + 1],
+            unwrapped_phi[seg_idx],
+            unwrapped_phi[seg_idx + 1],
+        )
+
+    return [
+        np.asarray(points, dtype=np.float64).reshape(-1, 3)
+        if points else np.empty((0, 3), dtype=np.float64)
+        for points in plane_hits
+    ]
 
 class Poincare():
     """Class to handle Poincare analysis of magnetic field lines."""
@@ -66,7 +159,7 @@ class Poincare():
                             new_name = name.replace("poincare_", "")  # Remove prefix
                             setattr(self, new_name, func)  # Attach to the instance with the new name
 
-    def set_conditions(self, init_pos_arr=np.zeros([1, 3]), spins=100, field: Mesh = None, events=None):
+    def set_conditions(self, init_pos_arr=np.zeros([1, 3]), spins=100, field: Mesh = None, events=None, nplanes=360):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
@@ -78,385 +171,22 @@ class Poincare():
         Returns:
             None
         """
-        self.IC_rtp_arr = init_pos_arr
-        self.nlines = len(init_pos_arr)
+        self.IC_rtp_arr = np.atleast_2d(np.asarray(init_pos_arr, dtype=np.float64))
+        self.nlines = len(self.IC_rtp_arr)
         self.spins = spins
-        
+
         if field: self.field = field
         else: raise ValueError("Field mesh is required.")
 
         ## CONVERT TO XYZ COORDS
-        ICs_XYZ = np.zeros(shape=(self.nlines, 3))
-        for i in range(self.nlines):
-            ICs_XYZ[i] = RTP_to_XYZ(init_pos_arr[i], self.field.R0)
-        length = (2*np.pi * self.field.R0) * spins
+        ICs_XYZ = RTP_to_XYZ_many(self.IC_rtp_arr, self.field.R0)
+        length = (2 * np.pi * self.field.R0) * spins
 
         self.fieldlines = [FieldLine(init_cond, length, direction = 1.0) for init_cond in ICs_XYZ]
         if self.double_line: 
             self.fieldlines += [FieldLine(init_cond, length, direction = -1.0) for init_cond in ICs_XYZ]
 
-        poincare_events = [ inVV, 
-                        isphi1, 
-                        isphi2, 
-                        isphi3, 
-                        isphi4, 
-                        isphi5, 
-                        isphi6, 
-                        isphi7, 
-                        isphi8, 
-                        isphi9, 
-                        isphi10, 
-                        isphi11, 
-                        isphi12, 
-                        isphi13, 
-                        isphi14, 
-                        isphi15, 
-                        isphi16, 
-                        isphi17, 
-                        isphi18, 
-                        isphi19, 
-                        isphi20, 
-                        isphi21, 
-                        isphi22, 
-                        isphi23, 
-                        isphi24, 
-                        isphi25, 
-                        isphi26, 
-                        isphi27, 
-                        isphi28, 
-                        isphi29, 
-                        isphi30, 
-                        isphi31, 
-                        isphi32, 
-                        isphi33, 
-                        isphi34, 
-                        isphi35, 
-                        isphi36, 
-                        isphi37, 
-                        isphi38, 
-                        isphi39, 
-                        isphi40, 
-                        isphi41, 
-                        isphi42, 
-                        isphi43, 
-                        isphi44, 
-                        isphi45, 
-                        isphi46, 
-                        isphi47, 
-                        isphi48, 
-                        isphi49, 
-                        isphi50, 
-                        isphi51, 
-                        isphi52, 
-                        isphi53, 
-                        isphi54, 
-                        isphi55, 
-                        isphi56, 
-                        isphi57, 
-                        isphi58, 
-                        isphi59, 
-                        isphi60, 
-                        isphi61, 
-                        isphi62, 
-                        isphi63, 
-                        isphi64, 
-                        isphi65, 
-                        isphi66, 
-                        isphi67, 
-                        isphi68, 
-                        isphi69, 
-                        isphi70, 
-                        isphi71, 
-                        isphi72, 
-                        isphi73, 
-                        isphi74, 
-                        isphi75, 
-                        isphi76, 
-                        isphi77, 
-                        isphi78, 
-                        isphi79, 
-                        isphi80, 
-                        isphi81, 
-                        isphi82, 
-                        isphi83, 
-                        isphi84, 
-                        isphi85, 
-                        isphi86, 
-                        isphi87, 
-                        isphi88, 
-                        isphi89, 
-                        isphi90, 
-                        isphi91, 
-                        isphi92, 
-                        isphi93, 
-                        isphi94, 
-                        isphi95, 
-                        isphi96, 
-                        isphi97, 
-                        isphi98, 
-                        isphi99, 
-                        isphi100, 
-                        isphi101, 
-                        isphi102, 
-                        isphi103, 
-                        isphi104, 
-                        isphi105, 
-                        isphi106, 
-                        isphi107, 
-                        isphi108, 
-                        isphi109, 
-                        isphi110, 
-                        isphi111, 
-                        isphi112, 
-                        isphi113, 
-                        isphi114, 
-                        isphi115, 
-                        isphi116, 
-                        isphi117, 
-                        isphi118, 
-                        isphi119, 
-                        isphi120, 
-                        isphi121, 
-                        isphi122, 
-                        isphi123, 
-                        isphi124, 
-                        isphi125, 
-                        isphi126, 
-                        isphi127, 
-                        isphi128, 
-                        isphi129, 
-                        isphi130, 
-                        isphi131, 
-                        isphi132, 
-                        isphi133, 
-                        isphi134, 
-                        isphi135, 
-                        isphi136, 
-                        isphi137, 
-                        isphi138, 
-                        isphi139, 
-                        isphi140, 
-                        isphi141, 
-                        isphi142, 
-                        isphi143, 
-                        isphi144, 
-                        isphi145, 
-                        isphi146, 
-                        isphi147, 
-                        isphi148, 
-                        isphi149, 
-                        isphi150, 
-                        isphi151, 
-                        isphi152, 
-                        isphi153, 
-                        isphi154, 
-                        isphi155, 
-                        isphi156, 
-                        isphi157, 
-                        isphi158, 
-                        isphi159, 
-                        isphi160, 
-                        isphi161, 
-                        isphi162, 
-                        isphi163, 
-                        isphi164, 
-                        isphi165, 
-                        isphi166, 
-                        isphi167, 
-                        isphi168, 
-                        isphi169, 
-                        isphi170, 
-                        isphi171, 
-                        isphi172, 
-                        isphi173, 
-                        isphi174, 
-                        isphi175, 
-                        isphi176, 
-                        isphi177, 
-                        isphi178, 
-                        isphi179, 
-                        isphi180, 
-                        isphi181, 
-                        isphi182, 
-                        isphi183, 
-                        isphi184, 
-                        isphi185, 
-                        isphi186, 
-                        isphi187, 
-                        isphi188, 
-                        isphi189, 
-                        isphi190, 
-                        isphi191, 
-                        isphi192, 
-                        isphi193, 
-                        isphi194, 
-                        isphi195, 
-                        isphi196, 
-                        isphi197, 
-                        isphi198, 
-                        isphi199, 
-                        isphi200, 
-                        isphi201, 
-                        isphi202, 
-                        isphi203, 
-                        isphi204, 
-                        isphi205, 
-                        isphi206, 
-                        isphi207, 
-                        isphi208, 
-                        isphi209, 
-                        isphi210, 
-                        isphi211, 
-                        isphi212, 
-                        isphi213, 
-                        isphi214, 
-                        isphi215, 
-                        isphi216, 
-                        isphi217, 
-                        isphi218, 
-                        isphi219, 
-                        isphi220, 
-                        isphi221, 
-                        isphi222, 
-                        isphi223, 
-                        isphi224, 
-                        isphi225, 
-                        isphi226, 
-                        isphi227, 
-                        isphi228, 
-                        isphi229, 
-                        isphi230, 
-                        isphi231, 
-                        isphi232, 
-                        isphi233, 
-                        isphi234, 
-                        isphi235, 
-                        isphi236, 
-                        isphi237, 
-                        isphi238, 
-                        isphi239, 
-                        isphi240, 
-                        isphi241, 
-                        isphi242, 
-                        isphi243, 
-                        isphi244, 
-                        isphi245, 
-                        isphi246, 
-                        isphi247, 
-                        isphi248, 
-                        isphi249, 
-                        isphi250, 
-                        isphi251, 
-                        isphi252, 
-                        isphi253, 
-                        isphi254, 
-                        isphi255, 
-                        isphi256, 
-                        isphi257, 
-                        isphi258, 
-                        isphi259, 
-                        isphi260, 
-                        isphi261, 
-                        isphi262, 
-                        isphi263, 
-                        isphi264, 
-                        isphi265, 
-                        isphi266, 
-                        isphi267, 
-                        isphi268, 
-                        isphi269, 
-                        isphi270, 
-                        isphi271, 
-                        isphi272, 
-                        isphi273, 
-                        isphi274, 
-                        isphi275, 
-                        isphi276, 
-                        isphi277, 
-                        isphi278, 
-                        isphi279, 
-                        isphi280, 
-                        isphi281, 
-                        isphi282, 
-                        isphi283, 
-                        isphi284, 
-                        isphi285, 
-                        isphi286, 
-                        isphi287, 
-                        isphi288, 
-                        isphi289, 
-                        isphi290, 
-                        isphi291, 
-                        isphi292, 
-                        isphi293, 
-                        isphi294, 
-                        isphi295, 
-                        isphi296, 
-                        isphi297, 
-                        isphi298, 
-                        isphi299, 
-                        isphi300, 
-                        isphi301, 
-                        isphi302, 
-                        isphi303, 
-                        isphi304, 
-                        isphi305, 
-                        isphi306, 
-                        isphi307, 
-                        isphi308, 
-                        isphi309, 
-                        isphi310, 
-                        isphi311, 
-                        isphi312, 
-                        isphi313, 
-                        isphi314, 
-                        isphi315, 
-                        isphi316, 
-                        isphi317, 
-                        isphi318, 
-                        isphi319, 
-                        isphi320, 
-                        isphi321, 
-                        isphi322, 
-                        isphi323, 
-                        isphi324, 
-                        isphi325, 
-                        isphi326, 
-                        isphi327, 
-                        isphi328, 
-                        isphi329, 
-                        isphi330, 
-                        isphi331, 
-                        isphi332, 
-                        isphi333, 
-                        isphi334, 
-                        isphi335, 
-                        isphi336, 
-                        isphi337, 
-                        isphi338, 
-                        isphi339, 
-                        isphi340, 
-                        isphi341, 
-                        isphi342, 
-                        isphi343, 
-                        isphi344, 
-                        isphi345, 
-                        isphi346, 
-                        isphi347, 
-                        isphi348, 
-                        isphi349, 
-                        isphi350, 
-                        isphi351, 
-                        isphi352, 
-                        isphi353, 
-                        isphi354, 
-                        isphi355, 
-                        isphi356, 
-                        isphi357, 
-                        isphi358, 
-                        isphi359, 
-                        isphi360] 
-
+        """
         if events is None:
             self.solver_events = poincare_events
             self.plot_angles = np.linspace(np.pi/180., 2*np.pi, 360)
@@ -464,6 +194,20 @@ class Poincare():
             self.solver_events = events
             n_angles = len(events) - 1
             self.plot_angles = np.linspace(np.pi/180., 2*np.pi, n_angles)
+        """
+
+        if events is None:
+            if nplanes <= 0:
+                raise ValueError("nplanes must be positive.")
+            self.use_plane_reconstruction = True
+            self.solver_events = [inVV]
+            self.plot_angles = np.linspace(2 * np.pi / nplanes, 2 * np.pi, nplanes)
+        else:
+            self.use_plane_reconstruction = False
+            self.solver_events = events
+            n_angles = len(events) - 1
+            self.plot_angles = np.linspace(np.pi / 180.0, 2 * np.pi, n_angles)
+
 
         self.IO.log.info("+----------------+-------------------------+")
         self.IO.log.info(f"| NLINES         | {self.nlines:<23} |")
@@ -508,42 +252,55 @@ class Poincare():
         init_cond = particle.pos0_XYZ
         maxLength = particle.maxLife
 
-        for event in self.solver_events:
-            if event.__name__ == 'inVV':
-                event.direction = -1.0
-            elif event.__name__ == 'isphi360':
-                event.direction = -particle.direction
-            else:
-                event.direction = particle.direction
-
         tic = perf_counter()
-        fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
-                                args = ([self.field]),
-                                dense_output=False,
-                                events = self.solver_events, 
-                                method=self.solver, rtol=self.r_tol, atol=self.a_tol)
+        if self.use_plane_reconstruction:
+            fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
+                                    args=([self.field]), dense_output=True,
+                                    events=self.solver_events,
+                                    method=self.solver, rtol=self.r_tol, atol=self.a_tol)
+            plane_output = _extract_plane_crossings( fieldlines.sol, fieldlines.t, fieldlines.y.T, self.plot_angles)
+            wall_output = fieldlines.y_events[0] if fieldlines.y_events else np.empty((0, 3), dtype=np.float64)
+        else:
+            for event in self.solver_events:
+                if event.__name__ == 'inVV':
+                    event.direction = -1.0
+                elif event.__name__ == 'isphi360':
+                    event.direction = -particle.direction
+                else:
+                    event.direction = particle.direction
+
+        
+            fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
+                                    args = ([self.field]),
+                                    dense_output=False,
+                                    events = self.solver_events, 
+                                    method=self.solver, rtol=self.r_tol, atol=self.a_tol)
+            plane_output = fieldlines.y_events[1:]
+            wall_output = fieldlines.y_events[0] if fieldlines.y_events else np.empty((0, 3), dtype=np.float64)
+
         toc = perf_counter()
         elapsed_timeInd = toc - tic
-
-        tmax = np.max(fieldlines.t)
+        tmax = float(fieldlines.t[-1])
 
         if fieldlines.status == 0: #solver ran to max. time
-            self.IO.log.info('Success!: Particle {} of {} took {:.4f} sec.\tEnd at tmax={:.3f}'
-                .format(particle.particleID,
-                        particle.particleCount,
-                        elapsed_timeInd,
-                        tmax))
+            self.IO.log.info(
+                'Success!: Particle {} of {} took {:.4f} sec.\tEnd at tmax={:.3f}'.format(
+                    particle.particleID,
+                    particle.particleCount,
+                    elapsed_timeInd,
+                    tmax))
         elif fieldlines.status == 1: #termination event
-            self.IO.log.info('Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'
-                .format(particle.particleID,
-                        particle.particleCount,
-                        elapsed_timeInd,
-                        fieldlines.t_events[0]))
+            self.IO.log.info(
+                'Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'.format(
+                    particle.particleID,
+                    particle.particleCount,
+                    elapsed_timeInd,
+                    fieldlines.t_events[0]))
         else: #solver failure
             self.IO.log.critical('FAILURE!: Particle {}'
                 .format(particle.particleID))
 
-        return tmax, fieldlines.y_events[:]
+        return tmax, plane_output, wall_output
 
     def post_solver(self, solver_output):
         """Processes the solver output to extract path lengths and Poincare data,
@@ -562,11 +319,13 @@ class Poincare():
         path_lengths = []
         poincare_points = []
         wall_points = []
-        for pLngth, out in solver_output:
-            path_lengths += [pLngth]
-            poincare_points += [out[1:]]
-            if isinstance(out[0], np.ndarray) and out[0].any():
-                wall_points += [XYZ_to_RTP(out[0][0], self.field.R0)]
+        for pLngth, plane_out, wall_out in solver_output:
+            path_lengths.append(pLngth)
+            poincare_points.append(plane_out)
+            if isinstance(wall_out, np.ndarray) and wall_out.size:
+                wall_points.append(XYZ_to_RTP(wall_out[0], self.field.R0))
+
+
 
         if self.double_line:
             # Combine the positive and negative fieldlines into one
@@ -677,22 +436,27 @@ class Poincare():
         phi_deg = phi*180/np.pi
 
         num_sets = len(xyz_list)
-        maxLength = max(len(xyz_list[i][n]) for i in range(num_sets))
+        maxLength = max((len(xyz_list[i][n]) for i in range(num_sets)), default=0)
         radtheta_pts = np.full([num_sets, 2, maxLength], fill_value=np.nan)
         point_total = np.zeros(num_sets, dtype=int)
+
         for i in range(num_sets):
             xyz_points = xyz_list[i][n]
-            point_total[i] = max(0, len(xyz_points)-1)
-            for j in range(point_total[i]):
-                radtheta_pts[i][1][j], radtheta_pts[i][0][j] = XYZ_to_RTP(xyz_points[j][:3], self.field.R0)[:2]
-            #plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]], marker='.', s=1.00, c='k', linewidths=0.0)
+            point_total[i] = len(xyz_points)
+            if point_total[i] == 0:
+                continue
+
+            rtp_points = XYZ_to_RTP_many(xyz_points[:, :3], self.field.R0)
+            radtheta_pts[i][0, :point_total[i]] = rtp_points[:, 1]
+            radtheta_pts[i][1, :point_total[i]] = rtp_points[:, 0]
+
 
         if saveData:
             fname = self.anlys_name + '_{:03.0f}'.format(phi_deg)
             self.IO.saveNumpyData(radtheta_pts, fname)
 
         # plotting
-        self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name)#, self.IO)
+        self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name, simIO=self.IO)
 
 
     def run(self):

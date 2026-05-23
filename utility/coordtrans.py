@@ -122,6 +122,39 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
 
     return p_RTP
 
+def RTP_to_XYZ_many(p_RTP, Rmajor=0.72):
+    """Vectorized RTP -> XYZ transform for arrays shaped (..., 3)."""
+    p_RTP = np.asarray(p_RTP, dtype=np.float64)
+    r = p_RTP[..., 0]
+    theta = p_RTP[..., 1]
+    phi = p_RTP[..., 2]
+
+    temp_ = Rmajor + r * np.cos(theta)
+    x = temp_ * np.cos(phi)
+    y = (-1.0) * temp_ * np.sin(phi)
+    z = r * np.sin(theta)
+
+    return np.stack([x, y, z], axis=-1)
+
+def XYZ_to_RTP_many(p_XYZ, Rmajor=0.72):
+    """Vectorized XYZ -> RTP transform for arrays shaped (..., 3)."""
+    p_XYZ = np.asarray(p_XYZ, dtype=np.float64)
+    x = p_XYZ[..., 0]
+    y = p_XYZ[..., 1]
+    z = p_XYZ[..., 2]
+
+    x2plusy2 = x * x + y * y
+    R = np.sqrt(x2plusy2)
+    r = np.sqrt(x2plusy2 + z * z + Rmajor * Rmajor - 2.0 * Rmajor * R)
+
+    theta = np.arctan2(z, R - Rmajor)
+    theta = np.where(theta < 0.0, theta + 2.0 * np.pi, theta)
+
+    phi = -np.arctan2(y, x)
+    phi = np.where(phi < 0.0, phi + 2.0 * np.pi, phi)
+
+    return np.stack([r, theta, phi], axis=-1)
+
 
 ## ROTATE A CARTESIAN VECTOR BY ANGLE DELTA_PHI
 def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
