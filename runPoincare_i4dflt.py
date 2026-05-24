@@ -35,22 +35,22 @@ CONFIG_HEL = "default_helical"
 ENABLE_ERRFIELD = True
 
 # DEFINE INITIAL CONDITIONS #
-IC_PHI_DEG = 324. #180. #[deg]
+IC_PHI_DEG = 180. #[deg]
 IC_THETA_DEG = 180. #[deg]
-START_RADIUS = 0.140 #[m]
+START_RADIUS = 0.150 #[m]
 END_RADIUS = 0.020 #[m]
-NLINES = 49 #97 
+NLINES = 105
 SPINS = 1500 #1500 # max length, SPIN = 2pi*R0 [meters]
 NPLANES = 360
 
 # DEFINE SOLVER PARAMETERS #
-SOLVER = "RK45"#"LSODA"
+SOLVER = "LSODA"#"RK45"#
 RTOL = 2.49e-12
-ATOL = 1e-8 #2.49e-8
-NTHREADS = -1
+ATOL = 2.49e-9
+NTHREADS = 105 #-1
 DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = f"It-{CURRENT_TOR*1000:04.0f}_Ih-{CURRENT_HEL*1000:04.0f}_PHI324_{SPINS:04d}sp_ins_{NLINES}Lines_{SOLVER}1e8_newEvents"
+OUTPUT_DIR = f"It-{CURRENT_TOR*1000:04.0f}_Ih-{CURRENT_HEL*1000:04.0f}_PHI{IC_PHI_DEG:03.0f}_{SPINS:04d}spins_{NLINES}Lines_{SOLVER}1e9_newEvents"
 
 def main():
     """
@@ -76,11 +76,10 @@ def main():
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
     PoinCare = Poincare(simIO, *solver_args)
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, nplanes=NPLANES)
-    # old_events = [phi_event_defs.inVV]
-    # old_events.extend(getattr(phi_event_defs, f"isphi{i}") for i in range(1, NPLANES + 1))
-    # PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, events=old_events)
-    #PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra)
-    out_tMax = PoinCare.run()[0]
+
+
+
+    out_tMax = PoinCare.run(plot_args={'title_on': True, 'dpi': 300})[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
     PoinCare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)

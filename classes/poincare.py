@@ -302,7 +302,7 @@ class Poincare():
 
         return tmax, plane_output, wall_output
 
-    def post_solver(self, solver_output):
+    def post_solver(self, solver_output, plot_args=None):
         """Processes the solver output to extract path lengths and Poincare data,
         and prepares the data for plotting and output.
 
@@ -340,7 +340,7 @@ class Poincare():
 
         self.IO.log.info('PLOTTING AND OUTPUTTING PHI-ANGLE DATA:')
         # self.IO.log.info('path_lengths: {}'.format(path_lengths))
-        save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True)
+        save_output_partial = partial(self.save_output, xyz_list=poincare_points, saveData=True, plot_args=plot_args)
         plot_workers = min(self.workers, 9)
         iter_in = enumerate(self.plot_angles)
         with cf.ProcessPoolExecutor(max_workers=plot_workers) as executor:
@@ -412,7 +412,7 @@ class Poincare():
         self.IO.log.info('LCFS_index = {}'.format(LCFS_index))
         return LCFS_index
 
-    def save_output(self, iter, xyz_list, saveData=True):
+    def save_output(self, iter, xyz_list, saveData=True, plot_args=None):
         """
         Generates and saves Poincare plots and associated data for a given phi angle, and logs the operation.
 
@@ -456,10 +456,10 @@ class Poincare():
             self.IO.saveNumpyData(radtheta_pts, fname)
 
         # plotting
-        self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name, simIO=self.IO)
+        self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name, simIO=self.IO, plot_args=plot_args)
 
 
-    def run(self):
+    def run(self, plot_args=None):
         """Generates Poincare plots based on the initial conditions and magnetic field.
 
         Returns:
@@ -469,6 +469,6 @@ class Poincare():
             wall_output_test (list): List of wall intersection data for each particle.
         """
         solv_out = self.parallel_solver()
-        pathLength, Poincare_output, wall_output = self.post_solver(solv_out)
+        pathLength, Poincare_output, wall_output = self.post_solver(solv_out, plot_args)
         # self.IO.log.info('pathLength: {}'.format(pathLength))
         return pathLength, Poincare_output, wall_output

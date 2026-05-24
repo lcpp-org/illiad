@@ -896,9 +896,16 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
     #plt.show()
 
 # POINCARE PLOT FUNCTIONS:
-def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, title_on=True):
+def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, plot_args=None):
     """Plots a black and white Poincare plot of the magnetic field lines."""
 
+    if plot_args:
+        title_on = plot_args['title_on']
+        dpi = plot_args['dpi']
+    else:        
+        title_on = True
+        dpi = 400
+    
     rho_max = b_hidra.a
     num_sets = len(radtheta_pts)
 
@@ -930,7 +937,7 @@ def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysi
 
     plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
     plt.tight_layout()
-    simIO.saveFig(plot_name, dpi=400)
+    simIO.saveFig(plot_name, dpi=dpi)
     plt.close(fig)
     del fig, ax, radtheta_pts
     gc.collect()
