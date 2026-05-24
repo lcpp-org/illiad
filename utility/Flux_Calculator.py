@@ -394,16 +394,12 @@ def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=
     # INTEGRATION HELPER FUNCTIONS
     def flux_integrand(r, theta, phi, field, axis):
         """Function to calculate the toroidal field times radius at a given point in space"""
-        #geo_point = np.array([r+axis[1], theta+axis[0], phi])
-        # axis[0] += np.pi
-        # geo_point = np.array([*axisShift(r, theta, *axis), phi])
-        # performed in 'interpField' method
-        # if geo_point[0] < 0.0:
-        #     geo_point[0] *= -1.
-        #     geo_point[1] += np.pi
+        geo_point = np.array([r+axis[1], theta+axis[0], phi])
+        axis[0] += np.pi
+        geo_point = np.array([*axisShift(r, theta, *axis), phi])
 
-        #bxy = field.interpField(geo_point, Cart=False)[0][:2]
-        bxy = np.array([1.0, 1.0])
+        bxy = field.interpField(geo_point, Cart=False)[0][:2]
+
         # Calculate the toroidal flux integrand: r*B_toroidal = r*( -Bx*sin(phi) - By*cos(phi) )
         return -r*( bxy[0]*np.sin(phi) - bxy[1]*np.cos(phi) )
 
