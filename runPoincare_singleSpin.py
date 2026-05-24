@@ -39,20 +39,21 @@ ENABLE_ERRFIELD = True
 IC_PHI_DEG = 180. #[deg]
 IC_THETA_DEG = 180. #[deg]
 START_RADIUS = 0.000 #[m]
-END_RADIUS = 0.012 #[m]
-NLINES = 105
+END_RADIUS = 0.10 #[m]
+NLINES = 11+10+20
+NTHETA = 90
 SPINS = 1
-NPLANES = 360
-NTHETA = 24
+NPLANES = 180
+
 
 # DEFINE SOLVER PARAMETERS #
 SOLVER = "RK45"#"LSODA"#
 RTOL = 2.49e-12
 ATOL = 2.49e-8
-NTHREADS = 105 #-1
+NTHREADS = -1
 DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = f"It-{CURRENT_TOR*1000:04.0f}_Ih-{CURRENT_HEL*1000:04.0f}_PHI{IC_PHI_DEG:03.0f}_{SPINS:04d}spins_{NLINES}Lines_{SOLVER}1e9_newEvents"
+OUTPUT_DIR = f"It-{CURRENT_TOR*1000:04.0f}_Ih-{CURRENT_HEL*1000:04.0f}_PHI{IC_PHI_DEG:03.0f}_{SPINS:0d}spins_{NLINES*NTHETA}Lines_{SOLVER}1e8_SINGLEIOTA"
 
 
 def _wrap_to_pi(angle):
@@ -148,6 +149,8 @@ def calculate_single_spin_iota(init_conds_rtp, poincare_points, field, initial_p
         'axis_delta_r': axis_info['delta_r'],
         'axis_delta_theta': axis_info['delta_theta'],
         'axis_poloidal_mismatch': axis_info['poloidal_mismatch'],
+        'theta_initial_geo': init_conds_rtp[:, 1].copy(),
+        'radius_initial_geo': init_conds_rtp[:, 0].copy(),
         'final_rtp': final_rtp,
         'theta_initial_axis': initial_theta_axis,
         'radius_initial_axis': initial_radius_axis,
@@ -163,20 +166,20 @@ def plot_iota_contours(iota_output, simIO, dpi=300, levels=24):
     valid_mask = (
         iota_output['valid_mask']
         & np.isfinite(iota_output['iota'])
-        & np.isfinite(iota_output['theta_initial_axis'])
-        & np.isfinite(iota_output['radius_initial_axis'])
+        & np.isfinite(iota_output['theta_initial_geo'])
+        & np.isfinite(iota_output['radius_initial_geo'])
     )
 
     if np.count_nonzero(valid_mask) < 3:
         raise ValueError("Need at least three valid iota samples to build a contour plot.")
 
-    theta_axis = np.asarray(iota_output['theta_initial_axis'][valid_mask], dtype=np.float64)
-    radius_axis = np.asarray(iota_output['radius_initial_axis'][valid_mask], dtype=np.float64)
+    theta_geo = np.asarray(iota_output['theta_initial_geo'][valid_mask], dtype=np.float64)
+    radius_geo = np.asarray(iota_output['radius_initial_geo'][valid_mask], dtype=np.float64)
     iota_vals = np.asarray(iota_output['iota'][valid_mask], dtype=np.float64)
 
-    x_axis = radius_axis * np.cos(theta_axis)
-    z_axis = radius_axis * np.sin(theta_axis)
-    rounded_coords = np.round(np.column_stack((x_axis, z_axis)), decimals=12)
+    x_geo = radius_geo * np.cos(theta_geo)
+    z_geo = radius_geo * np.sin(theta_geo)
+    rounded_coords = np.round(np.column_stack((x_geo, z_geo)), decimals=12)
     unique_coords, inverse = np.unique(rounded_coords, axis=0, return_inverse=True)
 
     counts = np.bincount(inverse)
@@ -211,14 +214,14 @@ def plot_iota_contours(iota_output, simIO, dpi=300, levels=24):
     ax = fig.add_subplot(111, polar=True)
     contour = ax.tricontourf(theta_plot, radius_plot, iota_plot, levels=contour_levels, cmap='viridis')
     ax.scatter(theta_unique, radius_unique, c='k', s=1.0, alpha=0.20, linewidths=0.0)
-    ax.scatter([0.0], [0.0], c='white', edgecolors='k', marker='x', s=50, linewidths=0.75)
+    ax.scatter([iota_output['axis_thetar'][0]], [iota_output['axis_thetar'][1]], c='white', marker='x', s=50, linewidths=0.75)
 
     ax.set_rmax(max(np.nanmax(radius_unique) * 1.05, 1.0e-6))
     ax.grid(linewidth=0.25, linestyle=':', c='k')
     ax.set_rgrids([], angle=0)
     ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315], labels=['', '', '', '', '', '', '', ''], fontsize=12)
     ax.set_title(
-        'One-turn iota, magnetic-axis cross-section\n'
+        'One-turn iota, geometric cross-section\n'
         + '$\\phi_c$={:.0f}$\\degree$ | $\\iota_{{min}}$={:.5f}, $\\iota_{{max}}$={:.5f}'.format(phi_deg, iota_min, iota_max),
         loc='left',
     )
@@ -256,7 +259,7 @@ def main():
     PoinCare = Poincare(simIO, *solver_args)
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, nplanes=NPLANES)
 
-    poincare_points = PoinCare.run(plot_args={'title_on': True, 'dpi': 300})[1]
+    poincare_points = PoinCare.run(plot_args={'title_on': True, 'dpi': 250})[1]
 
 
     iota_output = calculate_single_spin_iota(init_conds_rtp, poincare_points, b_hidra, 
