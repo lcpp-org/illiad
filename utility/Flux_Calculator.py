@@ -107,10 +107,9 @@ def fluxCalculator(input_params=None):
                 th_size = th_in.size
 
                 # SHIFT ORIGIN OF R, THETA COORDINATES FROM GEOMETRIC CENTER TO MAGNETIC AXIS
-                points_tr_magAxis = np.empty((th_size, 2))
-                points_tr_magAxis[:] = axisShift(th_in, r_in[:], *mag_axis).T
+                points_tr_magAxis = axisShift(th_in, r_in, *mag_axis).T
                 # REMOVE DUPLICATE THETA VALUES AND SORT DATA IN INCREASING THETA
-                unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True)[1]
+                unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
                 points_tr_magAxis = points_tr_magAxis[unique_indices]
                 th_size = points_tr_magAxis.shape[0]
                 points_tr_magAxis = points_tr_magAxis[np.argsort(points_tr_magAxis[:, 0])]
@@ -453,11 +452,9 @@ def first_surface_loop(flux_surfaces, mag_axis, field, start_index, end_index, m
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]
         th_size = th_in.size
-        # shift origin of r, theta coords from geo center to mag axis 
-        pts_tr_magAxis = np.empty((th_size, 2))
-        for j, theta in enumerate(th_in):
-            pts_tr_magAxis[j] = axisShift(theta, r_in[j], *mag_axis)
-        # remove duplicate thetas, sort data in increasing theta
+        # shift origin of r, theta coords from geo center to mag axis
+        pts_tr_magAxis = axisShift(th_in, r_in, *mag_axis).T
+        # REMOVE DUPLICATE THETA VALUES AND SORT DATA IN INCREASING THETA
         unique_indices = np.unique(pts_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
         pts_tr_magAxis = pts_tr_magAxis[unique_indices]
         pts_tr_magAxis = pts_tr_magAxis[np.argsort(pts_tr_magAxis[:, 0])]
@@ -479,10 +476,15 @@ def first_surface_loop(flux_surfaces, mag_axis, field, start_index, end_index, m
         # LOOP THROUGH SUBSETS
         subset_mean_rads = np.zeros(num_subsets[surf_index])
         for subset_index in range(num_subsets[surf_index]):
+            subset_points = split_data_magAxis[surf_index][subset_index]
             if num_subsets[surf_index] > 1:
-                rad_toSpline = np.array([axisShift(theta, r, *surface_axes_magAxis[surf_index][subset_index]) for theta, r in split_data_magAxis[surf_index][subset_index]]).T[1]
+                rad_toSpline = axisShift(
+                    subset_points[:, 0],
+                    subset_points[:, 1],
+                    *surface_axes_magAxis[surf_index][subset_index],
+                )[1]
             else:
-                rad_toSpline = split_data_magAxis[surf_index][subset_index].T[1]
+                rad_toSpline = subset_points[:, 1]
             subset_mean_rads[subset_index] = np.mean(rad_toSpline)
         set_mean_rads[surf_index] = np.mean(subset_mean_rads)
 
@@ -544,15 +546,14 @@ def subset_looper(subsetData, subsetCenters, surf_index,
     subset_flux_list = []
     for subset_idx in range(num_subsets):
         current_center = subsetCenters[surf_index][subset_idx]
-        current_data = subsetData[surf_index][subset_idx]
+        current_data = np.array(subsetData[surf_index][subset_idx], copy=True)
 
-        ## SHIFT DATA POINTS FROM [REL. TO MAGAXIS] TO [REL. TO THE CENTERS OF THE SMALLEST ISLANDS]
+        # SHIFT DATA POINTS FROM [REL. TO MAGAXIS] TO [REL. TO THE CENTERS OF THE SMALLEST ISLANDS]
         if num_subsets == MAX_SUBSETS:
-            for i in range(len(current_data)):
-                current_data[i] = axisShift(*current_data[i], *current_center)
-                current_data[i] = axisShift(*current_data[i], *subCenters_Shift[subset_idx])
+            current_data = axisShift(current_data[:, 0], current_data[:, 1], *current_center).T
+            current_data = axisShift(current_data[:, 0], current_data[:, 1], *subCenters_Shift[subset_idx]).T
 
-            current_data = current_data[np.argsort(current_data.T[0])]
+            current_data = current_data[np.argsort(current_data[:, 0])]
             current_center = subsetCenters[smallest_island_index][subset_idx-shiftint]
             subCenters_geo[subset_idx][:] = axisShift(*current_center, *mag_axis_rev)
         else:
@@ -580,17 +581,18 @@ def subset_looper(subsetData, subsetCenters, surf_index,
         radius_evals_locAxis[subset_idx] = splev(current_theta_gens, fSurface_splineParms)
 
         # Shift the points to be relative to the magnetic axis
-        for theta_idx, theta in enumerate(current_theta_gens):
-            if num_subsets > 1:
-                shift_r = current_center[1]
-                shift_theta = current_center[0] + np.pi
-                splined_tr_MagAxis[subset_idx][theta_idx] = axisShift(theta, radius_evals_locAxis[subset_idx][theta_idx], shift_theta, shift_r)
-            else:
-               splined_tr_MagAxis[subset_idx][theta_idx][0] = theta
-               splined_tr_MagAxis[subset_idx][theta_idx][1] = radius_evals_locAxis[subset_idx][theta_idx]
+        if num_subsets > 1:
+            shift_r = current_center[1]
+            shift_theta = current_center[0] + np.pi
+            splined_tr_MagAxis[subset_idx] = axisShift(current_theta_gens, radius_evals_locAxis[subset_idx],
+                                                        shift_theta, shift_r).T
+        else:
+            splined_tr_MagAxis[subset_idx, :, 0] = current_theta_gens
+            splined_tr_MagAxis[subset_idx, :, 1] = radius_evals_locAxis[subset_idx]
 
-            ## Shift r, theta back relative to geometric axis
-            splined_tr_GeoAxis[subset_idx][theta_idx] = axisShift(*splined_tr_MagAxis[subset_idx][theta_idx], *mag_axis_rev)
+        ## Shift r, theta back relative to geometric axis
+        splined_tr_GeoAxis[subset_idx] = axisShift(splined_tr_MagAxis[subset_idx, :, 0], splined_tr_MagAxis[subset_idx, :, 1],
+                                                    *mag_axis_rev).T
 
     return splined_tr_GeoAxis, splined_tr_MagAxis, subCenters_geo, subset_flux_list, valid_surface
 
