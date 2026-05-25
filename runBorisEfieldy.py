@@ -118,10 +118,10 @@ def boris_runner(input_params=None):
                                 runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
     
     ion_tracer.plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_28stride13_30f_480p2' , simIO=simIO,
-                                  interval=1000/120, stride=13, max_frames=300,
+                                  interval=1000/120, stride=13, max_frames=3000,
                                   linewidth=0.5, linecolor=plotFuncs.UIUC['il_orange'], line_alpha=0.4, line_window=40,
                                   trail_length=10, markersize=2, markercolor=plotFuncs.UIUC['il_blue'],
-                                  parallel=True, n_workers=28, resolution='480p')
+                                  parallel=True, n_workers=15, resolution='720p')
 
     #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
     ion_tracer.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
@@ -135,24 +135,26 @@ if __name__ == "__main__":
 
     ## SET SIMULATION INPUTS:
     # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
-    OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
-    TAG = "Lithium_FS40_1p0ms_UPDATED_longAnimationManyIons"
+    #OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
+    OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
+    TAG = "Lithium_FS70_1p0ms_UPDATED_Zlonger480p"
     # TOROIDAL AND HELICAL MAGNETIC FIELDS
     TOROIDAL_CURRENT = 0.486 #[kA]
-    HELICAL_CURRENT = 0.790 #[kA]``
+    HELICAL_CURRENT = 0.900 #[kA]``
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
-    ENABLE_ERRFIELD = True
+    ENABLE_ERRFIELD = False
     # ELECTRIC FIELD
     #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
-    FIELD_FILE_ELECTRIC = 'input_files/Efield_dftIota4_lcfs16.npy'
-    FIELD_SCALE_ELECTRIC = 40.0 # [Volts]
+    #FIELD_FILE_ELECTRIC = 'input_files/Efield_dftIota4_lcfs16.npy'
+    FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
+    FIELD_SCALE_ELECTRIC = 80.0 # [Volts]
     # ION PROPERTIES
     ION_MASS = Li_mass # [amu]
     ION_TEMP = 5.0 # [eV]
     CHARGE_NUM = 1 # [Z]
     # INITIAL CONDITIONS
-    LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
+    LCFS_INDEX = 70 #30 #29 #40 (from Poincare output (simIO.log))
     DELTRS = [0.000] # [m]
     NPHI = 180
     NTHETA = 120
@@ -161,8 +163,8 @@ if __name__ == "__main__":
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 60#18 #60  #18
-    TRACK_NTHETA = 40#12 #40  #12
+    TRACK_NPHI = 45#60#18 #60  #18
+    TRACK_NTHETA = 30#40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
 
     boris_runner()
