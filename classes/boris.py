@@ -153,35 +153,52 @@ class Boris():
             with logging_redirect_tqdm(loggers=[log]):
                 pbar = tqdm(range(1, self.nsteps), ncols=100, mininterval=2.0)
                 for k in pbar:
+                    pos_active = pos_k[running]
+                    qdt2m_active = qdt2m[running]
+                    v_k_active = v_k[running]
                     if Efield:
-                        Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
+                        # Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
+                        Evec_active = (Efield.interpField(pos_active) * qdt2m_active).T
 
                     if freq_corr:
-                        Bvec[running] = Bfield.interpField(pos_k[running]).T
-                        Bmag[running] = torch.linalg.norm(Bvec[running], axis=-1)
-                        Bhat[running] = Bvec[running] / Bmag[running][:, None]
-                        tvec[running] = torch.tan(qdt2m[running] * Bmag[running])[:, None] * Bhat[running]
+                        # Bvec[running] = Bfield.interpField(pos_k[running]).T
+                        # Bmag[running] = torch.linalg.norm(Bvec[running], axis=-1)
+                        # Bhat[running] = Bvec[running] / Bmag[running][:, None]
+                        # tvec[running] = torch.tan(qdt2m[running] * Bmag[running])[:, None] * Bhat[running]
+                        Bvec_active = Bfield.interpField(pos_active).T
+                        Bmag_active = torch.linalg.norm(Bvec_active, axis=-1)
+                        Bhat_active = Bvec_active / Bmag_active[:, None]
+                        tvec_active = torch.tan(qdt2m_active * Bmag_active)[:, None] * Bhat_active
                     else:
-                        tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
+                        # tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
+                        tvec_active = (Bfield.interpField(pos_active) * qdt2m_active).T
 
-                    tmag[running] = torch.linalg.norm(tvec[running], axis=-1)
+                    # tmag[running] = torch.linalg.norm(tvec[running], axis=-1)
+                    tmag_active = torch.linalg.norm(tvec_active, axis=-1)
 
-                    vminus[running] = v_k[running] + Evec[running]
-                    vprime[running] = vminus[running] + torch.linalg.cross(vminus[running], tvec[running])
-                    svec[running] = 2 * tvec[running] / (1 + (tmag[running] * tmag[running])[:, None])
-                    vplus[running] = vminus[running] + torch.linalg.cross(vprime[running], svec[running])
-                    v_k[running] = vplus[running] + Evec[running]
+                    # vminus[running] = v_k[running] + Evec[running]
+                    # vprime[running] = vminus[running] + torch.linalg.cross(vminus[running], tvec[running])
+                    # svec[running] = 2 * tvec[running] / (1 + (tmag[running] * tmag[running])[:, None])
+                    # vplus[running] = vminus[running] + torch.linalg.cross(vprime[running], svec[running])
+                    # v_k[running] = vplus[running] + Evec[running]
 
-                    pos_k[running] = pos_k[running] + v_k[running] * self.dt
+                    vminus_active = v_k_active + Evec_active
+                    vprime_active = vminus_active + torch.linalg.cross(vminus_active, tvec_active)
+                    svec_active = 2 * tvec_active / (1 + (tmag_active * tmag_active)[:, None])
+                    vplus_active = vminus_active + torch.linalg.cross(vprime_active, svec_active)
+                    
+                    v_k_active = vplus_active + Evec_active
+                    pos_k[running] = pos_active + v_k_active * self.dt
+                    v_k[running] = v_k_active
 
                     # ADD SELECTED PARTICLE TRACING
                     trace_output[k] = pos_k[trace_IDs]
 
-                    x2[running] = pos_k[running].T[0]**2
-                    y2[running] = pos_k[running].T[1]**2
-                    z2[running] = pos_k[running].T[2]**2
-                    r_k[running] = torch.sqrt(x2[running] + y2[running] + z2[running] + Bfield.R0 * Bfield.R0
-                                               - 2 * Bfield.R0 * torch.sqrt(x2[running] + y2[running]))
+                    x2 = pos_k.T[0]**2
+                    y2 = pos_k.T[1]**2
+                    z2 = pos_k.T[2]**2
+                    r_k = torch.sqrt(x2 + y2 + z2 + Bfield.R0 * Bfield.R0
+                                               - 2 * Bfield.R0 * torch.sqrt(x2 + y2))
 
                     running = torch.where(r_k < Bfield.a)[0]
 
