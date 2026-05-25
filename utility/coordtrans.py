@@ -98,10 +98,12 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
         torch.Tensor: Transformed point(s) in r-theta-phi coordinates, same shape as input.
     """
     _require_torch()
-    #p_XYZ = torch.tensor(p_XYZ).to(device)
-    p_XYZ = p_XYZ.clone().detach().to(device)
+    if torch.is_tensor(p_XYZ):
+        p_XYZ = p_XYZ.to(device=device, dtype=torch.float64)
+    else:
+        p_XYZ = torch.as_tensor(p_XYZ, dtype=torch.float64, device=device)
     
-    p_RTP = torch.zeros(p_XYZ.shape, dtype=torch.float64).to(device)
+    p_RTP = torch.empty_like(p_XYZ, dtype=torch.float64, device=device)
     #x, y, z = p_XYZ.T
     x, y, z = p_XYZ.unbind(-1)
     x2 = x*x
@@ -109,16 +111,16 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
     #z2 = z*z
     R = torch.sqrt(x2 + y2)
 
-    p_RTP.T[0] = torch.sqrt( x2 + y2 + z*z + Rmajor*Rmajor - 2*Rmajor*R )
+    p_RTP[..., 0] = torch.sqrt( x2 + y2 + z*z + Rmajor*Rmajor - 2*Rmajor*R )
 
     den = R - Rmajor
     theta = torch.arctan2(z,den) # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    p_RTP.T[1] = torch.where(theta < 0, theta + 2*torch.pi, theta)
+    p_RTP[..., 1] = torch.where(theta < 0, theta + 2*torch.pi, theta)
 
     phi = (-1) * torch.arctan2(y,x) # arctan2 returns radians from (-pi to +pi)
     # here we shift the domain to (0 to 2*pi)
-    p_RTP.T[2] = torch.where(phi<0, phi + 2*torch.pi, phi)
+    p_RTP[..., 2] = torch.where(phi < 0, phi + 2*torch.pi, phi)
 
     return p_RTP
 
