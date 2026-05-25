@@ -103,9 +103,11 @@ class Mesh:
             total_mult = att_mult * coilCurrent
             self.nr, self.ntheta, self.nphi = Bx_.shape
             self.periodicity = period_
-            self.Bx = torch.tensor(Bx_ * total_mult, dtype=torch.float64).to(device)
-            self.By = torch.tensor(By_ * total_mult, dtype=torch.float64).to(device)
-            self.Bz = torch.tensor(Bz_ * total_mult, dtype=torch.float64).to(device)
+            self.B = torch.as_tensor(np.stack([Bx_, By_, Bz_], axis=-1) * total_mult,
+                                        dtype=torch.float64, device=device)
+            self.Bx = self.B[..., 0]
+            self.By = self.B[..., 1]
+            self.Bz = self.B[..., 2]
 
             self.errField = errField
 
@@ -178,9 +180,8 @@ class Mesh:
 
             total_mult = att_mult * coilCurrent
 
-            self.Bx += torch.tensor((Bx_ * total_mult), dtype=torch.float64).to(device)
-            self.By += torch.tensor((By_ * total_mult), dtype=torch.float64).to(device)
-            self.Bz += torch.tensor((Bz_ * total_mult), dtype=torch.float64).to(device)
+            self.B += torch.as_tensor(np.stack([Bx_, By_, Bz_], axis=-1) * total_mult,
+                                        dtype=torch.float64, device=device)
 
     def setErrorField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
         """Sets the magnitude and direction of the non-periodic error field.
@@ -222,7 +223,8 @@ class Mesh:
         convention: When looking at across-section to the right of the +z axis, theta is counterclockwise
         convention: +phi is clockwise when viewed from above
         """
-        rotated_XYZ = torch.zeros(vec_XYZ.shape, dtype=torch.float64).to(device)
+        #rotated_XYZ = torch.zeros(vec_XYZ.shape, dtype=torch.float64).to(device)
+        rotated_XYZ = torch.empty_like(vec_XYZ, dtype=torch.float64, device=vec_XYZ.device)
         #xFormMat = np.array([[ np.cos(delta_phi), (-1)*np.sin(delta_phi), zeros_],
         #                     [ np.sin(delta_phi),      np.cos(delta_phi), zeros_],
         #                     [           zeros_,             zeros_,       ones_]],
@@ -261,7 +263,7 @@ class Mesh:
         """
         ## Sanitize input (or make sure we are passing torch tensors!)
         #print(f'{len(point_XYZ.shape)=}')
-        #if len(point_XYZ.shape) < 2: # if we passed a single vector
+        #if len(point_INPUT.shape) < 2: # if we passed a single vector
         #point_XYZ = torch.tensor([point_XYZ], dtype=torch.float64).to(device)
         #print(f'{point_XYZ.shape=}')
         Npts = torch.int64
@@ -271,9 +273,9 @@ class Mesh:
             Npts = point_INPUT.shape[0]
 
         if Cart:
-            point_RTP = XYZ_to_RTP2(point_INPUT, self.R0).to(device)
+            point_RTP = XYZ_to_RTP2(point_INPUT, self.R0) #.to(device)
         else:
-            point_RTP = point_INPUT.to(device)
+            point_RTP = point_INPUT #.to(device)
 
         point_RTP = point_RTP.permute(*torch.arange(point_RTP.ndim - 1, -1, -1)) #= point_RTP.T throws a warning
 
@@ -284,11 +286,11 @@ class Mesh:
         ph_local = torch.remainder(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
         ph_localN = torch.div(point_RTP[2], self.phi_max, rounding_mode='floor') # keep phi within 0 and phi_max!  #floor?
 
-        vecOUT = torch.zeros([3,Npts], dtype=torch.float64).to(device)
+        # vecOUT = torch.zeros([3,Npts], dtype=torch.float64).to(device)
+        # rindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
+        # thindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
+        # phindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
 
-        rindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
-        thindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
-        phindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
         rindex = torch.where( r_local >= self.r_max, self.nr - 2, torch.div(r_local, self.dr, rounding_mode='floor'))
         r_el = torch.remainder(r_local, self.dr)
 
@@ -328,36 +330,36 @@ class Mesh:
         iph_hi = phindex.type(torch.int)
         iph_lo = (phindex - 1).type(torch.int)
 
-        # node vectors
-        Bvec1 = torch.stack([ self.Bx[ir_hi, ith_hi, iph_hi], self.By[ir_hi, ith_hi, iph_hi], self.Bz[ir_hi, ith_hi, iph_hi] ], dim = 0)
-        Bvec2 = torch.stack([ self.Bx[ir_lo, ith_hi, iph_hi], self.By[ir_lo, ith_hi, iph_hi], self.Bz[ir_lo, ith_hi, iph_hi] ], dim = 0)
-        Bvec3 = torch.stack([ self.Bx[ir_hi, ith_lo, iph_hi], self.By[ir_hi, ith_lo, iph_hi], self.Bz[ir_hi, ith_lo, iph_hi] ], dim = 0)
-        Bvec4 = torch.stack([ self.Bx[ir_lo, ith_lo, iph_hi], self.By[ir_lo, ith_lo, iph_hi], self.Bz[ir_lo, ith_lo, iph_hi] ], dim = 0)
-        Bvec5 = torch.stack([ self.Bx[ir_hi, ith_hi, iph_lo], self.By[ir_hi, ith_hi, iph_lo], self.Bz[ir_hi, ith_hi, iph_lo] ], dim = 0)
-        Bvec6 = torch.stack([ self.Bx[ir_lo, ith_hi, iph_lo], self.By[ir_lo, ith_hi, iph_lo], self.Bz[ir_lo, ith_hi, iph_lo] ], dim = 0)
-        Bvec7 = torch.stack([ self.Bx[ir_hi, ith_lo, iph_lo], self.By[ir_hi, ith_lo, iph_lo], self.Bz[ir_hi, ith_lo, iph_lo] ], dim = 0)
-        Bvec8 = torch.stack([ self.Bx[ir_lo, ith_lo, iph_lo], self.By[ir_lo, ith_lo, iph_lo], self.Bz[ir_lo, ith_lo, iph_lo] ], dim = 0)
+        # Gather the eight cell corners in one batched tensor shaped (8, 3, Npts).
+        corner_r = torch.stack([ir_hi, ir_lo, ir_hi, ir_lo, ir_hi, ir_lo, ir_hi, ir_lo], dim=0)
+        corner_theta = torch.stack([ith_hi, ith_hi, ith_lo, ith_lo, ith_hi, ith_hi, ith_lo, ith_lo], dim=0)
+        corner_phi = torch.stack([iph_hi, iph_hi, iph_hi, iph_hi, iph_lo, iph_lo, iph_lo, iph_lo], dim=0)
+        corner_vecs = torch.movedim(self.B[corner_r, corner_theta, corner_phi], -1, 1)
+        weights = torch.stack([A1, A2, A3, A4, A5, A6, A7, A8], dim=0)
 
         # perform vector rotation if wrapping around in phi direction
         if Npts > 1:
             toRotate = torch.where(iph_hi == 0)[0]
             #toRotate = torch.where(iph_hi >= self.phi_max)[0]
             if toRotate.numel() > 0:
-                Bvec5[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec5[:,toRotate], self.phi_max )
-                Bvec6[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec6[:,toRotate], self.phi_max )
-                Bvec7[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec7[:,toRotate], self.phi_max )
-                Bvec8[:,toRotate] = self.rot_vecXYZ_byPHI( Bvec8[:,toRotate], self.phi_max )
+                corner_vecs[4, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[4, :, toRotate], self.phi_max)
+                corner_vecs[5, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[5, :, toRotate], self.phi_max)
+                corner_vecs[6, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[6, :, toRotate], self.phi_max)
+                corner_vecs[7, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[7, :, toRotate], self.phi_max)
         else:
             if iph_hi == 0:
             #if iph_hi >= self.phi_max:
-                Bvec5 = self.rot_vecXYZ_byPHI( Bvec5, self.phi_max )
-                Bvec6 = self.rot_vecXYZ_byPHI( Bvec6, self.phi_max )
-                Bvec7 = self.rot_vecXYZ_byPHI( Bvec7, self.phi_max )
-                Bvec8 = self.rot_vecXYZ_byPHI( Bvec8, self.phi_max )
+                corner_vecs[4] = self.rot_vecXYZ_byPHI(corner_vecs[4], self.phi_max)
+                corner_vecs[5] = self.rot_vecXYZ_byPHI(corner_vecs[5], self.phi_max)
+                corner_vecs[6] = self.rot_vecXYZ_byPHI(corner_vecs[6], self.phi_max)
+                corner_vecs[7] = self.rot_vecXYZ_byPHI(corner_vecs[7], self.phi_max)
 
         # sum of vectors, weighted by 'anti-node' volume
-        total_vol = A1 + A2 + A3 + A4 + A5 + A6 + A7 + A8
-        vecOUT = (Bvec1*A1 + Bvec2*A2 + Bvec3*A3 + Bvec4*A4 + Bvec5*A5 + Bvec6*A6 + Bvec7*A7 + Bvec8*A8) / total_vol
+        total_vol = weights.sum(dim=0)
+        if Npts > 1:
+            vecOUT = (corner_vecs * weights.unsqueeze(1)).sum(dim=0) / total_vol.unsqueeze(0)
+        else:
+            vecOUT = (corner_vecs * weights[:, None]).sum(dim=0) / total_vol
 
         # if the mesh is defined with periodic symmetry, we must 
         # perform a rotational transform based on which 'period' of the mesh the point is located
