@@ -12,7 +12,14 @@ import matplotlib.pyplot as plt
 import gc
 from classes.mesh import *
 
-def fluxInterpolator():
+def fluxInterpolator(input_params=None):
+    ## LOAD INPUT PARAMETERS
+    if input_params is not None:
+        print(f'{input_params.keys()=}')
+        for key, value in input_params.items():
+            print(f'{key}: {value}')
+            globals()[str(key)] = value
+            
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()

@@ -9,7 +9,14 @@ import classes.class_outputHandler as out
 from classes.mesh import *
 from utility.coordtrans import RTP_XYZ_JAC
 
-def fluxGradientor():
+def fluxGradientor(input_params=None):
+    ## LOAD INPUT PARAMETERS
+    if input_params is not None:
+        print(f'{input_params.keys()=}')
+        for key, value in input_params.items():
+            print(f'{key}: {value}')
+            globals()[str(key)] = value
+
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = out.IOHandler(ANLYS_DIR)
     simIO.startLog()
