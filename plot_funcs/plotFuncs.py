@@ -778,13 +778,19 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
                 pool.map(_anim_render_frame, worker_args)
 
             save_path = os.path.join(simIO.plot_dir, plotname_mp4)
-            subprocess.run(['ffmpeg', '-y',
+            ffmpeg_bin = animation.FFMpegWriter.bin_path()
+            subprocess.run([ffmpeg_bin, '-y',
                 '-framerate', str(fps),
                 '-i', os.path.join(frame_dir, 'frame_%06d.png'),
+                '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
                 '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
                 '-crf', '18', save_path], check=True, capture_output=True)
             
             simIO.log.info('OUTPUT PLOT: {} (parallel, steps_per_frame={}, fps={})'.format(plotname_mp4, steps_per_frame, fps))
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode('utf-8', errors='replace').strip() if e.stderr else 'ffmpeg produced no stderr output.'
+            simIO.log.warning(f'boris_plotTraceAnim parallel path failed ({e}); ffmpeg stderr: {stderr}; falling back to serial.')
+            parallel = False   # fall through to serial below
         except Exception as e:
             simIO.log.warning(f'boris_plotTraceAnim parallel path failed ({e}); falling back to serial.')
             parallel = False   # fall through to serial below
