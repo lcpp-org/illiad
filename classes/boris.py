@@ -156,31 +156,29 @@ class Boris():
                     pos_active = pos_k[running]
                     qdt2m_active = qdt2m[running]
                     v_k_active = v_k[running]
-                    if Efield:
-                        # Evec[running] = (Efield.interpField(pos_k[running]) * qdt2m[running]).T
-                        Evec_active = (Efield.interpField(pos_active) * qdt2m_active).T
+
+                    actv_weights, actv_corner_indices, actv_ph_localN = Bfield.get_weights(pos_active)
+                    b_vecs_active = Bfield.return_vecs(actv_weights, actv_corner_indices, actv_ph_localN)
 
                     if freq_corr:
-                        # Bvec[running] = Bfield.interpField(pos_k[running]).T
-                        # Bmag[running] = torch.linalg.norm(Bvec[running], axis=-1)
-                        # Bhat[running] = Bvec[running] / Bmag[running][:, None]
-                        # tvec[running] = torch.tan(qdt2m[running] * Bmag[running])[:, None] * Bhat[running]
-                        Bvec_active = Bfield.interpField(pos_active).T
-                        Bmag_active = torch.linalg.norm(Bvec_active, axis=-1)
-                        Bhat_active = Bvec_active / Bmag_active[:, None]
+                        Bmag_active = torch.linalg.norm(b_vecs_active, axis=-1)
+                        Bhat_active = b_vecs_active / Bmag_active[:, None]
                         tvec_active = torch.tan(qdt2m_active * Bmag_active)[:, None] * Bhat_active
                     else:
-                        # tvec[running] = (Bfield.interpField(pos_k[running]) * qdt2m[running]).T
-                        tvec_active = (Bfield.interpField(pos_active) * qdt2m_active).T
+                        tvec_active = (b_vecs_active * qdt2m_active).T
 
-                    # tmag[running] = torch.linalg.norm(tvec[running], axis=-1)
                     tmag_active = torch.linalg.norm(tvec_active, axis=-1)
 
-                    # vminus[running] = v_k[running] + Evec[running]
-                    # vprime[running] = vminus[running] + torch.linalg.cross(vminus[running], tvec[running])
-                    # svec[running] = 2 * tvec[running] / (1 + (tmag[running] * tmag[running])[:, None])
-                    # vplus[running] = vminus[running] + torch.linalg.cross(vprime[running], svec[running])
-                    # v_k[running] = vplus[running] + Evec[running]
+                    if Efield:
+                        sector = torch.remainder(actv_ph_localN.to(torch.long), Bfield.periodicity[2])
+                        phi_offset = sector.unsqueeze(0) * Bfield.nphi
+                        e_phi_idx = actv_corner_indices[2] + phi_offset
+                        # e_corner_indices = actv_corner_indices.clone()
+                        # e_corner_indices[2] = e_phi_idx
+
+                        #e_vecs_active = Efield.return_vecs(actv_weights, e_corner_indices, torch.zeros_like(actv_ph_localN))
+                        e_vecs_active = Efield.return_vecs(actv_weights, torch.stack([actv_corner_indices[0], actv_corner_indices[1], e_phi_idx]), ph_localN=None)
+                        Evec_active = (e_vecs_active * qdt2m_active).T
 
                     vminus_active = v_k_active + Evec_active
                     vprime_active = vminus_active + torch.linalg.cross(vminus_active, tvec_active)

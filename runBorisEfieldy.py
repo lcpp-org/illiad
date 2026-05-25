@@ -118,7 +118,7 @@ def boris_runner(input_params=None):
                                 runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
     
     ion_tracer.plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_28stride13_30f_480p2' , simIO=simIO,
-                                  interval=1000/120, stride=13, max_frames=30,
+                                  interval=1000/120, stride=13, max_frames=300,
                                   linewidth=0.5, linecolor=plotFuncs.UIUC['il_orange'], line_alpha=0.4, line_window=40,
                                   trail_length=10, markersize=2, markercolor=plotFuncs.UIUC['il_blue'],
                                   parallel=True, n_workers=28, resolution='480p')
@@ -131,42 +131,15 @@ def boris_runner(input_params=None):
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
-# input_params = {
-#     'OUTPUT_DIRECTORY_NAME': OUTPUT_DIRECTORY_NAME,
-#     'TAG': TAG,
-#     'TOROIDAL_CURRENT': TOROIDAL_CURRENT,
-#     'HELICAL_CURRENT': HELICAL_CURRENT,
-#     'CONFIG_TOR': CONFIG_TOR,
-#     'CONFIG_HEL': CONFIG_HEL,
-#     'ENABLE_ERRFIELD': ENABLE_ERRFIELD,
-#     'FIELD_FILE_ELECTRIC': FIELD_FILE_ELECTRIC,
-#     'FIELD_SCALE_ELECTRIC': FIELD_SCALE_ELECTRIC,
-#     'ION_MASS': ION_MASS,
-#     'ION_TEMP': ION_TEMP,
-#     'CHARGE_NUM': CHARGE_NUM,
-#     # INITIAL CONDITIONS
-#     'LCFS_INDEX': LCFS_INDEX,
-#     'DELTRS': DELTRS,
-#     'NPHI': NPHI,
-#     'NTHETA': NTHETA,
-#     'NPARTICLES_PER_EMITTER': NPARTICLES_PER_EMITTER,
-#     # SIMULATION PARAMETERS
-#     'DT': DT,
-#     'TMAX': TMAX,
-#     'NSTEPS': NSTEPS
-#     'TRACK_NPHI': TRACK_NPHI,
-#     'TRACK_NTHETA': TRACK_NTHETA,
-#     'TRACK_NPARTICLES_PER_EMITTER': TRACK_NPARTICLES_PER_EMITTER
-# }
 if __name__ == "__main__":
 
     ## SET SIMULATION INPUTS:
     # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
     OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
-    TAG = "Lithium_FS40_1p0ms_UPDATEcoordtrans_meshNew_1_borisGather2_interpNewagain"
+    TAG = "Lithium_FS40_1p0ms_UPDATED_longAnimationManyIons"
     # TOROIDAL AND HELICAL MAGNETIC FIELDS
     TOROIDAL_CURRENT = 0.486 #[kA]
-    HELICAL_CURRENT = 0.790 #[kA]
+    HELICAL_CURRENT = 0.790 #[kA]``
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
     ENABLE_ERRFIELD = True
@@ -188,8 +161,8 @@ if __name__ == "__main__":
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 18 #60  #18
-    TRACK_NTHETA = 12 #40  #12
+    TRACK_NPHI = 60#18 #60  #18
+    TRACK_NTHETA = 40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
 
     boris_runner()

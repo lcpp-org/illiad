@@ -241,12 +241,9 @@ class Mesh:
         # mismatch in sign between 'Mesh' and 'eshNew' inmplementations?
         return rotated_XYZ
 
-    def interpField(self, point_INPUT, Cart=True, basis='physical'):
+    def get_weights(self, point_INPUT, Cart=True):
         """
-        Returns the interpolated field values at a point defined in Cartesian coordinates.
-
-        Interpolation is performed using a weighted sum of field values at each node of the enclosing cell.
-        The weights are calculated as the volume of the octant opposed to each node.
+        Returns the corner indices and interpolation weights for a point defined in XYZ or RTP coordinates.
 
         The input point is converted to RTP coordinates and kept within the following domains:
             r: 0.0 to r_max (minor radius)
@@ -258,14 +255,14 @@ class Mesh:
             Cart (bool): If True, input is in Cartesian coordinates; otherwise, RTP coordinates.
 
         Returns:
-            torch.Tensor: Tensor of shape (3, Npts), where Npts is the number of input points.
-            Each column corresponds to the interpolated field components [Bx, By, Bz] at the respective point.
+            weights (torch.Tensor): Tensor of shape (8, Npts) containing the interpolation weights for each of the 8 cell corners.
+            corner_vecs (torch.Tensor): Tensor of shape (8, 3, Npts) containing the field vectors at each of the 8 cell corners.
+            ph_localN (torch.Tensor): Tensor of shape (Npts,) containing the local phi period index for each point.
         """
         ## Sanitize input (or make sure we are passing torch tensors!)
-        #print(f'{len(point_XYZ.shape)=}')
         #if len(point_INPUT.shape) < 2: # if we passed a single vector
         #point_XYZ = torch.tensor([point_XYZ], dtype=torch.float64).to(device)
-        #print(f'{point_XYZ.shape=}')
+
         Npts = torch.int64
         if len(point_INPUT.shape) < 2:
             Npts = 1
@@ -286,11 +283,6 @@ class Mesh:
         ph_local = torch.remainder(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
         ph_localN = torch.div(point_RTP[2], self.phi_max, rounding_mode='floor') # keep phi within 0 and phi_max!  #floor?
 
-        # vecOUT = torch.zeros([3,Npts], dtype=torch.float64).to(device)
-        # rindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
-        # thindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
-        # phindex = torch.zeros([3,Npts], dtype=torch.int).to(device)
-
         rindex = torch.where( r_local >= self.r_max, self.nr - 2, torch.div(r_local, self.dr, rounding_mode='floor'))
         r_el = torch.remainder(r_local, self.dr)
 
@@ -307,9 +299,7 @@ class Mesh:
         invth_el = self.dtheta - th_el
         invph_el = self.dphi - ph_el
 
-        # r_lowr_el = r_low * r_el
-        # r_localinvr_el = r_local * invr_el
-        # above replaced with below in mesh.py to fix failing interp at r=0
+        # fix failing interp at r=0
         r_lowr_el = (r_low + r_el/2) * r_el
         r_localinvr_el = (r_local + invr_el/2) * invr_el
 
@@ -322,6 +312,7 @@ class Mesh:
         A6 = (self.R0 + r_local*torch.cos(th_low))   * r_localinvr_el * th_el    * invph_el
         A7 = (self.R0 + r_low*torch.cos(th_local))   * r_lowr_el      * invth_el * invph_el
         A8 = (self.R0 + r_local*torch.cos(th_local)) * r_localinvr_el * invth_el * invph_el
+        weights = torch.stack([A1, A2, A3, A4, A5, A6, A7, A8], dim=0)
 
         ir_hi = (rindex + 1).type(torch.int)
         ir_lo = rindex.type(torch.int)
@@ -334,67 +325,63 @@ class Mesh:
         corner_r = torch.stack([ir_hi, ir_lo, ir_hi, ir_lo, ir_hi, ir_lo, ir_hi, ir_lo], dim=0)
         corner_theta = torch.stack([ith_hi, ith_hi, ith_lo, ith_lo, ith_hi, ith_hi, ith_lo, ith_lo], dim=0)
         corner_phi = torch.stack([iph_hi, iph_hi, iph_hi, iph_hi, iph_lo, iph_lo, iph_lo, iph_lo], dim=0)
-        corner_vecs = torch.movedim(self.B[corner_r, corner_theta, corner_phi], -1, 1)
-        weights = torch.stack([A1, A2, A3, A4, A5, A6, A7, A8], dim=0)
+        corner_indices = torch.stack([corner_r, corner_theta, corner_phi], dim=0)
+
+        return weights, corner_indices, ph_localN
+
+    def return_vecs(self, weights, corner_idx, ph_localN):
+        """
+        Returns the interpolated field values at a point defined in Cartesian coordinates.
+
+        Interpolation is performed using a weighted sum of field values at each node of the enclosing cell.
+        The weights are calculated as the volume of the octant opposed to each node.
+
+        Args:
+            weights (torch.Tensor): Tensor of shape (8, Npts) containing the interpolation weights for each of the 8 cell corners.
+            corner_vecs (torch.Tensor): Tensor of shape (8, 3, Npts) containing the field vectors at each of the 8 cell corners.
+            ph_localN (torch.Tensor): Tensor of shape (Npts,) containing the local phi period index for each point.
+
+        Returns:
+            vecOUT (torch.Tensor): Tensor of shape (3, Npts) containing the interpolated field vectors at the input points.
+        """
+
+        Npts = 1 if corner_idx.ndim == 2 else corner_idx.shape[-1]
+        iph_hi = corner_idx[2][0]  # index of the 'high' phi corner (the one that may need to be rotated if wrapping around in phi direction)
+        corner_vecs = torch.movedim(self.B[corner_idx[0], corner_idx[1], corner_idx[2]], -1, 1)
+        # sum of vectors, weighted by 'anti-node' volume
+        total_vol = weights.sum(dim=0)
 
         # perform vector rotation if wrapping around in phi direction
         if Npts > 1:
             toRotate = torch.where(iph_hi == 0)[0]
-            #toRotate = torch.where(iph_hi >= self.phi_max)[0]
             if toRotate.numel() > 0:
                 corner_vecs[4, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[4, :, toRotate], self.phi_max)
                 corner_vecs[5, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[5, :, toRotate], self.phi_max)
                 corner_vecs[6, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[6, :, toRotate], self.phi_max)
                 corner_vecs[7, :, toRotate] = self.rot_vecXYZ_byPHI(corner_vecs[7, :, toRotate], self.phi_max)
+            vecOUT = (corner_vecs * weights.unsqueeze(1)).sum(dim=0) / total_vol.unsqueeze(0)
         else:
             if iph_hi == 0:
-            #if iph_hi >= self.phi_max:
                 corner_vecs[4] = self.rot_vecXYZ_byPHI(corner_vecs[4], self.phi_max)
                 corner_vecs[5] = self.rot_vecXYZ_byPHI(corner_vecs[5], self.phi_max)
                 corner_vecs[6] = self.rot_vecXYZ_byPHI(corner_vecs[6], self.phi_max)
                 corner_vecs[7] = self.rot_vecXYZ_byPHI(corner_vecs[7], self.phi_max)
-
-        # sum of vectors, weighted by 'anti-node' volume
-        total_vol = weights.sum(dim=0)
-        if Npts > 1:
-            vecOUT = (corner_vecs * weights.unsqueeze(1)).sum(dim=0) / total_vol.unsqueeze(0)
-        else:
             vecOUT = (corner_vecs * weights[:, None]).sum(dim=0) / total_vol
 
         # if the mesh is defined with periodic symmetry, we must 
         # perform a rotational transform based on which 'period' of the mesh the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
-        phi_rotation = ph_localN * self.phi_max  # angle of transform
-        vecOUT = self.rot_vecXYZ_byPHI(vecOUT, -phi_rotation)
+        if self.periodicity[2] > 1:
+            phi_rotation = ph_localN * self.phi_max  # angle of transform
+            vecOUT = self.rot_vecXYZ_byPHI(vecOUT, -phi_rotation)
 
         if self.errField:
-            if basis == 'physical':
-                vecOUT += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
-            elif basis == 'contravariant':
-                # convert error field to contravariant basis before adding
-                bxerr = self.err_adder[0]
-                byerr = self.err_adder[1]
-
-                rho = point_RTP[0]
-                sin_theta = torch.sin(point_RTP[1])
-                cos_theta = torch.cos(point_RTP[1])
-                sin_phi = torch.sin(point_RTP[2])
-                cos_phi = torch.cos(point_RTP[2])
-
-                R_cyl = self.R0 + rho * cos_theta
-                term = (bxerr*cos_phi - byerr*sin_phi)
-
-                err_adder_rho = term * cos_theta
-                err_adder_theta = term * (-sin_theta) / torch.clamp(rho, min=self.dr/2)
-                err_adder_phi = -(bxerr*sin_phi + byerr*cos_phi) / R_cyl
-
-                err_adder_contra = torch.stack([err_adder_rho, err_adder_theta, err_adder_phi], dim=0)
-                vecOUT += err_adder_contra
-                # if Npts > 1:
-                #     vecOUT += err_adder_contra.unsqueeze(-1) 
-                # else:
-                #     vecOUT += err_adder_contra
-            else:   
-                print(f"{self}: BASIS TYPE NOT RECOGNIZED FOR ERROR FIELD ADDITION!!")
+            vecOUT += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
 
         return vecOUT
+
+    def interpField(self, point_INPUT, Cart=True, basis='physical'):
+        weights, corner_indices, ph_localN = self.get_weights(point_INPUT, Cart)
+        vecOUT = self.return_vecs(weights, corner_indices, ph_localN)
+        return vecOUT
+    
