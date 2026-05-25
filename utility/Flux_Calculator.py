@@ -109,7 +109,8 @@ def fluxCalculator(input_params=None):
                 # SHIFT ORIGIN OF R, THETA COORDINATES FROM GEOMETRIC CENTER TO MAGNETIC AXIS
                 points_tr_magAxis = axisShift(th_in, r_in, *mag_axis).T
                 # REMOVE DUPLICATE THETA VALUES AND SORT DATA IN INCREASING THETA
-                unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
+                #unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
+                unique_indices = np.unique(points_tr_magAxis[:, 0], return_index=True)[1]
                 points_tr_magAxis = points_tr_magAxis[unique_indices]
                 th_size = points_tr_magAxis.shape[0]
                 points_tr_magAxis = points_tr_magAxis[np.argsort(points_tr_magAxis[:, 0])]
@@ -373,8 +374,6 @@ def spline_Data(theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
     return spline_rep
 
 
-
-
 def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=1e-3):
     """
     Integrates the total toroidal flux contained within the given spline, defined relative to the specified center.
@@ -393,11 +392,14 @@ def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=
     # INTEGRATION HELPER FUNCTIONS
     def flux_integrand(r, theta, phi, field, axis):
         """Function to calculate the toroidal field times radius at a given point in space"""
-        geo_point = np.array([r+axis[1], theta+axis[0], phi])
-        axis[0] += np.pi
+        geo_point = np.array([r+axis[1], theta+axis[0], phi], dtype=np.float64)
+        #axis[0] += np.pi
         geo_point = np.array([*axisShift(r, theta, *axis), phi])
-
+        if geo_point[0] < 0.0:
+            geo_point[0] *= -1.0
+            geo_point[1] += np.pi
         bxy = field.interpField(geo_point, Cart=False)[0][:2]
+        #bxy = np.array([1.0, 1.0]) # TESTING
 
         # Calculate the toroidal flux integrand: r*B_toroidal = r*( -Bx*sin(phi) - By*cos(phi) )
         return -r*( bxy[0]*np.sin(phi) - bxy[1]*np.cos(phi) )
@@ -571,7 +573,7 @@ def subset_looper(subsetData, subsetCenters, surf_index,
             valid_surface = True # valid surface for interpolation
 
         ## INTEGRATE AMOUNT OF TOROIDAL FIELD BOUNDED BY FLUX SURFACE [Tesla*m^2]
-        this_flux = integrate_flux(fSurface_splineParms, current_center,
+        this_flux = integrate_flux(fSurface_splineParms, np.array(current_center, copy=True),
                                    PHI_GEN_DEG*np.pi/180, field,
                                    err_abs=INTEGRATE_EPSABS, err_rel=INTEGRATE_EPSREL)
         subset_flux_list += [this_flux]
@@ -580,19 +582,25 @@ def subset_looper(subsetData, subsetCenters, surf_index,
         current_theta_gens = (THETA_GENs + current_center[0]) % (2*np.pi)
         radius_evals_locAxis[subset_idx] = splev(current_theta_gens, fSurface_splineParms)
 
-        # Shift the points to be relative to the magnetic axis
         if num_subsets > 1:
             shift_r = current_center[1]
             shift_theta = current_center[0] + np.pi
-            splined_tr_MagAxis[subset_idx] = axisShift(current_theta_gens, radius_evals_locAxis[subset_idx],
-                                                        shift_theta, shift_r).T
+            splined_tr_MagAxis[subset_idx] = axisShift(
+                current_theta_gens,
+                radius_evals_locAxis[subset_idx],
+                shift_theta,
+                shift_r,
+            ).T
         else:
             splined_tr_MagAxis[subset_idx, :, 0] = current_theta_gens
             splined_tr_MagAxis[subset_idx, :, 1] = radius_evals_locAxis[subset_idx]
 
         ## Shift r, theta back relative to geometric axis
-        splined_tr_GeoAxis[subset_idx] = axisShift(splined_tr_MagAxis[subset_idx, :, 0], splined_tr_MagAxis[subset_idx, :, 1],
-                                                    *mag_axis_rev).T
+        splined_tr_GeoAxis[subset_idx] = axisShift(
+            splined_tr_MagAxis[subset_idx, :, 0],
+            splined_tr_MagAxis[subset_idx, :, 1],
+            *mag_axis_rev,
+        ).T
 
     return splined_tr_GeoAxis, splined_tr_MagAxis, subCenters_geo, subset_flux_list, valid_surface
 
