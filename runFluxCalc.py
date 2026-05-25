@@ -2,50 +2,31 @@ import numpy as np
 import utility.Flux_Calculator as fc
 import utility.Flux_Gradientor as fg
 
-# fc.ANLYS_DIR = "LSODA-2p49e8_Iota4FWD_1200spins_320Lines"
-# fc.ANLYS_SUBDIR = "LCFS100_4x360x180mesh_tole1e2_LOMEM"
 
-# fc.ANLYS_DIR = "AcceptedIota4_1500spins_atole-8_eng"
-# fc.ANLYS_SUBDIR = "LCFS35_180x360_tol_5e1_5e2_APS2025"
+input_params = {
+    'ANLYS_DIR': "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents",
+    'ANLYS_SUBDIR': "LCFS16_100x180_2",
+    'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
+    'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
+    'CURRENT_TOR': 0.486, #[kA]
+    'CURRENT_HEL': 0.790, #[kA]
+    'CONFIG_TOR': 'default_toroidal',
+    'CONFIG_HEL': 'default_helical',
+    'ENABLE_ERRFIELD': True,
+    'LCFS_INDEX': 16,
+    'NPHI': 10,
+    'NTHETA': 180,
+    'PHI_GENs': np.linspace(360//10, 360, 10),
+    'MAX_SUBSETS': 4,
+    'SMOOTH_FCTR': 3e-5, #7.5e-6 #baseline 1e-6
+    'INTEGRATE_EPSABS': 5e-1,
+    'INTEGRATE_EPSREL': 5e-2,
+    'ISLAND_ALGORITHM': 'histogram', # 'kmeans', 'spectral'
+    'HIST_BINS': 90,
+    'PLOT_ALL': True,
+    'BIG_MESH': True
+}
 
-fc.ANLYS_DIR = "AcceptedIota3_1500spins_atole-9"
-fc.ANLYS_SUBDIR = "LCFS19_360x180_ARTICLE_smooth3e-5"
-
-# ## FEB26: [Ideal iota1/3] case and [no-island-surface 1/4's and reverse 1/3] cases
-# fc.ANLYS_DIR = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-# fc.ANLYS_SUBDIR = "LCFS30_360x180_smooth1e-4"
-
-# fc.ANLYS_DIR = "It-0486_Ih-0790_PHI324_1500sp_LSODA2p49e8"
-# fc.ANLYS_SUBDIR = "LCFS15_360x180_smooth1e-4"
-
-
-## DEFINE FIELDS
-fc.FIELD_FILE_TOR = 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy'
-fc.FIELD_FILE_HEL = 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'
-fc.CURRENT_TOR = 0.486 #[kA]
-fc.CURRENT_HEL = 0.900 #[kA]
-fc.CONFIG_TOR = 'default_toroidal'
-fc.CONFIG_HEL = 'default_helical'
-fc.ENABLE_ERRFIELD = True
-
-## DEFINE LCFS AND ANGLES TO EVALUATE
-fc.LCFS_INDEX = 19 #30 #29 #100  #1f00 #40 #22 #29?
-fc.NPHI = 360
-fc.NTHETA = 180
-fc.PHI_GENs = np.linspace(360//fc.NPHI, 360, fc.NPHI)
-
-## FLUX INTEGRATION PARAMETERS
-fc.MAX_SUBSETS = 3
-fc.SMOOTH_FCTR = 3e-5 #7.5e-6 #baseline 1e-6
-fc.INTEGRATE_EPSABS = 5e-1
-fc.INTEGRATE_EPSREL = 5e-2
-
-## PLOTTING FLAG
-fc.ISLAND_ALGORITHM = 'histogram' # 'kmeans', 'spectral'
-fc.HIST_BINS = 90
-fc.PLOT_ALL = True
-fc.BIG_MESH = True
 
 ## RUN ANALYSIS
-island_index = fc.fluxCalculator()
-
+island_index = fc.fluxCalculator(input_params)
