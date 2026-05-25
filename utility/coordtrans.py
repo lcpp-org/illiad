@@ -104,11 +104,10 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
         p_XYZ = torch.as_tensor(p_XYZ, dtype=torch.float64, device=device)
     
     p_RTP = torch.empty_like(p_XYZ, dtype=torch.float64, device=device)
-    #x, y, z = p_XYZ.T
+
     x, y, z = p_XYZ.unbind(-1)
     x2 = x*x
     y2 = y*y
-    #z2 = z*z
     R = torch.sqrt(x2 + y2)
 
     p_RTP[..., 0] = torch.sqrt( x2 + y2 + z*z + Rmajor*Rmajor - 2*Rmajor*R )
