@@ -41,15 +41,15 @@ He_mass = 4.002602 #amu
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSmoothed_linear_3.npy'
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_acceptedSOFE1.npy'
 # FIELD_FILE_ELECTRIC = 'input_files/Efield_SOFE2.npy'
-FIELD_SCALE_ELECTRIC = 80.0 # [Volts]
+FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
 # ION PROPERTIES
 ION_MASS = Li_mass # [amu]
-ION_TEMP = 5.0 # [eV]
+ION_TEMP = 2.0 # [eV]
 CHARGE_NUM = 1 # [Z]
 # INITIAL CONDITIONS
-LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
+LCFS_INDEX = 80 #30 #29 #40 (from Poincare output (simIO.log))
 DELTRS = [0.000] # [m]
-NPHI = 180
+NPHI = 360
 NTHETA = 120
 NPARTICLES_PER_EMITTER = 50
 # SIMULATION PARAMETERS
@@ -59,7 +59,7 @@ NSTEPS = int(TMAX / DT)
 
 # UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-TAG = "Lithium_FS40_1p0ms_TRACKMORE3"
+TAG = "Lithium_FS80_1p0ms_TRACK72x40"
 
 
 #####################
@@ -134,11 +134,11 @@ b_hidra = Mesh(R0=0.72, a=0.19)
 
 #plotFuncs.boris_plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
-plotFuncs.boris_plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_28stride13_30f_480p2' , simIO=simIO,
-                              interval=1000/120, stride=13, max_frames=30,
-                              linewidth=0.5, linecolor=UIUC['il_orange'], line_alpha=0.4, line_window=40,
-                              trail_length=10, markersize=2, markercolor=UIUC['il_blue'],
-                              parallel=True, n_workers=28, resolution='480p')
+plotFuncs.boris_plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_mSize_1080p_again' , simIO=simIO,
+                              interval=1000/120, stride=13, max_frames=500,
+                              linewidth=2.0, linecolor=UIUC['il_orange'], line_alpha=0.4, line_window=40,
+                              trail_length=10, markersize=5., markercolor=UIUC['il_blue'],
+                              parallel=True, n_workers=12, resolution='1080p')
 
 #plotFuncs.boris_plotTracesPoincare(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
 
