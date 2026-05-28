@@ -137,7 +137,7 @@ if __name__ == "__main__":
     # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
     #OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
     OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-    TAG = "Lithium_FS80_1p0ms_TRACK72x40"
+    TAG = "Lithium_FS86_1p0ms_TRACK4x4"
     # TOROIDAL AND HELICAL MAGNETIC FIELDS
     TOROIDAL_CURRENT = 0.486 #[kA]
     HELICAL_CURRENT = 0.900 #[kA]``
@@ -154,7 +154,7 @@ if __name__ == "__main__":
     ION_TEMP = 2.0 # [eV]
     CHARGE_NUM = 1 # [Z]
     # INITIAL CONDITIONS
-    LCFS_INDEX = 80 #30 #29 #40 (from Poincare output (simIO.log))
+    LCFS_INDEX = 86 #30 #29 #40 (from Poincare output (simIO.log))
     DELTRS = [0.000] # [m]
     NPHI = 360
     NTHETA = 120
@@ -163,8 +163,8 @@ if __name__ == "__main__":
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 72#60#18 #60  #18
-    TRACK_NTHETA = 40#40#12 #40  #12
+    TRACK_NPHI = 4#72     #60#18 #60  #18
+    TRACK_NTHETA = 4#40   #40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
 
     boris_runner()
