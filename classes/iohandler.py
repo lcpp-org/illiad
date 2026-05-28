@@ -126,7 +126,7 @@ class IOHandler:
         #self.log.info(f'saving numpy file: "{name_loc}"')
         np.save(name_loc, data)
 
-    def loadNumpyData(self, name, subdir=None):
+    def loadNumpyData(self, name, subdir=None, mmap_mode=None):
         # method to load a numpy array from the \data sub-directory
         if subdir:
             name_loc = os.path.join(self.data_dir, subdir, name)
@@ -135,7 +135,7 @@ class IOHandler:
 
         self.log.info('loading numpy file: "{}"'.format(name_loc))
 
-        return np.load(name_loc)
+        return np.load(name_loc, mmap_mode=mmap_mode)
 
     def saveFig(self, name, dpi=300):
         # method to store  a plot in the \plots sub-directory
