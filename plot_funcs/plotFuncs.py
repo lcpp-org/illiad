@@ -19,6 +19,108 @@ UIUC = {
     'il_stormlight1': '#8D8F8E',
     }
 
+_TRACE_ANIM_STYLE_PRESETS = {
+    'classic': {
+        'background_color': '#FFFFFF',
+        'torus_facecolor': 'lightgrey',
+        'torus_edgecolor': '#000000',
+        'torus_linewidth': 0.10,
+        'torus_alpha': 1.00,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#13294B',
+        'title_fontsize': 18,
+    },
+    'research_clean': {
+        'background_color': '#F4F6F8',
+        'torus_facecolor': '#D8DEE6',
+        'torus_edgecolor': '#9AA6B2',
+        'torus_linewidth': 0.045,
+        'torus_alpha': 0.36,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#1F2933',
+        'title_fontsize': 20,
+    },
+    'conference_slide': {
+        'background_color': '#111821',
+        'torus_facecolor': '#AAB7C4',
+        'torus_edgecolor': '#65717D',
+        'torus_linewidth': 0.045,
+        'torus_alpha': 0.22,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#E7EEF5',
+        'title_fontsize': 20,
+    },
+    'cinematic_uiuc': {
+        'background_color': '#081A29',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#5F6C79',
+        'torus_linewidth': 0.035,
+        'torus_alpha': 0.18,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#F2F6FA',
+        'title_fontsize': 20,
+    },
+    'poster_overdriveplus': {
+        'background_color': '#02070D',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#2D3E4A',
+        'torus_linewidth': 0.013,
+        'torus_alpha': 0.06,
+        'torus_shade': True,
+        'camera_dist': 1.22,
+        'camera_elev': 34,
+        'camera_azim': -86,
+        'camera_fov_deg': 132,
+        'axes_zoom': 1.32,
+        'allow_scene_clip': True,
+        'limits_scale': 0.72,
+        'limits_offset': (0.12, 0.12, 0.00),
+        'title_color': '#FFF4EA',
+        'title_fontsize': 32,
+    },
+}
+
+
+def _resolve_trace_anim_style(style='classic', style_overrides=None):
+    """Resolves a named trace-animation style and merges any explicit overrides."""
+    if style is None:
+        style = 'classic'
+
+    style_config = dict(_TRACE_ANIM_STYLE_PRESETS['classic'])
+
+    if isinstance(style, dict):
+        style_config.update(style)
+    else:
+        style_key = str(style).lower()
+        if style_key not in _TRACE_ANIM_STYLE_PRESETS:
+            valid_styles = ', '.join(sorted(_TRACE_ANIM_STYLE_PRESETS))
+            raise ValueError(f'Unknown trace animation style "{style}". Valid styles: {valid_styles}')
+        style_config.update(_TRACE_ANIM_STYLE_PRESETS[style_key])
+
+    if style_overrides:
+        style_config.update(style_overrides)
+
+    return style_config
+
+
+def _normalize_resolution(resolution):
+    """Normalizes resolution names so preset lookup is case-insensitive."""
+    if resolution is None:
+        return '1080p'
+    return str(resolution).strip().lower()
+
 ## PORT PLOTTING CONVENIENCE FUNCTION
 def global_plotPorts(ax_, simIO):
     """Plots the ports on the given axis."""
@@ -644,53 +746,366 @@ def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def _anim_render_frame(args):
-    """Module-level worker for parallel animation frame rendering (must be picklable).
+def _normalize_trace_sources(ion_traces=None, trace_sources=None, skip_indices=None,
+                             linecolor=None, markercolor=None):
+    """Normalizes animation inputs into a list of trace-source dictionaries."""
+    if trace_sources is None:
+        if ion_traces is None:
+            raise ValueError('boris_plotTraceAnim requires ion_traces or trace_sources.')
+        trace_sources = [{'ion_traces': ion_traces}]
+    elif not isinstance(trace_sources, (list, tuple)):
+        trace_sources = [trace_sources]
 
-    Renders a single animation frame to a PNG. Each subprocess creates its own
-    matplotlib figure, so this is safe to call from a multiprocessing Pool.
-    """
-    (frame_idx, out_path, traces_xyz, steps_per_frame, trail_length, trail_alphas,
-     line_window, linewidth, linecolor, alpha_line, markersize, markercolor, R0, a_radius, figsize, dpi) = args
+    default_skip = list(skip_indices or [])
+    normalized = []
+    for source in trace_sources:
+        spec = dict(source) if isinstance(source, dict) else {'ion_traces': source}
+        if spec.get('ion_traces') is None and spec.get('path') is None:
+            raise ValueError('Each trace source requires either ion_traces or path.')
+        spec.setdefault('skip_indices', default_skip)
+        spec['skip_indices'] = sorted(set(spec.get('skip_indices', [])))
+        spec.setdefault('linecolor', linecolor)
+        spec.setdefault('markercolor', markercolor)
+        if spec.get('path') is not None and 'mmap_mode' not in spec:
+            spec['mmap_mode'] = 'r'
+        normalized.append(spec)
 
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    import numpy as np
+    return normalized
 
-    fig = plt.figure(figsize=figsize, dpi=dpi)
+
+def _get_trace_source_array(spec):
+    """Returns the ndarray or memmap backing a trace source."""
+    if '_ion_traces' in spec:
+        return spec['_ion_traces']
+
+    ion_traces = spec.get('ion_traces')
+    if ion_traces is None:
+        ion_traces = np.load(spec['path'], mmap_mode=spec.get('mmap_mode', 'r'))
+    spec['_ion_traces'] = ion_traces
+    return ion_traces
+
+
+def _infer_valid_lengths(ion_traces):
+    """Counts non-zero samples per particle without building trimmed copies."""
+    valid_lengths = np.zeros(ion_traces.shape[1], dtype=np.int64)
+    for particle_idx in range(ion_traces.shape[1]):
+        particle_trace = ion_traces[:, particle_idx, :]
+        valid_lengths[particle_idx] = int(np.count_nonzero(np.any(particle_trace != 0, axis=1)))
+    return valid_lengths
+
+
+def _get_source_valid_lengths(spec):
+    """Gets or lazily infers valid particle lengths for a source."""
+    if '_valid_lengths' in spec:
+        return spec['_valid_lengths']
+
+    valid_lengths = spec.get('valid_lengths')
+    if valid_lengths is None:
+        valid_lengths = _infer_valid_lengths(_get_trace_source_array(spec))
+    valid_lengths = np.asarray(valid_lengths, dtype=np.int64)
+    spec['_valid_lengths'] = valid_lengths
+    return valid_lengths
+
+
+def _build_trace_entries(trace_sources, stride):
+    """Builds per-particle metadata while keeping trace data file-backed."""
+    trace_entries = []
+    for source_idx, spec in enumerate(trace_sources):
+        ion_traces = _get_trace_source_array(spec)
+        valid_lengths = _get_source_valid_lengths(spec)
+        skip_indices = set(spec.get('skip_indices', []))
+
+        for particle_idx in range(ion_traces.shape[1]):
+            if particle_idx in skip_indices:
+                continue
+            valid_length = int(valid_lengths[particle_idx])
+            if valid_length < 2:
+                continue
+            strided_length = (valid_length + stride - 1) // stride
+            if strided_length < 2:
+                continue
+            trace_entries.append({
+                'source_idx': source_idx,
+                'particle_idx': particle_idx,
+                'ion_traces': ion_traces,
+                'valid_length': valid_length,
+                'strided_length': strided_length,
+                'linecolor': spec.get('linecolor'),
+                'markercolor': spec.get('markercolor'),
+            })
+
+    return trace_entries
+
+
+def _setup_trace_anim_axes(fig, R0, a_radius, style_config=None):
+    """Creates the shared 3D vessel scene for trace animations."""
+    style_config = _resolve_trace_anim_style(style_config)
+
     ax = fig.add_subplot(111, projection='3d')
+    background_color = style_config['background_color']
+    fig.patch.set_facecolor(background_color)
+    ax.set_facecolor(background_color)
+    pane_color = colors.to_rgba(background_color, alpha=1.0)
+    for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+        try:
+            axis.set_pane_color(pane_color)
+        except AttributeError:
+            pass
 
-    # Static torus surface
     nphi = ntheta = 180
-    ptheta = np.linspace(-np.pi, 0, ntheta // 2)
-    pphi   = np.linspace(0, 2. * np.pi, nphi)
+    ptheta = np.linspace(-np.pi, 0, int(np.ceil(ntheta / 2)))
+    pphi = np.linspace(0, 2. * np.pi, nphi)
     ptheta, pphi = np.meshgrid(ptheta, pphi)
     px = (R0 + a_radius * np.cos(ptheta)) * np.cos(pphi)
     py = (R0 + a_radius * np.cos(ptheta)) * np.sin(pphi)
     pz = a_radius * np.sin(ptheta)
     ax.plot_surface(px, py, pz, rstride=9, cstride=9,
-                    facecolor='lightgrey', edgecolor='k', linewidth=0.1,
-                    alpha=1.0, shade=True, zorder=1)
+                    facecolor=style_config['torus_facecolor'],
+                    edgecolor=style_config['torus_edgecolor'],
+                    linewidth=style_config['torus_linewidth'],
+                    alpha=style_config['torus_alpha'],
+                    shade=style_config['torus_shade'], zorder=1)
 
-    for i, trace in enumerate(traces_xyz):
-        end   = min(frame_idx * steps_per_frame + 1, trace.shape[0])
-        start = max(0, end - line_window) if line_window else 0
-        color = linecolor if linecolor else f'C{i % 10}'
-        ax.plot(trace[start:end, 0], trace[start:end, 1], trace[start:end, 2],
-                linewidth=linewidth, color=color, alpha=alpha_line, zorder=5)
-        for k in range(trail_length):
-            pt_idx = end - trail_length + k
-            if pt_idx >= 0:
-                pt = trace[pt_idx]
-                ax.plot([pt[0]], [pt[1]], [pt[2]], '.', markersize=markersize,
-                        color=markercolor if markercolor else color, markeredgewidth=0, alpha=float(trail_alphas[k]), zorder=6)
+    limits_scale = float(style_config.get('limits_scale', 1.0) or 1.0)
+    if limits_scale <= 0.0:
+        raise ValueError('limits_scale must be > 0')
+    allow_scene_clip = bool(style_config.get('allow_scene_clip', False))
+    effective_limits_scale = limits_scale if allow_scene_clip else max(1.0, limits_scale)
 
-    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.41, 0.41])
+    limits_offset = style_config.get('limits_offset', (0.0, 0.0, 0.0))
+    if limits_offset is None:
+        limits_offset = (0.0, 0.0, 0.0)
+    elif np.isscalar(limits_offset):
+        limits_offset = (float(limits_offset),) * 3
+    else:
+        limits_offset = tuple(float(value) for value in limits_offset)
+    if len(limits_offset) != 3:
+        raise ValueError('limits_offset must be a scalar or a length-3 sequence.')
+    axis_offsets = dict(zip(('xlim', 'ylim', 'zlim'), limits_offset))
+
+    xy_extent = max(0.61, float(R0 + a_radius + 0.02))
+    z_extent = max(0.41, float(a_radius + 0.02))
+    default_limits = {
+        'xlim': (-xy_extent, xy_extent),
+        'ylim': (-xy_extent, xy_extent),
+        'zlim': (-z_extent, z_extent),
+    }
+    for limit_name, base_limits in default_limits.items():
+        limits = style_config.get(limit_name)
+        if limits is None:
+            center = 0.5 * (base_limits[0] + base_limits[1])
+            half_span = 0.5 * (base_limits[1] - base_limits[0]) * effective_limits_scale
+            offset = axis_offsets[limit_name]
+            center += offset
+            if not allow_scene_clip:
+                half_span += abs(offset)
+            limits = (center - half_span, center + half_span)
+        getattr(ax, f'set_{limit_name}')([limits[0], limits[1]])
+
+    box_aspect = style_config.get('box_aspect', (1.0, 1.0, 0.67))
+    if box_aspect is not None:
+        axes_zoom = style_config.get('axes_zoom')
+        try:
+            if axes_zoom is None:
+                ax.set_box_aspect(box_aspect)
+            else:
+                ax.set_box_aspect(box_aspect, zoom=axes_zoom)
+        except TypeError:
+            ax.set_box_aspect(box_aspect)
+
+    camera_fov_deg = style_config.get('camera_fov_deg')
+    camera_focal_length = style_config.get('camera_focal_length')
+    if camera_fov_deg is not None:
+        if not 0.0 < float(camera_fov_deg) < 180.0:
+            raise ValueError('camera_fov_deg must be between 0 and 180 degrees.')
+        camera_focal_length = 1.0 / np.tan(np.radians(float(camera_fov_deg)) / 2.0)
+    if camera_focal_length is not None:
+        try:
+            ax.set_proj_type('persp', focal_length=float(camera_focal_length))
+        except TypeError:
+            ax.set_proj_type('persp')
+
     ax.set_axis_off()
-    ax.dist = 3
+    if style_config.get('camera_dist') is not None:
+        ax.dist = style_config['camera_dist']
+    if style_config.get('camera_elev') is not None:
+        ax.elev = style_config['camera_elev']
+    if style_config.get('camera_azim') is not None:
+        ax.azim = style_config['camera_azim']
     plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-    plt.savefig(out_path, dpi=dpi)
+    return ax
+
+
+def _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize):
+    """Allocates line and trail artists for each trace entry."""
+    for entry in trace_entries:
+        if entry['linecolor']:
+            line = ax.plot([], [], [], linewidth=linewidth, color=entry['linecolor'], alpha=line_alpha, zorder=5)[0]
+        else:
+            line = ax.plot([], [], [], linewidth=linewidth, alpha=line_alpha, zorder=5)[0]
+        line_color = entry['linecolor'] if entry['linecolor'] else line.get_color()
+        marker_color = entry['markercolor'] if entry['markercolor'] else line_color
+        trail_dots = [
+            ax.plot([], [], [], '.', markersize=markersize, markeredgewidth=0,
+                    color=marker_color, alpha=0.0, zorder=6)[0]
+            for _ in range(trail_length)
+        ]
+        entry['line'] = line
+        entry['line_alpha'] = line_alpha
+        entry['trail_dots'] = trail_dots
+
+
+def _set_artist_empty(artist):
+    """Hides a 3D artist without dropping it from the animation graph."""
+    artist.set_data_3d([0.], [0.], [0.])
+    artist.set_alpha(0.0)
+
+
+def _update_trace_artists(frame_idx, trace_entries, steps_per_frame, stride,
+                          line_window, trail_length, trail_alphas):
+    """Updates all trace artists for a specific animation frame."""
+    all_artists = []
+    for entry in trace_entries:
+        strided_end = min(frame_idx * steps_per_frame + 1, entry['strided_length'])
+        line = entry['line']
+        trail_dots = entry['trail_dots']
+
+        if strided_end <= 0:
+            _set_artist_empty(line)
+            all_artists.append(line)
+            for dot in trail_dots:
+                _set_artist_empty(dot)
+                all_artists.append(dot)
+            continue
+
+        strided_start = max(0, strided_end - line_window) if line_window else 0
+        raw_start = strided_start * stride
+        raw_stop = min(entry['valid_length'], (strided_end - 1) * stride + 1)
+        trace_segment = entry['ion_traces'][raw_start:raw_stop:stride, entry['particle_idx'], :]
+
+        line.set_data_3d(trace_segment[:, 0], trace_segment[:, 1], trace_segment[:, 2])
+        line.set_alpha(entry['line_alpha'])
+        all_artists.append(line)
+
+        for k, dot in enumerate(trail_dots):
+            strided_idx = strided_end - trail_length + k
+            if strided_idx < 0:
+                _set_artist_empty(dot)
+            else:
+                raw_idx = strided_idx * stride
+                point = entry['ion_traces'][raw_idx, entry['particle_idx'], :]
+                dot.set_data_3d([point[0]], [point[1]], [point[2]])
+                dot.set_alpha(float(trail_alphas[k]))
+            all_artists.append(dot)
+
+    return all_artists
+
+
+def _serialize_trace_sources(trace_sources):
+    """Strips runtime caches before passing sources to worker processes."""
+    serialized = []
+    for spec in trace_sources:
+        source_out = {
+            'skip_indices': list(spec.get('skip_indices', [])),
+            'linecolor': spec.get('linecolor'),
+            'markercolor': spec.get('markercolor'),
+        }
+        if spec.get('path') is not None:
+            source_out['path'] = spec['path']
+            source_out['mmap_mode'] = spec.get('mmap_mode', 'r')
+        else:
+            source_out['ion_traces'] = spec.get('ion_traces', spec.get('_ion_traces'))
+
+        valid_lengths = spec.get('valid_lengths', spec.get('_valid_lengths'))
+        if valid_lengths is not None:
+            source_out['valid_lengths'] = np.asarray(valid_lengths, dtype=np.int64)
+        serialized.append(source_out)
+
+    return serialized
+
+
+def boris_saveTracePreviewFrame(ion_traces, b_hidra, frame_idx, save_path,
+                                trace_sources=None, skip_indices=None, stride=1, steps_per_frame=1,
+                                linewidth=1.0, linecolor=None, line_alpha=1.0, line_window=None,
+                                trail_length=10, markersize=4, markercolor=None,
+                                resolution='720p', render_dpi=100,
+                                style='classic', style_overrides=None,
+                                title=None, title_kwargs=None):
+    """Renders a single still frame using the same lazy-loading path as the animation."""
+    if skip_indices is None:
+        skip_indices = []
+    if stride < 1:
+        raise ValueError('stride must be >= 1')
+    if steps_per_frame < 1:
+        raise ValueError('steps_per_frame must be >= 1')
+
+    trace_sources = _normalize_trace_sources(
+        ion_traces=ion_traces,
+        trace_sources=trace_sources,
+        skip_indices=skip_indices,
+        linecolor=linecolor,
+        markercolor=markercolor,
+    )
+    trace_entries = _build_trace_entries(trace_sources, stride)
+    if len(trace_entries) == 0:
+        raise ValueError('boris_saveTracePreviewFrame: no valid traces to render.')
+
+    resolution_key = _normalize_resolution(resolution)
+    w_px, h_px = _RESOLUTION_MAP.get(resolution_key, _RESOLUTION_MAP['1080p'])
+    figsize = (w_px / render_dpi, h_px / render_dpi)
+    trail_alphas = np.linspace(0.0, 1.0, trail_length + 1)[1:]
+    style_config = _resolve_trace_anim_style(style, style_overrides)
+
+    fig = plt.figure(figsize=figsize, dpi=render_dpi)
+    ax = _setup_trace_anim_axes(fig, b_hidra.R0, b_hidra.a, style_config=style_config)
+    _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize)
+    _update_trace_artists(int(frame_idx), trace_entries, steps_per_frame, stride,
+                          line_window, trail_length, trail_alphas)
+
+    if title:
+        title_defaults = {
+            'x': 0.03,
+            'y': 0.94,
+            's': title,
+            'color': style_config['title_color'],
+            'fontsize': style_config['title_fontsize'],
+            'fontweight': 'bold',
+            'ha': 'left',
+            'va': 'top',
+        }
+        if title_kwargs:
+            title_defaults.update(title_kwargs)
+        fig.text(**title_defaults)
+
+    fig.savefig(save_path, dpi=render_dpi, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return save_path
+
+
+def _anim_render_chunk(args):
+    """Renders a consecutive frame chunk using one figure and file-backed traces."""
+    (frame_start, frame_stop, frame_dir, trace_sources, steps_per_frame, stride,
+     line_window, trail_length, trail_alphas, linewidth, line_alpha, markersize,
+     figsize, dpi, style_config, R0, a_radius) = args
+
+    import os
+
+    plt.switch_backend('Agg')
+
+    local_sources = [dict(spec) for spec in trace_sources]
+    trace_entries = _build_trace_entries(local_sources, stride)
+    if len(trace_entries) == 0:
+        return
+
+    fig = plt.figure(figsize=figsize, dpi=dpi)
+    ax = _setup_trace_anim_axes(fig, R0, a_radius, style_config=style_config)
+    _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize)
+
+    for frame_idx in range(frame_start, frame_stop):
+        _update_trace_artists(frame_idx, trace_entries, steps_per_frame, stride,
+                              line_window, trail_length, trail_alphas)
+        fig.savefig(os.path.join(frame_dir, f'frame_{frame_idx:06d}.png'), dpi=dpi)
+
     plt.close(fig)
 
 
@@ -699,14 +1114,16 @@ _RESOLUTION_MAP = {
     '720p':  (1280, 720),
     '1080p': (1920, 1080),
     '1440p': (2560, 1440),
-    '4K':    (3840, 2160),
+    '4k':    (3840, 2160),
 }
 
 def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
                         interval=50, skip_indices=None, stride=1, max_frames=None, steps_per_frame=1,
                         linewidth=1.0, linecolor=None, line_alpha=1.0, line_window=None,
                         trail_length=10, markersize=4, markercolor=None,
-                        parallel=True, n_workers=None, resolution='1080p'):
+                        parallel=True, n_workers=None, resolution='1080p',
+                        trace_sources=None, parallel_chunk_size=120,
+                        style='classic', style_overrides=None):
     """Animates the ion traces in 3D, growing each trace step by step.
 
     Speed control:
@@ -719,45 +1136,54 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
       - parallel (bool): render frames as PNGs in parallel across CPU cores, then
         stitch with ffmpeg. Dramatically faster for large frame counts. Requires ffmpeg.
       - n_workers (int|None): number of worker processes. Defaults to cpu_count().
-      - resolution (str): output resolution preset. One of '480p', '720p', '1080p',
-        '1440p', '4K'. All presets use a 16:9 aspect ratio. Default: '1080p'.
+            - resolution (str): output resolution preset. One of '480p', '720p', '1080p',
+                '1440p', '4K'. Lookup is case-insensitive. Default: '1080p'.
+            - trace_sources (list|None): optional list of source specs. Each spec may
+                provide `path` or `ion_traces`, plus optional `valid_lengths`,
+                `skip_indices`, `linecolor`, `markercolor`, and `mmap_mode`.
+            - parallel_chunk_size (int): frames rendered per worker task in the parallel
+                path. Larger chunks reduce process overhead and repeated scene setup.
+            - style (str|dict): named torus/background style preset, or a style dict.
+            - style_overrides (dict|None): optional explicit style overrides applied on
+                top of the selected preset.
     Trail effect:
       - trail_length (int): number of recent positions shown as scatter dots with
         alpha fading from 0 (oldest) to 1 (newest).
     """
     import os
-    import math
 
     if skip_indices is None:
         skip_indices = []
+    if stride < 1:
+        raise ValueError('stride must be >= 1')
+    if steps_per_frame < 1:
+        raise ValueError('steps_per_frame must be >= 1')
 
-    ## PRE-PROCESS TRACES: filter zero rows, apply striding, and collect valid traces
-    traces_xyz = []
-    for i in range(ion_traces.shape[1]):
-        if i in skip_indices:
-            continue
-        this_ion = ion_traces[:, i, :]
-        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
-        if stride > 1:
-            this_ion = this_ion[::stride]
-        if this_ion.shape[0] < 2:
-            continue
-        traces_xyz.append(this_ion)  # shape (nsteps_i, 3)
+    trace_sources = _normalize_trace_sources(
+        ion_traces=ion_traces,
+        trace_sources=trace_sources,
+        skip_indices=skip_indices,
+        linecolor=linecolor,
+        markercolor=markercolor,
+    )
 
-    if len(traces_xyz) == 0:
+    trace_entries = _build_trace_entries(trace_sources, stride)
+    if len(trace_entries) == 0:
         simIO.log.info('boris_plotTraceAnim: no valid traces to animate.')
         return
 
-    max_data_pts = max(t.shape[0] for t in traces_xyz)
-    num_frames = math.ceil(max_data_pts / steps_per_frame)
+    max_data_pts = max(entry['strided_length'] for entry in trace_entries)
+    num_frames = (max_data_pts + steps_per_frame - 1) // steps_per_frame
     if max_frames:
         num_frames = min(num_frames, max_frames)
 
     trail_alphas = np.linspace(0.0, 1.0, trail_length + 1)[1:]
     fps = max(1, round(1000 / interval))
-    w_px, h_px = _RESOLUTION_MAP.get(resolution, (1920, 1080))
+    resolution_key = _normalize_resolution(resolution)
+    w_px, h_px = _RESOLUTION_MAP.get(resolution_key, _RESOLUTION_MAP['1080p'])
     render_dpi = 100
     figsize = (w_px / render_dpi, h_px / render_dpi)
+    style_config = _resolve_trace_anim_style(style, style_overrides)
     plotname_mp4 = 'IonTraceAnim_' + runString + '.mp4'
     plotname_gif = 'IonTraceAnim_' + runString + '.gif'
 
@@ -766,16 +1192,22 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
         import multiprocessing, tempfile, subprocess, shutil
         frame_dir = tempfile.mkdtemp(prefix='boris_anim_')
         try:
-            worker_args = [(f, os.path.join(frame_dir, f'frame_{f:06d}.png'),
-                             traces_xyz, steps_per_frame, trail_length, trail_alphas,
-                             line_window, linewidth, linecolor, line_alpha, markersize, markercolor,
-                             b_hidra.R0, b_hidra.a, figsize, render_dpi)
-                            for f in range(num_frames)]
             n = n_workers or multiprocessing.cpu_count()
-            simIO.log.info(f'boris_plotTraceAnim: rendering {num_frames} frames on {n} workers...')
+            chunk_size = max(1, int(parallel_chunk_size))
+            serialized_sources = _serialize_trace_sources(trace_sources)
+            worker_args = [
+                (frame_start, min(frame_start + chunk_size, num_frames), frame_dir,
+                 serialized_sources, steps_per_frame, stride, line_window,
+                 trail_length, trail_alphas, linewidth, line_alpha, markersize,
+                 figsize, render_dpi, style_config, b_hidra.R0, b_hidra.a)
+                for frame_start in range(0, num_frames, chunk_size)
+            ]
+            simIO.log.info(
+                f'boris_plotTraceAnim: rendering {num_frames} frames in {len(worker_args)} chunks on {n} workers...'
+            )
             ctx = multiprocessing.get_context('fork')   # fork avoids re-importing on Linux
             with ctx.Pool(n) as pool:
-                pool.map(_anim_render_frame, worker_args)
+                pool.map(_anim_render_chunk, worker_args)
 
             save_path = os.path.join(simIO.plot_dir, plotname_mp4)
             ffmpeg_bin = animation.FFMpegWriter.bin_path()
@@ -805,60 +1237,15 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
 
     ## ── SERIAL PATH (FuncAnimation) ──────────────────────────────────────────
     fig = plt.figure(figsize=figsize, dpi=render_dpi)
-    ax = fig.add_subplot(111, projection='3d')
+    ax = _setup_trace_anim_axes(fig, b_hidra.R0, b_hidra.a, style_config=style_config)
+    _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize)
 
-    nphi = ntheta = 180
-    ptheta = np.linspace(-np.pi, 0, int(np.ceil(ntheta / 2)))
-    pphi = np.linspace(0, 2. * np.pi, nphi)
-    ptheta, pphi = np.meshgrid(ptheta, pphi)
-    px = (b_hidra.R0 + b_hidra.a * np.cos(ptheta)) * np.cos(pphi)
-    py = (b_hidra.R0 + b_hidra.a * np.cos(ptheta)) * np.sin(pphi)
-    pz = b_hidra.a * np.sin(ptheta)
-    ax.plot_surface(px, py, pz, rstride=9, cstride=9,
-                    facecolor='lightgrey', edgecolor='k', linewidth=0.1,
-                    alpha=1.0, shade=True, zorder=1)
-
-    if linecolor:
-        lines = [ax.plot([], [], [], linewidth=linewidth, color=linecolor, alpha=line_alpha, zorder=5)[0] for _ in traces_xyz]
-    else:
-        lines = [ax.plot([], [], [], linewidth=linewidth, alpha=line_alpha, zorder=5)[0] for _ in traces_xyz]
-
-    trail_dots = []
-    for line in lines:
-        color = linecolor if linecolor else line.get_color()
-        trail_dots.append([
-            ax.plot([], [], [], '.', markersize=markersize, markeredgewidth=0,
-                    color=markercolor if markercolor else color, alpha=0.0, zorder=6)[0]
-            for _ in range(trail_length)
-        ])
-
-    ax.set_xlim([-0.61, 0.61]); ax.set_ylim([-0.61, 0.61]); ax.set_zlim([-0.41, 0.41])
-    ax.set_axis_off()
-    ax.dist = 3
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-    def update_lines(num, traces, lines, trail_dots):
-        all_artists = []
-        for line, t_dots, trace in zip(lines, trail_dots, traces):
-            end   = min(num * steps_per_frame + 1, trace.shape[0])
-            start = max(0, end - line_window) if line_window else 0
-            line.set_data_3d(trace[start:end, :].T)
-            all_artists.append(line)
-            for k, dot in enumerate(t_dots):
-                pt_idx = end - trail_length + k
-                if pt_idx < 0:
-                    dot.set_alpha(0.0)
-                    dot.set_data_3d([[0.], [0.], [0.]])
-                else:
-                    pt = trace[pt_idx]
-                    dot.set_data_3d([[pt[0]], [pt[1]], [pt[2]]])
-                    dot.set_alpha(float(trail_alphas[k]))
-                all_artists.append(dot)
-        return all_artists
+    def update_lines(num):
+        return _update_trace_artists(num, trace_entries, steps_per_frame, stride,
+                                     line_window, trail_length, trail_alphas)
 
     ani = animation.FuncAnimation(
-        fig, update_lines, frames=num_frames,
-        fargs=(traces_xyz, lines, trail_dots), interval=interval, blit=True)
+        fig, update_lines, frames=num_frames, interval=interval, blit=True)
 
     try:
         writer = animation.FFMpegWriter(fps=fps, bitrate=-1)
