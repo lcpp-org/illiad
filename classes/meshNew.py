@@ -53,6 +53,7 @@ class Mesh:
         self.Bx: np.float64[:][:][:]
         self.By: np.float64[:][:][:]
         self.Bz: np.float64[:][:][:]
+        self.value = None
         self.periodicity: np.int32[:]
         
         self.errField: np.bool
@@ -182,6 +183,56 @@ class Mesh:
 
             self.B += torch.as_tensor(np.stack([Bx_, By_, Bz_], axis=-1) * total_mult,
                                         dtype=torch.float64, device=device)
+
+    def loadScalarField(self, file_path, period_=np.array([0, 1, 1], dtype=np.int32), att_mult=1.0):
+        """Loads a scalar field from a file and sets mesh properties.
+
+        The input array is expected in the saved Flux_Interpolator ordering of
+        (phi, theta, r) and is transposed into the internal (r, theta, phi)
+        layout used by the interpolation routines.
+        """
+        val_ = np.load(file_path)
+        val_ = np.transpose(val_, (2, 1, 0))
+
+        self.nr, self.ntheta, self.nphi = val_.shape
+        self.periodicity = period_
+        self.att_mult = float(att_mult)
+
+        value = torch.as_tensor(val_ * self.att_mult, dtype=torch.float64, device=device)
+        self.value = torch.clamp(value, min=0.0)
+        self.errField = torch.tensor(False, dtype=torch.bool).to(device)
+
+        if self.periodicity[0]:
+            self.r_max = self.a / self.periodicity[0]
+            self.dr = self.r_max / self.nr
+            self.r_min = self.dr
+        else:
+            self.r_max = self.a
+            self.dr = self.r_max / (self.nr-1)
+            self.r_min = 0.
+
+        if self.periodicity[1]:
+            self.theta_max = (2*np.pi) / self.periodicity[1]
+            self.dtheta = self.theta_max / self.ntheta
+            self.theta_min = self.dtheta
+        else:
+            self.theta_max = (2*np.pi)
+            self.dtheta = self.theta_max / (self.ntheta-1)
+            self.theta_min = 0.
+
+        if self.periodicity[2]:
+            self.phi_max = (2*np.pi) / self.periodicity[2]
+            self.dphi = self.phi_max / self.nphi
+            self.phi_min = self.dphi
+        else:
+            self.phi_max = (2*np.pi)
+            self.dphi = self.phi_max / (self.nphi-1)
+            self.phi_min = 0.
+
+        self.phi_max = torch.tensor(self.phi_max, dtype=torch.float64).to(device)
+        self.dr = torch.tensor(self.dr, dtype=torch.float64).to(device)
+        self.dtheta = torch.tensor(self.dtheta, dtype=torch.float64).to(device)
+        self.dphi = torch.tensor(self.dphi, dtype=torch.float64).to(device)
 
     def setErrorField(self, err_mag=1.5654e-4, err_dir=271.5*np.pi/180):
         """Sets the magnitude and direction of the non-periodic error field.
@@ -380,8 +431,19 @@ class Mesh:
 
         return vecOUT
 
+    def return_scalars(self, weights, corner_idx):
+        """Returns interpolated scalar values using precomputed corner weights."""
+        node_vals = self.value[corner_idx[0], corner_idx[1], corner_idx[2]]
+        total_vol = weights.sum(dim=0)
+        scalar_out = (node_vals * weights).sum(dim=0) / total_vol
+        return torch.atleast_1d(scalar_out)
+
     def interpField(self, point_INPUT, Cart=True, basis='physical'):
         weights, corner_indices, ph_localN = self.get_weights(point_INPUT, Cart)
         vecOUT = self.return_vecs(weights, corner_indices, ph_localN)
         return vecOUT
+
+    def interpScalarField(self, point_INPUT, Cart=True):
+        weights, corner_indices, _ = self.get_weights(point_INPUT, Cart)
+        return self.return_scalars(weights, corner_indices)
     
