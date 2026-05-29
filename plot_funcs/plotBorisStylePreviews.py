@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -15,12 +16,13 @@ import plot_funcs.plotFuncs as plotFuncs
 
 
 OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-PREVIEW_SUBDIR = "style_previews"
+#OUTPUT_DIRECTORY_NAME = "STYLES"
+PREVIEW_SUBDIR = "style_previews_multires"
 
 # Preview frame index is in animation-frame units after striding.
 FRAME_INDEX = 220
-# Use a larger preview frame so marker and title scale reads closer to final output.
-RESOLUTION = "720p"
+# Render one preview set per target output size.
+RESOLUTIONS = ["480p", "720p", "1080p", "1440p", "4k"]
 RENDER_DPI = 100
 
 # Match the animation settings you care about while tweaking style.
@@ -254,8 +256,41 @@ STYLE_GROUPS = {
                 'va': 'bottom',
             },
         },
+        {
+            'slug': 'poster_manual_1',
+            'title': 'Poster Manual 1',
+            'style': 'cinematic_uiuc',
+            'style_overrides': {
+                'background_color': '#02070D',
+                'camera_dist': 0.80,
+                'camera_elev': 10,
+                'camera_azim': -85,
+                'camera_fov_deg': 160,
+                'axes_zoom': 1.39,
+                'allow_scene_clip': True,
+                'limits_scale': 1.36,
+                'limits_offset': (-0.23, 0.27, 0.23),
+                'torus_alpha': 0.07,
+                'torus_linewidth': 0.014,
+                'torus_edgecolor': '#334450',
+                'title_color': '#FFF4EA',
+                'title_fontsize': 30,
+            },
+            'title_kwargs': {
+                'x': 0.92,
+                'y': 0.14,
+                'ha': 'right',
+                'va': 'bottom',
+            },
+        },
     ],
 }
+
+STYLE_SLUGS = [
+    spec['slug']
+    for group_specs in STYLE_GROUPS.values()
+    for spec in group_specs
+]
 
 
 def build_trace_sources(sim_io, source_specs):
@@ -287,41 +322,100 @@ def save_contact_sheet(sheet_path, styles_with_paths, title):
     plt.close(fig)
 
 
-def render_group(group_name, style_specs, trace_sources, b_hidra, preview_root):
+def _collect_existing_group_outputs(group_dir, style_specs):
+    rendered = []
+    for spec in style_specs:
+        image_path = os.path.join(group_dir, f"{spec['slug']}.png")
+        if os.path.exists(image_path):
+            rendered.append((spec, image_path))
+    return rendered
+
+
+def render_group(group_name, style_specs, trace_sources, b_hidra, preview_root, resolution,
+                 selected_slugs=None, render_images=True, render_contact_sheet=True):
     group_dir = os.path.join(preview_root, group_name)
     os.makedirs(group_dir, exist_ok=True)
 
-    rendered = []
-    for spec in style_specs:
-        save_path = os.path.join(group_dir, f"{spec['slug']}.png")
-        plotFuncs.boris_saveTracePreviewFrame(
-            None,
-            b_hidra,
-            FRAME_INDEX,
-            save_path,
-            trace_sources=trace_sources,
-            stride=STRIDE,
-            steps_per_frame=STEPS_PER_FRAME,
-            linewidth=LINEWIDTH,
-            line_alpha=LINE_ALPHA,
-            line_window=LINE_WINDOW,
-            trail_length=TRAIL_LENGTH,
-            markersize=MARKERSIZE,
-            resolution=RESOLUTION,
-            render_dpi=RENDER_DPI,
-            style=spec['style'],
-            style_overrides=spec.get('style_overrides'),
-            title=spec['title'],
-            title_kwargs=spec.get('title_kwargs'),
-        )
-        rendered.append((spec, save_path))
+    if selected_slugs is None:
+        selected_slugs = {spec['slug'] for spec in style_specs}
+    else:
+        selected_slugs = set(selected_slugs)
 
-    contact_sheet = os.path.join(group_dir, f"{group_name}_contact_sheet.png")
-    save_contact_sheet(contact_sheet, rendered, f"UIUC Trace Style Previews: {group_name}")
+    rendered = []
+    if render_images:
+        for spec in style_specs:
+            if spec['slug'] not in selected_slugs:
+                continue
+            save_path = os.path.join(group_dir, f"{spec['slug']}.png")
+            plotFuncs.boris_saveTracePreviewFrame(
+                None,
+                b_hidra,
+                FRAME_INDEX,
+                save_path,
+                trace_sources=trace_sources,
+                stride=STRIDE,
+                steps_per_frame=STEPS_PER_FRAME,
+                linewidth=LINEWIDTH,
+                line_alpha=LINE_ALPHA,
+                line_window=LINE_WINDOW,
+                trail_length=TRAIL_LENGTH,
+                markersize=MARKERSIZE,
+                resolution=resolution,
+                render_dpi=RENDER_DPI,
+                style=spec['style'],
+                style_overrides=spec.get('style_overrides'),
+                title=spec['title'],
+                title_kwargs=spec.get('title_kwargs'),
+            )
+            rendered.append((spec, save_path))
+
+    contact_sheet = None
+    if render_contact_sheet:
+        styles_with_paths = _collect_existing_group_outputs(group_dir, style_specs)
+        if styles_with_paths:
+            contact_sheet = os.path.join(group_dir, f"{group_name}_contact_sheet.png")
+            save_contact_sheet(contact_sheet, styles_with_paths, f"UIUC Trace Style Previews: {group_name}")
     return rendered, contact_sheet
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Render Boris style previews.')
+    parser.add_argument(
+        '--resolution',
+        dest='resolutions',
+        action='append',
+        choices=RESOLUTIONS,
+        help='Render only the selected resolution. Pass multiple times to render more than one.',
+    )
+    parser.add_argument(
+        '--group',
+        dest='groups',
+        action='append',
+        choices=sorted(STYLE_GROUPS),
+        help='Render only the selected style group. Pass multiple times to render more than one.',
+    )
+    parser.add_argument(
+        '--style-slug',
+        dest='style_slugs',
+        action='append',
+        choices=sorted(STYLE_SLUGS),
+        help='Render only the selected style slug. Pass multiple times to render more than one.',
+    )
+    parser.add_argument(
+        '--skip-contact-sheets',
+        action='store_true',
+        help='Render preview PNGs without rebuilding contact sheets.',
+    )
+    parser.add_argument(
+        '--contact-sheets-only',
+        action='store_true',
+        help='Rebuild contact sheets from existing preview PNGs without rendering new frames.',
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     sim_io = out.IOHandler(OUTPUT_DIRECTORY_NAME)
     sim_io.startLog()
 
@@ -330,14 +424,33 @@ def main():
 
     trace_sources = build_trace_sources(sim_io, TRACE_SOURCES)
     b_hidra = Mesh(R0=0.72, a=0.19)
+    resolutions = args.resolutions or RESOLUTIONS
+    group_names = args.groups or list(STYLE_GROUPS)
 
     print(f"Preview root: {preview_root}")
-    for group_name, style_specs in STYLE_GROUPS.items():
-        rendered, sheet_path = render_group(group_name, style_specs, trace_sources, b_hidra, preview_root)
-        print(f"\nGroup: {group_name}")
-        for spec, image_path in rendered:
-            print(f"  {spec['title']}: {image_path}")
-        print(f"  Contact sheet: {sheet_path}")
+    for resolution in resolutions:
+        resolution_root = os.path.join(preview_root, resolution)
+        os.makedirs(resolution_root, exist_ok=True)
+        print(f"\nResolution: {resolution}")
+        for group_name in group_names:
+            style_specs = STYLE_GROUPS[group_name]
+            rendered, sheet_path = render_group(
+                group_name,
+                style_specs,
+                trace_sources,
+                b_hidra,
+                resolution_root,
+                resolution,
+                selected_slugs=args.style_slugs,
+                render_images=not args.contact_sheets_only,
+                render_contact_sheet=not args.skip_contact_sheets,
+            )
+            if rendered or sheet_path:
+                print(f"  Group: {group_name}")
+                for spec, image_path in rendered:
+                    print(f"    {spec['title']}: {image_path}")
+                if sheet_path:
+                    print(f"    Contact sheet: {sheet_path}")
 
 
 if __name__ == '__main__':

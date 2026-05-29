@@ -7,6 +7,7 @@ plt.rcParams['animation.ffmpeg_path'] = '/home/sgula/miniforge/envs/testenv/bin/
 import copy
 import numpy as np
 import logging
+from PIL import Image
 from utility.coordtrans import XYZ_to_RTP2
 
 # UIUC branding color palette
@@ -89,6 +90,24 @@ _TRACE_ANIM_STYLE_PRESETS = {
         'limits_offset': (0.12, 0.12, 0.00),
         'title_color': '#FFF4EA',
         'title_fontsize': 32,
+    },
+    'poster_manual_1': {
+        'background_color': '#02070D',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#334450',
+        'torus_linewidth': 0.014,
+        'torus_alpha': 0.07,
+        'torus_shade': True,
+        'camera_dist': 0.80,
+        'camera_elev': 10,
+        'camera_azim': -85,
+        'camera_fov_deg': 160,
+        'axes_zoom': 1.39,
+        'allow_scene_clip': True,
+        'limits_scale': 1.36,
+        'limits_offset': (-0.23, 0.27, 0.23),
+        'title_color': '#FFF4EA',
+        'title_fontsize': 30,
     },
 }
 
@@ -936,6 +955,62 @@ def _setup_trace_anim_axes(fig, R0, a_radius, style_config=None):
     return ax
 
 
+def _trace_frame_to_rgba(fig):
+    """Draws the current figure canvas and returns an RGBA pixel buffer."""
+    fig.canvas.draw()
+    return np.array(fig.canvas.buffer_rgba(), copy=True)
+
+
+def _measure_trace_frame_bbox(fig, background_color, padding_frac=0.08):
+    """Measures a tight scene bbox against the solid figure background color."""
+    rgba = _trace_frame_to_rgba(fig)
+    bg_rgb = np.rint(np.array(colors.to_rgba(background_color)[:3]) * 255.0).astype(np.uint8)
+    diff_mask = np.any(rgba[..., :3] != bg_rgb, axis=2)
+
+    if not np.any(diff_mask):
+        return (0, 0, rgba.shape[1], rgba.shape[0])
+
+    ys, xs = np.nonzero(diff_mask)
+    x0 = int(xs.min())
+    x1 = int(xs.max()) + 1
+    y0 = int(ys.min())
+    y1 = int(ys.max()) + 1
+
+    pad_px = int(np.ceil(max(x1 - x0, y1 - y0) * float(padding_frac)))
+    if pad_px > 0:
+        x0 = max(0, x0 - pad_px)
+        x1 = min(rgba.shape[1], x1 + pad_px)
+        y0 = max(0, y0 - pad_px)
+        y1 = min(rgba.shape[0], y1 + pad_px)
+
+    return (x0, y0, x1, y1)
+
+
+def _compose_trace_frame(fig, target_size_px, background_color, crop_bbox):
+    """Crops the active scene and fits it into the requested output frame."""
+    target_w, target_h = target_size_px
+    rgba = _trace_frame_to_rgba(fig)
+    x0, y0, x1, y1 = crop_bbox
+    cropped = rgba[y0:y1, x0:x1, :]
+
+    if cropped.size == 0:
+        bg_rgba = tuple(int(round(channel * 255.0)) for channel in colors.to_rgba(background_color))
+        return np.full((target_h, target_w, 4), bg_rgba, dtype=np.uint8)
+
+    resampling = getattr(Image, 'Resampling', Image).LANCZOS
+    crop_img = Image.fromarray(cropped, mode='RGBA')
+    scale = min(target_w / crop_img.width, target_h / crop_img.height)
+    new_w = max(1, int(round(crop_img.width * scale)))
+    new_h = max(1, int(round(crop_img.height * scale)))
+    resized = crop_img.resize((new_w, new_h), resampling)
+
+    bg_rgba = tuple(int(round(channel * 255.0)) for channel in colors.to_rgba(background_color))
+    canvas = Image.new('RGBA', (target_w, target_h), bg_rgba)
+    offset = ((target_w - new_w) // 2, (target_h - new_h) // 2)
+    canvas.alpha_composite(resized, dest=offset)
+    return np.asarray(canvas)
+
+
 def _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize):
     """Allocates line and trail artists for each trace entry."""
     for entry in trace_entries:
@@ -1052,15 +1127,25 @@ def boris_saveTracePreviewFrame(ion_traces, b_hidra, frame_idx, save_path,
 
     resolution_key = _normalize_resolution(resolution)
     w_px, h_px = _RESOLUTION_MAP.get(resolution_key, _RESOLUTION_MAP['1080p'])
+    scene_figsize = (h_px / render_dpi, h_px / render_dpi)
     figsize = (w_px / render_dpi, h_px / render_dpi)
     trail_alphas = np.linspace(0.0, 1.0, trail_length + 1)[1:]
     style_config = _resolve_trace_anim_style(style, style_overrides)
 
-    fig = plt.figure(figsize=figsize, dpi=render_dpi)
+    fig = plt.figure(figsize=scene_figsize, dpi=render_dpi)
     ax = _setup_trace_anim_axes(fig, b_hidra.R0, b_hidra.a, style_config=style_config)
     _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize)
     _update_trace_artists(int(frame_idx), trace_entries, steps_per_frame, stride,
                           line_window, trail_length, trail_alphas)
+    crop_bbox = _measure_trace_frame_bbox(fig, style_config['background_color'])
+    frame_image = _compose_trace_frame(fig, (w_px, h_px), style_config['background_color'], crop_bbox)
+    plt.close(fig)
+
+    final_fig = plt.figure(figsize=figsize, dpi=render_dpi)
+    final_fig.patch.set_facecolor(style_config['background_color'])
+    final_ax = final_fig.add_axes([0.0, 0.0, 1.0, 1.0])
+    final_ax.imshow(frame_image)
+    final_ax.axis('off')
 
     if title:
         title_defaults = {
@@ -1075,10 +1160,10 @@ def boris_saveTracePreviewFrame(ion_traces, b_hidra, frame_idx, save_path,
         }
         if title_kwargs:
             title_defaults.update(title_kwargs)
-        fig.text(**title_defaults)
+        final_fig.text(**title_defaults)
 
-    fig.savefig(save_path, dpi=render_dpi, facecolor=fig.get_facecolor())
-    plt.close(fig)
+    final_fig.savefig(save_path, dpi=render_dpi, facecolor=final_fig.get_facecolor())
+    plt.close(final_fig)
     return save_path
 
 
@@ -1086,7 +1171,7 @@ def _anim_render_chunk(args):
     """Renders a consecutive frame chunk using one figure and file-backed traces."""
     (frame_start, frame_stop, frame_dir, trace_sources, steps_per_frame, stride,
      line_window, trail_length, trail_alphas, linewidth, line_alpha, markersize,
-     figsize, dpi, style_config, R0, a_radius) = args
+    scene_figsize, target_size_px, dpi, style_config, R0, a_radius, bbox_frame_idx) = args
 
     import os
 
@@ -1097,14 +1182,18 @@ def _anim_render_chunk(args):
     if len(trace_entries) == 0:
         return
 
-    fig = plt.figure(figsize=figsize, dpi=dpi)
+    fig = plt.figure(figsize=scene_figsize, dpi=dpi)
     ax = _setup_trace_anim_axes(fig, R0, a_radius, style_config=style_config)
     _attach_trace_artists(ax, trace_entries, linewidth, line_alpha, trail_length, markersize)
+    _update_trace_artists(bbox_frame_idx, trace_entries, steps_per_frame, stride,
+                          line_window, trail_length, trail_alphas)
+    crop_bbox = _measure_trace_frame_bbox(fig, style_config['background_color'])
 
     for frame_idx in range(frame_start, frame_stop):
         _update_trace_artists(frame_idx, trace_entries, steps_per_frame, stride,
                               line_window, trail_length, trail_alphas)
-        fig.savefig(os.path.join(frame_dir, f'frame_{frame_idx:06d}.png'), dpi=dpi)
+        frame_image = _compose_trace_frame(fig, target_size_px, style_config['background_color'], crop_bbox)
+        Image.fromarray(frame_image).save(os.path.join(frame_dir, f'frame_{frame_idx:06d}.png'))
 
     plt.close(fig)
 
@@ -1182,6 +1271,7 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
     resolution_key = _normalize_resolution(resolution)
     w_px, h_px = _RESOLUTION_MAP.get(resolution_key, _RESOLUTION_MAP['1080p'])
     render_dpi = 100
+    scene_figsize = (h_px / render_dpi, h_px / render_dpi)
     figsize = (w_px / render_dpi, h_px / render_dpi)
     style_config = _resolve_trace_anim_style(style, style_overrides)
     plotname_mp4 = 'IonTraceAnim_' + runString + '.mp4'
@@ -1199,7 +1289,8 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
                 (frame_start, min(frame_start + chunk_size, num_frames), frame_dir,
                  serialized_sources, steps_per_frame, stride, line_window,
                  trail_length, trail_alphas, linewidth, line_alpha, markersize,
-                 figsize, render_dpi, style_config, b_hidra.R0, b_hidra.a)
+                 scene_figsize, (w_px, h_px), render_dpi, style_config,
+                 b_hidra.R0, b_hidra.a, num_frames - 1)
                 for frame_start in range(0, num_frames, chunk_size)
             ]
             simIO.log.info(
