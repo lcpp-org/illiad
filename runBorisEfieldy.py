@@ -64,6 +64,12 @@ def boris_runner(input_params=None):
     e_hidra = Mesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
                                     att_mult=FIELD_SCALE_ELECTRIC)
+    if ENABLE_COLLISIONS:
+      n_hidra = Mesh(R0=0.72, a=0.19)
+      n_hidra.loadScalarField(FIELD_FILE_DENSITY, period_=np.array([0, 1, 1]),
+                  att_mult=FIELD_SCALE_DENSITY)
+    else:
+      n_hidra = None
 
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
     init_conds = [LCFS_INDEX, NPHI, NTHETA, DELTRS, NPARTICLES_PER_EMITTER]
@@ -92,7 +98,11 @@ def boris_runner(input_params=None):
 
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
     ion_tracer.setConditions(ion_list, cond_string, DT, TMAX)
-    output_array, energy_output, depo_angles_deg, toroidal_angles_deg, ion_traces = ion_tracer.run(b_hidra, e_hidra, particle_tracker_list)
+    output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
+                                                                                    Efield=e_hidra,
+                                                                                    nfield=n_hidra,
+                                                                                    collisions=ENABLE_COLLISIONS,
+                                                                                    trace_IDs=particle_tracker_list)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
     # COORDINATE FLIIPING & CONVERSION
@@ -107,24 +117,19 @@ def boris_runner(input_params=None):
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
     ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles_deg, colorRange=[0, 90], 
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90], 
                                 colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
                                 runString=cond_string+TAG+'_AngleCombined', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_output,
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_out,
                                 colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
                                 runString=cond_string+TAG+'_EnergyCombined', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles_deg, colorRange=[0, 180], 
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180], 
                                 colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
                                 runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
-    
-    # ion_tracer.plotTraceAnim(ion_traces, b_hidra, runString=cond_string+TAG+'_28stride13_30f_480p2' , simIO=simIO,
-    #                               interval=1000/120, stride=13, max_frames=200,
-    #                               linewidth=0.5, linecolor=plotFuncs.UIUC['il_orange'], line_alpha=0.4, line_window=40,
-    #                               trail_length=10, markersize=2, markercolor=plotFuncs.UIUC['il_blue'],
-    #                               parallel=True, n_workers=18, resolution='720p')
+
 
     #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
-    ion_tracer.plotTraces(ion_traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotTraces(traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
     #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
     #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
 
@@ -137,7 +142,7 @@ if __name__ == "__main__":
     # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
     #OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
     OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-    TAG = "Lithium_FS86_1p0ms_TRACK4x4"
+    TAG = "Lithium_TRACK72x40_linFPCollisionsSpatialNe1e18_IdealIota3"
     # TOROIDAL AND HELICAL MAGNETIC FIELDS
     TOROIDAL_CURRENT = 0.486 #[kA]
     HELICAL_CURRENT = 0.900 #[kA]``
@@ -148,23 +153,27 @@ if __name__ == "__main__":
     #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
     #FIELD_FILE_ELECTRIC = 'input_files/Efield_dftIota4_lcfs16.npy'
     FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
-    FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
+    FIELD_SCALE_ELECTRIC = 80.0 # [Volts]
+    FIELD_FILE_DENSITY = 'input_files/big_grid_linear_IdealIota3.npy'
+    FIELD_SCALE_DENSITY = 1e18 # [m^-3]
     # ION PROPERTIES
     ION_MASS = Li_mass # [amu]
     ION_TEMP = 2.0 # [eV]
     CHARGE_NUM = 1 # [Z]
+    # COLLISIONS
+    ENABLE_COLLISIONS = True
     # INITIAL CONDITIONS
-    LCFS_INDEX = 86 #30 #29 #40 (from Poincare output (simIO.log))
+    LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
     DELTRS = [0.000] # [m]
-    NPHI = 360
+    NPHI = 180
     NTHETA = 120
     NPARTICLES_PER_EMITTER = 50
     # SIMULATION PARAMETERS
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 4#72     #60#18 #60  #18
-    TRACK_NTHETA = 4#40   #40#12 #40  #12
+    TRACK_NPHI = 72#72     #60#18 #60  #18
+    TRACK_NTHETA = 40#40   #40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
 
     boris_runner()
