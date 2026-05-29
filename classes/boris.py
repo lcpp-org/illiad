@@ -79,7 +79,54 @@ class Boris():
         # self.IO.log.info(f"| NSTEPS         | {self.nsteps:<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
-    def parallel_solver(self, ions, Bfield, Efield=None, trace_IDs=[], freq_corr=False):
+    def viscous_drag_hstep(self, x, v, n_gas=1e18, sigma_mt=1e-19):
+        """Function to apply a half-step of viscous drag to the ion velocities, simulating ion-neutral collisions.
+        Constant cross-section and cold (motionless) neutrals are assumed for simplicity.
+        
+        Parameters:
+            -x (torch.Tensor): Current positions of the ions, shape (Nparticles, 3).
+            -v (torch.Tensor): Current velocities of the ions, shape (Nparticles, 3).
+            -n_gas (float, optional): Neutral gas density in m^-3. Defaults to 1e18.
+            -sigma_mt (float, optional): Momentum transfer cross-section in m^2. Defaults to 1e-19 m^2.
+         Returns:
+            -v_new (torch.Tensor): Updated velocities of the ions after applying viscous drag, shape (Nparticles, 3).
+        """
+
+        v_mag = torch.linalg.norm(v, axis=-1)
+        nu = n_gas * sigma_mt * v_mag
+
+        alpha = torch.exp(-nu * self.dt / 2)
+        v_new = alpha * v
+
+        return v_new  # Return unchanged for now
+
+
+    def ion_neutral_collisions(self, x, v, n_gas=1e18, T_gas_eV=0.025, u_b=None):
+        # Placeholder for ion-neutral collision logic
+        # This function should take in the current position (x) and velocity (v) of the ions,
+        # and return the updated velocity after accounting for collisions.
+        # The actual implementation would depend on the specific collision model being used.
+
+        nu = 1e17
+        alpha = torch.exp(-nu * self.dt /2)
+
+        if u_b is None:
+            v_new = alpha * v #+ (1 - alpha) * torch.sqrt(T_gas_eV) * torch.randn_like(v)
+        else:
+            v_new = u_b + alpha*(v - u_b) #+ torch.sqrt(1 - alpha**2) * torch.sqrt(T_gas) * torch.randn_like(v)
+
+        return v_new  # Return unchanged for now
+
+
+    def ion_ion_collisions(self, x, v):
+        # Placeholder for ion-ion collision logic
+        # This function should take in the current position (x) and velocity (v) of the ions,
+        # and return the updated velocity after accounting for collisions.
+        # The actual implementation would depend on the specific collision model being used.
+        return v  # Return unchanged for now
+    
+
+    def parallel_solver(self, ions, Bfield, Efield=None, trace_IDs=[], freq_corr=False, collisions=False):
         """
         Function to take in a particle and field object and solves the particle path until termination event or tmax
         using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
@@ -152,10 +199,20 @@ class Boris():
             logging.basicConfig(level=logging.INFO)
             with logging_redirect_tqdm(loggers=[log]):
                 pbar = tqdm(range(1, self.nsteps), ncols=100, mininterval=2.0)
+
+
+
                 for k in pbar:
                     pos_active = pos_k[running]
                     qdt2m_active = qdt2m[running]
                     v_k_active = v_k[running]
+
+                    # INSERT (FIRST) COLLISION HALF-STEP HERE IF DESIRED
+                    ##-----------------------------------------##
+                    if collisions:
+                        v_k_active = self.viscous_drag_hstep(pos_active, v_k_active)
+                    ##-----------------------------------------##
+
 
                     actv_weights, actv_corner_indices, actv_ph_localN = Bfield.get_weights(pos_active)
                     b_vecs_active = Bfield.return_vecs(actv_weights, actv_corner_indices, actv_ph_localN)
@@ -173,10 +230,7 @@ class Boris():
                         sector = torch.remainder(actv_ph_localN.to(torch.long), Bfield.periodicity[2])
                         phi_offset = sector.unsqueeze(0) * Bfield.nphi
                         e_phi_idx = actv_corner_indices[2] + phi_offset
-                        # e_corner_indices = actv_corner_indices.clone()
-                        # e_corner_indices[2] = e_phi_idx
 
-                        #e_vecs_active = Efield.return_vecs(actv_weights, e_corner_indices, torch.zeros_like(actv_ph_localN))
                         e_vecs_active = Efield.return_vecs(actv_weights, torch.stack([actv_corner_indices[0], actv_corner_indices[1], e_phi_idx]), ph_localN=None)
                         Evec_active = (e_vecs_active * qdt2m_active).T
 
@@ -186,27 +240,44 @@ class Boris():
                     vplus_active = vminus_active + torch.linalg.cross(vprime_active, svec_active)
                     
                     v_k_active = vplus_active + Evec_active
-                    pos_k[running] = pos_active + v_k_active * self.dt
+
+                    pos_active += v_k_active * self.dt
+    
+                    # INSERT (SECOND)COLLISION HALF-STEP HERE IF DESIRED
+                    ##-----------------------------------------##
+                    if collisions:
+                        v_k_active = self.viscous_drag_hstep(pos_active, v_k_active)
+                    ##-----------------------------------------##
+
+                    # Update particle positions and velocities
+                    pos_k[running] = pos_active
                     v_k[running] = v_k_active
 
-                    # ADD SELECTED PARTICLE TRACING
-                    trace_output[k] = pos_k[trace_IDs]
+
 
                     x2 = pos_k.T[0]**2
                     y2 = pos_k.T[1]**2
                     z2 = pos_k.T[2]**2
                     r_k = torch.sqrt(x2 + y2 + z2 + Bfield.R0 * Bfield.R0
                                                - 2 * Bfield.R0 * torch.sqrt(x2 + y2))
-
                     running = torch.where(r_k < Bfield.a)[0]
 
+
                     maxStep[running] = k # +1?
+
+
+                    # ADD SELECTED PARTICLE TRACING
+                    trace_output[k] = pos_k[trace_IDs]
+
                     Nrunning = running.size(0)
                     if Nrunning == 0:
                         log.info('All particles terminated at step {}'.format(k))
                         break
 
                     pbar.set_postfix({'#Particles running': Nrunning}, refresh=False)
+
+
+
 
             terminated = torch.where(r_k >= Bfield.a)[0]
             wallPts[terminated] = pos_k[terminated]
@@ -302,7 +373,7 @@ class Boris():
         self.IO.saveNumpyData(outputArray, wallpts_filename)
         self.IO.log.info('OUTPUT RESULT DATA: {}'.format(wallpts_filename))
 
-    def run(self, Bfield, Efield=None, trace_IDs=[]):
+    def run(self, Bfield, Efield=None, collisions=False, trace_IDs=[]):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -318,7 +389,7 @@ class Boris():
                 toroidal_angles_deg (np.ndarray): Array of toroidal angles (in degrees).
                 ion_traces (np.ndarray): Array of traced particle positions.
         """
-        solv_out = self.parallel_solver(self.ion_list, Bfield, Efield, trace_IDs=trace_IDs)
+        solv_out = self.parallel_solver(self.ion_list, Bfield, Efield, collisions=collisions, trace_IDs=trace_IDs)
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)
 
