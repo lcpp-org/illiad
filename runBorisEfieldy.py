@@ -64,10 +64,10 @@ def boris_runner(input_params=None):
     e_hidra = Mesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
                                     att_mult=FIELD_SCALE_ELECTRIC)
-    if ENABLE_COLLISIONS:
+    if ION_ION_COLLISIONS:
       n_hidra = Mesh(R0=0.72, a=0.19)
       n_hidra.loadScalarField(FIELD_FILE_DENSITY, period_=np.array([0, 1, 1]),
-                  att_mult=FIELD_SCALE_DENSITY)
+                  att_mult=PLASMA_DENSITY)
     else:
       n_hidra = None
 
@@ -97,11 +97,13 @@ def boris_runner(input_params=None):
                                 for p in _track_p_idx]
 
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
-    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX)
+    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX,
+                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY)
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
                                                                                     nfield=n_hidra,
-                                                                                    collisions=ENABLE_COLLISIONS,
+                                                                                    ion_neutral_collisions=ION_NEUTRAL_COLLISIONS,
+                                                                                    ion_ion_collisions=ION_ION_COLLISIONS,
                                                                                     trace_IDs=particle_tracker_list)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
@@ -137,43 +139,48 @@ def boris_runner(input_params=None):
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
 if __name__ == "__main__":
-
-    ## SET SIMULATION INPUTS:
-    # ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG
-    #OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents"
-    OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-    TAG = "Lithium_TRACK72x40_linFPCollisionsSpatialNe1e18_IdealIota3"
-    # TOROIDAL AND HELICAL MAGNETIC FIELDS
-    TOROIDAL_CURRENT = 0.486 #[kA]
-    HELICAL_CURRENT = 0.900 #[kA]``
+ 
+    # [B-FIELD]
     CONFIG_TOR = 'default_toroidal'
     CONFIG_HEL = 'default_helical'
     ENABLE_ERRFIELD = False
-    # ELECTRIC FIELD
-    #FIELD_FILE_ELECTRIC = 'input_files/Efield_AcceptedIota3.npy'
-    #FIELD_FILE_ELECTRIC = 'input_files/Efield_dftIota4_lcfs16.npy'
-    FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
-    FIELD_SCALE_ELECTRIC = 80.0 # [Volts]
+    TOROIDAL_CURRENT = 0.486 #[kA]
+    HELICAL_CURRENT = 0.900 #[kA]
+
+    # [BACKGROUND PLASMA]
     FIELD_FILE_DENSITY = 'input_files/big_grid_linear_IdealIota3.npy'
-    FIELD_SCALE_DENSITY = 1e18 # [m^-3]
-    # ION PROPERTIES
+    FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
+
+    FIELD_SCALE_ELECTRIC = 120.0 # [Volts] (V_p, corresponds to ~4.2*T_e[eV])
+    ION_NEUTRAL_COLLISIONS = 'langevin_in_hstep' # None, 'viscous_drag_hstep', 'langevin_in_hstep'
+    ION_ION_COLLISIONS = 'fokker_planck_ii_hstep' # None, 'linearFP_ii_hstep', 'fokker_planck_ii_hstep'
+    NEUTRAL_GAS_DENSITY = 3e17 # [m^-3]
+    PLASMA_DENSITY = 5e18 # [m^-3]
+
+    # [IMPURITY PROPERTIES]
     ION_MASS = Li_mass # [amu]
     ION_TEMP = 2.0 # [eV]
     CHARGE_NUM = 1 # [Z]
-    # COLLISIONS
-    ENABLE_COLLISIONS = True
-    # INITIAL CONDITIONS
-    LCFS_INDEX = 40 #30 #29 #40 (from Poincare output (simIO.log))
+ 
+    # [INITIAL CONDITIONS]
+    LCFS_INDEX = 86 #40 #30 #29 #40 (from Poincare output (simIO.log))
     DELTRS = [0.000] # [m]
     NPHI = 180
     NTHETA = 120
     NPARTICLES_PER_EMITTER = 50
-    # SIMULATION PARAMETERS
+
+    # [SIMULATION PARAMETERS]
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 72#72     #60#18 #60  #18
+    TRACK_NPHI = 60#72     #60#18 #60  #18
     TRACK_NTHETA = 40#40   #40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
+
+
+   # [ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG]
+    OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
+    TAG = "Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation"
+
 
     boris_runner()
