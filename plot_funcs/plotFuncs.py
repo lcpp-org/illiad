@@ -8,6 +8,7 @@ import copy
 import numpy as np
 import logging
 from PIL import Image
+from tqdm import tqdm
 from utility.coordtrans import XYZ_to_RTP2
 
 # UIUC branding color palette
@@ -1180,7 +1181,7 @@ def _anim_render_chunk(args):
     local_sources = [dict(spec) for spec in trace_sources]
     trace_entries = _build_trace_entries(local_sources, stride)
     if len(trace_entries) == 0:
-        return
+        return 0
 
     fig = plt.figure(figsize=scene_figsize, dpi=dpi)
     ax = _setup_trace_anim_axes(fig, R0, a_radius, style_config=style_config)
@@ -1196,6 +1197,7 @@ def _anim_render_chunk(args):
         Image.fromarray(frame_image).save(os.path.join(frame_dir, f'frame_{frame_idx:06d}.png'))
 
     plt.close(fig)
+    return frame_stop - frame_start
 
 
 _RESOLUTION_MAP = {
@@ -1298,7 +1300,9 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
             )
             ctx = multiprocessing.get_context('fork')   # fork avoids re-importing on Linux
             with ctx.Pool(n) as pool:
-                pool.map(_anim_render_chunk, worker_args)
+                with tqdm(total=num_frames, desc=f'Frame generation: {runString}', unit='frame') as pbar:
+                    for frames_done in pool.imap_unordered(_anim_render_chunk, worker_args):
+                        pbar.update(frames_done)
 
             save_path = os.path.join(simIO.plot_dir, plotname_mp4)
             ffmpeg_bin = animation.FFMpegWriter.bin_path()
