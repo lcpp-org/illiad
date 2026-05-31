@@ -23,12 +23,12 @@ animation_jobs = [
     # {
     # 'trace_file': ["Ion_traces_0mm_LCFS86_2eV_80V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_TypicalOperation.npy",
     #                    "Ion_traces_0mm_LCFS40_2eV_80V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_TypicalOperation.npy"],
-    # 'runString': "2eV_80V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_TypicalOperation_LCFS86_LCFS40_4K",
+    # 'runString': "2eV_80V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_TypicalOperation_LCFS86_LCFS40_1440p_3",
     # },
     {
-    'trace_file': ["Ion_traces_0mm_LCFS40_2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation.npy",
-                   "Ion_traces_0mm_LCFS86_2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation.npy"],
-    'runString': "2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation_4K",
+    'trace_file': [#"Ion_traces_0mm_LCFS86_2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation_stride13.npy",
+                   "Ion_traces_0mm_LCFS40_2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation_stride13.npy"],
+    'runString': "2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation_1080p_stride13",
     }
 ]
 
@@ -54,17 +54,17 @@ for job in animation_jobs:
         runString=job['runString'],
         simIO=simOut,
         interval=1000/120,
-        stride=13,
-        max_frames=4000,
-        linewidth=3.0,
+        stride=1,#13,
+        max_frames=4500,
+        linewidth=2.5,
         line_alpha=0.25,
         line_window=40,
-        trail_length=15,
-        markersize=10.0,
+        trail_length=10,
+        markersize=7.0,
         parallel=True,
-        n_workers=14,
-        resolution="4K",
+        n_workers=14,#18,
+        resolution="1080p",
         trace_sources=trace_sources,
-        parallel_chunk_size=50,
-        style='research_clean' #'poster_manual_1',
+        parallel_chunk_size=10,
+        style='poster_manual_1',#'research_clean'#
     )
