@@ -53,7 +53,6 @@ class Boris(Collisions):
         # self.IO.log.info(f"| TAG            | {str(self.tag):<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
-
     def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3, T_gas_eV=0.025, n_gas=3e18, n_e=1e18):
         """Sets the initial conditions and events for Poincare analysis.
 
@@ -90,6 +89,7 @@ class Boris(Collisions):
         # self.IO.log.info("+----------------+-------------------------+")
 
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
+                        trace_stride=1,
                         freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None):
         """
         Function to take in a particle and field object and solves the particle path until termination event or tmax
@@ -104,11 +104,19 @@ class Boris(Collisions):
             -freq_corr (bool, optional): Flag to enable frequency correction. Defaults to False.
             -ion_neutral_collisions (str or None): None, 'viscous_drag_hstep', or 'langevin_in_hstep'.
             -ion_ion_collisions (str or None): None, 'linearFP_ii_hstep', or 'fokker_planck_ii_hstep'.
+            -trace_stride (int): Save one trace sample every trace_stride timesteps.
         Returns:
             -wallPts (torch.Tensor): XYZ Positions where particles terminate (e.g., hit the wall), shape (Nparticles, 3).
             -wallVelocities (torch.Tensor): Velocities of particles at termination, shape (Nparticles, 3).
             -maxStep (torch.Tensor): Step index at which each particle terminated, shape (Nparticles,).
         """
+        try:
+            trace_stride = int(trace_stride)
+        except (TypeError, ValueError) as exc:
+            raise ValueError('trace_stride must be a positive integer') from exc
+        if trace_stride < 1:
+            raise ValueError('trace_stride must be a positive integer')
+
         log = logging.getLogger()
         log.info('Start ICs: {}-{}'.format(ions[0].particleID, ions[-1].particleID))
 
@@ -121,7 +129,11 @@ class Boris(Collisions):
 
         t_startInd = perf_counter()
         Nparticles = len(ions)
-        trace_output = torch.zeros([self.nsteps+1, len(trace_IDs), 3], dtype=torch.float64, device=device)
+        max_trace_saves = 1 + ((self.nsteps - 1) // trace_stride) + 1
+        trace_output = torch.zeros([max_trace_saves, len(trace_IDs), 3], dtype=torch.float64, device=device)
+        trace_write_idx = 0
+        last_trace_step = None
+        final_step = 0
         with torch.no_grad():
             wallPts = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
             wallVelocities = torch.zeros([Nparticles, 3], dtype=torch.float64, device=device)
@@ -179,9 +191,12 @@ class Boris(Collisions):
             Nrunning = Nparticles
 
             # ADD SELECTED PARTICLE TRACING
-            trace_output[0] = pos_k[trace_IDs]
+            trace_output[trace_write_idx] = pos_k[trace_IDs]
+            trace_write_idx += 1
+            last_trace_step = 0
 
             log.info('START STEPPING...')
+            log.info('Trace output stride: saving every {} timestep(s) plus final positions'.format(trace_stride))
             logging.basicConfig(level=logging.INFO)
             with logging_redirect_tqdm(loggers=[log]):
                 pbar = tqdm(range(1, self.nsteps), ncols=100, mininterval=2.0)
@@ -189,6 +204,7 @@ class Boris(Collisions):
 
 
                 for k in pbar:
+                    final_step = k
                     pos_active = pos_k[running]
                     qdt2m_active = qdt2m[running]
                     v_k_active = v_k[running]
@@ -296,7 +312,10 @@ class Boris(Collisions):
 
 
                     # ADD SELECTED PARTICLE TRACING
-                    trace_output[k] = pos_k[trace_IDs]
+                    if k % trace_stride == 0:
+                        trace_output[trace_write_idx] = pos_k[trace_IDs]
+                        trace_write_idx += 1
+                        last_trace_step = k
 
                     Nrunning = running.size(0)
                     if Nrunning == 0:
@@ -312,6 +331,12 @@ class Boris(Collisions):
             wallPts[terminated] = pos_k[terminated]
             wallVelocities[terminated] = v_k[terminated]
 
+            if last_trace_step != final_step:
+                trace_output[trace_write_idx] = pos_k[trace_IDs]
+                trace_write_idx += 1
+                last_trace_step = final_step
+            trace_output = trace_output[:trace_write_idx]
+
         t_stopInd = perf_counter()
         elapsed_timeInd = t_stopInd - t_startInd
         min_, sec_ = divmod(elapsed_timeInd, 60)
@@ -324,9 +349,6 @@ class Boris(Collisions):
         )
 
         return wallPts, wallVelocities, maxStep, trace_output
-
-    def single_solver(self, particle):
-        pass
 
     def post_solver(self, solver_output, Bfield):
         """Processes the solver output to extract path lengths and Poincare data,
@@ -403,7 +425,8 @@ class Boris(Collisions):
         self.IO.log.info('OUTPUT RESULT DATA: {}'.format(wallpts_filename))
 
     def run(self, Bfield, Efield=None, nfield=None,
-            ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[]):
+            ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
+            trace_stride=1):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -413,6 +436,7 @@ class Boris(Collisions):
             ion_neutral_collisions: Ion-neutral collision model name, or None.
             ion_ion_collisions: Ion-ion collision model name, or None.
             trace_IDs: List of particle IDs to trace. Defaults to [].
+            trace_stride: Save one trace sample every trace_stride timesteps.
 
         Returns:
             Tuple containing:
@@ -429,7 +453,8 @@ class Boris(Collisions):
             nfield = nfield,
             ion_neutral_collisions = ion_neutral_collisions,
             ion_ion_collisions = ion_ion_collisions,
-            trace_IDs = trace_IDs
+            trace_IDs = trace_IDs,
+            trace_stride = trace_stride
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)
