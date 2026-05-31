@@ -1,0 +1,27 @@
+# Arguments for boris_trace_scatter_slider.py.
+# Run from the repo root with:
+#   QT_QPA_PLATFORM=wayland conda run -n testenv python fastplotlib_tests/boris_trace_scatter_slider.py @fastplotlib_tests/scatter_slider_speed_custom.args
+
+--trace-file output/It-0486_Ih-0900_noErr_1500sp_LSODA1e8/data/Ion_traces_0mm_LCFS86_2eV_120V_Z1_Lithium_TRACK60x40_IdealIota3_collisionTest_both_LiEvaporation_stride13.npy
+--color-mode speed
+--sample-dt 1.3e-7
+--cmap-colors "#0000ff;#00ffff;#ffff00;#ff0000"
+--marker-size 6
+--frame-stride 1
+
+# Scene reference
+--torus-style wireframe
+--torus-half bottom
+--torus-wire-color "#9bb7d4"
+--torus-wire-alpha 0.42
+--torus-wire-phi 24
+--torus-wire-theta 9
+
+# Optional particle trails. Set --trail-length 0 to disable.
+--trail-length 20
+--trail-stride 2
+--trail-alpha-min 0.04
+--trail-color same
+
+# Axes are hidden by default. Use --axes to show them.
+--no-axes

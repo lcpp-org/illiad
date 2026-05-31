@@ -1,0 +1,971 @@
+"""Interactive fastplotlib scatter viewer for Boris ion traces.
+
+The viewer shows one scatter point per particle at a selected stored trace
+timestep. A small PySide6/Qt control panel provides a time slider plus
+step/play controls.
+
+Example:
+    conda run -n testenv python fastplotlib_tests/boris_trace_scatter_slider.py \
+        --trace-file output/.../data/Ion_traces_....npy
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib
+import shlex
+import sys
+import time
+from pathlib import Path
+
+import numpy as np
+import matplotlib as mpl
+from matplotlib.colors import LinearSegmentedColormap
+
+# import UIUC colors for consistency with other plots
+try:
+    from plot_funcs.plotFuncs import UIUC
+except ImportError:
+    UIUC = {
+        "il_blue": '#13294B',
+        "il_orange": '#FF5F05',
+        "il_storm": '#707372',  # Added a default color for il_storm
+        "il_stormdark1": '#4A4C4B',  # Added a default color for il_storm
+        "il_stormdark2": '#252525',  # Added a default color for il_storm
+    }
+
+colors = [
+
+    (0.0, UIUC["il_storm"]),
+    (0.01, UIUC["il_stormdark2"]),
+    (0.05, UIUC["il_blue"]),
+    (0.5, UIUC["il_blue"]),
+    (0.75, UIUC["il_orange"]),
+    (1.0, UIUC["il_orange"]),
+    ]
+#colors = [UIUC["il_blue"], UIUC["il_orange"]]
+custom_cmap = LinearSegmentedColormap.from_list("my_gradient", colors, N=256)
+mpl.colormaps.register(cmap=custom_cmap, name="my_registered_cmap")
+
+
+
+from boris_trace_data import (
+    infer_valid_lengths,
+    load_boris_trace_file,
+    make_synthetic_boris_traces,
+    make_torus_mesh,
+    select_trace_particles,
+)
+
+
+
+
+
+class ArgFileParser(argparse.ArgumentParser):
+    """Allow @args-file syntax with shell-like quoting and comments."""
+
+    def convert_arg_line_to_args(self, arg_line: str):
+        if not arg_line.strip():
+            return []
+        return shlex.split(arg_line, comments=True, posix=True)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = ArgFileParser(
+        description="Scatter all Boris particles at a selected trace timestep using fastplotlib.",
+        fromfile_prefix_chars="@",
+    )
+    parser.add_argument("--trace-file", type=Path, default=None, help="Path to Ion_traces_*.npy.")
+    parser.add_argument("--no-mmap", action="store_true", help="Load the whole trace file into RAM.")
+    parser.add_argument("--max-particles", type=int, default=None, help="Optional cap for testing.")
+    parser.add_argument("--skip-indices", default="", help="Comma-separated particle indices to skip.")
+    parser.add_argument("--frame-stride", type=int, default=1, help="Slider frame increment in stored samples.")
+    parser.add_argument("--initial-frame", type=int, default=0, help="Initial stored sample index.")
+    parser.add_argument("--marker-size", type=float, default=6.0, help="Scatter marker size in screen pixels.")
+    parser.add_argument(
+        "--color-mode",
+        choices=("solid", "particle", "speed", "energy"),
+        default="particle",
+        help=(
+            "Marker coloring mode. speed/energy are estimated from finite differences "
+            "between stored trace positions."
+        ),
+    )
+    parser.add_argument(
+        "--marker-color",
+        default="cyan",
+        help="Solid marker color for --color-mode solid. Accepts names, hex, or r,g,b[,a].",
+    )
+    parser.add_argument("--marker-alpha", type=float, default=1.0, help="Marker alpha for solid/particle colors.")
+    parser.add_argument("--cmap", default="viridis", help="Matplotlib colormap for speed/energy colors.")
+    parser.add_argument(
+        "--cmap-colors",
+        default=None,
+        help=(
+            "Custom colormap as semicolon-separated colors, e.g. "
+            "'#0011ff;cyan;yellow;red'. Overrides --cmap for speed/energy."
+        ),
+    )
+    parser.add_argument("--cmap-reverse", action="store_true", help="Reverse --cmap or --cmap-colors.")
+    parser.add_argument("--color-vmin", type=float, default=None, help="Fixed lower color limit for speed/energy.")
+    parser.add_argument("--color-vmax", type=float, default=None, help="Fixed upper color limit for speed/energy.")
+    parser.add_argument(
+        "--sample-dt",
+        type=float,
+        default=1.0,
+        help="Time between stored trace samples, seconds. Use DT * TRACE_STRIDE for physical speed/energy.",
+    )
+    parser.add_argument(
+        "--ion-mass-amu",
+        type=float,
+        default=6.941,
+        help="Ion mass in amu for --color-mode energy. Default is lithium.",
+    )
+    parser.add_argument("--trail-length", type=int, default=0, help="Number of previous samples to show as particle trails.")
+    parser.add_argument("--trail-stride", type=int, default=1, help="Stored-sample spacing between trail points.")
+    parser.add_argument("--trail-alpha-min", type=float, default=0.05, help="Alpha for oldest trail points.")
+    parser.add_argument(
+        "--trail-color",
+        default="same",
+        help="Trail color: 'same' follows particle/solid colors where possible, or pass a color spec.",
+    )
+    parser.add_argument("--trail-marker-size", type=float, default=None, help="Trail marker size. Defaults to 0.7 times marker size.")
+    parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
+    parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
+    parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
+    parser.add_argument("--hide-zero-rows", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--show-torus", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--torus-style",
+        choices=("mesh", "wireframe", "both"),
+        default="wireframe",
+        help="Torus rendering style.",
+    )
+    parser.add_argument("--torus-color", default="#d40707", help="Translucent mesh torus color.")
+    parser.add_argument("--torus-alpha", type=float, default=0.16, help="Translucent mesh torus alpha.")
+    parser.add_argument("--torus-wire-color", default="#9bb7d4", help="Wireframe torus color.")
+    parser.add_argument("--torus-wire-alpha", type=float, default=0.42, help="Wireframe torus alpha.")
+    parser.add_argument("--torus-wire-thickness", type=float, default=1.0, help="Wireframe line thickness.")
+    parser.add_argument(
+        "--torus-half",
+        choices=("bottom", "full"),
+        default="bottom",
+        help="Render only the bottom half of the torus or the full torus.",
+    )
+    parser.add_argument("--torus-nphi", type=int, default=144, help="Torus mesh/ring toroidal resolution.")
+    parser.add_argument("--torus-ntheta", type=int, default=64, help="Torus mesh/ring poloidal resolution.")
+    parser.add_argument("--torus-wire-phi", type=int, default=24, help="Number of toroidal wire rings.")
+    parser.add_argument("--torus-wire-theta", type=int, default=9, help="Number of poloidal wire rings.")
+    parser.add_argument("--axes", action=argparse.BooleanOptionalAction, default=False, help="Show or hide fastplotlib axes.")
+    parser.add_argument("--synthetic-steps", type=int, default=4_000, help="Synthetic trace steps.")
+    parser.add_argument("--synthetic-particles", type=int, default=2_400, help="Synthetic particle count.")
+    parser.add_argument("--synthetic-turns", type=float, default=8.0, help="Synthetic toroidal turns.")
+    parser.add_argument("--play-fps", type=float, default=60.0, help="Playback frame rate for Play.")
+    return parser.parse_args()
+
+
+def parse_size(value: str) -> tuple[int, int]:
+    try:
+        width, height = value.lower().split("x", 1)
+        return int(width), int(height)
+    except Exception as exc:
+        raise argparse.ArgumentTypeError("--size must look like 1280x760") from exc
+
+
+def parse_skip_indices(value: str) -> set[int]:
+    if not value.strip():
+        return set()
+    return {int(item.strip()) for item in value.split(",") if item.strip()}
+
+
+def import_fastplotlib():
+    try:
+        return importlib.import_module("fastplotlib")
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "fastplotlib is not importable in this Python environment. "
+            "Run with the conda environment where fastplotlib is installed, e.g. "
+            "`conda run -n testenv python ...`."
+        ) from exc
+
+
+def import_qt_and_canvas():
+    try:
+        from PySide6 import QtCore, QtWidgets
+        from rendercanvas.pyside6 import QRenderWidget
+    except ModuleNotFoundError as exc:
+        raise SystemExit(
+            "This script requires PySide6 and rendercanvas' PySide6 backend. "
+            "They appear to be available in your `testenv`; run with "
+            "`conda run -n testenv python ...`."
+        ) from exc
+    return QtCore, QtWidgets, QRenderWidget
+
+
+def load_or_make_traces(args: argparse.Namespace) -> tuple[np.ndarray, str]:
+    if args.trace_file is None:
+        traces = make_synthetic_boris_traces(
+            n_steps=args.synthetic_steps,
+            n_particles=args.synthetic_particles,
+            R0=args.R0,
+            a=args.a,
+            turns=args.synthetic_turns,
+        )
+        return traces, "synthetic"
+
+    traces = load_boris_trace_file(args.trace_file, mmap=not args.no_mmap)
+    return traces, str(args.trace_file)
+
+
+def particle_colors(n_particles: int) -> np.ndarray:
+    hue = np.linspace(0.0, 1.0, int(n_particles), endpoint=False, dtype=np.float32)
+    r = 0.5 + 0.5 * np.cos(2.0 * np.pi * (hue + 0.00))
+    g = 0.5 + 0.5 * np.cos(2.0 * np.pi * (hue + 0.66))
+    b = 0.5 + 0.5 * np.cos(2.0 * np.pi * (hue + 0.33))
+    return np.column_stack([r, g, b, np.ones_like(r)]).astype(np.float32)
+
+
+def parse_rgba(value: str, alpha: float = 1.0) -> np.ndarray:
+    """Parse a simple color spec into float32 RGBA."""
+    try:
+        from matplotlib.colors import to_rgba
+
+        rgba = to_rgba(value, alpha=alpha)
+        return np.asarray(rgba, dtype=np.float32)
+    except Exception:
+        pass
+
+    named = {
+        "white": (1.0, 1.0, 1.0),
+        "black": (0.0, 0.0, 0.0),
+        "red": (1.0, 0.0, 0.0),
+        "green": (0.0, 0.8, 0.0),
+        "blue": (0.0, 0.25, 1.0),
+        "cyan": (0.0, 1.0, 1.0),
+        "magenta": (1.0, 0.0, 1.0),
+        "yellow": (1.0, 1.0, 0.0),
+        "orange": (1.0, 0.55, 0.0),
+        "purple": (0.55, 0.25, 0.95),
+    }
+    text = value.strip().lower()
+    if text in named:
+        return np.asarray((*named[text], alpha), dtype=np.float32)
+
+    if text.startswith("#") and len(text) in (7, 9):
+        channels = [int(text[i : i + 2], 16) / 255.0 for i in range(1, len(text), 2)]
+        if len(channels) == 3:
+            channels.append(alpha)
+        else:
+            channels[3] *= alpha
+        return np.asarray(channels, dtype=np.float32)
+
+    parts = [float(part.strip()) for part in text.split(",") if part.strip()]
+    if len(parts) not in (3, 4):
+        raise ValueError(f"Could not parse color {value!r}.")
+    if max(parts) > 1.0:
+        parts = [channel / 255.0 for channel in parts]
+    if len(parts) == 3:
+        parts.append(alpha)
+    else:
+        parts[3] *= alpha
+    return np.asarray(parts, dtype=np.float32)
+
+
+def solid_colors(n_particles: int, color: str, alpha: float) -> np.ndarray:
+    rgba = parse_rgba(color, alpha)
+    return np.repeat(rgba[None, :], int(n_particles), axis=0).astype(np.float32)
+
+
+def apply_alpha(colors: np.ndarray, alpha: float) -> np.ndarray:
+    colors = np.asarray(colors, dtype=np.float32).copy()
+    colors[:, 3] *= float(alpha)
+    return colors
+
+
+def parse_custom_cmap(value: str | None, reverse: bool = False) -> np.ndarray | None:
+    if value is None:
+        return None
+
+    colors = [parse_rgba(item.strip()) for item in value.split(";") if item.strip()]
+    if len(colors) < 2:
+        raise ValueError("--cmap-colors requires at least two semicolon-separated colors.")
+
+    cmap = np.asarray(colors, dtype=np.float32)
+    if reverse:
+        cmap = cmap[::-1].copy()
+    return cmap
+
+
+def interpolate_custom_cmap(normed: np.ndarray, cmap_colors: np.ndarray) -> np.ndarray:
+    normed = np.clip(np.asarray(normed, dtype=np.float32), 0.0, 1.0)
+    scaled = normed * float(len(cmap_colors) - 1)
+    left = np.floor(scaled).astype(np.int64)
+    right = np.clip(left + 1, 0, len(cmap_colors) - 1)
+    frac = (scaled - left).astype(np.float32)[:, None]
+    return cmap_colors[left] * (1.0 - frac) + cmap_colors[right] * frac
+
+
+def scalar_to_colors(
+    values: np.ndarray,
+    cmap_name: str,
+    out: np.ndarray,
+    vmin: float | None = None,
+    vmax: float | None = None,
+    custom_cmap: np.ndarray | None = None,
+    reverse: bool = False,
+) -> tuple[float, float, float, float]:
+    """Map scalar values to RGBA colors and return finite min/max plus color limits."""
+    finite = np.isfinite(values)
+    out[:] = (0.0, 0.0, 0.0, 0.0)
+    if not np.any(finite):
+        return np.nan, np.nan, np.nan, np.nan
+
+    finite_values = values[finite]
+    data_min = float(np.nanmin(finite_values))
+    data_max = float(np.nanmax(finite_values))
+    color_min = data_min if vmin is None else float(vmin)
+    color_max = data_max if vmax is None else float(vmax)
+    if not np.isfinite(color_min) or not np.isfinite(color_max) or color_max <= color_min:
+        color_max = color_min + 1.0
+
+    normed = np.clip((values - color_min) / (color_max - color_min), 0.0, 1.0)
+    if custom_cmap is not None:
+        out[finite] = interpolate_custom_cmap(normed[finite], custom_cmap)
+    else:
+        try:
+            from matplotlib import colormaps
+
+            cmap = colormaps[cmap_name].reversed() if reverse else colormaps[cmap_name]
+            mapped = cmap(normed[finite])
+            out[finite] = np.asarray(mapped, dtype=np.float32)
+        except Exception:
+            grey = normed[finite].astype(np.float32)
+            if reverse:
+                grey = 1.0 - grey
+            out[finite] = np.column_stack([grey, grey, grey, np.ones_like(grey)])
+
+    return data_min, data_max, color_min, color_max
+
+def instantaneous_speed(
+    traces: np.ndarray,
+    frame_idx: int,
+    valid_lengths: np.ndarray,
+    sample_dt: float,
+    out: np.ndarray,
+) -> np.ndarray:
+    """Estimate per-particle speed from neighboring stored positions."""
+    if sample_dt <= 0.0:
+        raise ValueError("--sample-dt must be positive.")
+
+    frame_idx = max(0, min(int(frame_idx), traces.shape[0] - 1))
+    particle_idx = np.arange(traces.shape[1])
+    last_valid = np.maximum(valid_lengths.astype(np.int64) - 1, 0)
+    prev_idx = np.minimum(np.maximum(frame_idx - 1, 0), last_valid)
+    next_idx = np.minimum(frame_idx + 1, last_valid)
+
+    prev_pos = np.asarray(traces[prev_idx, particle_idx, :], dtype=np.float32)
+    next_pos = np.asarray(traces[next_idx, particle_idx, :], dtype=np.float32)
+    denom = (next_idx - prev_idx).astype(np.float32) * float(sample_dt)
+
+    out[:] = np.nan
+    valid = denom > 0.0
+    if np.any(valid):
+        displacement = next_pos[valid] - prev_pos[valid]
+        out[valid] = np.linalg.norm(displacement, axis=1) / denom[valid]
+    return out
+
+
+def frame_positions(
+    traces: np.ndarray,
+    frame_idx: int,
+    valid_lengths: np.ndarray,
+    hide_zero_rows: bool,
+    out: np.ndarray,
+) -> np.ndarray:
+    clamped = max(0, min(int(frame_idx), traces.shape[0] - 1))
+    out[:] = np.asarray(traces[clamped, :, :], dtype=np.float32)
+
+    inactive = valid_lengths <= clamped
+    if hide_zero_rows:
+        inactive |= ~np.any(out != 0.0, axis=1)
+    if np.any(inactive):
+        out[inactive] = np.nan
+    return out
+
+
+def trail_positions(
+    traces: np.ndarray,
+    frame_idx: int,
+    valid_lengths: np.ndarray,
+    trail_length: int,
+    trail_stride: int,
+    hide_zero_rows: bool,
+    out: np.ndarray,
+) -> np.ndarray:
+    """Fill an ``(n_particles * trail_length, 3)`` buffer with recent positions."""
+    trail_length = max(1, int(trail_length))
+    trail_stride = max(1, int(trail_stride))
+    frame_idx = max(0, min(int(frame_idx), traces.shape[0] - 1))
+    out[:] = np.nan
+
+    for particle_idx in range(traces.shape[1]):
+        valid_length = int(valid_lengths[particle_idx])
+        if valid_length < 2:
+            continue
+
+        end = min(frame_idx, valid_length - 1)
+        raw_indices = end - np.arange(trail_length - 1, -1, -1, dtype=np.int64) * trail_stride
+        raw_indices = raw_indices[raw_indices >= 0]
+        if raw_indices.size == 0:
+            continue
+
+        values = np.asarray(traces[raw_indices, particle_idx, :], dtype=np.float32)
+        if hide_zero_rows:
+            keep = np.any(values != 0.0, axis=1)
+            values = values[keep]
+        if values.size == 0:
+            continue
+
+        offset = particle_idx * trail_length
+        out[offset + trail_length - values.shape[0] : offset + trail_length, :] = values
+
+    return out
+
+
+def make_trail_colors(
+    n_particles: int,
+    trail_length: int,
+    marker_colors: np.ndarray,
+    trail_color: str,
+    alpha_min: float,
+) -> np.ndarray:
+    """Create static RGBA colors for the trail scatter buffer."""
+    trail_length = max(1, int(trail_length))
+    alphas = np.linspace(float(alpha_min), 0.75, trail_length, dtype=np.float32)
+
+    if trail_color.strip().lower() == "same":
+        base = np.asarray(marker_colors, dtype=np.float32).copy()
+    else:
+        base = solid_colors(n_particles, trail_color, 1.0)
+
+    colors = np.repeat(base, trail_length, axis=0)
+    colors[:, 3] *= np.tile(alphas, int(n_particles))
+    return colors.astype(np.float32)
+
+
+def torus_wire_lines(
+    R0: float,
+    a: float,
+    nphi: int,
+    ntheta: int,
+    wire_phi: int,
+    wire_theta: int,
+    half_shell: bool = True,
+) -> list[np.ndarray]:
+    """Build torus latitude/longitude curves as 3D line arrays."""
+    theta_min, theta_max = (-np.pi, 0.0) if half_shell else (-np.pi, np.pi)
+    theta_curve = np.linspace(theta_min, theta_max, max(8, int(ntheta)), dtype=np.float32)
+    phi_curve = np.linspace(0.0, 2.0 * np.pi, max(16, int(nphi)), dtype=np.float32)
+    lines: list[np.ndarray] = []
+
+    for phi in np.linspace(0.0, 2.0 * np.pi, max(1, int(wire_phi)), endpoint=False, dtype=np.float32):
+        x = (R0 + a * np.cos(theta_curve)) * np.cos(phi)
+        y = (R0 + a * np.cos(theta_curve)) * np.sin(phi)
+        z = a * np.sin(theta_curve)
+        lines.append(np.column_stack([x, y, z]).astype(np.float32))
+
+    for theta in np.linspace(theta_min, theta_max, max(1, int(wire_theta)), dtype=np.float32):
+        x = (R0 + a * np.cos(theta)) * np.cos(phi_curve)
+        y = (R0 + a * np.cos(theta)) * np.sin(phi_curve)
+        z = np.full_like(phi_curve, a * np.sin(theta))
+        lines.append(np.column_stack([x, y, z]).astype(np.float32))
+
+    return lines
+
+
+def add_torus(
+    subplot,
+    R0: float,
+    a: float,
+    style: str = "wireframe",
+    mesh_color: str = "#3f7fbf",
+    mesh_alpha: float = 0.16,
+    wire_color: str = "#9bb7d4",
+    wire_alpha: float = 0.42,
+    wire_thickness: float = 1.0,
+    half_shell: bool = True,
+    nphi: int = 144,
+    ntheta: int = 64,
+    wire_phi: int = 24,
+    wire_theta: int = 9,
+) -> None:
+    """Add a translucent and/or wireframe torus scene reference."""
+    if style in ("mesh", "both"):
+        positions, indices = make_torus_mesh(
+            R0=R0,
+            a=a,
+            nphi=max(8, nphi),
+            ntheta=max(4, ntheta),
+            half_shell=half_shell,
+        )
+        rgba = parse_rgba(mesh_color, mesh_alpha)
+        if hasattr(subplot, "add_mesh"):
+            try:
+                subplot.add_mesh(
+                    positions=positions,
+                    indices=indices,
+                    colors=rgba,
+                    mode="basic",
+                    alpha=float(mesh_alpha),
+                )
+            except TypeError:
+                subplot.add_mesh(positions, indices, colors=rgba, mode="basic")
+
+    if style in ("wireframe", "both") or not hasattr(subplot, "add_mesh"):
+        lines = torus_wire_lines(R0, a, nphi, ntheta, wire_phi, wire_theta, half_shell=half_shell)
+        subplot.add_line_collection(
+            lines,
+            colors=parse_rgba(wire_color, wire_alpha),
+            thickness=float(wire_thickness),
+        )
+
+
+def setup_camera(subplot, R0: float, a: float) -> None:
+    extent = float(R0 + a + 0.06)
+    try:
+        subplot.camera.show_rect(-extent, extent, -extent, extent)
+    except Exception:
+        pass
+    try:
+        subplot.camera.local.position = (1.45, -1.85, 0.75)
+        subplot.camera.look_at((0.0, 0.0, -0.04))
+    except Exception:
+        pass
+
+
+class TraceTimeState:
+    """State holder used by the Qt controls."""
+
+    def __init__(
+        self,
+        scatter,
+        traces: np.ndarray,
+        valid_lengths: np.ndarray,
+        frame_buffer: np.ndarray,
+        color_buffer: np.ndarray,
+        scalar_buffer: np.ndarray,
+        trail_scatter,
+        trail_buffer: np.ndarray | None,
+        trail_length: int,
+        trail_stride: int,
+        max_frame: int,
+        frame_stride: int,
+        hide_zero_rows: bool,
+        play_fps: float,
+        color_mode: str,
+        cmap: str,
+        custom_cmap: np.ndarray | None,
+        cmap_reverse: bool,
+        color_vmin: float | None,
+        color_vmax: float | None,
+        sample_dt: float,
+        ion_mass_amu: float,
+    ):
+        self.scatter = scatter
+        self.traces = traces
+        self.valid_lengths = valid_lengths
+        self.frame_buffer = frame_buffer
+        self.color_buffer = color_buffer
+        self.scalar_buffer = scalar_buffer
+        self.trail_scatter = trail_scatter
+        self.trail_buffer = trail_buffer
+        self.trail_length = max(0, int(trail_length))
+        self.trail_stride = max(1, int(trail_stride))
+        self.max_frame = int(max_frame)
+        self.frame_stride = max(1, int(frame_stride))
+        self.hide_zero_rows = bool(hide_zero_rows)
+        self.play_fps = max(1.0, float(play_fps))
+        self.color_mode = color_mode
+        self.cmap = cmap
+        self.custom_cmap = custom_cmap
+        self.cmap_reverse = bool(cmap_reverse)
+        self.color_vmin = color_vmin
+        self.color_vmax = color_vmax
+        self.sample_dt = float(sample_dt)
+        self.ion_mass_amu = float(ion_mass_amu)
+        self.current_frame = 0
+        self.playing = False
+        self.loop = True
+        self._last_play_time = time.perf_counter()
+        self.color_status = ""
+
+    def set_frame(self, frame_idx: int) -> None:
+        frame_idx = max(0, min(int(frame_idx), self.max_frame))
+        if frame_idx == self.current_frame:
+            return
+        self.current_frame = frame_idx
+        self.update_scatter()
+
+    def step(self, direction: int) -> None:
+        next_frame = self.current_frame + int(direction) * self.frame_stride
+        if next_frame > self.max_frame:
+            next_frame = 0 if self.loop else self.max_frame
+        elif next_frame < 0:
+            next_frame = self.max_frame if self.loop else 0
+        self.set_frame(next_frame)
+
+    def update_scatter(self) -> None:
+        frame_positions(
+            self.traces,
+            self.current_frame,
+            self.valid_lengths,
+            self.hide_zero_rows,
+            self.frame_buffer,
+        )
+        self.scatter.data = self.frame_buffer
+        self.update_trails()
+        self.update_colors()
+        canvas = getattr(self.scatter, "figure", None)
+        if canvas is not None and hasattr(canvas, "canvas"):
+            canvas.canvas.request_draw()
+
+    def update_trails(self) -> None:
+        if self.trail_scatter is None or self.trail_buffer is None or self.trail_length <= 0:
+            return
+        trail_positions(
+            self.traces,
+            self.current_frame,
+            self.valid_lengths,
+            self.trail_length,
+            self.trail_stride,
+            self.hide_zero_rows,
+            self.trail_buffer,
+        )
+        self.trail_scatter.data = self.trail_buffer
+
+    def update_colors(self) -> None:
+        if self.color_mode not in ("speed", "energy"):
+            return
+
+        instantaneous_speed(
+            self.traces,
+            self.current_frame,
+            self.valid_lengths,
+            self.sample_dt,
+            self.scalar_buffer,
+        )
+        if self.color_mode == "energy":
+            kg_per_amu = 1.660_539_068e-27
+            joules_per_ev = 1.602_176_634e-19
+            mass_kg = self.ion_mass_amu * kg_per_amu
+            self.scalar_buffer[:] = 0.5 * mass_kg * self.scalar_buffer**2 / joules_per_ev
+
+        inactive = ~np.isfinite(self.frame_buffer).all(axis=1)
+        self.scalar_buffer[inactive] = np.nan
+        data_min, data_max, color_min, color_max = scalar_to_colors(
+            self.scalar_buffer,
+            self.cmap,
+            self.color_buffer,
+            self.color_vmin,
+            self.color_vmax,
+            self.custom_cmap,
+            self.cmap_reverse,
+        )
+        self.scatter.colors = self.color_buffer
+        units = "m/s" if self.color_mode == "speed" else "eV"
+        self.color_status = (
+            f"{self.color_mode}: {data_min:.3g}..{data_max:.3g} {units} "
+            f"(scale {color_min:.3g}..{color_max:.3g})"
+        )
+
+    def update_playback(self) -> None:
+        if not self.playing:
+            return
+        now = time.perf_counter()
+        if now - self._last_play_time >= 1.0 / self.play_fps:
+            self.step(1)
+            self._last_play_time = now
+
+
+class TraceSliderWindow:
+    """Thin Qt window around a fastplotlib canvas and a horizontal time slider."""
+
+    def __init__(self, QtCore, QtWidgets, canvas, state: TraceTimeState):
+        self.QtCore = QtCore
+        self.QtWidgets = QtWidgets
+        self.canvas = canvas
+        self.state = state
+
+        self.window = QtWidgets.QWidget()
+        self.window.setWindowTitle("Boris ion trace scatter slider")
+
+        root = QtWidgets.QVBoxLayout(self.window)
+        root.setContentsMargins(8, 8, 8, 8)
+        root.setSpacing(6)
+        root.addWidget(canvas, stretch=1)
+
+        controls = QtWidgets.QHBoxLayout()
+        controls.setSpacing(6)
+        root.addLayout(controls)
+
+        self.frame_label = QtWidgets.QLabel()
+        self.frame_label.setMinimumWidth(150)
+        controls.addWidget(self.frame_label)
+        self.color_label = QtWidgets.QLabel()
+        self.color_label.setMinimumWidth(260)
+        controls.addWidget(self.color_label)
+
+        self.first_button = QtWidgets.QPushButton("<<")
+        self.back_button = QtWidgets.QPushButton("<")
+        self.play_button = QtWidgets.QPushButton("Play")
+        self.play_button.setCheckable(True)
+        self.forward_button = QtWidgets.QPushButton(">")
+        self.last_button = QtWidgets.QPushButton(">>")
+        for button in (
+            self.first_button,
+            self.back_button,
+            self.play_button,
+            self.forward_button,
+            self.last_button,
+        ):
+            controls.addWidget(button)
+
+        self.loop_box = QtWidgets.QCheckBox("Loop")
+        self.loop_box.setChecked(state.loop)
+        controls.addWidget(self.loop_box)
+
+        controls.addWidget(QtWidgets.QLabel("FPS"))
+        self.fps_spin = QtWidgets.QDoubleSpinBox()
+        self.fps_spin.setRange(1.0, 120.0)
+        self.fps_spin.setDecimals(1)
+        self.fps_spin.setSingleStep(5.0)
+        self.fps_spin.setValue(state.play_fps)
+        self.fps_spin.setMaximumWidth(80)
+        controls.addWidget(self.fps_spin)
+
+        self.slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self.slider.setRange(0, state.max_frame)
+        self.slider.setSingleStep(state.frame_stride)
+        self.slider.setPageStep(max(state.frame_stride, state.frame_stride * 10))
+        root.addWidget(self.slider)
+
+        self.timer = QtCore.QTimer(self.window)
+        self.timer.timeout.connect(self._play_tick)
+
+        self.first_button.clicked.connect(lambda: self.set_frame(0))
+        self.back_button.clicked.connect(lambda: self.step(-1))
+        self.forward_button.clicked.connect(lambda: self.step(1))
+        self.last_button.clicked.connect(lambda: self.set_frame(state.max_frame))
+        self.play_button.toggled.connect(self._toggle_play)
+        self.loop_box.toggled.connect(self._set_loop)
+        self.fps_spin.valueChanged.connect(self._set_fps)
+        self.slider.valueChanged.connect(self.set_frame)
+
+        self.set_frame(state.current_frame)
+
+    def _set_loop(self, value: bool) -> None:
+        self.state.loop = bool(value)
+
+    def _set_fps(self, value: float) -> None:
+        self.state.play_fps = max(1.0, float(value))
+        if self.timer.isActive():
+            self.timer.start(int(round(1000.0 / self.state.play_fps)))
+
+    def _toggle_play(self, checked: bool) -> None:
+        self.state.playing = bool(checked)
+        self.play_button.setText("Pause" if checked else "Play")
+        if checked:
+            self.timer.start(int(round(1000.0 / self.state.play_fps)))
+        else:
+            self.timer.stop()
+
+    def _play_tick(self) -> None:
+        self.step(1)
+
+    def set_frame(self, frame_idx: int) -> None:
+        self.state.set_frame(int(frame_idx))
+        if self.slider.value() != self.state.current_frame:
+            self.slider.blockSignals(True)
+            self.slider.setValue(self.state.current_frame)
+            self.slider.blockSignals(False)
+        self.frame_label.setText(f"Frame {self.state.current_frame} / {self.state.max_frame}")
+        self.color_label.setText(self.state.color_status)
+        self.canvas.request_draw()
+
+    def step(self, direction: int) -> None:
+        self.state.step(direction)
+        self.set_frame(self.state.current_frame)
+
+    def show(self) -> None:
+        self.window.resize(self.canvas.width(), self.canvas.height() + 92)
+        self.window.show()
+
+
+def main() -> int:
+    args = parse_args()
+    if args.frame_stride < 1:
+        raise SystemExit("--frame-stride must be positive.")
+    if args.sample_dt <= 0.0:
+        raise SystemExit("--sample-dt must be positive.")
+    if args.color_vmin is not None and args.color_vmax is not None and args.color_vmax <= args.color_vmin:
+        raise SystemExit("--color-vmax must be greater than --color-vmin.")
+    if args.trail_length < 0:
+        raise SystemExit("--trail-length must be >= 0.")
+    if args.trail_stride < 1:
+        raise SystemExit("--trail-stride must be positive.")
+    if not 0.0 <= args.trail_alpha_min <= 1.0:
+        raise SystemExit("--trail-alpha-min must be between 0 and 1.")
+    try:
+        custom_cmap_colors = parse_custom_cmap(args.cmap_colors, args.cmap_reverse)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    QtCore, QtWidgets, QRenderWidget = import_qt_and_canvas()
+    fpl = import_fastplotlib()
+    size = parse_size(args.size)
+
+    raw_traces, source_label = load_or_make_traces(args)
+    raw_valid_lengths = infer_valid_lengths(raw_traces)
+    selection = select_trace_particles(
+        raw_traces,
+        valid_lengths=raw_valid_lengths,
+        max_particles=args.max_particles,
+        skip_indices=parse_skip_indices(args.skip_indices),
+    )
+    traces = selection.traces
+    valid_lengths = selection.valid_lengths
+    n_particles = traces.shape[1]
+    max_frame = int(min(traces.shape[0] - 1, np.max(valid_lengths) - 1))
+
+    frame_buffer = np.empty((n_particles, 3), dtype=np.float32)
+    color_buffer = np.empty((n_particles, 4), dtype=np.float32)
+    scalar_buffer = np.empty(n_particles, dtype=np.float32)
+    trail_length = max(0, int(args.trail_length))
+    trail_marker_size = float(args.trail_marker_size) if args.trail_marker_size is not None else float(args.marker_size) * 0.7
+    trail_buffer = np.empty((n_particles * max(1, trail_length), 3), dtype=np.float32) if trail_length > 0 else None
+    initial_frame = max(0, min(int(args.initial_frame), max_frame))
+
+    print(f"fastplotlib: {getattr(fpl, '__version__', 'unknown')}")
+    print(f"source: {source_label}")
+    print(f"trace shape: {traces.shape}, dtype={traces.dtype}")
+    print(f"particles displayed: {n_particles}; frame range: 0..{max_frame}")
+    print(f"color mode: {args.color_mode}")
+    print(f"trail length: {trail_length}")
+    print("Use the bottom slider or step/play controls to move through time.")
+
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication([])
+
+    canvas = QRenderWidget(size=size, title="Boris ion positions")
+    figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas=canvas, size=size)
+    subplot = figure[0, 0]
+    try:
+        subplot.set_title("Boris ion positions")
+    except Exception:
+        pass
+
+    if args.show_torus:
+        add_torus(
+            subplot,
+            args.R0,
+            args.a,
+            style=args.torus_style,
+            mesh_color=args.torus_color,
+            mesh_alpha=args.torus_alpha,
+            wire_color=args.torus_wire_color,
+            wire_alpha=args.torus_wire_alpha,
+            wire_thickness=args.torus_wire_thickness,
+            half_shell=(args.torus_half == "bottom"),
+            nphi=args.torus_nphi,
+            ntheta=args.torus_ntheta,
+            wire_phi=args.torus_wire_phi,
+            wire_theta=args.torus_wire_theta,
+        )
+
+    frame_positions(traces, initial_frame, valid_lengths, args.hide_zero_rows, frame_buffer)
+    if args.color_mode == "solid":
+        initial_colors = solid_colors(n_particles, args.marker_color, args.marker_alpha)
+    elif args.color_mode == "particle":
+        initial_colors = apply_alpha(particle_colors(n_particles), args.marker_alpha)
+    else:
+        initial_colors = np.zeros((n_particles, 4), dtype=np.float32)
+        initial_colors[:, 3] = 1.0
+
+    trail_scatter = None
+    if trail_length > 0:
+        trail_positions(
+            traces,
+            initial_frame,
+            valid_lengths,
+            trail_length,
+            args.trail_stride,
+            args.hide_zero_rows,
+            trail_buffer,
+        )
+        if args.trail_color.strip().lower() == "same" and args.color_mode in ("speed", "energy"):
+            trail_base_colors = solid_colors(n_particles, "#d0d0d0", 0.8)
+        else:
+            trail_base_colors = initial_colors
+        trail_colors = make_trail_colors(
+            n_particles,
+            trail_length,
+            trail_base_colors,
+            args.trail_color,
+            args.trail_alpha_min,
+        )
+        trail_scatter = subplot.add_scatter(
+            data=trail_buffer,
+            sizes=trail_marker_size,
+            colors=trail_colors,
+            edge_width=0.0,
+            mode="simple",
+        )
+
+    scatter = subplot.add_scatter(
+        data=frame_buffer,
+        sizes=float(args.marker_size),
+        colors=initial_colors,
+        edge_width=0.0,
+        mode="simple",
+    )
+
+    state = TraceTimeState(
+        scatter=scatter,
+        traces=traces,
+        valid_lengths=valid_lengths,
+        frame_buffer=frame_buffer,
+        color_buffer=color_buffer,
+        scalar_buffer=scalar_buffer,
+        trail_scatter=trail_scatter,
+        trail_buffer=trail_buffer,
+        trail_length=trail_length,
+        trail_stride=args.trail_stride,
+        max_frame=max_frame,
+        frame_stride=args.frame_stride,
+        hide_zero_rows=args.hide_zero_rows,
+        play_fps=args.play_fps,
+        color_mode=args.color_mode,
+        cmap=args.cmap,
+        custom_cmap=custom_cmap_colors,
+        cmap_reverse=args.cmap_reverse,
+        color_vmin=args.color_vmin,
+        color_vmax=args.color_vmax,
+        sample_dt=args.sample_dt,
+        ion_mass_amu=args.ion_mass_amu,
+    )
+    state.current_frame = initial_frame
+    state.update_colors()
+    setup_camera(subplot, args.R0, args.a)
+    figure.show(axes_visible=args.axes)
+    viewer = TraceSliderWindow(QtCore, QtWidgets, canvas, state)
+    viewer.show()
+
+    if __name__ == "__main__":
+        app.exec()
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
