@@ -197,15 +197,23 @@ class IOHandler:
         # List of all possible input parameters to check if user has set them
         possible_input_parameters = [
             "FIELD_FILE_TOR",
+            "CONFIG_TOR",
             "TOROIDAL_CURRENT",
             "FIELD_SCALE_TOR",
             "FIELD_FILE_HEL",
+            "CONFIG_HEL",
             "HELICAL_CURRENT",
             "FIELD_SCALE_HEL",
+            "ENABLE_ERRFIELD",
             "ERRFIELD_MAG",
             "ERRFIELD_DIR_DEG",
             "FIELD_FILE_ELECTRIC",
             "FIELD_SCALE_ELECTRIC",
+            "FIELD_FILE_DENSITY",
+            "ION_NEUTRAL_COLLISIONS",
+            "ION_ION_COLLISIONS",
+            "NEUTRAL_GAS_DENSITY",
+            "PLASMA_DENSITY",
             "LCFS_INDEX",
             "ION_TEMP",
             "ION_MASS",
@@ -216,7 +224,14 @@ class IOHandler:
             "NPARTICLES_PER_EMITTER",
             "DT",
             "TMAX",
-            "NSTEPS"
+            "NSTEPS",
+            "TRACK_NPHI",
+            "TRACK_NTHETA",
+            "TRACK_NPARTICLES_PER_EMITTER",
+            "STRIDE",
+            "TRACE_STRIDE",
+            "OUTPUT_DIRECTORY_NAME",
+            "TAG"
         ]
     
         # Build a dictionary of parameter values or '*DEFAULT*'
@@ -233,15 +248,23 @@ class IOHandler:
     
         self.log.info('\n|=======================================================================================|'
                       +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_TOR"])
+                      +'\n| LOADED TOROIDAL FIELD CONFIG: {}'.format(param_values["CONFIG_TOR"])
                       +'\n| LOADED TOROIDAL COIL CURRENT: {}'.format(param_values["TOROIDAL_CURRENT"])
                       +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_TOR"])
                       +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_HEL"])
+                      +'\n| LOADED HELICAL FIELD CONFIG: {}'.format(param_values["CONFIG_HEL"])
                       +'\n| LOADED HELICAL COIL CURRENT: {}'.format(param_values["HELICAL_CURRENT"])
                       +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_HEL"])
+                      +'\n| ENABLE ERROR FIELD: {}'.format(param_values["ENABLE_ERRFIELD"])
                       +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
                       +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
                       +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
                       +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_ELECTRIC"])
+                      +'\n| LOADED DENSITY FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_DENSITY"])
+                      +'\n| ION-NEUTRAL COLLISIONS: {}'.format(param_values["ION_NEUTRAL_COLLISIONS"])
+                      +'\n| ION-ION COLLISIONS: {}'.format(param_values["ION_ION_COLLISIONS"])
+                      +'\n| NEUTRAL GAS DENSITY: {} m^-3'.format(param_values["NEUTRAL_GAS_DENSITY"])
+                      +'\n| PLASMA DENSITY: {} m^-3'.format(param_values["PLASMA_DENSITY"])
                       +'\n|---------------------------------------------------------------------------------------|'
                       +'\n| LAST-CLOSED FLUX SURFACE INDEX: {}'.format(param_values["LCFS_INDEX"])
                       +'\n| ION TEMPERATURE: {} eV'.format(param_values["ION_TEMP"])
@@ -259,4 +282,12 @@ class IOHandler:
                       +'\n| TIME STEP: {} sec'.format(param_values["DT"])
                       +'\n| TOTAL TIME: {:.6f} sec'.format(param_values["TMAX"] if param_values["TMAX"] != '*DEFAULT*' else 0)
                       +'\n|  --> # OF TIME STEPS: {}'.format(param_values["NSTEPS"])
+                      +'\n| TRACE TRACK_NPHI: {}'.format(param_values["TRACK_NPHI"])
+                      +'\n| TRACE TRACK_NTHETA: {}'.format(param_values["TRACK_NTHETA"])
+                      +'\n| TRACE TRACK_NPARTICLES_PER_EMITTER: {}'.format(param_values["TRACK_NPARTICLES_PER_EMITTER"])
+                      +'\n| TRACE OUTPUT STRIDE: {}'.format(
+                            param_values["TRACE_STRIDE"] if param_values["TRACE_STRIDE"] != '*DEFAULT*'
+                            else param_values["STRIDE"])
+                      +'\n| OUTPUT DIRECTORY NAME: {}'.format(param_values["OUTPUT_DIRECTORY_NAME"])
+                      +'\n| TAG: {}'.format(param_values["TAG"])
                       +'\n|=======================================================================================|\n\n\n')
