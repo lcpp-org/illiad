@@ -53,9 +53,27 @@ class IOHandler:
         except OSError as error:
             pass #print(error)
 
-    def startLog(self):
+        self.log_dir = os.path.join(self.run_dir, 'logs')
+        try:
+            os.mkdir(self.log_dir)
+        except OSError as error:
+            pass #print(error)
+
+        self.active_subdir = None
+
+    def startLog(self, log_name="simLog.log", subdir=None, mode="w", logger_name="Poincare"):
         # Creates a logger instance and configures the logging opions, handlers, formatting, etc.        
-        self.log = logging.getLogger("Poincare")
+        self.log = logging.getLogger(logger_name)
+
+        if subdir:
+            log_dir = os.path.join(self.log_dir, subdir)
+            try:
+                os.makedirs(log_dir)
+            except OSError as error:
+                pass
+            log_path = os.path.join(log_dir, log_name)
+        else:
+            log_path = os.path.join(self.run_dir, log_name)
 
         logging_config = {
             "version": 1,
@@ -88,41 +106,73 @@ class IOHandler:
                     "class": "logging.handlers.RotatingFileHandler",
                     "level": "INFO",
                     "formatter": "detailed",
-                    "filename": self.run_dir + "/simLog.log",
+                    "filename": log_path,
+                    "mode": mode,
                     "maxBytes": 100000000, #100MB
                     "backupCount": 5
                 }
 
             },
 
-            "loggers": {
-                "root": {"level": "DEBUG", "handlers": ["stdout", "file"]}
+            "root": {
+                "level": "DEBUG",
+                "handlers": ["stdout", "file"]
             },
         }
 
         logging.config.dictConfig(config=logging_config)
-        self.log.info(f"Started Logger in {self.run_dir}")
+        self.log.info(f"Started Logger: {log_path}")
 
         # create runStats file
         # create output file?
 
-    def createSubDir(self, name, plots=True, data=True):
+    def createSubDir(self, name, plots=True, data=True, logs=True):
+        if self.active_subdir:
+            active_prefix = self.active_subdir + os.sep
+            if name != self.active_subdir and not name.startswith(active_prefix):
+                name = os.path.join(self.active_subdir, name)
+
         sub_dir1 = os.path.join(self.plot_dir, name)
         sub_dir2 = os.path.join(self.data_dir, name)
+        sub_dir3 = os.path.join(self.log_dir, name)
         if plots:
             try:
-                os.mkdir(sub_dir1)
+                os.makedirs(sub_dir1)
             except OSError as error:
                 pass #print('Plot subDirectory already exists!')
         if data:
             try:
-                os.mkdir(sub_dir2)
+                os.makedirs(sub_dir2)
             except OSError as error:
                 pass #print('Data subDirectory already exists!')
+        if logs:
+            try:
+                os.makedirs(sub_dir3)
+            except OSError as error:
+                pass #print('Log subDirectory already exists!')
 
-    def saveNumpyData(self, data, name):
+    def setActiveSubDir(self, name, plots=True, data=True, logs=True):
+        self.createSubDir(name, plots=plots, data=data, logs=logs)
+        self.active_subdir = name
+
+    def _outputPath(self, base_dir, name, subdir=None):
+        name = os.fspath(name)
+        if os.path.isabs(name):
+            return name
+
+        active_subdir = self.active_subdir if subdir is None else subdir
+        if active_subdir:
+            active_prefix = active_subdir + os.sep
+            if name == active_subdir or name.startswith(active_prefix):
+                return os.path.join(base_dir, name)
+            return os.path.join(base_dir, active_subdir, name)
+
+        return os.path.join(base_dir, name)
+
+    def saveNumpyData(self, data, name, subdir=None):
         # method to store a numpy array in the \data sub-directory
-        name_loc = os.path.join( self.data_dir, name)
+        name_loc = self._outputPath(self.data_dir, name, subdir=subdir)
+        os.makedirs(os.path.dirname(name_loc), exist_ok=True)
         #self.log.info(f'saving numpy file: "{name_loc}"')
         np.save(name_loc, data)
 
@@ -137,9 +187,10 @@ class IOHandler:
 
         return np.load(name_loc, mmap_mode=mmap_mode)
 
-    def saveFig(self, name, dpi=300):
+    def saveFig(self, name, dpi=300, subdir=None):
         # method to store  a plot in the \plots sub-directory
-        name_loc = os.path.join( self.plot_dir, name)
+        name_loc = self._outputPath(self.plot_dir, name, subdir=subdir)
+        os.makedirs(os.path.dirname(name_loc), exist_ok=True)
         plt.savefig(name_loc, dpi=dpi, bbox_inches=None)
 
     def loadPorts_fromCSV(self, name):
@@ -178,12 +229,39 @@ class IOHandler:
         Method to save data to a CSV file.
         If header is provided, it will be written as the first line.
         """
-        name_loc = os.path.join(self.data_dir, name)
+        name_loc = self._outputPath(self.data_dir, name)
+        os.makedirs(os.path.dirname(name_loc), exist_ok=True)
         if header:
             np.savetxt(name_loc, data, delimiter=',', header=header, comments='')
         else:
             np.savetxt(name_loc, data, delimiter=',')
         self.log.info(f'Saved data to CSV file: "{name_loc}"')
+
+    def inputsBoilerplate(self, title, param_dict=None, input_parameters=None):
+        if input_parameters is None:
+            input_parameters = sorted(param_dict.keys()) if param_dict is not None else []
+
+        param_values = {}
+        for param in input_parameters:
+            if param_dict is not None and param in param_dict:
+                param_values[param] = param_dict[param]
+            elif hasattr(self, param):
+                param_values[param] = getattr(self, param)
+            elif param in globals():
+                param_values[param] = globals()[param]
+            else:
+                param_values[param] = '*DEFAULT*'
+
+        lines = [
+            "",
+            "|=======================================================================================|",
+            f"| {title}",
+            "|---------------------------------------------------------------------------------------|",
+        ]
+        for param in input_parameters:
+            lines.append(f"| {param}: {param_values[param]}")
+        lines.append("|=======================================================================================|\n")
+        self.log.info("\n".join(lines))
 
     def borisBoilerplate(self, param_dict=None):
         """
