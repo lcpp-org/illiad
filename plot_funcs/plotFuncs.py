@@ -21,126 +21,6 @@ UIUC = {
     'il_stormlight1': '#8D8F8E',
     }
 
-_TRACE_ANIM_STYLE_PRESETS = {
-    'classic': {
-        'background_color': '#FFFFFF',
-        'torus_facecolor': 'lightgrey',
-        'torus_edgecolor': '#000000',
-        'torus_linewidth': 0.10,
-        'torus_alpha': 1.00,
-        'torus_shade': True,
-        'camera_dist': 3.0,
-        'camera_elev': None,
-        'camera_azim': None,
-        'title_color': '#13294B',
-        'title_fontsize': 18,
-    },
-    'research_clean': {
-        'background_color': '#F4F6F8',
-        'torus_facecolor': '#D8DEE6',
-        'torus_edgecolor': '#9AA6B2',
-        'torus_linewidth': 0.045,
-        'torus_alpha': 0.36,
-        'torus_shade': True,
-        'camera_dist': 3.0,
-        'camera_elev': None,
-        'camera_azim': None,
-        'title_color': '#1F2933',
-        'title_fontsize': 20,
-    },
-    'conference_slide': {
-        'background_color': '#111821',
-        'torus_facecolor': '#AAB7C4',
-        'torus_edgecolor': '#65717D',
-        'torus_linewidth': 0.045,
-        'torus_alpha': 0.22,
-        'torus_shade': True,
-        'camera_dist': 3.0,
-        'camera_elev': None,
-        'camera_azim': None,
-        'title_color': '#E7EEF5',
-        'title_fontsize': 20,
-    },
-    'cinematic_uiuc': {
-        'background_color': '#081A29',
-        'torus_facecolor': '#C7D0D9',
-        'torus_edgecolor': '#5F6C79',
-        'torus_linewidth': 0.035,
-        'torus_alpha': 0.18,
-        'torus_shade': True,
-        'camera_dist': 3.0,
-        'camera_elev': None,
-        'camera_azim': None,
-        'title_color': '#F2F6FA',
-        'title_fontsize': 20,
-    },
-    'poster_overdriveplus': {
-        'background_color': '#02070D',
-        'torus_facecolor': '#C7D0D9',
-        'torus_edgecolor': '#2D3E4A',
-        'torus_linewidth': 0.013,
-        'torus_alpha': 0.06,
-        'torus_shade': True,
-        'camera_dist': 1.22,
-        'camera_elev': 34,
-        'camera_azim': -86,
-        'camera_fov_deg': 132,
-        'axes_zoom': 1.32,
-        'allow_scene_clip': True,
-        'limits_scale': 0.72,
-        'limits_offset': (0.12, 0.12, 0.00),
-        'title_color': '#FFF4EA',
-        'title_fontsize': 32,
-    },
-    'poster_manual_1': {
-        'background_color': '#02070D',
-        'torus_facecolor': '#C7D0D9',
-        'torus_edgecolor': '#334450',
-        'torus_linewidth': 0.014,
-        'torus_alpha': 0.07,
-        'torus_shade': True,
-        'camera_dist': 0.80,
-        'camera_elev': 10,
-        'camera_azim': -85,
-        'camera_fov_deg': 160,
-        'axes_zoom': 1.39,
-        'allow_scene_clip': True,
-        'limits_scale': 1.36,
-        'limits_offset': (-0.23, 0.27, 0.23),
-        'title_color': '#FFF4EA',
-        'title_fontsize': 30,
-    },
-}
-
-
-def _resolve_trace_anim_style(style='classic', style_overrides=None):
-    """Resolves a named trace-animation style and merges any explicit overrides."""
-    if style is None:
-        style = 'classic'
-
-    style_config = dict(_TRACE_ANIM_STYLE_PRESETS['classic'])
-
-    if isinstance(style, dict):
-        style_config.update(style)
-    else:
-        style_key = str(style).lower()
-        if style_key not in _TRACE_ANIM_STYLE_PRESETS:
-            valid_styles = ', '.join(sorted(_TRACE_ANIM_STYLE_PRESETS))
-            raise ValueError(f'Unknown trace animation style "{style}". Valid styles: {valid_styles}')
-        style_config.update(_TRACE_ANIM_STYLE_PRESETS[style_key])
-
-    if style_overrides:
-        style_config.update(style_overrides)
-
-    return style_config
-
-
-def _normalize_resolution(resolution):
-    """Normalizes resolution names so preset lookup is case-insensitive."""
-    if resolution is None:
-        return '1080p'
-    return str(resolution).strip().lower()
-
 ## PORT PLOTTING CONVENIENCE FUNCTION
 def global_plotPorts(ax_, simIO):
     """Plots the ports on the given axis."""
@@ -766,6 +646,205 @@ def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
+def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
+    """Plots the ion traces in polar coordinates (Poincare plot)."""
+    print('ion_traces shape:', ion_traces.shape)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='polar')
+    ax.set_title('Ion Traces')
+
+    for i in range(ion_traces.shape[1]):  # Loop over particles
+        this_ion = ion_traces[:, i, :]
+        # filter rows containing all zeros
+        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
+    
+        this_ion_rtp = XYZ_to_RTP2(this_ion, b_hidra.R0).cpu().numpy()
+        this_r = this_ion_rtp[:,0] #ion_traces[:, i, 0]
+        this_theta = this_ion_rtp[:,1] #ion_traces[:, i, 1]
+
+        skip_indices = [0,1,3,5,6,7,8,10]
+        if i not in skip_indices:
+            ax.plot(this_theta, this_r, linewidth=0.5, zorder=5)
+
+    ax.set_rlim([0., b_hidra.a])#[-1, 1])
+
+    plotname = 'IonTracesPoin_' + runString + '.png'
+    simIO.saveFig(plotname, dpi=600)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close()
+    #plt.show()
+
+def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, plot_args=None):
+    """Plots a black and white Poincare plot of the magnetic field lines."""
+
+    if plot_args:
+        title_on = plot_args['title_on']
+        dpi = plot_args['dpi']
+    else:        
+        title_on = True
+        dpi = 400
+    
+    rho_max = b_hidra.a
+    num_sets = len(radtheta_pts)
+
+    plt.rcParams.update({'font.size': 10})
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, polar=True)
+    for i in range(num_sets):
+        plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
+                     marker='.', s=1.00, c='k', linewidths=0.0)
+    ax.set_rmax(rho_max)
+    # ax.set_rticks(np.arange(0.0, rho_max, 0.02))
+    # ax.yaxis.set_tick_params(labelsize=5)
+    ax.grid(linewidth = 0.25, linestyle=':', c='k')
+ 
+    ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
+                labels=['', '', '', '', '', '', ''], angle=0, fontsize=4)
+
+    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
+                    #labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=12)
+                    labels=['', '', '', '', '', '', '', ''], fontsize=12)
+
+    #ax.grid(False)
+
+
+    phi_phys_deg = (phi_deg + 198.) % 360.
+    phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
+    phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
+    if title_on: ax.set_title(phi_phy_string + phy_comp_string, loc='left')
+
+    plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
+    plt.tight_layout()
+    simIO.saveFig(plot_name, dpi=dpi)
+    plt.close(fig)
+    del fig, ax, radtheta_pts
+    gc.collect()
+
+    #simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
+
+
+# ANIMATION & SUPPORT FUNCTIONS
+_TRACE_ANIM_STYLE_PRESETS = {
+    'classic': {
+        'background_color': '#FFFFFF',
+        'torus_facecolor': 'lightgrey',
+        'torus_edgecolor': '#000000',
+        'torus_linewidth': 0.10,
+        'torus_alpha': 1.00,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#13294B',
+        'title_fontsize': 18,
+    },
+    'research_clean': {
+        'background_color': '#F4F6F8',
+        'torus_facecolor': '#D8DEE6',
+        'torus_edgecolor': '#9AA6B2',
+        'torus_linewidth': 0.045,
+        'torus_alpha': 0.36,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#1F2933',
+        'title_fontsize': 20,
+    },
+    'conference_slide': {
+        'background_color': '#111821',
+        'torus_facecolor': '#AAB7C4',
+        'torus_edgecolor': '#65717D',
+        'torus_linewidth': 0.045,
+        'torus_alpha': 0.22,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#E7EEF5',
+        'title_fontsize': 20,
+    },
+    'cinematic_uiuc': {
+        'background_color': '#081A29',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#5F6C79',
+        'torus_linewidth': 0.035,
+        'torus_alpha': 0.18,
+        'torus_shade': True,
+        'camera_dist': 3.0,
+        'camera_elev': None,
+        'camera_azim': None,
+        'title_color': '#F2F6FA',
+        'title_fontsize': 20,
+    },
+    'poster_overdriveplus': {
+        'background_color': '#02070D',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#2D3E4A',
+        'torus_linewidth': 0.013,
+        'torus_alpha': 0.06,
+        'torus_shade': True,
+        'camera_dist': 1.22,
+        'camera_elev': 34,
+        'camera_azim': -86,
+        'camera_fov_deg': 132,
+        'axes_zoom': 1.32,
+        'allow_scene_clip': True,
+        'limits_scale': 0.72,
+        'limits_offset': (0.12, 0.12, 0.00),
+        'title_color': '#FFF4EA',
+        'title_fontsize': 32,
+    },
+    'poster_manual_1': {
+        'background_color': '#02070D',
+        'torus_facecolor': '#C7D0D9',
+        'torus_edgecolor': '#334450',
+        'torus_linewidth': 0.014,
+        'torus_alpha': 0.07,
+        'torus_shade': True,
+        'camera_dist': 0.80,
+        'camera_elev': 10,
+        'camera_azim': -85,
+        'camera_fov_deg': 160,
+        'axes_zoom': 1.39,
+        'allow_scene_clip': True,
+        'limits_scale': 1.36,
+        'limits_offset': (-0.23, 0.27, 0.23),
+        'title_color': '#FFF4EA',
+        'title_fontsize': 30,
+    },
+}
+
+
+def _resolve_trace_anim_style(style='classic', style_overrides=None):
+    """Resolves a named trace-animation style and merges any explicit overrides."""
+    if style is None:
+        style = 'classic'
+
+    style_config = dict(_TRACE_ANIM_STYLE_PRESETS['classic'])
+
+    if isinstance(style, dict):
+        style_config.update(style)
+    else:
+        style_key = str(style).lower()
+        if style_key not in _TRACE_ANIM_STYLE_PRESETS:
+            valid_styles = ', '.join(sorted(_TRACE_ANIM_STYLE_PRESETS))
+            raise ValueError(f'Unknown trace animation style "{style}". Valid styles: {valid_styles}')
+        style_config.update(_TRACE_ANIM_STYLE_PRESETS[style_key])
+
+    if style_overrides:
+        style_config.update(style_overrides)
+
+    return style_config
+
+
+def _normalize_resolution(resolution):
+    """Normalizes resolution names so preset lookup is case-insensitive."""
+    if resolution is None:
+        return '1080p'
+    return str(resolution).strip().lower()
+
+
 def _normalize_trace_sources(ion_traces=None, trace_sources=None, skip_indices=None,
                              linecolor=None, markercolor=None):
     """Normalizes animation inputs into a list of trace-source dictionaries."""
@@ -1356,82 +1435,3 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
         simIO.log.info('OUTPUT PLOT: {} (serial GIF, steps_per_frame={}, fps={})'.format(
             plotname_gif, steps_per_frame, fps))
     plt.close()
-
-
-
-def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=None):
-    """Plots the ion traces in polar coordinates (Poincare plot)."""
-    print('ion_traces shape:', ion_traces.shape)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='polar')
-    ax.set_title('Ion Traces')
-
-    for i in range(ion_traces.shape[1]):  # Loop over particles
-        this_ion = ion_traces[:, i, :]
-        # filter rows containing all zeros
-        this_ion = this_ion[~np.all(this_ion == 0, axis=1)]
-    
-        this_ion_rtp = XYZ_to_RTP2(this_ion, b_hidra.R0).cpu().numpy()
-        this_r = this_ion_rtp[:,0] #ion_traces[:, i, 0]
-        this_theta = this_ion_rtp[:,1] #ion_traces[:, i, 1]
-
-        skip_indices = [0,1,3,5,6,7,8,10]
-        if i not in skip_indices:
-            ax.plot(this_theta, this_r, linewidth=0.5, zorder=5)
-
-    ax.set_rlim([0., b_hidra.a])#[-1, 1])
-
-    plotname = 'IonTracesPoin_' + runString + '.png'
-    simIO.saveFig(plotname, dpi=600)
-    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
-    plt.close()
-    #plt.show()
-
-# POINCARE PLOT FUNCTIONS:
-def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, plot_args=None):
-    """Plots a black and white Poincare plot of the magnetic field lines."""
-
-    if plot_args:
-        title_on = plot_args['title_on']
-        dpi = plot_args['dpi']
-    else:        
-        title_on = True
-        dpi = 400
-    
-    rho_max = b_hidra.a
-    num_sets = len(radtheta_pts)
-
-    plt.rcParams.update({'font.size': 10})
-    fig = plt.figure(figsize=(6, 6))
-    ax = fig.add_subplot(111, polar=True)
-    for i in range(num_sets):
-        plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
-                     marker='.', s=1.00, c='k', linewidths=0.0)
-    ax.set_rmax(rho_max)
-    # ax.set_rticks(np.arange(0.0, rho_max, 0.02))
-    # ax.yaxis.set_tick_params(labelsize=5)
-    ax.grid(linewidth = 0.25, linestyle=':', c='k')
- 
-    ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
-                labels=['', '', '', '', '', '', ''], angle=0, fontsize=4)
-
-    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
-                    #labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=12)
-                    labels=['', '', '', '', '', '', '', ''], fontsize=12)
-
-    #ax.grid(False)
-
-
-    phi_phys_deg = (phi_deg + 198.) % 360.
-    phi_phy_string = '$\phi_{{phy}}$={:02.0f}$\degree$ CW from North Split\n'.format(phi_phys_deg)
-    phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
-    if title_on: ax.set_title(phi_phy_string + phy_comp_string, loc='left')
-
-    plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
-    plt.tight_layout()
-    simIO.saveFig(plot_name, dpi=dpi)
-    plt.close(fig)
-    del fig, ax, radtheta_pts
-    gc.collect()
-
-    #simIO.log.info('\tPHI: {:.2f} degrees'.format(phi_deg))
