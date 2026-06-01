@@ -1,5 +1,5 @@
 {
-  "trace_file": "output/It-0486_Ih-0900_noErr_1500sp_LSODA1e8/data/Ion_traces_0mm_LCFS40_2eV_60V_Z1_Lithium_TRACK360x180_IdealIota3_collisionTest_both_TypicalOperation_stride13.npy",
+  "trace_file": "output/It-0486_Ih-0900_noErr_1500sp_LSODA1e8/data/Ion_traces_0mm_LCFS40_2eV_60V_Z1_JSON_Ttest.npy",
   "max_particles": 30000,
 
 
@@ -13,7 +13,7 @@
 
   "marker_size": 4,
   "frame_stride": 2,
-  "size": "1920x1400",
+  "size": "1920x1080",
 
   "torus_style": "wireframe",
   "torus_color": "#ffffff",
@@ -27,10 +27,10 @@
   "histogram_log_y": true,
   "side_panel_width": 853,
 
-  "export_mp4": "output/LCFS40_2eV_60V_TRACK360x180_collisionTest_TypicalOperation_stride13_DASHtest2.mp4",
+  "export_mp4": "output/LCFS40_2eV_60V_TRACK360x180_JSON_Ttest_DASHtest3.mp4",
   "export_start": 0,
   "export_stop": 500,
   "export_step": 1,
   "export_fps": 60,
-  "export_size": "2560x1440"
+  "export_size": "1920x1080"
 }
