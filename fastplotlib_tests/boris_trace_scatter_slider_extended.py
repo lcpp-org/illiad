@@ -130,6 +130,27 @@ def parse_args() -> argparse.Namespace:
         help="Trail color: 'same' follows particle/solid colors where possible, or pass a color spec.",
     )
     parser.add_argument("--trail-marker-size", type=float, default=None, help="Trail marker size. Defaults to 0.7 times marker size.")
+    parser.add_argument("--histogram-bins", type=int, default=40, help="Number of energy histogram bins.")
+    parser.add_argument("--histogram-height", type=int, default=220, help="Energy histogram panel height in pixels.")
+    parser.add_argument("--histogram-log-y", action=argparse.BooleanOptionalAction, default=False, help="Use a log-scaled histogram y-axis.")
+    parser.add_argument("--hide-histogram", action="store_true", help="Hide the energy histogram panel.")
+    parser.add_argument("--histogram-color-vmin", type=float, default=None, help="Fixed lower color limit for histogram bar colors, eV.")
+    parser.add_argument("--histogram-color-vmax", type=float, default=None, help="Fixed upper color limit for histogram bar colors, eV.")
+    parser.add_argument(
+        "--histogram-xmax",
+        type=float,
+        default=None,
+        help="Fixed histogram x-axis maximum, eV. Defaults to 5x the fixed histogram color max when available.",
+    )
+    parser.add_argument(
+        "--histogram-auto-xmax",
+        action="store_true",
+        help="Autoscale the histogram x-axis from each frame instead of using a fixed maximum.",
+    )
+    parser.add_argument("--hide-running-fraction", action="store_true", help="Hide the running-particle fraction side plot.")
+    parser.add_argument("--side-panel-width", type=int, default=380, help="Width of the stacked side diagnostic plots in pixels.")
+    parser.add_argument("--plot-background", default="#02070D", help="Shared background color for the viewer and side plots.")
+    parser.add_argument("--plot-foreground", default="#E8EDF2", help="Shared foreground/text color for the side plots.")
     parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
     parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
     parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
@@ -381,6 +402,43 @@ def instantaneous_speed(
     return out
 
 
+def instantaneous_energy_ev(
+    traces: np.ndarray,
+    frame_idx: int,
+    valid_lengths: np.ndarray,
+    sample_dt: float,
+    ion_mass_amu: float,
+    out: np.ndarray,
+) -> np.ndarray:
+    """Estimate per-particle kinetic energy in eV at one stored trace sample."""
+    instantaneous_speed(traces, frame_idx, valid_lengths, sample_dt, out)
+    kg_per_amu = 1.660_539_068e-27
+    joules_per_ev = 1.602_176_634e-19
+    mass_kg = float(ion_mass_amu) * kg_per_amu
+    out[:] = 0.5 * mass_kg * out**2 / joules_per_ev
+    return out
+
+
+def running_fraction_over_time(
+    traces: np.ndarray,
+    valid_lengths: np.ndarray,
+    max_frame: int,
+    sample_dt: float,
+    ion_mass_amu: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return stored frame indices and fraction of selected particles with energy > 0."""
+    frame_indices = np.arange(int(max_frame) + 1, dtype=np.int64)
+    fractions = np.zeros(frame_indices.shape, dtype=np.float32)
+    energy = np.empty(traces.shape[1], dtype=np.float32)
+    denominator = max(1, int(traces.shape[1]))
+
+    for output_idx, frame_idx in enumerate(frame_indices):
+        instantaneous_energy_ev(traces, int(frame_idx), valid_lengths, sample_dt, ion_mass_amu, energy)
+        fractions[output_idx] = float(np.count_nonzero(np.isfinite(energy) & (energy > 0.0))) / denominator
+
+    return frame_indices, fractions
+
+
 def frame_positions(
     traces: np.ndarray,
     frame_idx: int,
@@ -399,15 +457,15 @@ def frame_positions(
     return out
 
 
-def trail_positions(
-    traces: np.ndarray,
-    frame_idx: int,
-    valid_lengths: np.ndarray,
-    trail_length: int,
-    trail_stride: int,
-    hide_zero_rows: bool,
-    out: np.ndarray,
-) -> np.ndarray:
+def trail_positions(traces: np.ndarray,
+                    frame_idx: int,
+                    valid_lengths: np.ndarray,
+                    trail_length: int,
+                    trail_stride: int,
+                    hide_zero_rows: bool,
+                    out: np.ndarray,
+                    ) -> np.ndarray:
+    
     """Fill an ``(n_particles * trail_length, 3)`` buffer with recent positions."""
     trail_length = max(1, int(trail_length))
     trail_stride = max(1, int(trail_stride))
@@ -438,13 +496,13 @@ def trail_positions(
     return out
 
 
-def make_trail_colors(
-    n_particles: int,
-    trail_length: int,
-    marker_colors: np.ndarray,
-    trail_color: str,
-    alpha_min: float,
-) -> np.ndarray:
+def make_trail_colors(n_particles: int,
+                      trail_length: int,
+                      marker_colors: np.ndarray,
+                      trail_color: str,
+                      alpha_min: float,
+                      ) -> np.ndarray:
+    
     """Create static RGBA colors for the trail scatter buffer."""
     trail_length = max(1, int(trail_length))
     alphas = np.linspace(float(alpha_min), 0.75, trail_length, dtype=np.float32)
@@ -459,15 +517,12 @@ def make_trail_colors(
     return colors.astype(np.float32)
 
 
-def torus_wire_lines(
-    R0: float,
-    a: float,
-    nphi: int,
-    ntheta: int,
-    wire_phi: int,
-    wire_theta: int,
-    half_shell: bool = True,
-) -> list[np.ndarray]:
+def torus_wire_lines(R0: float, a: float,
+                    nphi: int, ntheta: int,
+                    wire_phi: int, wire_theta: int,
+                    half_shell: bool = True,
+                    )-> list[np.ndarray]:
+    
     """Build torus latitude/longitude curves as 3D line arrays."""
     theta_min, theta_max = (-np.pi, 0.0) if half_shell else (-np.pi, np.pi)
     theta_curve = np.linspace(theta_min, theta_max, max(8, int(ntheta)), dtype=np.float32)
@@ -489,22 +544,22 @@ def torus_wire_lines(
     return lines
 
 
-def add_torus(
-    subplot,
-    R0: float,
-    a: float,
-    style: str = "wireframe",
-    mesh_color: str = "#3f7fbf",
-    mesh_alpha: float = 0.16,
-    wire_color: str = "#9bb7d4",
-    wire_alpha: float = 0.42,
-    wire_thickness: float = 1.0,
-    half_shell: bool = True,
-    nphi: int = 144,
-    ntheta: int = 64,
-    wire_phi: int = 24,
-    wire_theta: int = 9,
-) -> None:
+def add_torus(subplot,
+              R0: float,
+              a: float,
+              style: str = "wireframe",
+              mesh_color: str = "#3f7fbf",
+              mesh_alpha: float = 0.16,
+              wire_color: str = "#9bb7d4",
+              wire_alpha: float = 0.42,
+              wire_thickness: float = 1.0,
+              half_shell: bool = True,
+              nphi: int = 144,
+              ntheta: int = 64,
+              wire_phi: int = 24,
+              wire_theta: int = 9,
+              ) -> None:
+
     """Add a translucent and/or wireframe torus scene reference."""
     if style in ("mesh", "both"):
         positions, indices = make_torus_mesh(
@@ -537,20 +592,207 @@ def add_torus(
 
 
 def setup_camera(subplot, R0: float, a: float) -> None:
-    extent = float(R0 + a + 0.06)
+    extent = float(R0 + a)
     try:
         subplot.camera.show_rect(-extent, extent, -extent, extent)
     except Exception:
         pass
     try:
         #subplot.camera.local.position = (1.45, -1.85, 0.75)
-        subplot.camera.local.position = (0.0, -1.35, 0.57)
-        subplot.camera.look_at((0.0, 0.0, -0.04))
-        subplot.camera.fov = 85.0
-        subplot.camera.zoom = 1.0
+        subplot.camera.local.position = (0.0, -1.0, 0.35)
+        subplot.camera.look_at((0.0, -0.0, -0.0))
+        subplot.camera.set_state({'fov': 90.0, 'zoom': 0.01})
 
     except Exception:
         pass
+
+
+def set_subplot_background(subplot, color: str) -> None:
+    try:
+        subplot.background_color = color
+    except Exception:
+        pass
+
+
+def style_mpl_axis(axis, background_color: str, foreground_color: str) -> None:
+    axis.figure.patch.set_facecolor(background_color)
+    axis.set_facecolor(background_color)
+    axis.title.set_color(foreground_color)
+    axis.xaxis.label.set_color(foreground_color)
+    axis.yaxis.label.set_color(foreground_color)
+    axis.tick_params(colors=foreground_color)
+    for spine in axis.spines.values():
+        spine.set_color(foreground_color)
+
+
+class EnergyHistogramPanel:
+    """Matplotlib panel showing per-frame particle energy distribution."""
+
+    def __init__(
+        self,
+        axis,
+        canvas,
+        bins: int,
+        cmap: str,
+        custom_cmap: np.ndarray | None,
+        cmap_reverse: bool,
+        color_vmin: float | None,
+        color_vmax: float | None,
+        x_max: float | None,
+        log_y: bool,
+        background_color: str,
+        foreground_color: str,
+    ):
+        self.axis = axis
+        self.canvas = canvas
+        self.bins = max(1, int(bins))
+        self.cmap = cmap
+        self.custom_cmap = custom_cmap
+        self.cmap_reverse = bool(cmap_reverse)
+        self.color_vmin = color_vmin
+        self.color_vmax = color_vmax
+        self.x_max = x_max
+        self.log_y = bool(log_y)
+        self.background_color = background_color
+        self.foreground_color = foreground_color
+        self._color_buffer = np.empty((self.bins, 4), dtype=np.float32)
+
+    def update(self, energies_ev: np.ndarray, frame_idx: int) -> None:
+        finite = np.asarray(energies_ev[np.isfinite(energies_ev) & (energies_ev > 0.0)], dtype=np.float32)
+        self.axis.clear()
+        style_mpl_axis(self.axis, self.background_color, self.foreground_color)
+
+        if finite.size == 0:
+            self.axis.set_title(f"Particle energy distribution: frame {frame_idx}")
+            self.axis.set_xlabel("Energy (eV)")
+            self.axis.set_ylabel("Particles")
+            self.axis.text(
+                0.5,
+                0.5,
+                "No nonzero finite energies",
+                ha="center",
+                va="center",
+                color=self.foreground_color,
+                transform=self.axis.transAxes,
+            )
+            if self.x_max is not None:
+                self.axis.set_xlim(0.0, self.x_max)
+            self._draw()
+            return
+
+        if self.x_max is not None:
+            hist_range = (0.0, self.x_max)
+        else:
+            data_min = float(np.nanmin(finite))
+            data_max = float(np.nanmax(finite))
+            if not np.isfinite(data_min) or not np.isfinite(data_max):
+                data_min, data_max = 0.0, 1.0
+            if data_max <= data_min:
+                pad = max(abs(data_min) * 0.05, 1.0)
+                hist_range = (max(0.0, data_min - pad), data_max + pad)
+            else:
+                hist_range = (0.0, data_max)
+
+        counts, edges = np.histogram(finite, bins=self.bins, range=hist_range)
+        centers = 0.5 * (edges[:-1] + edges[1:])
+        if self._color_buffer.shape[0] != centers.shape[0]:
+            self._color_buffer = np.empty((centers.shape[0], 4), dtype=np.float32)
+        scalar_to_colors(
+            centers,
+            self.cmap,
+            self._color_buffer,
+            self.color_vmin,
+            self.color_vmax,
+            self.custom_cmap,
+            self.cmap_reverse,
+        )
+
+        self.axis.bar(
+            edges[:-1],
+            counts,
+            width=np.diff(edges),
+            align="edge",
+            color=self._color_buffer,
+            edgecolor="none",
+        )
+        if self.log_y:
+            self.axis.set_yscale("log")
+            self.axis.set_ylim(bottom=0.8)
+        if self.x_max is not None:
+            self.axis.set_xlim(0.0, self.x_max)
+        self.axis.set_title(f"Particle energy distribution: frame {frame_idx}")
+        self.axis.set_xlabel("Energy (eV)")
+        self.axis.set_ylabel("Particles")
+        self.axis.grid(True, axis="y", color=self.foreground_color, alpha=0.25)
+        self._draw()
+
+    def _draw(self) -> None:
+        try:
+            self.axis.figure.tight_layout()
+        except Exception:
+            pass
+        if hasattr(self.canvas, "draw_idle"):
+            self.canvas.draw_idle()
+        else:
+            self.canvas.draw()
+
+
+class RunningFractionPanel:
+    """Matplotlib panel showing the full running-particle fraction history."""
+
+    def __init__(
+        self,
+        axis,
+        canvas,
+        frame_indices: np.ndarray,
+        fractions: np.ndarray,
+        background_color: str,
+        foreground_color: str,
+        line_color: str,
+        cursor_color: str,
+    ):
+        self.axis = axis
+        self.canvas = canvas
+        self.frame_indices = np.asarray(frame_indices, dtype=np.int64)
+        self.values = np.asarray(fractions, dtype=np.float32) * 100.0
+        self.background_color = background_color
+        self.foreground_color = foreground_color
+        self.line_color = line_color
+        self.cursor_color = cursor_color
+        self.cursor = None
+        self._build()
+
+    def _build(self) -> None:
+        self.axis.clear()
+        style_mpl_axis(self.axis, self.background_color, self.foreground_color)
+        self.axis.plot(self.frame_indices, self.values, color=self.line_color, linewidth=1.8)
+        x0 = int(self.frame_indices[0]) if self.frame_indices.size else 0
+        x1 = int(self.frame_indices[-1]) if self.frame_indices.size else 1
+        if x1 <= x0:
+            x1 = x0 + 1
+        self.cursor = self.axis.axvline(x0, color=self.cursor_color, linewidth=1.4)
+        self.axis.set_xlim(x0, x1)
+        self.axis.set_ylim(0.0, 100.0)
+        self.axis.set_title("Particles still running")
+        self.axis.set_xlabel("Stored timestep")
+        self.axis.set_ylabel("Running (%)")
+        self.axis.grid(True, color=self.foreground_color, alpha=0.25)
+        self._draw()
+
+    def update(self, frame_idx: int) -> None:
+        if self.cursor is not None:
+            self.cursor.set_xdata([frame_idx, frame_idx])
+        self._draw()
+
+    def _draw(self) -> None:
+        try:
+            self.axis.figure.tight_layout()
+        except Exception:
+            pass
+        if hasattr(self.canvas, "draw_idle"):
+            self.canvas.draw_idle()
+        else:
+            self.canvas.draw()
 
 
 class TraceTimeState:
@@ -564,6 +806,9 @@ class TraceTimeState:
         frame_buffer: np.ndarray,
         color_buffer: np.ndarray,
         scalar_buffer: np.ndarray,
+        energy_buffer: np.ndarray,
+        histogram_panel: EnergyHistogramPanel | None,
+        running_panel: RunningFractionPanel | None,
         trail_scatter,
         trail_buffer: np.ndarray | None,
         trail_length: int,
@@ -587,6 +832,9 @@ class TraceTimeState:
         self.frame_buffer = frame_buffer
         self.color_buffer = color_buffer
         self.scalar_buffer = scalar_buffer
+        self.energy_buffer = energy_buffer
+        self.histogram_panel = histogram_panel
+        self.running_panel = running_panel
         self.trail_scatter = trail_scatter
         self.trail_buffer = trail_buffer
         self.trail_length = max(0, int(trail_length))
@@ -635,6 +883,8 @@ class TraceTimeState:
         self.scatter.data = self.frame_buffer
         self.update_trails()
         self.update_colors()
+        self.update_histogram()
+        self.update_running_fraction()
         canvas = getattr(self.scatter, "figure", None)
         if canvas is not None and hasattr(canvas, "canvas"):
             canvas.canvas.request_draw()
@@ -665,10 +915,14 @@ class TraceTimeState:
             self.scalar_buffer,
         )
         if self.color_mode == "energy":
-            kg_per_amu = 1.660_539_068e-27
-            joules_per_ev = 1.602_176_634e-19
-            mass_kg = self.ion_mass_amu * kg_per_amu
-            self.scalar_buffer[:] = 0.5 * mass_kg * self.scalar_buffer**2 / joules_per_ev
+            instantaneous_energy_ev(
+                self.traces,
+                self.current_frame,
+                self.valid_lengths,
+                self.sample_dt,
+                self.ion_mass_amu,
+                self.scalar_buffer,
+            )
 
         inactive = ~np.isfinite(self.frame_buffer).all(axis=1)
         self.scalar_buffer[inactive] = np.nan
@@ -688,6 +942,26 @@ class TraceTimeState:
             f"(scale {color_min:.3g}..{color_max:.3g})"
         )
 
+    def update_histogram(self) -> None:
+        if self.histogram_panel is None:
+            return
+        instantaneous_energy_ev(
+            self.traces,
+            self.current_frame,
+            self.valid_lengths,
+            self.sample_dt,
+            self.ion_mass_amu,
+            self.energy_buffer,
+        )
+        inactive = ~np.isfinite(self.frame_buffer).all(axis=1)
+        self.energy_buffer[inactive] = np.nan
+        self.histogram_panel.update(self.energy_buffer, self.current_frame)
+
+    def update_running_fraction(self) -> None:
+        if self.running_panel is None:
+            return
+        self.running_panel.update(self.current_frame)
+
     def update_playback(self) -> None:
         if not self.playing:
             return
@@ -700,19 +974,43 @@ class TraceTimeState:
 class TraceSliderWindow:
     """Thin Qt window around a fastplotlib canvas and a horizontal time slider."""
 
-    def __init__(self, QtCore, QtWidgets, canvas, state: TraceTimeState):
+    def __init__(
+        self,
+        QtCore,
+        QtWidgets,
+        canvas,
+        state: TraceTimeState,
+        side_canvases: list | None = None,
+        side_panel_width: int = 380,
+        background_color: str = "#02070D",
+        foreground_color: str = "#E8EDF2",
+    ):
         self.QtCore = QtCore
         self.QtWidgets = QtWidgets
         self.canvas = canvas
         self.state = state
+        self.side_panel_width = int(side_panel_width) if side_canvases else 0
 
         self.window = QtWidgets.QWidget()
         self.window.setWindowTitle("Boris ion trace scatter slider")
+        self.window.setStyleSheet(f"background-color: {background_color}; color: {foreground_color};")
 
         root = QtWidgets.QVBoxLayout(self.window)
         root.setContentsMargins(8, 8, 8, 8)
         root.setSpacing(6)
-        root.addWidget(canvas, stretch=1)
+
+        content = QtWidgets.QHBoxLayout()
+        content.setSpacing(6)
+        root.addLayout(content, stretch=1)
+        content.addWidget(canvas, stretch=4)
+        if side_canvases:
+            side = QtWidgets.QVBoxLayout()
+            side.setSpacing(6)
+            content.addLayout(side, stretch=1)
+            for side_canvas in side_canvases:
+                side_canvas.setMinimumWidth(int(side_panel_width))
+                side_canvas.setMaximumWidth(int(side_panel_width))
+                side.addWidget(side_canvas, stretch=1)
 
         controls = QtWidgets.QHBoxLayout()
         controls.setSpacing(6)
@@ -807,7 +1105,7 @@ class TraceSliderWindow:
         self.set_frame(self.state.current_frame)
 
     def show(self) -> None:
-        self.window.resize(self.canvas.width(), self.canvas.height() + 92)
+        self.window.resize(self.canvas.width() + self.side_panel_width + 28, self.canvas.height() + 92)
         self.window.show()
 
 
@@ -903,6 +1201,88 @@ def add_scene_particles(
     return scatter, trail_scatter, trail_buffer
 
 
+def histogram_color_limits(args: argparse.Namespace) -> tuple[float | None, float | None]:
+    vmin = args.histogram_color_vmin
+    vmax = args.histogram_color_vmax
+    if args.color_mode == "energy":
+        if vmin is None:
+            vmin = args.color_vmin
+        if vmax is None:
+            vmax = args.color_vmax
+    return vmin, vmax
+
+
+def histogram_xmax(args: argparse.Namespace) -> float | None:
+    if args.histogram_auto_xmax:
+        return None
+    if args.histogram_xmax is not None:
+        return float(args.histogram_xmax)
+
+    _, vmax = histogram_color_limits(args)
+    if vmax is None:
+        return None
+    return 5.0 * float(vmax)
+
+
+def make_energy_histogram_panel(
+    args: argparse.Namespace,
+    custom_cmap_colors: np.ndarray | None,
+    canvas,
+    axis,
+) -> EnergyHistogramPanel:
+    vmin, vmax = histogram_color_limits(args)
+    x_max = histogram_xmax(args)
+    return EnergyHistogramPanel(
+        axis=axis,
+        canvas=canvas,
+        bins=args.histogram_bins,
+        cmap=args.cmap,
+        custom_cmap=custom_cmap_colors,
+        cmap_reverse=args.cmap_reverse,
+        color_vmin=vmin,
+        color_vmax=vmax,
+        x_max=x_max,
+        log_y=args.histogram_log_y,
+        background_color=args.plot_background,
+        foreground_color=args.plot_foreground,
+    )
+
+
+def make_running_fraction_panel(
+    args: argparse.Namespace,
+    canvas,
+    axis,
+    frame_indices: np.ndarray,
+    running_fractions: np.ndarray,
+) -> RunningFractionPanel:
+    return RunningFractionPanel(
+        axis=axis,
+        canvas=canvas,
+        frame_indices=frame_indices,
+        fractions=running_fractions,
+        background_color=args.plot_background,
+        foreground_color=args.plot_foreground,
+        line_color=UIUC["il_orange"],
+        cursor_color=args.plot_foreground,
+    )
+
+
+def match_image_height(image: np.ndarray, target_height: int) -> np.ndarray:
+    """Nearest-neighbor resize along height/width to match another exported frame."""
+    height = int(image.shape[0])
+    target_height = int(target_height)
+    if height == target_height:
+        return image
+    if height <= 0 or target_height <= 0:
+        return image
+
+    scale = target_height / height
+    target_width = max(1, int(round(image.shape[1] * scale)))
+    y_idx = np.clip((np.arange(target_height) / scale).astype(np.int64), 0, height - 1)
+    x_idx = np.clip((np.arange(target_width) / scale).astype(np.int64), 0, image.shape[1] - 1)
+    return image[y_idx][:, x_idx]
+
+
 def export_mp4(
     args: argparse.Namespace,
     fpl,
@@ -913,9 +1293,11 @@ def export_mp4(
 ) -> int:
     try:
         import imageio
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        from matplotlib.figure import Figure as MplFigure
     except ModuleNotFoundError as exc:
         raise SystemExit(
-            "--export-mp4 requires imageio and imageio-ffmpeg.\n"
+            "--export-mp4 requires imageio, imageio-ffmpeg, and matplotlib.\n"
             "Install them in testenv with:\n"
             "  conda install -n testenv -c conda-forge imageio imageio-ffmpeg"
         ) from exc
@@ -938,12 +1320,51 @@ def export_mp4(
     frame_buffer = np.empty((n_particles, 3), dtype=np.float32)
     color_buffer = np.empty((n_particles, 4), dtype=np.float32)
     scalar_buffer = np.empty(n_particles, dtype=np.float32)
+    energy_buffer = np.empty(n_particles, dtype=np.float32)
 
     frame_positions(traces, frame_indices[0], valid_lengths, args.hide_zero_rows, frame_buffer)
     initial_colors = initial_marker_colors(args, n_particles)
 
+    side_canvas_items = []
+    side_panel_count = int(not args.hide_running_fraction) + int(not args.hide_histogram)
+    side_width = max(1, int(args.side_panel_width))
+    side_heights = []
+    if side_panel_count > 0:
+        base_height = export_size[1] // side_panel_count
+        side_heights = [base_height] * side_panel_count
+        side_heights[-1] += export_size[1] - sum(side_heights)
+
+    side_idx = 0
+    running_panel = None
+    if not args.hide_running_fraction:
+        print("Computing running-particle fraction history...")
+        running_frames, running_fractions = running_fraction_over_time(
+            traces,
+            valid_lengths,
+            max_frame,
+            args.sample_dt,
+            args.ion_mass_amu,
+        )
+        running_figure = MplFigure(figsize=(side_width / 100, side_heights[side_idx] / 100), dpi=100)
+        running_canvas = FigureCanvasAgg(running_figure)
+        running_axis = running_figure.add_subplot(111)
+        running_panel = make_running_fraction_panel(args, running_canvas, running_axis, running_frames, running_fractions)
+        side_canvas_items.append(running_canvas)
+        side_idx += 1
+
+    histogram_panel = None
+    histogram_canvas = None
+    if not args.hide_histogram:
+        histogram_figure = MplFigure(figsize=(side_width / 100, side_heights[side_idx] / 100), dpi=100)
+        histogram_canvas = FigureCanvasAgg(histogram_figure)
+        histogram_axis = histogram_figure.add_subplot(111)
+        histogram_figure.tight_layout()
+        histogram_panel = make_energy_histogram_panel(args, custom_cmap_colors, histogram_canvas, histogram_axis)
+        side_canvas_items.append(histogram_canvas)
+
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas="offscreen", size=export_size)
     subplot = figure[0, 0]
+    set_subplot_background(subplot, args.plot_background)
     try:
         subplot.set_title("Boris ion positions")
     except Exception:
@@ -966,6 +1387,9 @@ def export_mp4(
         frame_buffer=frame_buffer,
         color_buffer=color_buffer,
         scalar_buffer=scalar_buffer,
+        energy_buffer=energy_buffer,
+        histogram_panel=histogram_panel,
+        running_panel=running_panel,
         trail_scatter=trail_scatter,
         trail_buffer=trail_buffer,
         trail_length=max(0, int(args.trail_length)),
@@ -1000,7 +1424,15 @@ def export_mp4(
             state.current_frame = int(frame_idx)
             state.update_scatter()
             figure._render(draw=False)
-            writer.append_data(figure.export_numpy(rgb=True))
+            frame_image = figure.export_numpy(rgb=True)
+            if side_canvas_items:
+                side_images = []
+                for side_canvas in side_canvas_items:
+                    side_canvas.draw()
+                    side_images.append(np.asarray(side_canvas.buffer_rgba())[:, :, :3].copy())
+                side_stack = match_image_height(np.vstack(side_images), frame_image.shape[0])
+                frame_image = np.hstack([frame_image, side_stack])
+            writer.append_data(frame_image)
             if output_idx == 0 or (output_idx + 1) % 50 == 0 or output_idx + 1 == len(frame_indices):
                 print(f"  frame {output_idx + 1}/{len(frame_indices)} source={frame_idx}", flush=True)
 
@@ -1022,6 +1454,18 @@ def main() -> int:
         raise SystemExit("--trail-stride must be positive.")
     if not 0.0 <= args.trail_alpha_min <= 1.0:
         raise SystemExit("--trail-alpha-min must be between 0 and 1.")
+    if args.histogram_bins < 1:
+        raise SystemExit("--histogram-bins must be positive.")
+    if args.histogram_height < 100:
+        raise SystemExit("--histogram-height must be at least 100.")
+    hist_vmin, hist_vmax = histogram_color_limits(args)
+    if hist_vmin is not None and hist_vmax is not None and hist_vmax <= hist_vmin:
+        raise SystemExit("--histogram-color-vmax must be greater than --histogram-color-vmin.")
+    hist_xmax = histogram_xmax(args)
+    if hist_xmax is not None and hist_xmax <= 0.0:
+        raise SystemExit("--histogram-xmax must be positive.")
+    if args.side_panel_width < 100:
+        raise SystemExit("--side-panel-width must be at least 100.")
     try:
         custom_cmap_colors = parse_custom_cmap(args.cmap_colors, args.cmap_reverse)
     except ValueError as exc:
@@ -1046,6 +1490,7 @@ def main() -> int:
     frame_buffer = np.empty((n_particles, 3), dtype=np.float32)
     color_buffer = np.empty((n_particles, 4), dtype=np.float32)
     scalar_buffer = np.empty(n_particles, dtype=np.float32)
+    energy_buffer = np.empty(n_particles, dtype=np.float32)
     trail_length = max(0, int(args.trail_length))
     trail_marker_size = float(args.trail_marker_size) if args.trail_marker_size is not None else float(args.marker_size) * 0.7
     trail_buffer = np.empty((n_particles * max(1, trail_length), 3), dtype=np.float32) if trail_length > 0 else None
@@ -1063,14 +1508,55 @@ def main() -> int:
         return export_mp4(args, fpl, traces, valid_lengths, custom_cmap_colors, max_frame)
 
     QtCore, QtWidgets, QRenderWidget = import_qt_and_canvas()
-
     app = QtWidgets.QApplication.instance()
     if app is None:
         app = QtWidgets.QApplication([])
 
+    side_canvases = []
+    histogram_panel = None
+    running_panel = None
+    if not args.hide_histogram or not args.hide_running_fraction:
+        try:
+            from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+            from matplotlib.figure import Figure as MplFigure
+        except ModuleNotFoundError as exc:
+            raise SystemExit(
+                "The side plots require Matplotlib's Qt backend. "
+                "Run with the same PySide6 environment used for fastplotlib."
+            ) from exc
+
+    dpi = 100
+    side_plot_count = int(not args.hide_running_fraction) + int(not args.hide_histogram)
+    side_plot_height = max(int(args.histogram_height), size[1] // max(1, side_plot_count))
+    if not args.hide_running_fraction:
+        print("Computing running-particle fraction history...")
+        running_frames, running_fractions = running_fraction_over_time(
+            traces,
+            valid_lengths,
+            max_frame,
+            args.sample_dt,
+            args.ion_mass_amu,
+        )
+        running_figure = MplFigure(figsize=(args.side_panel_width / dpi, side_plot_height / dpi), dpi=dpi)
+        running_canvas = FigureCanvasQTAgg(running_figure)
+        running_canvas.setMinimumHeight(side_plot_height)
+        running_axis = running_figure.add_subplot(111)
+        running_panel = make_running_fraction_panel(args, running_canvas, running_axis, running_frames, running_fractions)
+        side_canvases.append(running_canvas)
+
+    if not args.hide_histogram:
+        histogram_figure = MplFigure(figsize=(args.side_panel_width / dpi, side_plot_height / dpi), dpi=dpi)
+        histogram_canvas = FigureCanvasQTAgg(histogram_figure)
+        histogram_canvas.setMinimumHeight(int(args.histogram_height))
+        histogram_axis = histogram_figure.add_subplot(111)
+        histogram_figure.tight_layout()
+        histogram_panel = make_energy_histogram_panel(args, custom_cmap_colors, histogram_canvas, histogram_axis)
+        side_canvases.append(histogram_canvas)
+
     canvas = QRenderWidget(size=size, title="Boris ion positions")
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas=canvas, size=size)
     subplot = figure[0, 0]
+    set_subplot_background(subplot, args.plot_background)
     try:
         subplot.set_title("Boris ion positions")
     except Exception:
@@ -1148,6 +1634,9 @@ def main() -> int:
         frame_buffer=frame_buffer,
         color_buffer=color_buffer,
         scalar_buffer=scalar_buffer,
+        energy_buffer=energy_buffer,
+        histogram_panel=histogram_panel,
+        running_panel=running_panel,
         trail_scatter=trail_scatter,
         trail_buffer=trail_buffer,
         trail_length=trail_length,
@@ -1167,9 +1656,20 @@ def main() -> int:
     )
     state.current_frame = initial_frame
     state.update_colors()
+    state.update_histogram()
+    state.update_running_fraction()
     setup_camera(subplot, args.R0, args.a)
     figure.show(axes_visible=args.axes)
-    viewer = TraceSliderWindow(QtCore, QtWidgets, canvas, state)
+    viewer = TraceSliderWindow(
+        QtCore,
+        QtWidgets,
+        canvas,
+        state,
+        side_canvases=side_canvases,
+        side_panel_width=args.side_panel_width,
+        background_color=args.plot_background,
+        foreground_color=args.plot_foreground,
+    )
     viewer.show()
 
     if __name__ == "__main__":

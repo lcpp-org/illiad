@@ -18,3 +18,15 @@
 --torus-color '#ffffff'
 --torus-wire-alpha 0.3
 --torus-half full
+--histogram-bins 200
+--histogram-color-vmin 0
+--histogram-color-vmax 30
+--histogram-height 330
+--histogram-log-y
+--side-panel-width 853
+--export-mp4 output/LCFS40_2eV_60V_Z1_Lithium_TRACK360x180_IdealIota3_collisionTest_both_TypicalOperation_stride13_NEW.mp4
+--export-start 0
+--export-stop 5000
+--export-step 1
+--export-fps 60
+--export-size 2560x1440
