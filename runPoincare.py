@@ -62,7 +62,31 @@ def main():
     """
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
     simIO = IOHandler(OUTPUT_DIR) 
-    simIO.startLog()
+    simIO.startLog(log_name="poincare.log", subdir="Poincare", logger_name="Poincare")
+    simIO.inputsBoilerplate(
+        "POINCARE INPUTS",
+        globals(),
+        [
+            "CURRENT_TOR",
+            "CURRENT_HEL",
+            "CONFIG_TOR",
+            "CONFIG_HEL",
+            "ENABLE_ERRFIELD",
+            "IC_PHI_DEG",
+            "IC_THETA_DEG",
+            "START_RADIUS",
+            "END_RADIUS",
+            "NLINES",
+            "SPINS",
+            "NPLANES",
+            "SOLVER",
+            "RTOL",
+            "ATOL",
+            "NTHREADS",
+            "DOUBLE_LINE",
+            "OUTPUT_DIR",
+        ],
+    )
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)

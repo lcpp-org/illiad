@@ -5,8 +5,8 @@ import numpy as np
 from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 
-import classes.class_outputHandler as out
 from classes.mesh import *
+from classes.iohandler import IOHandler
 from utility.coordtrans import RTP_XYZ_JAC
 
 def fluxGradientor(input_params=None):
@@ -18,9 +18,25 @@ def fluxGradientor(input_params=None):
             globals()[str(key)] = value
 
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
-    simIO = out.IOHandler(ANLYS_DIR)
-    simIO.startLog()
-    simIO.createSubDir(ANLYS_SUBDIR)
+    simIO = IOHandler(ANLYS_DIR)
+    simIO.setActiveSubDir(ANLYS_SUBDIR)
+    simIO.startLog(log_name="fluxGradientor.log", subdir=ANLYS_SUBDIR, logger_name="FluxGradientor")
+    simIO.inputsBoilerplate(
+        "FLUX GRADIENTOR INPUTS",
+        globals(),
+        [
+            "ANLYS_DIR",
+            "ANLYS_SUBDIR",
+            "CURRENT_TOR",
+            "CURRENT_HEL",
+            "CONFIG_TOR",
+            "CONFIG_HEL",
+            "ENABLE_ERRFIELD",
+            "LCFS_INDEX",
+            "PHI_GENs",
+            "OUTPUT_FILE_NAME",
+        ],
+    )
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)

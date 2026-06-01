@@ -18,8 +18,10 @@ All configuration and physical parameters are expected to be defined in the glob
 import argparse
 import json
 import numpy as np
+import torch
 from time import perf_counter
 from pathlib import Path
+from typing import Optional
 
 from classes.iohandler import IOHandler
 from classes.meshNew import Mesh
@@ -34,6 +36,44 @@ kg_per_amu = 1.660_539_068E-27
 kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
+
+# JSON-provided run inputs. These are assigned dynamically in boris_runner();
+# the annotations keep static analyzers from reporting them as undefined.
+CONFIG_TOR: str
+CONFIG_HEL: str
+ENABLE_ERRFIELD: bool
+TOROIDAL_CURRENT: float
+HELICAL_CURRENT: float
+
+FIELD_FILE_DENSITY: str
+FIELD_FILE_ELECTRIC: str
+FIELD_SCALE_ELECTRIC: float
+ION_NEUTRAL_COLLISIONS: Optional[str]
+ION_ION_COLLISIONS: Optional[str]
+NEUTRAL_GAS_DENSITY: float
+PLASMA_DENSITY: float
+
+ION_MASS: float
+ION_TEMP: float
+CHARGE_NUM: int
+
+LCFS_INDEX: int
+DELTRS: list[float]
+NPHI: int
+NTHETA: int
+NPARTICLES_PER_EMITTER: int
+
+DT: float
+TMAX: float
+NSTEPS: int
+TRACK_NPHI: int
+TRACK_NTHETA: int
+TRACK_NPARTICLES_PER_EMITTER: int
+STRIDE: int
+TRACE_STRIDE: int
+
+OUTPUT_DIRECTORY_NAME: str
+TAG: str
 
 
 def load_boris_inputs(path):
@@ -78,16 +118,20 @@ def boris_runner(input_params=None):
     globals()["STRIDE"] = STRIDE
     globals()["TRACE_STRIDE"] = STRIDE
 
-    ## SET UP RUN DIRECTORY AND LOGGING
-    simIO = IOHandler(OUTPUT_DIRECTORY_NAME) 
-    simIO.startLog()
-    simIO.borisBoilerplate(globals())
-
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
     dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
     cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                                int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
+    boris_subdir = cond_string + TAG
+    globals()["NSTEPS"] = int(TMAX / DT)
+
+    ## SET UP RUN DIRECTORY AND LOGGING
+    simIO = IOHandler(OUTPUT_DIRECTORY_NAME)
+    simIO.setActiveSubDir(boris_subdir)
+    simIO.startLog(log_name="boris.log", subdir=boris_subdir, logger_name="Boris")
+    simIO.borisBoilerplate(globals())
+
     ## CALCULATE SOME CONSTANTS
     N_emitters = len(DELTRS) * NTHETA * NPHI
     N_particles = NPARTICLES_PER_EMITTER * N_emitters
@@ -113,7 +157,7 @@ def boris_runner(input_params=None):
     ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
-    IC_filename = 'initVelPos_' + cond_string+TAG
+    IC_filename = 'initVelPos'
     simIO.saveNumpyData(initVelPos, IC_filename)
     simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 
@@ -154,23 +198,23 @@ def boris_runner(input_params=None):
     theta_plot_deg = theta_plot*(180/np.pi)
 
     ## PLOTTING
-    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString=cond_string+TAG, simIO=simIO)
-    ion_tracer.plotWallHist(output_array[:3], cond_string+TAG, simIO=simIO, cond_string=cond_string)
+    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString='RunningFraction', simIO=simIO)
+    ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90], 
                                 colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-                                runString=cond_string+TAG+'_AngleCombined', simIO=simIO, cond_string=cond_string)
+                                runString='AngleCombined', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_out,
                                 colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-                                runString=cond_string+TAG+'_EnergyCombined', simIO=simIO, cond_string=cond_string)
+                                runString='EnergyCombined', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180], 
                                 colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
-                                runString=cond_string+TAG+'_PHIAngleCombined', simIO=simIO, cond_string=cond_string)
+                                runString='PHIAngleCombined', simIO=simIO, cond_string=cond_string)
 
 
-    #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
-    ion_tracer.plotTraces(traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
-    #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
-    #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
+    #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString='WallPoints3D', simIO=simIO)
+    ion_tracer.plotTraces(traces, b_hidra, runString='Traces', simIO=simIO)
+    #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString='WallPoints', simIO=simIO)
+    #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString='InitEnergies', simIO=simIO)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')

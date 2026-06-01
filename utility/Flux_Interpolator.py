@@ -2,7 +2,6 @@
 ## APPLY IT TO THE POINTS ON THE THEIR RESPECTIVE SURFACE, 
 ## AND THEN INTERPOLATE IT ONTO A MESH THE SAME SHAPE/RESOLUTION AS THE BFIELD MESH
 from re import DEBUG
-import classes.class_outputHandler as out
 import numpy as np
 import torch
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -11,6 +10,7 @@ from torchrbf import RBFInterpolator
 import matplotlib.pyplot as plt
 import gc
 from classes.mesh import *
+from classes.iohandler import IOHandler
 
 def fluxInterpolator(input_params=None):
     ## LOAD INPUT PARAMETERS
@@ -21,9 +21,28 @@ def fluxInterpolator(input_params=None):
             globals()[str(key)] = value
             
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
-    simIO = out.IOHandler(ANLYS_DIR)
-    simIO.startLog()
-    simIO.createSubDir(ANLYS_SUBDIR)
+    simIO = IOHandler(ANLYS_DIR)
+    simIO.setActiveSubDir(ANLYS_SUBDIR)
+    simIO.startLog(log_name="fluxInterpolator.log", subdir=ANLYS_SUBDIR, logger_name="FluxInterpolator")
+    simIO.inputsBoilerplate(
+        "FLUX INTERPOLATOR INPUTS",
+        globals(),
+        [
+            "ANLYS_DIR",
+            "ANLYS_SUBDIR",
+            "CURRENT_TOR",
+            "CURRENT_HEL",
+            "CONFIG_TOR",
+            "CONFIG_HEL",
+            "ENABLE_ERRFIELD",
+            "LCFS_INDEX",
+            "SMALLEST_ISLAND_INDEX",
+            "PHI_GENs",
+            "MAX_SUBSETS",
+            "ALPHA",
+            "GUESS_PHI_INDEX",
+        ],
+    )
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)

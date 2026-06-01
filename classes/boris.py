@@ -416,11 +416,11 @@ class Boris(Collisions):
 
     def save_output(self, outputArray, ion_traces):
         """Saves the output data to files in the specified output directory."""
-        trace_filename = 'Ion_traces_' + self.cond_string+self.tag
+        trace_filename = 'Ion_traces'
         self.IO.saveNumpyData(ion_traces, trace_filename)
         self.IO.log.info('OUTPUT ION TRACES: {}'.format(trace_filename))
 
-        wallpts_filename = 'Wallpt_OUTPUT_' + self.cond_string+self.tag
+        wallpts_filename = 'Wallpt_OUTPUT'
         self.IO.saveNumpyData(outputArray, wallpts_filename)
         self.IO.log.info('OUTPUT RESULT DATA: {}'.format(wallpts_filename))
 

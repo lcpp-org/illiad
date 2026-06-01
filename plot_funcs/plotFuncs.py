@@ -104,7 +104,7 @@ def boris_plotWallHist(wallPtArray, runString, simIO, cond_string):
 
 
     plt.tight_layout()
-    plotname = 'Wall_Histogram_' + runString + '.png'
+    plotname = 'Wall_Histogram.png'
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -149,7 +149,7 @@ def boris_plotWallPoints(phi_plot_deg, theta_plot_deg, color_data=None, colorRan
 
     ax.set_title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString )
     plt.tight_layout()
-    plotname = 'Wallpoints_BorisPts_' + runString +  '.png'
+    plotname = 'Wallpoints_BorisPts.png'
     simIO.saveFig(plotname, dpi=700)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -217,7 +217,7 @@ def boris_plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString, sim
     #plt.tight_layout()
     plt.title('Distribution of Field Line Intersections with HIDRA Wall\n' + runString)
 
-    plotname = 'WallHist3D_' + runString + '.png'
+    plotname = 'WallHist3D.png'
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -266,7 +266,7 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     plt.title('Initial Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
     plt.tight_layout()
 
-    plotname = 'E0_Dist_' + runString + '.png'
+    plotname = 'E0_Dist.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -309,7 +309,7 @@ def boris_plotFinalEnergies(energy_array, mass, runString='default', simIO=None)
     plt.title('Final Energy Distribution, $T_{{est}}$ = {:.2f} eV'.format(Te_calc))
     plt.tight_layout()
 
-    plotname = 'Ef_Dist_' + runString + '.png'
+    plotname = 'Ef_Dist.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -327,7 +327,7 @@ def boris_plotDepoAngles(angle_array, runString='default', simIO=None):
     plt.title('Ion Angle Distribution (degrees from normal)')
     plt.tight_layout()
 
-    plotname = 'Angle_Dist_' + runString + '.png'
+    plotname = 'Angle_Dist.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -480,7 +480,7 @@ def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='
     plt.grid(which='both')#, linestyle=':', linewidth=0.5)
     #plt.tight_layout()
 
-    plotname = 'IonsVtime_' + runString + '.png'
+    plotname = 'IonsVtime.png'
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}, residence time = {:.3f}ms, corr = {:.3f}ms, slope = {:.3f}'
                    .format(plotname, tau_res*1000, tau_res_corr*1000, slope))
@@ -594,7 +594,7 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
     axRight.grid(which='minor', linestyle=':', linewidth=0.5)
     axRight.grid(which='major', linestyle='-', linewidth=1)
 
-    plotname = 'CombinedHistogram_' + runString + '.png'
+    plotname = 'CombinedHistogram.png'
     simIO.saveFig(plotname, dpi=400)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -641,7 +641,7 @@ def boris_plotTraces(ion_traces, b_hidra, runString='default', simIO=None):
     ax.set_axis_off()  # Remove bounding box and grid
     plt.tight_layout()
 
-    plotname = 'IonTraces_' + runString + '.png'
+    plotname = 'IonTraces.png'
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -668,7 +668,7 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
 
     ax.set_rlim([0., b_hidra.a])#[-1, 1])
 
-    plotname = 'IonTracesPoin_' + runString + '.png'
+    plotname = 'IonTracesPoin.png'
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
@@ -1355,8 +1355,8 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
     scene_figsize = (h_px / render_dpi, h_px / render_dpi)
     figsize = (w_px / render_dpi, h_px / render_dpi)
     style_config = _resolve_trace_anim_style(style, style_overrides)
-    plotname_mp4 = 'IonTraceAnim_' + runString + '.mp4'
-    plotname_gif = 'IonTraceAnim_' + runString + '.gif'
+    plotname_mp4 = 'IonTraceAnim.mp4'
+    plotname_gif = 'IonTraceAnim.gif'
 
     ## ── PARALLEL PATH ────────────────────────────────────────────────────────
     if parallel:
@@ -1383,7 +1383,8 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
                     for frames_done in pool.imap_unordered(_anim_render_chunk, worker_args):
                         pbar.update(frames_done)
 
-            save_path = os.path.join(simIO.plot_dir, plotname_mp4)
+            save_path = simIO._outputPath(simIO.plot_dir, plotname_mp4)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
             ffmpeg_bin = animation.FFMpegWriter.bin_path()
             ffmpeg_cmd = [ffmpeg_bin, '-y',
                 '-framerate', str(fps),
@@ -1423,14 +1424,16 @@ def boris_plotTraceAnim(ion_traces, b_hidra, runString='default', simIO=None,
 
     try:
         writer = animation.FFMpegWriter(fps=fps, bitrate=-1)
-        save_path = os.path.join(simIO.plot_dir, plotname_mp4)
+        save_path = simIO._outputPath(simIO.plot_dir, plotname_mp4)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         ani.save(save_path, writer=writer)
         simIO.log.info('OUTPUT PLOT: {} (serial, steps_per_frame={}, fps={})'.format(
             plotname_mp4, steps_per_frame, fps))
     except Exception:
         simIO.log.warning('FFMpeg not available; falling back to GIF (fps capped at ~50).')
         writer = animation.PillowWriter(fps=fps)
-        save_path = os.path.join(simIO.plot_dir, plotname_gif)
+        save_path = simIO._outputPath(simIO.plot_dir, plotname_gif)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
         ani.save(save_path, writer=writer)
         simIO.log.info('OUTPUT PLOT: {} (serial GIF, steps_per_frame={}, fps={})'.format(
             plotname_gif, steps_per_frame, fps))

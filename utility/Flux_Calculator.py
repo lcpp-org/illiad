@@ -31,8 +31,35 @@ def fluxCalculator(input_params=None):
             globals()[str(key)] = value
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = IOHandler(ANLYS_DIR)
-    simIO.startLog()
-    simIO.createSubDir(ANLYS_SUBDIR)
+    simIO.setActiveSubDir(ANLYS_SUBDIR)
+    simIO.startLog(log_name="fluxCalc.log", subdir=ANLYS_SUBDIR, logger_name="FluxCalculator")
+    simIO.inputsBoilerplate(
+        "FLUX CALCULATOR INPUTS",
+        globals(),
+        [
+            "ANLYS_DIR",
+            "ANLYS_SUBDIR",
+            "FIELD_FILE_TOR",
+            "FIELD_FILE_HEL",
+            "CURRENT_TOR",
+            "CURRENT_HEL",
+            "CONFIG_TOR",
+            "CONFIG_HEL",
+            "ENABLE_ERRFIELD",
+            "LCFS_INDEX",
+            "NPHI",
+            "NTHETA",
+            "PHI_GENs",
+            "MAX_SUBSETS",
+            "SMOOTH_FCTR",
+            "INTEGRATE_EPSABS",
+            "INTEGRATE_EPSREL",
+            "ISLAND_ALGORITHM",
+            "HIST_BINS",
+            "PLOT_ALL",
+            "BIG_MESH",
+        ],
+    )
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
