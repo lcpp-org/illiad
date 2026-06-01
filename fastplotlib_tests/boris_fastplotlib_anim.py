@@ -73,14 +73,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def parse_size(value: str) -> tuple[int, int]:
-    try:
-        width, height = value.lower().split("x", 1)
-        return int(width), int(height)
-    except Exception as exc:
-        raise argparse.ArgumentTypeError("--size must look like 1280x720") from exc
-
-
 def parse_skip_indices(value: str) -> set[int]:
     if not value.strip():
         return set()
@@ -219,8 +211,9 @@ def setup_camera(subplot, R0: float, a: float) -> None:
     except Exception:
         pass
     try:
-        subplot.camera.local.position = (1.45, -1.85, 0.75)
-        subplot.camera.look_at((0.0, 0.0, -0.04))
+        #subplot.camera.local.position = (1.45, -1.85, 0.75)
+        subplot.camera.position.set = (-1.85, -1.85, 0.75)
+        subplot.camera.look_at((0.0, 0.0, 0.0))
     except Exception:
         pass
     try:
@@ -241,7 +234,16 @@ def main() -> int:
         raise SystemExit("--trail-length must be at least 1.")
 
     fpl = import_fastplotlib()
-    size = parse_size(args.size)
+
+    #def parse_size(value: str) -> tuple[int, int]:
+    try:
+        width, height = args.size.lower().split("x", 1)
+        size = int(width), int(height)
+    except Exception as exc:
+        raise argparse.ArgumentTypeError("--size must look like 1280x720") from exc
+    #size = parse_size(args.size)
+
+
 
     raw_traces, source_label = load_or_make_traces(args)
     valid_lengths = infer_valid_lengths(raw_traces)
