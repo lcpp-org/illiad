@@ -5,14 +5,15 @@ timestep. A small PySide6/Qt control panel provides a time slider plus
 step/play controls.
 
 Example:
-    conda run -n testenv python fastplotlib_tests/boris_trace_scatter_slider.py \
-        --trace-file output/.../data/Ion_traces_....npy
+    conda run -n testenv python fastplotlib_tests/boris_trace_scatter_slider_extended.py \
+        --inputs-json animation_inputs.json
 """
 
 from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import shlex
 import sys
 import time
@@ -70,11 +71,68 @@ class ArgFileParser(argparse.ArgumentParser):
         return shlex.split(arg_line, comments=True, posix=True)
 
 
-def parse_args() -> argparse.Namespace:
+def json_config_to_args(path: Path, parser: argparse.ArgumentParser) -> list[str]:
+    """Translate a JSON config object into argparse tokens."""
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            config = json.load(stream)
+    except OSError as exc:
+        raise SystemExit(f"Could not read --inputs-json file {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Could not parse --inputs-json file {path}: {exc}") from exc
+
+    if not isinstance(config, dict):
+        raise SystemExit("--inputs-json must contain a JSON object.")
+
+    actions = {
+        action.dest: action
+        for action in parser._actions
+        if action.dest != argparse.SUPPRESS and action.dest != "help"
+    }
+    tokens: list[str] = []
+
+    for raw_key, value in config.items():
+        dest = raw_key.replace("-", "_")
+        if dest == "inputs_json":
+            continue
+        if dest not in actions:
+            valid = ", ".join(sorted(key for key in actions if key != "inputs_json"))
+            raise SystemExit(f"Unknown JSON input {raw_key!r}. Valid inputs are: {valid}")
+        if value is None:
+            continue
+
+        action = actions[dest]
+        long_option = next(
+            (item for item in action.option_strings if item.startswith("--") and not item.startswith("--no-")),
+            None,
+        )
+        if long_option is None:
+            continue
+
+        if isinstance(action, argparse.BooleanOptionalAction):
+            if not isinstance(value, bool):
+                raise SystemExit(f"JSON input {raw_key!r} must be true or false.")
+            tokens.append(long_option if value else f"--no-{long_option[2:]}")
+            continue
+
+        if getattr(action, "nargs", None) == 0 and isinstance(getattr(action, "const", None), bool):
+            if not isinstance(value, bool):
+                raise SystemExit(f"JSON input {raw_key!r} must be true or false.")
+            if value:
+                tokens.append(long_option)
+            continue
+
+        tokens.extend([long_option, str(value)])
+
+    return tokens
+
+
+def build_arg_parser() -> ArgFileParser:
     parser = ArgFileParser(
         description="Scatter all Boris particles at a selected trace timestep using fastplotlib.",
         fromfile_prefix_chars="@",
     )
+    parser.add_argument("--inputs-json", type=Path, default=None, help="Load animation inputs from a JSON object.")
     parser.add_argument("--trace-file", type=Path, default=None, help="Path to Ion_traces_*.npy.")
     parser.add_argument("--no-mmap", action="store_true", help="Load the whole trace file into RAM.")
     parser.add_argument("--max-particles", type=int, default=None, help="Optional cap for testing.")
@@ -188,7 +246,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--synthetic-particles", type=int, default=2_400, help="Synthetic particle count.")
     parser.add_argument("--synthetic-turns", type=float, default=8.0, help="Synthetic toroidal turns.")
     parser.add_argument("--play-fps", type=float, default=60.0, help="Playback frame rate for Play.")
-    return parser.parse_args()
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = build_arg_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    pre_parser = ArgFileParser(add_help=False, fromfile_prefix_chars="@")
+    pre_parser.add_argument("--inputs-json", type=Path, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+
+    json_args = []
+    if pre_args.inputs_json is not None:
+        json_args = json_config_to_args(pre_args.inputs_json, parser)
+
+    return parser.parse_args(json_args + argv)
 
 
 def parse_size(value: str) -> tuple[int, int]:
