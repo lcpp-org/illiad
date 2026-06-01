@@ -1,5 +1,5 @@
 {
-  "trace_file": "output/It-0486_Ih-0900_noErr_1500sp_LSODA1e8/data/Ion_traces_0mm_LCFS40_2eV_60V_Z1_JSON_Test_ngas3e19.npy",
+  "trace_file": "output/AAAnewIO_iota3FWD_phi306/data/0mm_LCFS15_2eV_60V_Z1_pipelineTest/Ion_traces.npy",
   "max_particles": 30000,
 
 
@@ -27,9 +27,9 @@
   "histogram_log_y": true,
   "side_panel_width": 853,
 
-  "export_mp4": "output/LCFS40_2eV_60V_TRACK360x180_JSON_Test_ngas3e19_DASHtest3.mp4",
+  "export_mp4": "output/AAAnewIO_iota3FWD_phi306/plots/pipelineTest_JSON_Test_ngas3e19_DASHtest3.mp4",
   "export_start": 0,
-  "export_stop": 1500,
+  "export_stop": 2000,
   "export_step": 1,
   "export_fps": 60,
   "export_size": "1920x1080"

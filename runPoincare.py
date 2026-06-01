@@ -31,18 +31,18 @@ import utility.phi_events as phi_event_defs
 
 # DEFINE FIELDS #
 CURRENT_TOR = 0.486 #[kA]
-CURRENT_HEL = 0.790 #[kA]
+CURRENT_HEL = 0.900 #[kA]
 CONFIG_TOR = "default_toroidal"
 CONFIG_HEL = "default_helical"
 ENABLE_ERRFIELD = True
 
 # DEFINE INITIAL CONDITIONS #
-IC_PHI_DEG = 180. #[deg]
+IC_PHI_DEG = 306. #[deg]
 IC_THETA_DEG = 180. #[deg]
 START_RADIUS = 0.150 #[m]
 END_RADIUS = 0.020 #[m]
-NLINES = 14 + 13 # + 26 + 52 + 104
-SPINS = 1500 # max length, SPIN = 2pi*R0 [meters]
+NLINES = 14 + 13 + 26 #+ 52 + 104
+SPINS = 600#1500 # max length, SPIN = 2pi*R0 [meters]
 NPLANES = 360
 
 # DEFINE SOLVER PARAMETERS #
@@ -52,7 +52,8 @@ ATOL = 1e-8
 NTHREADS = -1
 DOUBLE_LINE = False
 # DEFINE OUTPUT DIRECTORY #
-OUTPUT_DIR = f"Iota4FWD_{SPINS}spins_{NLINES}Lines_RK45_1e8_newEvents"
+#OUTPUT_DIR = f"Iota4FWD_{SPINS}spins_{NLINES}Lines_RK45_1e8_newEvents"
+OUTPUT_DIR = f"AAAnewIO_iota3FWD_phi306"
 
 
 def main():
@@ -103,12 +104,6 @@ def main():
     ## GENERATE POINCARE PLOTS
     solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
     PoinCare = Poincare(simIO, *solver_args)
-
-    # # make a list of events 
-    # old_events = [phi_event_defs.inVV]
-    # old_events.extend(getattr(phi_event_defs, f"isphi{i}") for i in range(1, NPLANES + 1))
-    # PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, events=old_events)
-
     PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, nplanes=NPLANES)
     out_tMax = PoinCare.run()[0]
 
