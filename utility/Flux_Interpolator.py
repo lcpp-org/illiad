@@ -85,7 +85,7 @@ def fluxInterpolator(input_params=None):
         valid_surface = valid_surface[:, best_phi_index]
     valid_surface[LCFS_INDEX] = True # manually set LCFS surface to valid
     valid_surface[:LCFS_INDEX] = False # manually set surfaces outside LCFS to invalid
-    valid_surface[[ 55, 56, 57, 58]] = False # manually set surfaces outside LCFS to invalid
+    #valid_surface[[ 55, 56, 57, 58]] = False # manually set surfaces outside LCFS to invalid
 
     profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(int(PHI_GENs[best_phi_index]))
     print(profile_select_str)

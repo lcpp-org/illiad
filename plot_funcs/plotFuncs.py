@@ -693,6 +693,9 @@ def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysi
     for i in range(num_sets):
         plt.scatter(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
                      marker='.', s=1.00, c='k', linewidths=0.0)
+        # #check if more efficient for marge datasets!?
+        # plt.plot(radtheta_pts[i][0][:point_total[i]], radtheta_pts[i][1][:point_total[i]],
+        #      marker='.', markersize=1.00, color='k', linestyle='none')
     ax.set_rmax(rho_max)
     # ax.set_rticks(np.arange(0.0, rho_max, 0.02))
     # ax.yaxis.set_tick_params(labelsize=5)
