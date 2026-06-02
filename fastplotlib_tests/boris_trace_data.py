@@ -23,6 +23,39 @@ def load_boris_trace_file(path: str | Path, mmap: bool = True) -> np.ndarray:
     return traces
 
 
+def normalize_trace_paths(paths: str | Path | list[str | Path] | tuple[str | Path, ...]) -> list[Path]:
+    """Normalize one or more Boris trace paths."""
+    if isinstance(paths, (str, Path)):
+        return [Path(paths).expanduser()]
+    return [Path(path).expanduser() for path in paths]
+
+
+def load_boris_trace_files(
+    paths: str | Path | list[str | Path] | tuple[str | Path, ...],
+    mmap: bool = True,
+) -> np.ndarray:
+    """Load one or more Boris trace arrays and combine them along the particle axis."""
+    trace_paths = normalize_trace_paths(paths)
+    if not trace_paths:
+        raise ValueError("At least one Boris trace file is required.")
+    if len(trace_paths) == 1:
+        return load_boris_trace_file(trace_paths[0], mmap=mmap)
+
+    traces_by_file = [load_boris_trace_file(path, mmap=mmap) for path in trace_paths]
+    max_steps = max(traces.shape[0] for traces in traces_by_file)
+    total_particles = sum(traces.shape[1] for traces in traces_by_file)
+    dtype = np.result_type(*(traces.dtype for traces in traces_by_file))
+    combined = np.zeros((max_steps, total_particles, 3), dtype=dtype)
+
+    particle_offset = 0
+    for traces in traces_by_file:
+        particle_stop = particle_offset + traces.shape[1]
+        combined[: traces.shape[0], particle_offset:particle_stop, :] = traces
+        particle_offset = particle_stop
+
+    return combined
+
+
 def validate_trace_shape(traces: np.ndarray) -> None:
     if traces.ndim != 3 or traces.shape[2] != 3:
         raise ValueError(

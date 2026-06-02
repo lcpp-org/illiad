@@ -52,7 +52,8 @@ mpl.colormaps.register(cmap=custom_cmap, name="my_registered_cmap")
 
 from boris_trace_data import (
     infer_valid_lengths,
-    load_boris_trace_file,
+    load_boris_trace_files,
+    normalize_trace_paths,
     make_synthetic_boris_traces,
     make_torus_mesh,
     select_trace_particles,
@@ -122,6 +123,11 @@ def json_config_to_args(path: Path, parser: argparse.ArgumentParser) -> list[str
                 tokens.append(long_option)
             continue
 
+        if isinstance(value, list):
+            for item in value:
+                tokens.extend([long_option, str(item)])
+            continue
+
         tokens.extend([long_option, str(value)])
 
     return tokens
@@ -133,7 +139,13 @@ def build_arg_parser() -> ArgFileParser:
         fromfile_prefix_chars="@",
     )
     parser.add_argument("--inputs-json", type=Path, default=None, help="Load animation inputs from a JSON object.")
-    parser.add_argument("--trace-file", type=Path, default=None, help="Path to Ion_traces_*.npy.")
+    parser.add_argument(
+        "--trace-file",
+        type=Path,
+        action="append",
+        default=None,
+        help="Path to Ion_traces_*.npy. Repeat or pass a JSON list to combine trace files.",
+    )
     parser.add_argument("--no-mmap", action="store_true", help="Load the whole trace file into RAM.")
     parser.add_argument("--max-particles", type=int, default=None, help="Optional cap for testing.")
     parser.add_argument("--skip-indices", default="", help="Comma-separated particle indices to skip.")
@@ -304,8 +316,11 @@ def load_or_make_traces(args: argparse.Namespace) -> tuple[np.ndarray, str]:
         )
         return traces, "synthetic"
 
-    traces = load_boris_trace_file(args.trace_file, mmap=not args.no_mmap)
-    return traces, str(args.trace_file)
+    trace_paths = normalize_trace_paths(args.trace_file)
+    traces = load_boris_trace_files(trace_paths, mmap=not args.no_mmap)
+    if len(trace_paths) == 1:
+        return traces, str(trace_paths[0])
+    return traces, f"{len(trace_paths)} trace files: " + ", ".join(str(path) for path in trace_paths)
 
 
 def particle_colors(n_particles: int) -> np.ndarray:
