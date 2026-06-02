@@ -4,8 +4,8 @@ import utility.Flux_Gradientor as fg
 
 NUMBER_PHI = 360
 input_params = {
-    'ANLYS_DIR': "AAAnewIO_iota3FWD_phi306",
-    'ANLYS_SUBDIR': "LCFS8_360x180",
+    'ANLYS_DIR': "AAAnewIO_iota3FWD_phi306_LSODA",
+    'ANLYS_SUBDIR': "LCFS20_360x180",
     'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
     'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
     'CURRENT_TOR': 0.486, #[kA]
@@ -13,7 +13,7 @@ input_params = {
     'CONFIG_TOR': 'default_toroidal',
     'CONFIG_HEL': 'default_helical',
     'ENABLE_ERRFIELD': True,
-    'LCFS_INDEX': 9,
+    'LCFS_INDEX': 20,
     'NPHI': NUMBER_PHI,
     'NTHETA': 180,
     'PHI_GENs': np.linspace(360//NUMBER_PHI, 360, NUMBER_PHI),

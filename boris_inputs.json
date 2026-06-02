@@ -5,8 +5,8 @@
   "TOROIDAL_CURRENT": 0.486,
   "HELICAL_CURRENT": 0.900,
 
-  "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306/data/LCFS8_360x180/big_grid_linear.npy",
-  "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306/data/LCFS8_360x180/Efield_testingOutput.npy",
+  "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
+  "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
   "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
   "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
@@ -18,7 +18,7 @@
   "ION_TEMP": 2.0,
   "CHARGE_NUM": 1,
 
-  "LCFS_INDEX": 15,
+  "LCFS_INDEX": 20,
   "DELTRS": [0.0],
   "NPHI": 180,
   "NTHETA": 120,
@@ -32,6 +32,6 @@
   "TRACK_NPARTICLES_PER_EMITTER": 1,
   "STRIDE": 13,
 
-  "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306",
+  "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306_LSODA",
   "TAG": "pipelineTest"
 }
