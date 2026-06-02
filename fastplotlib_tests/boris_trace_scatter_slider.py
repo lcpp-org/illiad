@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import json
 import shlex
 import sys
 import time
@@ -70,11 +71,68 @@ class ArgFileParser(argparse.ArgumentParser):
         return shlex.split(arg_line, comments=True, posix=True)
 
 
-def parse_args() -> argparse.Namespace:
+def json_config_to_args(path: Path, parser: argparse.ArgumentParser) -> list[str]:
+    """Translate a JSON config object into argparse tokens."""
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            config = json.load(stream)
+    except OSError as exc:
+        raise SystemExit(f"Could not read --inputs-json file {path}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Could not parse --inputs-json file {path}: {exc}") from exc
+
+    if not isinstance(config, dict):
+        raise SystemExit("--inputs-json must contain a JSON object.")
+
+    actions = {
+        action.dest: action
+        for action in parser._actions
+        if action.dest != argparse.SUPPRESS and action.dest != "help"
+    }
+    tokens: list[str] = []
+
+    for raw_key, value in config.items():
+        dest = raw_key.replace("-", "_")
+        if dest == "inputs_json":
+            continue
+        if dest not in actions:
+            valid = ", ".join(sorted(key for key in actions if key != "inputs_json"))
+            raise SystemExit(f"Unknown JSON input {raw_key!r}. Valid inputs are: {valid}")
+        if value is None:
+            continue
+
+        action = actions[dest]
+        long_option = next(
+            (item for item in action.option_strings if item.startswith("--") and not item.startswith("--no-")),
+            None,
+        )
+        if long_option is None:
+            continue
+
+        if isinstance(action, argparse.BooleanOptionalAction):
+            if not isinstance(value, bool):
+                raise SystemExit(f"JSON input {raw_key!r} must be true or false.")
+            tokens.append(long_option if value else f"--no-{long_option[2:]}")
+            continue
+
+        if getattr(action, "nargs", None) == 0 and isinstance(getattr(action, "const", None), bool):
+            if not isinstance(value, bool):
+                raise SystemExit(f"JSON input {raw_key!r} must be true or false.")
+            if value:
+                tokens.append(long_option)
+            continue
+
+        tokens.extend([long_option, str(value)])
+
+    return tokens
+
+
+def build_arg_parser() -> ArgFileParser:
     parser = ArgFileParser(
         description="Scatter all Boris particles at a selected trace timestep using fastplotlib.",
         fromfile_prefix_chars="@",
     )
+    parser.add_argument("--inputs-json", type=Path, default=None, help="Load animation inputs from a JSON object.")
     parser.add_argument("--trace-file", type=Path, default=None, help="Path to Ion_traces_*.npy.")
     parser.add_argument("--no-mmap", action="store_true", help="Load the whole trace file into RAM.")
     parser.add_argument("--max-particles", type=int, default=None, help="Optional cap for testing.")
@@ -130,6 +188,18 @@ def parse_args() -> argparse.Namespace:
         help="Trail color: 'same' follows particle/solid colors where possible, or pass a color spec.",
     )
     parser.add_argument("--trail-marker-size", type=float, default=None, help="Trail marker size. Defaults to 0.7 times marker size.")
+    parser.add_argument("--histogram-bins", type=int, default=40, help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-height", type=int, default=220, help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-log-y", action=argparse.BooleanOptionalAction, default=False, help=argparse.SUPPRESS)
+    parser.add_argument("--hide-histogram", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-color-vmin", type=float, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-color-vmax", type=float, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-xmax", type=float, default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--histogram-auto-xmax", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--hide-running-fraction", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--side-panel-width", type=int, default=380, help=argparse.SUPPRESS)
+    parser.add_argument("--plot-background", default="#02070D", help="Viewer background color.")
+    parser.add_argument("--plot-foreground", default="#E8EDF2", help=argparse.SUPPRESS)
     parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
     parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
     parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
@@ -167,7 +237,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--synthetic-particles", type=int, default=2_400, help="Synthetic particle count.")
     parser.add_argument("--synthetic-turns", type=float, default=8.0, help="Synthetic toroidal turns.")
     parser.add_argument("--play-fps", type=float, default=60.0, help="Playback frame rate for Play.")
-    return parser.parse_args()
+    return parser
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = build_arg_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+
+    pre_parser = ArgFileParser(add_help=False, fromfile_prefix_chars="@")
+    pre_parser.add_argument("--inputs-json", type=Path, default=None)
+    pre_args, _ = pre_parser.parse_known_args(argv)
+
+    json_args = []
+    if pre_args.inputs_json is not None:
+        json_args = json_config_to_args(pre_args.inputs_json, parser)
+
+    return parser.parse_args(json_args + argv)
 
 
 def parse_size(value: str) -> tuple[int, int]:
@@ -549,6 +634,13 @@ def setup_camera(subplot, R0: float, a: float) -> None:
         subplot.camera.fov = 85.0
         subplot.camera.zoom = 1.0
 
+    except Exception:
+        pass
+
+
+def set_subplot_background(subplot, color: str) -> None:
+    try:
+        subplot.background_color = color
     except Exception:
         pass
 
@@ -944,6 +1036,7 @@ def export_mp4(
 
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas="offscreen", size=export_size)
     subplot = figure[0, 0]
+    set_subplot_background(subplot, args.plot_background)
     try:
         subplot.set_title("Boris ion positions")
     except Exception:
@@ -1071,6 +1164,7 @@ def main() -> int:
     canvas = QRenderWidget(size=size, title="Boris ion positions")
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas=canvas, size=size)
     subplot = figure[0, 0]
+    set_subplot_background(subplot, args.plot_background)
     try:
         subplot.set_title("Boris ion positions")
     except Exception:
