@@ -15,6 +15,34 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ## NAME YOUR OUTPUT FILE
 output_name = 'It0000_Ih1000_Iv000_1p000_1p000_64bit'
 
+## READ COIL INPUT FILE
+# Expected input file structure:
+#
+# Regular coil row:
+#   Columns 0-2 : x, y, z coordinates of coil geometry [float]
+#   Column 3    : number of turns, with sign indicating current direction [float]
+#
+# Ending delimiter row:
+#   Columns 0-2 : x, y, z coordinates of coil geometry [float]
+#   Column 3    : 0.0 
+#   Column 4    : NaN 
+#   Column 5    : coil type [string] (e.g., 'Helix', 'toroidal_field', 'Vertical_Field_Coil')
+
+coilfile = "input_files/coils.wega_with_VFCoils"
+
+## MACHINE INPUT PARAMETERS
+RMAJOR = 0.72 #[m]
+RMINOR = 0.19 #[m]
+
+## DEFINE MESH PERIODICITY
+# Mesh order: [r, theta, phi]
+#
+# 0: NOT PERIODIC
+# 1: 2PI PERIODIC
+# >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
+
+mesh_periodicity = [ 0, 1, 5]
+
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
 rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
@@ -111,7 +139,6 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
         coilpts = np.asarray(coil, dtype=np.float64)
         thiscoil = torch.tensor(coilpts) #, dtype=torch.float64)
         filament = thiscoil.T[:3].to(device)
-        thiscoil = torch.tensor(coilpts, dtype=torch.float64, device=device)
         ## Mesh-ified
         N = filament.shape[1]
         Bxyz += biotsavart_mesh(xyz_mesh, filament, current, N)
@@ -128,7 +155,6 @@ def main():
     The results are saved to a specified output file."""
 
     ## READ COIL INPUT FILE
-    coilfile = "input_files/coils.wega_with_VFCoils"
     coildata = pd.read_csv(
     coilfile,
     header=None,
@@ -148,16 +174,6 @@ def main():
             mycoils[i] = coildata.iloc[:coil_delim[i], 0:4]
         else:
             mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
-
-
-    RMAJOR = 0.72 #[m]
-    RMINOR = 0.19 #[m]
-
-    ## DEFINE MESH PERIODICITY
-    ## 0: NOT PERIODIC
-    ## 1: 2PI PERIODIC
-    ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
-    mesh_periodicity = [ 0, 1, 5]
 
     nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
     ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
