@@ -81,13 +81,105 @@ Not seeing any island, just a really dense surfaces.
 
 # Testing runFluxGrad.py
  **What I tried:** \
-Tried running `iota4FWD_1000spins_53Lines_LSODA_FLUX` to see what `runFluxGrad.py` does. 
+Tried running `iota4FWD_1000spins_53Lines_LSODA_flux` to see what `runFluxGrad.py` does. 
 
 **Nots:** \
 `runFluxGrad.py` is running fine on the local computer, no need for cluster. Graphs look noisy, I believe I might have been inconsistent with `'MAX_SUBSETS'` and other input parameters which led to bad plots.
 
 
+# Testing runBorisEfieldy.py
 
+**What I tried:** \
+First time running BorisEfieldy. Tried running my "best" `iota3FWD_1000spins_53Lines_LSODA_flux` trial. In the first attempt accidently wrote incorrect directory, once again it created empty folder and gave an error. The error said `No such file or directory: '/scratch/basov2/code/fieldlines-uiuc/output/iota3FWD_1000spins_53LinesLSODA_flux/data/Poincare_002.npy'`. It specifically could not find Poincare_002.npy, not sure why it starts with 002 instead of 001.
+Second attempt got a new error `KeyError: 'allocated_bytes.all.current'` I think it is because I set `gpus-per-node=0` in the batch file so the code is running on CPU, but still tries to print GPU memory stats.
+
+**Notes:**\
+It worked on the third attempt! I got the streaks, everything is very diffused and particles are unconfined. Not a good try, I need cleaner flux.
+
+
+# Re-running FluxCalc and FluxGrad 6/10/2026
+The goal is to get a nicer profile for Boris.
+
+## Trial 1
+**What I tried:** \
+Tried switching from 20 LCFS to 8 which is the suggestion by the Poincare log file. 
+
+**Output file:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/second_flux_run`
+
+**Notes:**\
+Flux_v_Surface plot looked messy between surface index 8–20. Many lines jump around and drop to zero, for one of the angles the toroidal flux has a huge spike near surface index 8 and goes close to 10000 g*m^2. `FluxGrad` gave uniformly dense `LinearFluxNorm` which is not physically correct. Because the Poincare plots look fine, this is probably the issue with the input during flux calc. 
+
+
+## Trial 2
+**What I tried:** \
+Chaning index to 10 for LCFS, also changed NPHI from 360 to 90 to hopefully speed up the runtime for testing. Lastly, decreased by tolarances by the order of magnitude.
+
+**Notes:** \
+A major improvment, still not perfect but now most of the flux​ curves follow a similar trend. What concerns me is the consistent spike in all trials at around: 24, 32, and 34, HOWEVER, this might actually be a good sign because these might be the islands. Lastly, the runtime did decrease which is very nice, I'm going to keep it this way for now.
+
+## Trial 3
+**What I tried:** \
+Keeping the same tolarance but now going back to LCFS = 20. 
+
+**Outpuf File:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/third_flux_run`
+
+**Notes:** \
+Accidentally override previous subdir, BUT the result is much cleaner. Still seeing the same spikes at same indices. Gonna do another run but in a new non existing subdir.
+
+## Trial 4
+**What I tried:** \
+'LCFS_INDEX': 20, 'INTEGRATE_EPSABS': 5e-2, 'INTEGRATE_EPSREL': 5e-3. Just rerunning previous trial to keep it organized.
+
+**Outpuf File:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/fourth_flux_run`
+
+**Notes:** \
+Very happy with this run, I think this is my best one so far. There is now a real gradient and its no longer just a blob but the edges are noisy. Maybe NPHI was too low or maybe I should try smoothing. I will start with increasing NPHI back to 360.
+
+## Trial 5
+**What I tried:** \
+Changed NPHI from 90 back to 360. The runtime is back to taking hours....
+
+**Outpuf File:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/sixth_flux_run`
+
+**Notes:** \
+Not really an improvment, there is a lot more outliers but the general shape is still being captured. Maybe it is not the NPHI issue. I will go back to NPHI = 90 for testing and play with smoothing. However, I think its the issue with spline not really integration or resolution because at some angles splines do not stay close to the Poincare points. The gradient is gone, this basically means that increasing NPHI in my case just add more noicy data. 
+
+## Trial 6
+**What I tried:** \
+Back to 90 NPHI and smoothing is set to baseline 1e-6.
+
+**Outpuf File:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/seventh_flux_run`
+
+**Notes:** \
+Maybe looks better than NPHI = 360 but no difference in previouse attempts. The density plot looks identical. Need to play with smoothing more, but if that does not work out, replotting Poincare is the way to go.
+
+# Re-running FluxGrad 6/10/2026
+## Trial 1
+**What I tried:** \
+Testing new `input_params['SAVE_BEST_PROFILE']` parameter input.
+
+**Outpuf File:** \
+`iota3FWD_1000spins_53Lines_LSODA_flux/fifth_flux_run`
+
+**Notes File:** \
+Everything looks good, profile saved inside the subdir.
+
+
+# Running FluxCalc and FluxGrad iota4 6/10/2026
+The goal is to get a nice profile for iota4 that has not surfaces inside the islands
+**What I tried:** \
+Immediately changed the tolarance to `'INTEGRATE_EPSABS': 5e-2,` and `'INTEGRATE_EPSREL': 5e-3,`. LCFS is set to 4 based on Poincare.
+
+**Outpuf File:** \
+`iota4FWD_1000spins_53Lines_LSODA_flux/first_flux_run`
+
+**Notes:** \
+Insane run, plot look amazing, but it is totally random. Nice gradient, super smooth, lack of any noice, looks awesome. It does look kind of layers rather than a continuous gradient, so I think applying smoothing for next trial is a good choice.
 
 
 
