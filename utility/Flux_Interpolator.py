@@ -101,6 +101,8 @@ def fluxInterpolator(input_params=None):
         ax.set_ylabel('Flux')
         ax.grid(True)
         ax.set_title(profile_select_str)
+        if SAVE_BEST_PROFILE:
+            simIO.saveFig(ANLYS_SUBDIR + '/' + 'Best_Flux_Profile' + f'_{int(PHI_GENs[best_phi_index])}deg.png', dpi=DPI)
         plt.show()
 
     # Create a meshgrid for the interpolation
@@ -118,9 +120,9 @@ def fluxInterpolator(input_params=None):
 
         # LOAD AXES POINTS
         if SMALLEST_ISLAND_INDEX:
-            points = np.zeros([MAX_SUBSETS+1,2])
-            flux_norm = np.ones([MAX_SUBSETS+1]) # peak values for the axes points
-            points[1:] = island_axis_array[phi_index]
+            points = np.zeros([1,2]) #MAX_SUBSETS+1])
+            flux_norm = np.ones([1]) # peak values for the axes points
+            #points[1:] = island_axis_array[phi_index]
         else:
             points = np.zeros([1,2])
             flux_norm = np.ones(1) # peak values for the axes points
@@ -272,4 +274,8 @@ if __name__ == '__main__':
     GUESS_PHI_INDEX = -20 #-71
     # Stop for flux profile selection
     DEBUG = True
+    # New input parameters
+    SAVE_BEST_PROFILE = False
+    DPI = 300
+    
     fluxInterpolator()
