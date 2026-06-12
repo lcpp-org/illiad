@@ -43,24 +43,27 @@ He_mass = 4.002602 #amu
 INPUT1_DIRECTORY_NAME = "AcceptedIota3_1500spins_atole-9"
 #TAG1 = '60V_Z1_TraceTest'
 #TAG1 = '60V_Li_Z1_SOFE25-2'
-TAG1 = 'APS25_Li-1ms'
+#TAG1 = 'APS25_Li-1ms'
+TAG1 = 'Li_ARTICLE_Testing'
+
 #output/AcceptedIota3_1500spins_atole-9/plots/Wall_Histogram_0mm_LCFS37_1eV_60V_Z1_APS25_Li-1ms.png
 # ION PROPERTIES
-ION_TEMP = 1.0 #eV 
+ION_TEMP = 5.0 #eV 
 ION_MASS = Li_mass #amu
-CHARGE_NUM = 1 # Z
-FIELD_SCALE_ELECTRIC = 60.0 # [Volts]
+CHARGE_NUM = 2 # Z
+FIELD_SCALE_ELECTRIC = 120.0 # [Volts]
 
 # INITIAL CONDITIONS
-LCFS_INDEX = 37 # from Poincare output (simIO.log)
-NPHI = 60
+LCFS_INDEX = 19 # from Poincare output (simIO.log)
+NPHI = 120
 NTHETA = 72 #90
 DELTRS = [0.000]
-NPARTICLES_PER_EMITTER = 15 #300
+NPARTICLES_PER_EMITTER = 500 #15 #300
 
 # SIMULATION PARAMETERS
 DT = 1e-8
-TMAX = 0.0006
+#TMAX = 0.0006
+TMAX = 0.001
 NSTEPS = int(TMAX / DT)
 
 ## DEFINE STRING (FOR FILE NAME)
@@ -103,9 +106,12 @@ dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
 cond_string2 = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                            int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
 
+
+
+
 # UNIQUE OUTPUT TAG
 OUTPUT_DIRECTORY_NAME = "TEST_HISTOGRAM"
-TAGOUT = 'article'
+TAGOUT = 'article2'
 
 
 
@@ -128,9 +134,9 @@ b_hidra = Mesh(R0=0.72, a=0.19)
 filename1 = 'Wallpt_OUTPUT_' + cond_string1+TAG1
 outputArray1 = sim_IN1.loadNumpyData(filename1+'.npy')
 
-filename2 = 'Wallpt_OUTPUT_' + cond_string2+TAG2
-outputArray2 = sim_IN2.loadNumpyData(filename2+'.npy')
-print(f'Loaded wall point data: {outputArray1.shape=}, {outputArray2.shape=}')
+# filename2 = 'Wallpt_OUTPUT_' + cond_string2+TAG2
+# outputArray2 = sim_IN2.loadNumpyData(filename2+'.npy')
+# print(f'Loaded wall point data: {outputArray1.shape=}, {outputArray2.shape=}')
 
 # JUST #1
 wallPtArray = outputArray1[:3, :]  # r, theta, phi
@@ -181,7 +187,7 @@ theta_plot = wallPtArray[1]
 theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 
 a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
-phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
+phi_plot_deg = (phi_plot*(180/np.pi) + 180 + a_phi) % 360.
 theta_plot_deg = theta_plot*(180/np.pi)
 
 

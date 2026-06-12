@@ -122,14 +122,14 @@ wallPtArray2 = outputArray2[:3, :]  # r, theta, phi
 a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
 
 phi_plot = wallPtArray[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
+phi_plot_deg = (phi_plot*(180/np.pi) + 180 + a_phi) % 360.
 
 theta_plot = wallPtArray[1]
 theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
 theta_plot_deg = theta_plot*(180/np.pi)
 
 phi_plot2 = wallPtArray2[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-phi_plot_deg2 = (phi_plot2*(180/np.pi) + a_phi) % 360.
+phi_plot_deg2 = (phi_plot2*(180/np.pi) + 180 + a_phi) % 360.
 
 theta_plot2 = wallPtArray2[1]
 theta_plot2[theta_plot2>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
