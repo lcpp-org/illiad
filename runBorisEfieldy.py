@@ -139,6 +139,7 @@ def boris_runner(input_params=None):
 
     #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString=cond_string+TAG, simIO=simIO)
     ion_tracer.plotTraces(traces, b_hidra, runString=cond_string+TAG, simIO=simIO)
+    ion_tracer.plotTracesPoincare(traces, b_hidra, runString=cond_string+TAG+'_Poincare', simIO=simIO)
     #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString=cond_string+TAG, simIO=simIO)
     #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString=cond_string+TAG, simIO=simIO)
 
@@ -159,8 +160,8 @@ if __name__ == "__main__":
     FIELD_FILE_ELECTRIC = 'input_files/Efield_IdealIota3_lcfs30.npy'
 
     FIELD_SCALE_ELECTRIC = 60.0 # [Volts] (V_p, corresponds to ~4.2*T_e[eV])
-    ION_NEUTRAL_COLLISIONS = 'langevin_in_hstep' # None, 'viscous_drag_hstep', 'langevin_in_hstep'
-    ION_ION_COLLISIONS = 'fokker_planck_ii_hstep' # None, 'linearFP_ii_hstep', 'fokker_planck_ii_hstep'
+    ION_NEUTRAL_COLLISIONS = None #'langevin_in_hstep' # None, 'viscous_drag_hstep', 'langevin_in_hstep'
+    ION_ION_COLLISIONS = None #'fokker_planck_ii_hstep' # None, 'linearFP_ii_hstep', 'fokker_planck_ii_hstep'
     NEUTRAL_GAS_DENSITY = 3e18 # [m^-3]
     PLASMA_DENSITY = 5e18 # [m^-3]
 
@@ -172,23 +173,23 @@ if __name__ == "__main__":
     # [INITIAL CONDITIONS]
     LCFS_INDEX = 40 #86 #30 #29 #40 (from Poincare output (simIO.log))
     DELTRS = [0.000] # [m]
-    NPHI = 180
+    NPHI = 90 #180
     NTHETA = 120
-    NPARTICLES_PER_EMITTER = 50
+    NPARTICLES_PER_EMITTER =20 #50
 
     # [SIMULATION PARAMETERS]
     DT = 1e-8 # [s]
     TMAX = 0.0010 # [s]
     NSTEPS = int(TMAX / DT)
-    TRACK_NPHI = 180#72     #60#18 #60  #18
-    TRACK_NTHETA = 120#40   #40#12 #40  #12
+    TRACK_NPHI = 5#180#72     #60#18 #60  #18
+    TRACK_NTHETA = 4#120#40   #40#12 #40  #12
     TRACK_NPARTICLES_PER_EMITTER = 1
     STRIDE = 13 # Save every STRIDE-th trace timestep, plus final positions.
 
 
    # [ANALYSIS DIRECTORY AND UNIQUE OUTPUT TAG]
     OUTPUT_DIRECTORY_NAME = "It-0486_Ih-0900_noErr_1500sp_LSODA1e8"
-    TAG = "Lithium_TRACK360x180_IdealIota3_collisionTest_both_TypicalOperation_stride13"
+    TAG = "Lithium_TRACK360x180_IdealIota3_ARTICLETRACES"
 
 
     boris_runner()
