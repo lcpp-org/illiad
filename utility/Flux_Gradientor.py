@@ -43,44 +43,39 @@ def fluxGradientor(input_params=None):
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
     b_hidra.set_nonPer_errField()
 
-    # load numpy data using simIO method: big_grid_linear, big_grid_parabolic
-    #big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear.npy')
-    big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy')
-    #big_grid_linear = simIO.loadNumpyData(ANLYS_SUBDIR + '/big_grid_linear2.npy')
-    print(f'{big_grid_linear.shape=}')#, {big_grid_parabolic.shape=}')
+    # load density data from flux inteprolator step
+    density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy') #'/big_grid_linear.npy')
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
     THETAS = np.linspace(b_hidra.theta_min, b_hidra.theta_max, b_hidra.ntheta)
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
 
-    simIO.log.info("## Starting flux gradient calculation. ##")
     # GRADIENT CALCULATION: remember to divide by Jacobian determinant:
     #  gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
-    big_flux_Lingrad = np.gradient(big_grid_linear, PHI_GENs, THETAS, RADS, edge_order=2)#, [grid_rad, grid_theta])
+    simIO.log.info("## Starting flux gradient calculation. ##")
+    flux_gradient = np.gradient(density_grid, PHI_GENs, THETAS, RADS, edge_order=2)#, [grid_rad, grid_theta])
     simIO.log.info("## Flux gradient calculation complete. ##")
 
-    big_flux_Lingrad_radial = -big_flux_Lingrad[2]  # E = -grad[V]
-    big_flux_Lingrad_poloidal = np.zeros_like(big_flux_Lingrad[1])
-    big_flux_Lingrad_poloidal[:,:,1:] = -big_flux_Lingrad[1][:,:,1:] / grid_rad[:,1:]
-    #big_flux_Lingrad_poloidal[:,:,0] = big_flux_Lingrad_poloidal[:,:,1]
-    big_flux_Lingrad_toroidal = -big_flux_Lingrad[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
-    print(f'{big_flux_Lingrad_radial.shape=}')
+    # Calculate RTP basis vectors and apply the Jacobian factors to get the physical gradient in each direction
+    flux_gradient_radial = -flux_gradient[2]  # E = -grad[V]
 
+    flux_gradient_poloidal = np.zeros_like(flux_gradient[1])
+    flux_gradient_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / grid_rad[:,1:]
+
+    flux_gradient_toroidal = -flux_gradient[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
+    simIO.log.info(f'{flux_gradient_radial.shape=}')
 
     # # Load LCFS file:
     # lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX))
     # lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
-    
+
     # set all points outside the LCFS to zero
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
-
-
         #lcfs_points = lcfs_points_full[phi_index]
         # keep only 1st subset of points (360 points)
         # lcfs_points= lcfs_points[:360].T
         #print(f'{phi_index=}')
-
 
         ## LOAD POINCARE DATA
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
@@ -92,33 +87,28 @@ def fluxGradientor(input_params=None):
 
         for theta_index, this_theta in enumerate(THETAS):
             # find the index of the value in lcfs_points[0] closest to this_theta
-            # mintheta1 = np.abs(lcfs_points[0] - this_theta)
-            # mintheta2 = np.abs(lcfs_points[0] - this_theta + 2*np.pi)
-            mintheta1 = np.abs(th_in - this_theta)
-            mintheta2 = np.abs(th_in - this_theta + 2*np.pi)
-
-
+            mintheta1 = np.abs(th_in - this_theta) #lcfs_points[0]
+            mintheta2 = np.abs(th_in - this_theta + 2*np.pi) #lcfs_points[0]
 
             # calculate the minimum of the two
             mintheta3 = np.fmin(mintheta1, mintheta2)
             lcfs_theta_index = np.argmin(mintheta3)
-            # lcfs_rad = lcfs_points[1][lcfs_theta_index]
-            lcfs_rad = r_in[lcfs_theta_index]
+            lcfs_rad = r_in[lcfs_theta_index] #lcfs_points[1]
 
             # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
             mask = RADS > (lcfs_rad + 0.01) # add buffer to avoid numerical issues
-            big_flux_Lingrad_radial[phi_index][theta_index][mask] = 0.0
-            big_flux_Lingrad_poloidal[phi_index][theta_index][mask] = 0.0
-            big_flux_Lingrad_toroidal[phi_index][theta_index][mask] = 0.0
+            flux_gradient_radial[phi_index][theta_index][mask] = 0.0
+            flux_gradient_poloidal[phi_index][theta_index][mask] = 0.0
+            flux_gradient_toroidal[phi_index][theta_index][mask] = 0.0
 
-
-    big_flux_Lingrad_magnitude = np.sqrt(big_flux_Lingrad_radial**2 + big_flux_Lingrad_poloidal**2 + big_flux_Lingrad_toroidal**2)
+    flux_gradient_magnitude = np.sqrt(flux_gradient_radial**2 + flux_gradient_poloidal**2 + flux_gradient_toroidal**2)
 
     # RESHAPE THE ARRAYS TO MATCH THE DIMNENSIONS OF INPUT BFIELDS
-    reshaped_big_grid_linear_r = np.transpose(big_flux_Lingrad_radial, (2, 1, 0))
-    reshaped_big_grid_linear_pol = np.transpose(big_flux_Lingrad_poloidal, (2, 1, 0))
-    reshaped_big_grid_linear_tor = np.transpose(big_flux_Lingrad_toroidal, (2, 1, 0))
-    Efield_rtpArray_linear = np.array([reshaped_big_grid_linear_r, reshaped_big_grid_linear_pol, reshaped_big_grid_linear_tor])
+    reshaped_flux_gradient_radial = np.transpose(flux_gradient_radial, (2, 1, 0))
+    reshaped_flux_gradient_poloidal = np.transpose(flux_gradient_poloidal, (2, 1, 0))
+    reshaped_flux_gradient_toroidal = np.transpose(flux_gradient_toroidal, (2, 1, 0))
+    Efield_rtpArray_linear = np.array([reshaped_flux_gradient_radial, reshaped_flux_gradient_poloidal, reshaped_flux_gradient_toroidal])
+
     # save the array using simIO method
     simIO.saveNumpyData(Efield_rtpArray_linear, ANLYS_SUBDIR + '/Efield_rtpArray_linear.npy')
 
@@ -129,12 +119,16 @@ def fluxGradientor(input_params=None):
     Ex_linear = np.zeros(flattened_shape)
     Ey_linear = np.zeros(flattened_shape)
     Ez_linear = np.zeros(flattened_shape)
-    for i, (rad, theta, phi, EradLin, EthetaLin, EphiLin) in enumerate(zip(xform_rad.flatten(), xform_theta.flatten(), xform_phi.flatten(),
-                                                                      reshaped_big_grid_linear_r.flatten(), reshaped_big_grid_linear_pol.flatten(), reshaped_big_grid_linear_tor.flatten())):
+    for i, (rad, theta, phi, EradLin, EthetaLin, EphiLin) in enumerate(zip(xform_rad.flatten(),
+                                                                           xform_theta.flatten(),
+                                                                           xform_phi.flatten(),
+                                                                           reshaped_flux_gradient_radial.flatten(),
+                                                                           reshaped_flux_gradient_poloidal.flatten(), 
+                                                                           reshaped_flux_gradient_toroidal.flatten())):
         ErtpLin = np.array([EradLin, EthetaLin, EphiLin])
         p_RTP = np.array([rad, theta, np.radians(phi)])
         Ex_linear[i], Ey_linear[i], Ez_linear[i] = RTP_XYZ_JAC(p_RTP, ErtpLin, form='rtp2xyz')
-    
+
     # reshape the arrays to match the dimensions of input Bfields
     Efield_xyzArray_linear[0] = Ex_linear.reshape(Efield_xyzArray_linear[0].shape)
     Efield_xyzArray_linear[1] = Ey_linear.reshape(Efield_xyzArray_linear[1].shape)
@@ -146,10 +140,10 @@ def fluxGradientor(input_params=None):
     colortest = 'afmhot_r'
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         #output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear[phi_index], 'FluxNorm', ANLYS_SUBDIR, simIO, 'inferno', 0.0, 1.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_magnitude[phi_index], 'FluxGradMagnitude', ANLYS_SUBDIR, simIO, colortest, 0.0, 200.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_radial[phi_index], 'FluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_poloidal[phi_index], 'FluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_flux_Lingrad_toroidal[phi_index], 'FluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_magnitude[phi_index], 'FluxGradMagnitude', ANLYS_SUBDIR, simIO, colortest, 0.0, 200.0)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_radial[phi_index], 'FluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_poloidal[phi_index], 'FluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_toroidal[phi_index], 'FluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
 
     simIO.log.info("## Flux gradienting complete. ##")
 
