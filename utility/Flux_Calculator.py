@@ -219,7 +219,7 @@ def fluxCalculator(input_params=None):
     axNORM.set_ylim(0, 1.1)
     axNORM.grid(which='both', linestyle=':', linewidth=0.5)
 
-    simIO.saveFig(ANLYS_SUBDIR+'/Flux_v_Surface.png', dpi=300)
+    simIO.saveFig(ANLYS_SUBDIR+'/Flux_v_Surface.png', dpi=250)
     simIO.log.info('Finished, LCFS=#{}, ISLAND AXIS=#{}'.format(LCFS_INDEX, smallest_island_index))
 
     # SAVE THE NUMPY ARRAYS TO INDIVIDUAL FILES USING SIMIO METHOD
@@ -419,14 +419,9 @@ def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=
     # INTEGRATION HELPER FUNCTIONS
     def flux_integrand(r, theta, phi, field, axis):
         """Function to calculate the toroidal field times radius at a given point in space"""
-        geo_point = np.array([r+axis[1], theta+axis[0], phi], dtype=np.float64)
-        #axis[0] += np.pi
+        axis[0] += np.pi
         geo_point = np.array([*axisShift(r, theta, *axis), phi])
-        if geo_point[0] < 0.0:
-            geo_point[0] *= -1.0
-            geo_point[1] += np.pi
         bxy = field.interpField(geo_point, Cart=False)[0][:2]
-        #bxy = np.array([1.0, 1.0]) # TESTING
 
         # Calculate the toroidal flux integrand: r*B_toroidal = r*( -Bx*sin(phi) - By*cos(phi) )
         return -r*( bxy[0]*np.sin(phi) - bxy[1]*np.cos(phi) )
@@ -675,7 +670,7 @@ def finalize_plotting(fig, axRect, axHist, axPolar, PHI_GEN_DEG, num_subsets, MA
                     labels=['', '5cm', '', '10cm', '', '15cm', ''], angle=0, fontsize=4)
 
     simIO.log.info('Plotting Flux Surfaces @ phi={}'.format(PHI_GEN_DEG))
-    simIO.saveFig(ANLYS_SUBDIR+'/Splines_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=600)
+    simIO.saveFig(ANLYS_SUBDIR+'/Splines_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=300)
     plt.close()
 
 if __name__ == '__main__':
