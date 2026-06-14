@@ -61,9 +61,10 @@ def fluxInterpolator(input_params=None):
     filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(N_surfaces-1)
     axis_array = simIO.loadNumpyData(filename_center)
 
-    if SMALLEST_ISLAND_INDEX:
-        filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(SMALLEST_ISLAND_INDEX)
-        island_axis_array = simIO.loadNumpyData(filename_center_island)
+    # CAN GET AWAY WITH FUXING NPHI<360!
+    # if SMALLEST_ISLAND_INDEX:
+    #     filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(SMALLEST_ISLAND_INDEX)
+    #     island_axis_array = simIO.loadNumpyData(filename_center_island)
 
     # Load LCFS file:
     lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX))
@@ -116,15 +117,18 @@ def fluxInterpolator(input_params=None):
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
 
-        # LOAD AXES POINTS
-        if SMALLEST_ISLAND_INDEX:
-            points = np.zeros([MAX_SUBSETS+1,2])
-            flux_norm = np.ones([MAX_SUBSETS+1]) # peak values for the axes points
-            points[1:] = island_axis_array[phi_index]
-        else:
-            points = np.zeros([1,2])
-            flux_norm = np.ones(1) # peak values for the axes points
-        points[0] = axis_array[phi_index][0]
+        # CAN GET AWAY WITH FUXING NPHI<360!
+        # # LOAD AXES POINTS
+        # if SMALLEST_ISLAND_INDEX:
+        #     points = np.zeros([MAX_SUBSETS+1,2])
+        #     flux_norm = np.ones([MAX_SUBSETS+1]) # peak values for the axes points
+        #     points[1:] = island_axis_array[phi_index]
+        # else:
+        points = np.zeros([1,2])
+        flux_norm = np.ones(1) # peak values for the axes points
+        # CAN GET AWAY WITH FUXING NPHI<360!
+        #points[0] = axis_array[phi_index][0]
+        points[0] = axis_array[0][0]
 
         ## LOAD SCATTER POINTS (POINCARE DATA)
         filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
@@ -176,7 +180,7 @@ def fluxInterpolator(input_params=None):
         grid_linear.T[1] = fred3
         grid_linear.T[0] = grid_linear.T[1]
 
-        # set all points outside the LCFS to zero
+        """       # set all points outside the LCFS to zero
         ## GET LCFS POINTS
         lcfs_points = lcfs_points_full[phi_index][:NTHETA].T # LCFS IS ONLY 1 SUBSET OF POINTS
         # if phi_index==0 and DEBUG:
@@ -202,6 +206,7 @@ def fluxInterpolator(input_params=None):
             lcfs_rad = lcfs_points[1][lcfs_theta_index]
             mask = RADS > (lcfs_rad + 0.0005) # add buffer to avoid numerical issues
             grid_linear[theta_index][mask] = 0.0
+        """
 
         # Add to big mesh array (3D)
         big_grid_linear[phi_index] = grid_linear[1:]  # skip the first row (theta=0) to match the shape of the b_hidra mesh
@@ -211,11 +216,14 @@ def fluxInterpolator(input_params=None):
     #### END OF LOOP THROUGH PHI ANGLES ####
     # save numpy data using simIO method
     big_grid_linear_np = big_grid_linear.detach().to("cpu").numpy()
-    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/big_grid_linear.npy')
+    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/density_field.npy')
 
     ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, big_grid_linear_np[phi_index], 'LinearFluxNorm', ANLYS_SUBDIR, simIO, 'Blues', 0.0, 1.0)
+
+    simIO.log.info("## Flux interpolation complete. ##")
+
 
 def output_phi_plots(phi_deg, mesh_theta, mesh_rad, data, name, subdir, output_handler, colormap='inferno', plotmin=None, plotmax=None):
     fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
