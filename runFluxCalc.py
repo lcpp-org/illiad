@@ -2,11 +2,11 @@ import numpy as np
 import utility.Flux_Calculator as fc
 import utility.Flux_Gradientor as fg
 
-NUMBER_PHI = 20
+NUMBER_PHI = 2
 input_params = {
     #'ANLYS_DIR': "AAAnewIO_iota3FWD_phi306_LSODA",
     'ANLYS_DIR': "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents",
-    'ANLYS_SUBDIR': "LCFS30_20x360_fixd2_abserr1e-7_relerr5e-3",
+    'ANLYS_SUBDIR': "LCFS30_2x360_fixd2_abserr1e-7_relerr5e-3",
     'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
     'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
     'CURRENT_TOR': 0.486, #[kA]
