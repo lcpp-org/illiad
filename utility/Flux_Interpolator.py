@@ -12,6 +12,11 @@ import gc
 from classes.mesh import *
 from classes.iohandler import IOHandler
 
+
+def _polar_interp_points(thetas, rads):
+    return np.array([rads * np.cos(thetas), rads * np.sin(thetas)]).T
+
+
 def fluxInterpolator(input_params=None):
     ## LOAD INPUT PARAMETERS
     if input_params is not None:
@@ -19,14 +24,26 @@ def fluxInterpolator(input_params=None):
         for key, value in input_params.items():
             print(f'{key}: {value}')
             globals()[str(key)] = value
-            
+
+    rbf_kernel = globals().get("RBF_KERNEL", "multiquadric")
+    rbf_neighbors = globals().get("RBF_NEIGHBORS", 45)
+    rbf_smoothing = globals().get("RBF_SMOOTHING", 1e-0)
+    rbf_epsilon = globals().get("RBF_EPSILON", 1000)
+    input_log_params = globals().copy()
+    input_log_params.update({
+        "RBF_KERNEL": rbf_kernel,
+        "RBF_NEIGHBORS": rbf_neighbors,
+        "RBF_SMOOTHING": rbf_smoothing,
+        "RBF_EPSILON": rbf_epsilon,
+    })
+
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
     simIO = IOHandler(ANLYS_DIR)
     simIO.setActiveSubDir(ANLYS_SUBDIR)
     simIO.startLog(log_name="fluxInterpolator.log", subdir=ANLYS_SUBDIR, logger_name="FluxInterpolator")
     simIO.inputsBoilerplate(
         "FLUX INTERPOLATOR INPUTS",
-        globals(),
+        input_log_params,
         [
             "ANLYS_DIR",
             "ANLYS_SUBDIR",
@@ -41,6 +58,10 @@ def fluxInterpolator(input_params=None):
             "MAX_SUBSETS",
             "ALPHA",
             "GUESS_PHI_INDEX",
+            "RBF_KERNEL",
+            "RBF_NEIGHBORS",
+            "RBF_SMOOTHING",
+            "RBF_EPSILON",
         ],
     )
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
@@ -109,7 +130,7 @@ def fluxInterpolator(input_params=None):
     THETAS = np.linspace(0, b_hidra.theta_max, b_hidra.ntheta+1) #add theta=0 for proper interpolation
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
     grid_shape = grid_theta.shape
-    interpol_pts = np.array([grid_theta.ravel(), grid_rad.ravel()]).T
+    interpol_pts = _polar_interp_points(grid_theta.ravel(), grid_rad.ravel())
     interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float32)
 
     big_grid_linear = torch.zeros([len(PHI_GENs), len(THETAS)-1, len(RADS)], device=device, dtype=torch.float32)
@@ -145,9 +166,6 @@ def fluxInterpolator(input_params=None):
                 # filter NaNs
                 thetas = thetas[~np.isnan(thetas)]
                 rads = rads[~np.isnan(rads)]
-                # # extend theta range for proper interpolation
-                thetas = np.concatenate((thetas,thetas+np.pi*2,thetas-np.pi*2))
-                rads = np.concatenate((rads,rads,rads))
                 N_pts = len(thetas)
 
                 # concatenate to big array of points
@@ -158,10 +176,11 @@ def fluxInterpolator(input_params=None):
                 flux_norm = np.concatenate((flux_norm, these_flux_norms))
 
         #grid_linear = griddata(points, flux_norm, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
-        points_torch = torch.as_tensor(points, device=device, dtype=torch.float32)
+        interp_points = _polar_interp_points(points[:, 0], points[:, 1])
+        points_torch = torch.as_tensor(interp_points, device=device, dtype=torch.float32)
         flux_norm_torch = torch.as_tensor(flux_norm, device=device, dtype=torch.float32)
         #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='multiquadric', neighbors=25, smoothing=1e-0, epsilon=1000)
-        interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='multiquadric', neighbors=45, smoothing=1e-0, epsilon=1000)
+        interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel=rbf_kernel, neighbors=rbf_neighbors, smoothing=rbf_smoothing, epsilon=rbf_epsilon)
         
         #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='linear', neighbors=15, smoothing=1e-5, degree=1) #, epsilon=1e4)
         #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='linear', neighbors=55, smoothing=1e-5, degree=1) #, epsilon=1e4)

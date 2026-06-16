@@ -110,7 +110,7 @@ def fluxGradientor(input_params=None):
     Efield_rtpArray_linear = np.array([reshaped_flux_gradient_radial, reshaped_flux_gradient_poloidal, reshaped_flux_gradient_toroidal])
 
     # save the array using simIO method
-    simIO.saveNumpyData(Efield_rtpArray_linear, ANLYS_SUBDIR + '/Efield_rtpArray_linear.npy')
+    # simIO.saveNumpyData(Efield_rtpArray_linear, ANLYS_SUBDIR + '/Efield_rtpArray_linear.npy')
 
     Efield_xyzArray_linear = np.zeros_like(Efield_rtpArray_linear)
     xform_rad, xform_theta, xform_phi= np.meshgrid(RADS, THETAS, PHI_GENs, indexing='ij')
