@@ -11,7 +11,9 @@ input_params = {
     #'ANLYS_DIR': "AAAnewIO_iota3FWD_phi306_LSODA",
     'ANLYS_DIR': "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents",
     #'ANLYS_SUBDIR': "LCFS21_20x180",
-    'ANLYS_SUBDIR': "LCFS30_20x180",
+    #'ANLYS_SUBDIR': "LCFS40_20x360_fixd2_abserr1e-2_relerr1e-1_meshErrTest2",
+    'ANLYS_SUBDIR': "LCFS15_20x180_FIXED",
+
 
     'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
     'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
@@ -20,7 +22,7 @@ input_params = {
     'CONFIG_TOR': 'default_toroidal',
     'CONFIG_HEL': 'default_helical',
     'ENABLE_ERRFIELD': True,
-    'LCFS_INDEX': 30,
+    'LCFS_INDEX': 15,
     'NPHI': N_phi,
     'NTHETA': 180,
     'PHI_GENs': np.linspace(360//N_phi, 360, N_phi),
@@ -43,12 +45,12 @@ input_params = {
 ## RUN ANALYSIS
 input_params['ALPHA'] = 1.0
 input_params['DEBUG'] = True
-input_params['LCFS_INDEX'] = 30
-input_params['INV_SURF_INDICES'] = [] #[55, 56, 57, 58] #[18,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59]
-input_params['GUESS_PHI_INDEX'] = -1
+input_params['LCFS_INDEX'] = 15
+input_params['INV_SURF_INDICES'] = [20]
+input_params['GUESS_PHI_INDEX'] = -3
 
 fi.fluxInterpolator(input_params)
 
 # ## RUN ANALYSIS
-input_params['OUTPUT_FILE_NAME'] = "Efield_LCFS30"
+input_params['OUTPUT_FILE_NAME'] = "Efield_LCFS15"
 fg.fluxGradientor(input_params)
