@@ -110,6 +110,7 @@ exclude = [
 ]
 
 [tool.setuptools]
+include-package-data = false
 py-modules = [
     "runBoris_new",
     "runFieldsolver",

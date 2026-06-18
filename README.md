@@ -88,6 +88,10 @@ trajectory traces, residence-time estimates, and collisionality comparisons.
 - `output/`: generated analysis products, logs, figures, and simulation data.
 - `fastplotlib_tests/`: standalone interactive trace-viewer prototypes.
 
+Release artifact contents are summarized in
+[`docs/RELEASE_CONTENTS.md`](docs/RELEASE_CONTENTS.md). Large generated field
+arrays and run outputs are intentionally kept out of package artifacts.
+
 ## Dependencies
 
 The versions below are the current development versions used on the Illinois
