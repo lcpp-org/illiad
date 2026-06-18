@@ -66,12 +66,11 @@ def main(input_params_override=_CLI_INPUTS):
     params.setdefault('LCFS_INDEX', 15)
     params.setdefault('INV_SURF_INDICES', [20])
     params.setdefault('GUESS_PHI_INDEX', -3)
+    params.setdefault('OUTPUT_FILE_NAME', "Efield_LCFS15")
     normalize_phi_gens(params)
 
+    ## RUN ANALYSIS
     fi.fluxInterpolator(params)
-
-    # ## RUN ANALYSIS
-    params.setdefault('OUTPUT_FILE_NAME', "Efield_LCFS15")
     fg.fluxGradientor(params)
 
 

@@ -67,6 +67,7 @@ def fluxInterpolator(input_params=None):
             "ALPHA",
             "INV_SURF_INDICES",
             "GUESS_PHI_INDEX",
+            "OUTPUT_FILE_NAME",
             "RBF_KERNEL",
             "RBF_NEIGHBORS",
             "RBF_SMOOTHING",
@@ -244,7 +245,7 @@ def fluxInterpolator(input_params=None):
     #### END OF LOOP THROUGH PHI ANGLES ####
     # save numpy data using simIO method
     big_grid_linear_np = big_grid_linear.detach().to("cpu").numpy()
-    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/density_field.npy')
+    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/' + 'nField_' + OUTPUT_FILE_NAME + '.npy')
 
     ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
@@ -306,6 +307,7 @@ if __name__ == '__main__':
     SMALLEST_ISLAND_INDEX = None #57 #104 #39
     ALPHA = 1.0 #0.85  # flux profile adjustment parameter
     GUESS_PHI_INDEX = -20 #-71
+    OUTPUT_FILE_NAME = "default"
     # Stop for flux profile selection
     DEBUG = True
     fluxInterpolator()
