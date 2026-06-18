@@ -29,6 +29,8 @@ input_params = {
     'BIG_MESH': True
 }
 
+_CLI_INPUTS = object()
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ILLIAD flux-surface integration.")
@@ -40,8 +42,11 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(input_params_override=None):
+def main(input_params_override=_CLI_INPUTS):
     ## RUN ANALYSIS
+    if input_params_override is _CLI_INPUTS:
+        args = parse_args()
+        input_params_override = load_inputs_json(args.inputs_json, "Flux calculator inputs") if args.inputs_json else None
     params = merge_input_params(input_params, input_params_override)
     normalize_phi_gens(params)
     island_index = fc.fluxCalculator(params)
@@ -49,5 +54,4 @@ def main(input_params_override=None):
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    main(load_inputs_json(args.inputs_json, "Flux calculator inputs") if args.inputs_json else None)
+    main()

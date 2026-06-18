@@ -64,6 +64,8 @@ DEFAULT_INPUTS = {
     "mesh_periodicity": [0, 1, 5],
 }
 
+_CLI_INPUTS = object()
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ILLIAD Biot-Savart magnetic field generation.")
@@ -147,10 +149,13 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
 
     #return Bxyz
 
-def main(input_params=None):
+def main(input_params=_CLI_INPUTS):
     """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
     It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
     The results are saved to a specified output file."""
+    if input_params is _CLI_INPUTS:
+        args = parse_args()
+        input_params = load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None
     globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
 
     ## READ COIL INPUT FILE
@@ -238,5 +243,4 @@ def main(input_params=None):
     np.save(output_name, B_XYZ.cpu())
 
 if __name__ == '__main__':
-    args = parse_args()
-    main(load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None)
+    main()

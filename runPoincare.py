@@ -79,6 +79,8 @@ DEFAULT_INPUTS = {
     "OUTPUT_DIR": OUTPUT_DIR,
 }
 
+_CLI_INPUTS = object()
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ILLIAD Poincare field-line tracing.")
@@ -90,11 +92,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(input_params=None):
+def main(input_params=_CLI_INPUTS):
     
     """
     Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
     """
+    if input_params is _CLI_INPUTS:
+        args = parse_args()
+        input_params = load_inputs_json(args.inputs_json, "Poincare inputs") if args.inputs_json else None
     if input_params is not None:
         globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
 
@@ -151,5 +156,4 @@ def main(input_params=None):
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
 if __name__ == '__main__':
-    args = parse_args()
-    main(load_inputs_json(args.inputs_json, "Poincare inputs") if args.inputs_json else None)
+    main()
