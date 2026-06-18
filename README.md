@@ -130,6 +130,19 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    Install the optional packages above only if you need the fitting utilities,
    interactive trace viewers, or animation export.
 
+   For editable development installs, the repository also includes packaging
+   metadata:
+
+   ```bash
+   pip install -e .
+   ```
+
+   Optional dependency extras are available for adjacent tooling:
+
+   ```bash
+   pip install -e ".[fitting,viewer,export]"
+   ```
+
 2. Confirm that the input data are available.
 
    The current analysis scripts expect pre-generated field and profile files in
