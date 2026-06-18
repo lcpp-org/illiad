@@ -3,6 +3,10 @@ include LICENSE
 include pyproject.toml
 include boris_inputs.json
 include animation_inputs.json
+include fieldsolver_inputs.json
+include poincare_inputs.json
+include flux_calc_inputs.json
+include flux_grad_inputs.json
 
 recursive-include illiad *.py
 recursive-include classes *.py

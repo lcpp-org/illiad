@@ -10,8 +10,9 @@ research runs.
   `fastplotlib_tests/`.
 - Public runner scripts: `runFieldsolver.py`, `runPoincare.py`,
   `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris_new.py`.
-- Example configuration files: `boris_inputs.json` and
-  `animation_inputs.json`.
+- Example configuration files: `fieldsolver_inputs.json`,
+  `poincare_inputs.json`, `flux_calc_inputs.json`, `flux_grad_inputs.json`,
+  `boris_inputs.json`, and `animation_inputs.json`.
 - Project metadata: `pyproject.toml`, `README.md`, `LICENSE`, and
   `MANIFEST.in`.
 - Small reference input files under `input_files/`, such as CSV geometry files,
