@@ -173,13 +173,83 @@ Everything looks good, profile saved inside the subdir.
 # Running FluxCalc and FluxGrad iota4 6/10/2026
 The goal is to get a nice profile for iota4 that has not surfaces inside the islands
 **What I tried:** \
-Immediately changed the tolarance to `'INTEGRATE_EPSABS': 5e-2,` and `'INTEGRATE_EPSREL': 5e-3,`. LCFS is set to 4 based on Poincare.
+Immediately changed the tolarance to `'INTEGRATE_EPSABS': 5e-2,` and `'INTEGRATE_EPSREL': 5e-3,`. LCFS is set to 4 based on Poincare and NPHI = 90
 
 **Outpuf File:** \
 `iota4FWD_1000spins_53Lines_LSODA_flux/first_flux_run`
 
 **Notes:** \
 Insane run, plot look amazing, but it is totally random. Nice gradient, super smooth, lack of any noice, looks awesome. It does look kind of layers rather than a continuous gradient, so I think applying smoothing for next trial is a good choice.
+
+
+# Running iota4 6/13/2026
+## Trial 1
+Running previous iota4 witn NPHI = 90 for streak did not work, the code gives the error
+``` Python
+RuntimeError: CUDA error: device-side assert triggered
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+```
+
+## Trial 2
+**Notes:** \
+Ran the whole simulation for iota4 with NPHI=360, the results showed only tiny difference between NPHI=90 and NPHI=360. For the NPHI=360 case, the `Flux_v_Surface.png` had more noise, while magnitude and density plots were ALMOST identical, NPHI=360 looks a little differnet on the edge but the difference is almost unnoticeable
+Additionally, I was able to run 43200 particles on my local computer, I compared the results to the one from the cluster to see if they match. Everything looked good and the runtime was only about 15 minutes. This is really good because the queue time can sometimes take days. The only problem is that simulation crashed while generating `IonTraces.png`. I still gonna figure out how to run NPHI=90.
+
+PC SPECS:
+- **Processor:** AMD Ryzen 9 5900HS 
+- **RAM:** 24.0 GB 
+- **Graphics Card:** NVIDIA GeForce RTX 3070 Laptop (8 GB)
+
+The results showed "concentrated" streaks along the vessel wall, no diffusion. There is more particle deposition at the outer edge which makes sense because this is where particles are spawned.
+
+**Output File:**
+`iota4FWD_1000spins_53Lines_LSODA_flux/fullNPHI_flux_run`
+
+## Trial 3
+Re-running Boris on the home pc with 1200 tracked particles to see if the simulation will crash again.
+
+**Notes:**\
+No crashes! Got the `IonTraces.png`, the plasma looks confined and I can the periodicity
+
+# Running iota3 6/13/2026
+Trying to fix previous attempts (fourth) to generate iota3 profile, by adjusting
+`SMALLEST_ISLAND_INDEX`
+
+**Notes:**\
+"Best" flux profile is still janky no matter what I try to fix. After this I'm just going to re run Poincare one more time.
+
+# Running iota3 with no islands 6/15/2026
+## Trial 1
+Generated 5 Poincares for different angles with 1200 spins which includes: baseline(theta=180), 90-deg, 135-deg, 160-deg, 170-deg.
+Initially I thought that 170-deg looked the "best" because there was no surfaces inside the islands and there was a good amount of surfaces at the magnetic axis. After running `fluxCalc` the "best flux profile" still looked horrible. It is able to map the entire shape from center to LCFS but there is still that tumor looking shape between surface 20 and 30. This exact shape was present in previous iota3 attempt not sure what it is. However, the magnitude and density looked okay. Everything is continuous, density has a gradient, but islands are explicitly shown (unlike iota4 no island case) and they are dense regions, this is not what we want. I think the reason why I got gradient inside islands is because there is still a lot of surfaces inside the islands, I want to re run Poincare for 165 degree to get rid of some surfaces.
+Additionally, the edge looks a bit noicy, probably have to play with smoothing a little. Also, maybe the tumor shape on the best flux profile is caused by bad tolarance when integrating, I will play with that as well. 
+Lastly, since I was running this trial at NPHI = 90 I could not get Boris to run
+
+**Output File:** \
+`iota3_1200spins_53Lines_LSODA_170deg/iota3_test1_170deg`
+
+## Trial 2
+Re running 170-deg case for NPHI=180
+
+
+## Trial 3
+Generated 165-deg Poincare 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
