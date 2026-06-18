@@ -114,15 +114,15 @@ def fluxInterpolator(input_params=None):
     print(f'{valid_surface=}')
     #valid_indices = np.where(valid_surface)[0] # find the indices where valid_surface is True
     # flux parameter vs surface index plot
+    fig, ax = plt.subplots()
+    #ax.plot(valid_indices, linear_flux_array[valid_indices])
+    ax.bar(range(len(linear_flux_array)), linear_flux_array)
+    ax.set_xlabel('Surface Index')
+    ax.set_ylabel('Flux')
+    ax.grid(True)
+    ax.set_title(profile_select_str)
+    simIO.saveFig(ANLYS_SUBDIR + '/' + 'Best_Flux_Profile.png', dpi=300)
     if DEBUG:
-        print()
-        fig, ax = plt.subplots()
-        #ax.plot(valid_indices, linear_flux_array[valid_indices])
-        ax.bar(range(len(linear_flux_array)), linear_flux_array)
-        ax.set_xlabel('Surface Index')
-        ax.set_ylabel('Flux')
-        ax.grid(True)
-        ax.set_title(profile_select_str)
         plt.show()
 
     # Create a meshgrid for the interpolation
