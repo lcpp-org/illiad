@@ -157,6 +157,14 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    illiad-boris --inputs-json boris_inputs.json
    ```
 
+   Public Python imports are available through the `illiad` namespace:
+
+   ```python
+   from illiad.mesh import Mesh, TorchMesh
+   from illiad.io import IOHandler
+   from illiad.flux import fluxCalculator, fluxInterpolator, fluxGradientor
+   ```
+
 2. Confirm that the input data are available.
 
    The current analysis scripts expect pre-generated field and profile files in
