@@ -168,7 +168,7 @@ def fluxInterpolator(input_params=None):
         ## LOOP THROUGH SURFACES
         for surface_index in range(LCFS_INDEX, N_surfaces):
             if valid_surface[surface_index] == False:
-                print(f'Skipping surface {surface_index} (not valid)')
+                simIO.log.info(f'Skipping surface {surface_index} (not valid)')
             else:
                 ### GET VALUES
                 thetas = flux_surfaces[surface_index][0]
@@ -264,8 +264,9 @@ def output_phi_plots(phi_deg, mesh_theta, mesh_rad, data, name, subdir, output_h
     ax.set_rticks([])
     plt.grid(False)
     fig.colorbar(c, ax=ax, label='Flux')
-
-    output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
+    fig_path = subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg))
+    output_handler.saveFig(fig_path, dpi=300)
+    output_handler.log.info('Saved figure: ' + fig_path)
     plt.close()
 
 if __name__ == '__main__':
