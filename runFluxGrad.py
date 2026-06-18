@@ -49,9 +49,7 @@ input_params['SMALLEST_ISLAND_INDEX'] = 25
 
 ## RUN ANALYSIS
 input_params['ALPHA'] = 1.0
-input_params['DEBUG'] = True #Debug helper 
-input_params['SAVE_BEST_PROFILE'] = True
-input_params['DPI'] = 300
+input_params['DEBUG'] = False #Debug helper 
 input_params['LCFS_INDEX'] = 10
 input_params['INV_SURF_INDICES'] = [2] #[55, 56, 57, 58] #[18,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59]
 input_params['GUESS_PHI_INDEX'] = -1 #16, 18
