@@ -150,10 +150,10 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    Editable installs expose the canonical workflow commands:
 
    ```bash
-   illiad-fieldsolver
-   illiad-poincare
-   illiad-flux-calc
-   illiad-flux-grad
+   illiad-fieldsolver --inputs-json fieldsolver_inputs.json
+   illiad-poincare --inputs-json poincare_inputs.json
+   illiad-flux-calc --inputs-json flux_calc_inputs.json
+   illiad-flux-grad --inputs-json flux_grad_inputs.json
    illiad-boris --inputs-json boris_inputs.json
    ```
 

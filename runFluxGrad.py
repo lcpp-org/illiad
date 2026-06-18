@@ -1,7 +1,9 @@
+import argparse
 import numpy as np
 import utility.Flux_Calculator as fc
 import utility.Flux_Interpolator as fi
 import utility.Flux_Gradientor as fg
+from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 
 N_phi = 360
 input_params = {
@@ -25,7 +27,6 @@ input_params = {
     'LCFS_INDEX': 15,
     'NPHI': N_phi,
     'NTHETA': 180,
-    'PHI_GENs': np.linspace(360//N_phi, 360, N_phi),
     'MAX_SUBSETS': 4,
     'SMALLEST_ISLAND_INDEX': 61, #61, #53 #39
     # 'SMOOTH_FCTR': 3e-5, #7.5e-6 #baseline 1e-6
@@ -38,24 +39,37 @@ input_params = {
 
     }
 
-def main():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD flux interpolation and gradient generation.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runFluxGrad.py defaults.",
+    )
+    return parser.parse_args()
+
+
+def main(input_params_override=None):
+    params = merge_input_params(input_params, input_params_override)
     ## RUN ANALYSIS
     #smallest_island_index = fc.fluxCalculator(input_params)
     #input_params['SMALLEST_ISLAND_INDEX'] = 27 #61
 
     ## RUN ANALYSIS
-    input_params['ALPHA'] = 1.0
-    input_params['DEBUG'] = True
-    input_params['LCFS_INDEX'] = 15
-    input_params['INV_SURF_INDICES'] = [20]
-    input_params['GUESS_PHI_INDEX'] = -3
+    params.setdefault('ALPHA', 1.0)
+    params.setdefault('DEBUG', True)
+    params.setdefault('LCFS_INDEX', 15)
+    params.setdefault('INV_SURF_INDICES', [20])
+    params.setdefault('GUESS_PHI_INDEX', -3)
+    normalize_phi_gens(params)
 
-    fi.fluxInterpolator(input_params)
+    fi.fluxInterpolator(params)
 
     # ## RUN ANALYSIS
-    input_params['OUTPUT_FILE_NAME'] = "Efield_LCFS15"
-    fg.fluxGradientor(input_params)
+    params.setdefault('OUTPUT_FILE_NAME', "Efield_LCFS15")
+    fg.fluxGradientor(params)
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    main(load_inputs_json(args.inputs_json, "Flux gradient inputs") if args.inputs_json else None)

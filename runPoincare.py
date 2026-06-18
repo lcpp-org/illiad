@@ -20,12 +20,14 @@
 #    True: run each fieldline in both directions from the init pos *!ONLY USE WHEN NTHREADS > NLINES!*
 #    False: run each fieldline in +B direction from the init pos
 """
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 import utility.phi_events as phi_event_defs
+from utility.run_config import load_inputs_json, merge_input_params
 
 
 
@@ -56,11 +58,46 @@ DOUBLE_LINE = False
 OUTPUT_DIR = f"AAAnewIO_iota3FWD_phi306_LSODA"
 
 
-def main():
+DEFAULT_INPUTS = {
+    "CURRENT_TOR": CURRENT_TOR,
+    "CURRENT_HEL": CURRENT_HEL,
+    "CONFIG_TOR": CONFIG_TOR,
+    "CONFIG_HEL": CONFIG_HEL,
+    "ENABLE_ERRFIELD": ENABLE_ERRFIELD,
+    "IC_PHI_DEG": IC_PHI_DEG,
+    "IC_THETA_DEG": IC_THETA_DEG,
+    "START_RADIUS": START_RADIUS,
+    "END_RADIUS": END_RADIUS,
+    "NLINES": NLINES,
+    "SPINS": SPINS,
+    "NPLANES": NPLANES,
+    "SOLVER": SOLVER,
+    "RTOL": RTOL,
+    "ATOL": ATOL,
+    "NTHREADS": NTHREADS,
+    "DOUBLE_LINE": DOUBLE_LINE,
+    "OUTPUT_DIR": OUTPUT_DIR,
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD Poincare field-line tracing.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runPoincare.py defaults.",
+    )
+    return parser.parse_args()
+
+
+def main(input_params=None):
     
     """
     Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
     """
+    if input_params is not None:
+        globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
+
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
     simIO = IOHandler(OUTPUT_DIR) 
     simIO.startLog(log_name="poincare.log", subdir="Poincare", logger_name="Poincare")
@@ -114,4 +151,5 @@ def main():
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    main(load_inputs_json(args.inputs_json, "Poincare inputs") if args.inputs_json else None)

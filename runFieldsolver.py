@@ -1,7 +1,10 @@
 ## IMPORTS
+import argparse
 import pandas as pd
 import numpy as np
 from time import perf_counter
+
+from utility.run_config import load_inputs_json, merge_input_params
 
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -48,6 +51,28 @@ I_vert *= s_vert
 ########################
 ## END OF USER INPUTS ##
 ########################
+
+DEFAULT_INPUTS = {
+    "output_name": output_name,
+    "mesh_size": mesh_size,
+    "I_toro": I_toro,
+    "I_heli": I_heli,
+    "I_vert": I_vert,
+    "coilfile": "input_files/coils.wega_with_VFCoils",
+    "RMAJOR": 0.72,
+    "RMINOR": 0.19,
+    "mesh_periodicity": [0, 1, 5],
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD Biot-Savart magnetic field generation.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runFieldsolver.py defaults.",
+    )
+    return parser.parse_args()
 
 def biotsavart_mesh(mesh, filament, current, Npoints):
     """Calculates the magnetic field on a mesh of Cartesian points using the Biot-Savart Law for a single current filament.
@@ -122,13 +147,13 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
 
     #return Bxyz
 
-def main():
+def main(input_params=None):
     """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
     It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
     The results are saved to a specified output file."""
+    globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
 
     ## READ COIL INPUT FILE
-    coilfile = "input_files/coils.wega_with_VFCoils"
     coildata = pd.read_csv(
     coilfile,
     header=None,
@@ -150,14 +175,10 @@ def main():
             mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
 
 
-    RMAJOR = 0.72 #[m]
-    RMINOR = 0.19 #[m]
-
     ## DEFINE MESH PERIODICITY
     ## 0: NOT PERIODIC
     ## 1: 2PI PERIODIC
     ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
-    mesh_periodicity = [ 0, 1, 5]
 
     nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
     ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
@@ -217,4 +238,5 @@ def main():
     np.save(output_name, B_XYZ.cpu())
 
 if __name__ == '__main__':
-    main()
+    args = parse_args()
+    main(load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None)
