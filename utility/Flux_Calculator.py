@@ -1,7 +1,7 @@
 #import logging
 import gc
 import numpy as np
-from scipy.interpolate import splev, splrep, make_splrep
+from scipy.interpolate import splev, splrep
 from scipy.integrate import dblquad
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -63,8 +63,9 @@ def fluxCalculator(input_params=None):
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
+    b_hidra.setErrorField()
     b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
-    b_hidra.set_nonPer_errField()
+    #b_hidra.set_nonPer_errField()
     b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
 
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
@@ -219,7 +220,7 @@ def fluxCalculator(input_params=None):
     axNORM.set_ylim(0, 1.1)
     axNORM.grid(which='both', linestyle=':', linewidth=0.5)
 
-    simIO.saveFig(ANLYS_SUBDIR+'/Flux_v_Surface.png', dpi=300)
+    simIO.saveFig(ANLYS_SUBDIR+'/Flux_v_Surface.png', dpi=250)
     simIO.log.info('Finished, LCFS=#{}, ISLAND AXIS=#{}'.format(LCFS_INDEX, smallest_island_index))
 
     # SAVE THE NUMPY ARRAYS TO INDIVIDUAL FILES USING SIMIO METHOD
@@ -419,24 +420,20 @@ def integrate_flux(spline_parms, spline_axis, phi, field, err_abs=1e-5, err_rel=
     # INTEGRATION HELPER FUNCTIONS
     def flux_integrand(r, theta, phi, field, axis):
         """Function to calculate the toroidal field times radius at a given point in space"""
-        geo_point = np.array([r+axis[1], theta+axis[0], phi], dtype=np.float64)
-        #axis[0] += np.pi
         geo_point = np.array([*axisShift(r, theta, *axis), phi])
-        if geo_point[0] < 0.0:
-            geo_point[0] *= -1.0
-            geo_point[1] += np.pi
         bxy = field.interpField(geo_point, Cart=False)[0][:2]
-        #bxy = np.array([1.0, 1.0]) # TESTING
 
         # Calculate the toroidal flux integrand: r*B_toroidal = r*( -Bx*sin(phi) - By*cos(phi) )
-        return -r*( bxy[0]*np.sin(phi) - bxy[1]*np.cos(phi) )
+        return -r*( bxy[0]*np.sin(phi) + bxy[1]*np.cos(phi) )
 
     # Define the upper radial bound of the integration
     def hfun(theta): return splev(theta, spline_parms)
 
     ## INTEGRATE TOROIDAL FLUX
+    spline_axis_rev = np.array(spline_axis, copy=True)
+    spline_axis_rev[0] += np.pi
     PSI, abserr = dblquad(flux_integrand, 0., 2*np.pi,
-                          0.0, hfun, args=(phi, field, spline_axis),
+                          0.0, hfun, args=(phi, field, spline_axis_rev),
                           epsabs=err_abs, epsrel=err_rel)
 
     return float(PSI)
@@ -675,7 +672,7 @@ def finalize_plotting(fig, axRect, axHist, axPolar, PHI_GEN_DEG, num_subsets, MA
                     labels=['', '5cm', '', '10cm', '', '15cm', ''], angle=0, fontsize=4)
 
     simIO.log.info('Plotting Flux Surfaces @ phi={}'.format(PHI_GEN_DEG))
-    simIO.saveFig(ANLYS_SUBDIR+'/Splines_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=600)
+    simIO.saveFig(ANLYS_SUBDIR+'/Splines_{:03d}deg.png'.format(int(PHI_GEN_DEG)), dpi=300)
     plt.close()
 
 if __name__ == '__main__':
