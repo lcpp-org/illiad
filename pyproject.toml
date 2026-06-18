@@ -72,6 +72,13 @@ all = [
 Homepage = "https://github.com/lcpp-org/fieldlines-uiuc"
 Repository = "https://github.com/lcpp-org/fieldlines-uiuc"
 
+[project.scripts]
+illiad-fieldsolver = "runFieldsolver:main"
+illiad-poincare = "runPoincare:main"
+illiad-flux-calc = "runFluxCalc:main"
+illiad-flux-grad = "runFluxGrad:main"
+illiad-boris = "runBoris_new:main"
+
 [dependency-groups]
 fitting = [
     "scikit-learn",

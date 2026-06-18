@@ -38,19 +38,24 @@ input_params = {
 
     }
 
-## RUN ANALYSIS
-#smallest_island_index = fc.fluxCalculator(input_params)
-#input_params['SMALLEST_ISLAND_INDEX'] = 27 #61
+def main():
+    ## RUN ANALYSIS
+    #smallest_island_index = fc.fluxCalculator(input_params)
+    #input_params['SMALLEST_ISLAND_INDEX'] = 27 #61
 
-## RUN ANALYSIS
-input_params['ALPHA'] = 1.0
-input_params['DEBUG'] = True
-input_params['LCFS_INDEX'] = 15
-input_params['INV_SURF_INDICES'] = [20]
-input_params['GUESS_PHI_INDEX'] = -3
+    ## RUN ANALYSIS
+    input_params['ALPHA'] = 1.0
+    input_params['DEBUG'] = True
+    input_params['LCFS_INDEX'] = 15
+    input_params['INV_SURF_INDICES'] = [20]
+    input_params['GUESS_PHI_INDEX'] = -3
 
-fi.fluxInterpolator(input_params)
+    fi.fluxInterpolator(input_params)
 
-# ## RUN ANALYSIS
-input_params['OUTPUT_FILE_NAME'] = "Efield_LCFS15"
-fg.fluxGradientor(input_params)
+    # ## RUN ANALYSIS
+    input_params['OUTPUT_FILE_NAME'] = "Efield_LCFS15"
+    fg.fluxGradientor(input_params)
+
+
+if __name__ == "__main__":
+    main()

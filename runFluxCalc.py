@@ -29,5 +29,11 @@ input_params = {
 }
 
 
-## RUN ANALYSIS
-island_index = fc.fluxCalculator(input_params)
+def main():
+    ## RUN ANALYSIS
+    island_index = fc.fluxCalculator(input_params)
+    return island_index
+
+
+if __name__ == "__main__":
+    main()

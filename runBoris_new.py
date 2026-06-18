@@ -219,6 +219,11 @@ def boris_runner(input_params=None):
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
-if __name__ == "__main__":
+
+def main():
     args = parse_args()
     boris_runner(load_boris_inputs(args.inputs_json))
+
+
+if __name__ == "__main__":
+    main()

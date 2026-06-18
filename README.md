@@ -147,6 +147,16 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    pip install -e ".[fitting,viewer,export]"
    ```
 
+   Editable installs expose the canonical workflow commands:
+
+   ```bash
+   illiad-fieldsolver
+   illiad-poincare
+   illiad-flux-calc
+   illiad-flux-grad
+   illiad-boris --inputs-json boris_inputs.json
+   ```
+
 2. Confirm that the input data are available.
 
    The current analysis scripts expect pre-generated field and profile files in
