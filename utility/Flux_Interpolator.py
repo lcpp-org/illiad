@@ -114,7 +114,7 @@ def fluxInterpolator(input_params=None):
     print(f'{valid_surface=}')
     #valid_indices = np.where(valid_surface)[0] # find the indices where valid_surface is True
     # flux parameter vs surface index plot
-    if DEBUG:
+    if DEBUG or SAVE_BEST_PROFILE:
         print()
         fig, ax = plt.subplots()
         #ax.plot(valid_indices, linear_flux_array[valid_indices])
@@ -123,7 +123,13 @@ def fluxInterpolator(input_params=None):
         ax.set_ylabel('Flux')
         ax.grid(True)
         ax.set_title(profile_select_str)
-        plt.show()
+
+        if SAVE_BEST_PROFILE:
+            simIO.saveFig(ANLYS_SUBDIR + '/' + 'Best_Flux_Profile' + f'_{int(PHI_GENs[best_phi_index])}deg.png', dpi=DPI)
+
+        if DEBUG:
+            plt.show()
+        
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
@@ -299,4 +305,8 @@ if __name__ == '__main__':
     GUESS_PHI_INDEX = -20 #-71
     # Stop for flux profile selection
     DEBUG = True
+    # New input parameters
+    SAVE_BEST_PROFILE = True
+    DPI = 300
+
     fluxInterpolator()
