@@ -1,6 +1,8 @@
+import argparse
 import numpy as np
 import utility.Flux_Calculator as fc
 import utility.Flux_Gradientor as fg
+from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 
 NUMBER_PHI = 20
 input_params = {
@@ -17,7 +19,6 @@ input_params = {
     'LCFS_INDEX': 15,
     'NPHI': NUMBER_PHI,
     'NTHETA': 180,
-    'PHI_GENs': np.linspace(360//NUMBER_PHI, 360, NUMBER_PHI),
     'MAX_SUBSETS': 4,
     'SMOOTH_FCTR': 1e-6, #3e-5, #7.5e-6 #baseline 1e-6
     'INTEGRATE_EPSABS': 1e-2,
@@ -28,6 +29,29 @@ input_params = {
     'BIG_MESH': True
 }
 
+_CLI_INPUTS = object()
 
-## RUN ANALYSIS
-island_index = fc.fluxCalculator(input_params)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD flux-surface integration.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runFluxCalc.py defaults.",
+    )
+    return parser.parse_args()
+
+
+def main(input_params_override=_CLI_INPUTS):
+    ## RUN ANALYSIS
+    if input_params_override is _CLI_INPUTS:
+        args = parse_args()
+        input_params_override = load_inputs_json(args.inputs_json, "Flux calculator inputs") if args.inputs_json else None
+    params = merge_input_params(input_params, input_params_override)
+    normalize_phi_gens(params)
+    island_index = fc.fluxCalculator(params)
+    return island_index
+
+
+if __name__ == "__main__":
+    main()

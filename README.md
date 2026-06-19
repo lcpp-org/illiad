@@ -88,6 +88,10 @@ trajectory traces, residence-time estimates, and collisionality comparisons.
 - `output/`: generated analysis products, logs, figures, and simulation data.
 - `fastplotlib_tests/`: standalone interactive trace-viewer prototypes.
 
+Release artifact contents are summarized in
+[`docs/RELEASE_CONTENTS.md`](docs/RELEASE_CONTENTS.md). Large generated field
+arrays and run outputs are intentionally kept out of package artifacts.
+
 ## Dependencies
 
 The versions below are the current development versions used on the Illinois
@@ -130,11 +134,46 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    Install the optional packages above only if you need the fitting utilities,
    interactive trace viewers, or animation export.
 
+   For editable development installs, the repository also includes packaging
+   metadata:
+
+   ```bash
+   pip install -e .
+   ```
+
+   Optional dependency extras are available for adjacent tooling:
+
+   ```bash
+   pip install -e ".[fitting,viewer,export]"
+   ```
+
+   Editable installs expose the canonical workflow commands:
+
+   ```bash
+   illiad-fieldsolver --inputs-json fieldsolver_inputs.json
+   illiad-poincare --inputs-json poincare_inputs.json
+   illiad-flux-calc --inputs-json flux_calc_inputs.json
+   illiad-flux-grad --inputs-json flux_grad_inputs.json
+   illiad-boris --inputs-json boris_inputs.json
+   ```
+
+   Public Python imports are available through the `illiad` namespace:
+
+   ```python
+   from illiad.mesh import Mesh, TorchMesh
+   from illiad.io import IOHandler
+   from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
+   ```
+
+   See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for the versioned public API
+   contract and [`docs/PUBLIC_NAMESPACE.md`](docs/PUBLIC_NAMESPACE.md) for a
+   concise import reference.
+
 2. Confirm that the input data are available.
 
    The current analysis scripts expect pre-generated field and profile files in
    `input_files/` and previously generated stage outputs under `output/`.
-   `runFieldsolver.py` can regenerate magnetic field arrays from
+   `illiad-fieldsolver` can regenerate magnetic field arrays from
    `input_files/coils.wega_with_VFCoils`, but the standard analysis path starts
    from prepared `.npy` field files such as:
 
@@ -146,10 +185,10 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 3. Run field-line tracing and identify the LCFS.
 
    Edit the currents, initial field-line locations, solver tolerances, and
-   `OUTPUT_DIR` in `runPoincare.py`, then run:
+   `OUTPUT_DIR` in `poincare_inputs.json`, then run:
 
    ```bash
-   python runPoincare.py
+   illiad-poincare --inputs-json poincare_inputs.json
    ```
 
    This writes Poincare surfaces, wall-intersection data, plots, and logs under
@@ -157,11 +196,11 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 
 4. Calculate normalized flux surfaces.
 
-   Set `ANLYS_DIR`, `ANLYS_SUBDIR`, `LCFS_INDEX`, and the toroidal planes in
-   `runFluxCalc.py` so they match the Poincare output, then run:
+   Set `ANLYS_DIR`, `ANLYS_SUBDIR`, `LCFS_INDEX`, and `NPHI` in
+   `flux_calc_inputs.json` so they match the Poincare output, then run:
 
    ```bash
-   python runFluxCalc.py
+   illiad-flux-calc --inputs-json flux_calc_inputs.json
    ```
 
    This integrates toroidal flux for each reconstructed surface and saves files
@@ -170,11 +209,11 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 
 5. Interpolate the flux profile and build the electric field.
 
-   Update `runFluxGrad.py` for the same analysis directory and LCFS selection,
-   then run:
+   Update `flux_grad_inputs.json` for the same analysis directory and LCFS
+   selection, then run:
 
    ```bash
-   python runFluxGrad.py
+   illiad-flux-grad --inputs-json flux_grad_inputs.json
    ```
 
    This calls the flux interpolator to generate `density_field.npy`, then takes
@@ -188,7 +227,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    properties, particle counts, timestep, and output tag. Then run:
 
    ```bash
-   python runBoris_new.py --inputs-json boris_inputs.json
+   illiad-boris --inputs-json boris_inputs.json
    ```
 
    The runner initializes lithium ions near the LCFS, advances them with the

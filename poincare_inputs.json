@@ -1,0 +1,23 @@
+{
+  "CURRENT_TOR": 0.486,
+  "CURRENT_HEL": 0.900,
+  "CONFIG_TOR": "default_toroidal",
+  "CONFIG_HEL": "default_helical",
+  "ENABLE_ERRFIELD": true,
+
+  "IC_PHI_DEG": 306.0,
+  "IC_THETA_DEG": 180.0,
+  "START_RADIUS": 0.150,
+  "END_RADIUS": 0.020,
+  "NLINES": 53,
+  "SPINS": 600,
+  "NPLANES": 360,
+
+  "SOLVER": "LSODA",
+  "RTOL": 2.49e-12,
+  "ATOL": 1e-8,
+  "NTHREADS": -1,
+  "DOUBLE_LINE": false,
+
+  "OUTPUT_DIR": "AAAnewIO_iota3FWD_phi306_LSODA"
+}

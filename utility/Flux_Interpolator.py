@@ -17,6 +17,12 @@ def _polar_interp_points(thetas, rads):
     return np.array([rads * np.cos(thetas), rads * np.sin(thetas)]).T
 
 
+def _surface_indices(indices):
+    if indices is None:
+        return np.array([], dtype=int)
+    return np.atleast_1d(np.asarray(indices, dtype=int))
+
+
 def fluxInterpolator(input_params=None):
     ## LOAD INPUT PARAMETERS
     if input_params is not None:
@@ -29,12 +35,14 @@ def fluxInterpolator(input_params=None):
     rbf_neighbors = globals().get("RBF_NEIGHBORS", 45)
     rbf_smoothing = globals().get("RBF_SMOOTHING", 1e-0)
     rbf_epsilon = globals().get("RBF_EPSILON", 1000)
+    inv_surf_indices = _surface_indices(globals().get("INV_SURF_INDICES", []))
     input_log_params = globals().copy()
     input_log_params.update({
         "RBF_KERNEL": rbf_kernel,
         "RBF_NEIGHBORS": rbf_neighbors,
         "RBF_SMOOTHING": rbf_smoothing,
         "RBF_EPSILON": rbf_epsilon,
+        "INV_SURF_INDICES": inv_surf_indices.tolist(),
     })
 
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -57,7 +65,9 @@ def fluxInterpolator(input_params=None):
             "PHI_GENs",
             "MAX_SUBSETS",
             "ALPHA",
+            "INV_SURF_INDICES",
             "GUESS_PHI_INDEX",
+            "OUTPUT_FILE_NAME",
             "RBF_KERNEL",
             "RBF_NEIGHBORS",
             "RBF_SMOOTHING",
@@ -107,7 +117,7 @@ def fluxInterpolator(input_params=None):
         valid_surface = valid_surface[:, best_phi_index]
     valid_surface[LCFS_INDEX] = True # manually set LCFS surface to valid
     valid_surface[:LCFS_INDEX] = False # manually set surfaces outside LCFS to invalid
-    #valid_surface[[ 55, 56, 57, 58]] = False # manually set surfaces outside LCFS to invalid
+    valid_surface[inv_surf_indices] = False # manually set surfaces outside LCFS to invalid
 
     profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(int(PHI_GENs[best_phi_index]))
     print(profile_select_str)
@@ -158,7 +168,7 @@ def fluxInterpolator(input_params=None):
         ## LOOP THROUGH SURFACES
         for surface_index in range(LCFS_INDEX, N_surfaces):
             if valid_surface[surface_index] == False:
-                print(f'Skipping surface {surface_index} (not valid)')
+                simIO.log.info(f'Skipping surface {surface_index} (not valid)')
             else:
                 ### GET VALUES
                 thetas = flux_surfaces[surface_index][0]
@@ -235,7 +245,7 @@ def fluxInterpolator(input_params=None):
     #### END OF LOOP THROUGH PHI ANGLES ####
     # save numpy data using simIO method
     big_grid_linear_np = big_grid_linear.detach().to("cpu").numpy()
-    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/density_field.npy')
+    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/' + 'nField_' + OUTPUT_FILE_NAME + '.npy')
 
     ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
@@ -254,8 +264,9 @@ def output_phi_plots(phi_deg, mesh_theta, mesh_rad, data, name, subdir, output_h
     ax.set_rticks([])
     plt.grid(False)
     fig.colorbar(c, ax=ax, label='Flux')
-
-    output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
+    fig_path = subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg))
+    output_handler.saveFig(fig_path, dpi=300)
+    output_handler.log.info('Saved figure: ' + fig_path)
     plt.close()
 
 if __name__ == '__main__':
@@ -297,6 +308,7 @@ if __name__ == '__main__':
     SMALLEST_ISLAND_INDEX = None #57 #104 #39
     ALPHA = 1.0 #0.85  # flux profile adjustment parameter
     GUESS_PHI_INDEX = -20 #-71
+    OUTPUT_FILE_NAME = "default"
     # Stop for flux profile selection
     DEBUG = True
     fluxInterpolator()

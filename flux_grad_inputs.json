@@ -1,0 +1,24 @@
+{
+  "ANLYS_DIR": "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents",
+  "ANLYS_SUBDIR": "LCFS30_20x720_furtherTESTING",
+  "FIELD_FILE_TOR": "input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy",
+  "FIELD_FILE_HEL": "input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy",
+
+  "CURRENT_TOR": 0.486,
+  "CURRENT_HEL": 0.790,
+  "CONFIG_TOR": "default_toroidal",
+  "CONFIG_HEL": "default_helical",
+  "ENABLE_ERRFIELD": true,
+
+  "LCFS_INDEX": 30,
+  "NPHI": 360,
+  "NTHETA": 720,
+  "MAX_SUBSETS": 4,
+  "SMALLEST_ISLAND_INDEX": 61,
+
+  "ALPHA": 1.0,
+  "DEBUG": true,
+  "INV_SURF_INDICES": [],
+  "GUESS_PHI_INDEX": -3,
+  "OUTPUT_FILE_NAME": "LCFS30alpha1p0"
+}
