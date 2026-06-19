@@ -165,8 +165,9 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
    ```
 
-   See [`docs/PUBLIC_NAMESPACE.md`](docs/PUBLIC_NAMESPACE.md) for the current
-   public import namespace.
+   See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for the versioned public API
+   contract and [`docs/PUBLIC_NAMESPACE.md`](docs/PUBLIC_NAMESPACE.md) for a
+   concise import reference.
 
 2. Confirm that the input data are available.
 
