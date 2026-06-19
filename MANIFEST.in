@@ -1,6 +1,7 @@
 include README.md
 include LICENSE
 include pyproject.toml
+recursive-include docs *.md
 include boris_inputs.json
 include animation_inputs.json
 include fieldsolver_inputs.json
