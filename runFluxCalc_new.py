@@ -25,7 +25,7 @@ from classes.fluxCalc import FluxCalculator
 NPHI = 10 # Number of phi planes to evaluate
 input_params = {
     'ANLYS_DIR': "iota3_1200spins_53Lines_LSODA_165deg", # Existing Poincare input directory
-    'ANLYS_SUBDIR': "iota3_test11_170deg", # Name of new output subdirectory inside ANLYS_DIR
+    'ANLYS_SUBDIR': "iota3_test12_170deg", # Name of new output subdirectory inside ANLYS_DIR
     'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
     'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
     'CURRENT_TOR': 0.486, #[kA]
@@ -33,7 +33,7 @@ input_params = {
     'CONFIG_TOR': 'default_toroidal',
     'CONFIG_HEL': 'default_helical',
     'ENABLE_ERRFIELD': True,
-    'LCFS_INDEX': 10, # Obtained from log file
+    'LCFS_INDEX': 10, # Surface index selected from Poincare log
     'NPHI': NPHI,
     'NTHETA': 180,
     'PHI_GENs': np.linspace(360//NPHI, 360, NPHI),
@@ -84,17 +84,13 @@ def main():
     )
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
-    CURRENT_TOR = input_params['CURRENT_TOR']
-    ENABLE_ERRFIELD = input_params['ENABLE_ERRFIELD']
-    CONFIG_TOR = input_params['CONFIG_TOR']
-    CURRENT_HEL = input_params['CURRENT_HEL']
-    CONFIG_HEL = input_params['CONFIG_HEL']
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.setErrorField()
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
-    #b_hidra.set_nonPer_errField()
-    b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
-
+    b_hidra.loadCartesianField(coilCurrent=input_params['CURRENT_TOR'],
+                               errField=input_params['ENABLE_ERRFIELD'],
+                               att_mult=input_params['CONFIG_TOR'])
+    b_hidra.addFieldPerturbation(coilCurrent=input_params['CURRENT_HEL'],
+                                 att_mult=input_params['CONFIG_HEL'])
     ## RUN ANALYSIS
     flux_calc = FluxCalculator(simIO, b_hidra, input_params)
     flux_calc.run()
