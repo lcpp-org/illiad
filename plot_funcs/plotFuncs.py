@@ -682,17 +682,12 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
 def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysis_name='default', simIO=None, plot_args=None):
     """Plots a black and white Poincare plot of the magnetic field lines."""
 
-    default_plot_args = {
-        'title_on': True,
-        'dpi': 400,
-    }
-    if plot_args is None:
-       title_on = default_plot_args['title_on']
-       dpi = default_plot_args['dpi']
-    else:
-        plot_args = {**default_plot_args, **plot_args} # combine default with provided overriding default
-        title_on = plot_args['title_on'] 
-        dpi = plot_args['dpi']   
+    if plot_args:
+        title_on = plot_args['title_on']
+        dpi = plot_args['dpi']
+    else:        
+        title_on = True
+        dpi = 400
     
     rho_max = b_hidra.a
     num_sets = len(radtheta_pts)

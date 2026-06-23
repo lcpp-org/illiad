@@ -149,19 +149,15 @@ class Poincare():
         self.IO.log.info(f"| THREADS        | {self.workers:<23} |")
         self.IO.log.info("+----------------+-------------------------+")
 
-        
         # attach plotting function to class instance
-    
         for name in dir(plotFuncs):
-            func = getattr(plotFuncs, name)
-            if callable(func) and not name.startswith("__"):
-                if name.startswith("global_"):
-                    new_name = name.replace("global_", "")  # Remove prefix
-                    setattr(self, new_name, func)  # Attach to the instance with the new name
-                elif name.startswith("poincare_"):
-                    new_name = name.replace("poincare_", "")  # Remove prefix
-                    setattr(self, new_name, func)  # Attach to the instance with the new name
-        
+                    func = getattr(plotFuncs, name)
+                    if callable(func) and not name.startswith("__"):
+                        if name.startswith("global_"):
+                            new_name = name.replace("global_", "")  # Remove prefix
+                        elif name.startswith("poincare_"):
+                            new_name = name.replace("poincare_", "")  # Remove prefix
+                            setattr(self, new_name, func)  # Attach to the instance with the new name
 
     def set_conditions(self, init_pos_arr=np.zeros([1, 3]), spins=100, field: Mesh = None, events=None, nplanes=360):
         """Sets the initial conditions and events for Poincare analysis.

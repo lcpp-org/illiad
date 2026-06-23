@@ -18,34 +18,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 ## NAME YOUR OUTPUT FILE
 output_name = 'It0000_Ih1000_Iv000_1p000_1p000_64bit'
 
-## READ COIL INPUT FILE
-# Expected input file structure:
-#
-# Regular coil row:
-#   Columns 0-2 : x, y, z coordinates of coil geometry [float]
-#   Column 3    : number of turns, with sign indicating current direction [float]
-#
-# Ending delimiter row:
-#   Columns 0-2 : x, y, z coordinates of coil geometry [float]
-#   Column 3    : 0.0 
-#   Column 4    : NaN 
-#   Column 5    : coil type [string] (e.g., 'Helix', 'toroidal_field', 'Vertical_Field_Coil')
-
-coilfile = "input_files/coils.wega_with_VFCoils"
-
-## MACHINE INPUT PARAMETERS
-RMAJOR = 0.72 #[m]
-RMINOR = 0.19 #[m]
-
-## DEFINE MESH PERIODICITY
-# Mesh order: [r, theta, phi]
-#
-# 0: NOT PERIODIC
-# 1: 2PI PERIODIC
-# >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
-
-mesh_periodicity = [ 0, 1, 5]
-
 ## DEFINE MESH RESOLUTION
 test = [20, 4, 10]
 rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
@@ -166,6 +138,7 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
         coilpts = np.asarray(coil, dtype=np.float64)
         thiscoil = torch.tensor(coilpts) #, dtype=torch.float64)
         filament = thiscoil.T[:3].to(device)
+        thiscoil = torch.tensor(coilpts, dtype=torch.float64, device=device)
         ## Mesh-ified
         N = filament.shape[1]
         Bxyz += biotsavart_mesh(xyz_mesh, filament, current, N)
@@ -176,16 +149,6 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
 
     #return Bxyz
 
-<<<<<<< HEAD
-def main():
-    """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
-    It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
-    The results are saved to a specified output file."""
-
-    ## READ COIL INPUT FILE
-    coildata = pd.read_csv(
-    coilfile,
-=======
 def main(input_params=_CLI_INPUTS):
     """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
     It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
@@ -198,7 +161,6 @@ def main(input_params=_CLI_INPUTS):
     ## READ COIL INPUT FILE
     coildata = pd.read_csv(
     coilfile,
->>>>>>> origin/main
     header=None,
     skiprows=3,
     index_col=None,
@@ -217,9 +179,6 @@ def main(input_params=_CLI_INPUTS):
         else:
             mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
 
-<<<<<<< HEAD
-    nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
-=======
 
     ## DEFINE MESH PERIODICITY
     ## 0: NOT PERIODIC
@@ -227,7 +186,6 @@ def main(input_params=_CLI_INPUTS):
     ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
 
     nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
->>>>>>> origin/main
     ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
     nphi   = int( mesh_size[2] / max(1, mesh_periodicity[2]) )
 

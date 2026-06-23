@@ -44,12 +44,8 @@ def fluxGradientor(input_params=None):
     b_hidra.set_nonPer_errField()
 
     # load density data from flux inteprolator step
-<<<<<<< HEAD
-    density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy') #'/big_grid_linear.npy')
-=======
     #density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy') #'/big_grid_linear.npy')
     density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/' + 'nField_' + OUTPUT_FILE_NAME + '.npy') #'/big_grid_linear.npy')
->>>>>>> origin/main
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)

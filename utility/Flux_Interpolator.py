@@ -17,15 +17,12 @@ def _polar_interp_points(thetas, rads):
     return np.array([rads * np.cos(thetas), rads * np.sin(thetas)]).T
 
 
-<<<<<<< HEAD
-=======
 def _surface_indices(indices):
     if indices is None:
         return np.array([], dtype=int)
     return np.atleast_1d(np.asarray(indices, dtype=int))
 
 
->>>>>>> origin/main
 def fluxInterpolator(input_params=None):
     ## LOAD INPUT PARAMETERS
     if input_params is not None:
@@ -38,20 +35,14 @@ def fluxInterpolator(input_params=None):
     rbf_neighbors = globals().get("RBF_NEIGHBORS", 45)
     rbf_smoothing = globals().get("RBF_SMOOTHING", 1e-0)
     rbf_epsilon = globals().get("RBF_EPSILON", 1000)
-<<<<<<< HEAD
-=======
     inv_surf_indices = _surface_indices(globals().get("INV_SURF_INDICES", []))
->>>>>>> origin/main
     input_log_params = globals().copy()
     input_log_params.update({
         "RBF_KERNEL": rbf_kernel,
         "RBF_NEIGHBORS": rbf_neighbors,
         "RBF_SMOOTHING": rbf_smoothing,
         "RBF_EPSILON": rbf_epsilon,
-<<<<<<< HEAD
-=======
         "INV_SURF_INDICES": inv_surf_indices.tolist(),
->>>>>>> origin/main
     })
 
     ## DATA AND PLOTS *WILL* BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!!
@@ -76,10 +67,7 @@ def fluxInterpolator(input_params=None):
             "ALPHA",
             "INV_SURF_INDICES",
             "GUESS_PHI_INDEX",
-<<<<<<< HEAD
-=======
             "OUTPUT_FILE_NAME",
->>>>>>> origin/main
             "RBF_KERNEL",
             "RBF_NEIGHBORS",
             "RBF_SMOOTHING",
@@ -257,11 +245,7 @@ def fluxInterpolator(input_params=None):
     #### END OF LOOP THROUGH PHI ANGLES ####
     # save numpy data using simIO method
     big_grid_linear_np = big_grid_linear.detach().to("cpu").numpy()
-<<<<<<< HEAD
-    simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/density_field.npy')
-=======
     simIO.saveNumpyData(big_grid_linear_np, ANLYS_SUBDIR + '/' + 'nField_' + OUTPUT_FILE_NAME + '.npy')
->>>>>>> origin/main
 
     ## LOOP THROUGH PHI ANGLES for plotting
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
