@@ -159,15 +159,33 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-input_files/*.npy
-input_files/*.txt
-input_files/*
-output/*
+# Project-local generated outputs and run artifacts
+output/
+*.log
+*.mp4
+*.avi
+*.mov
+*.gif
+*.xlsx
 *.o4*
 *.e4*
 *.sbatch
-NPR598/*
-Miniforge3-Linux-x86_64.sh
 
-# Large generated field dumps (keep out of git; use LFS or external storage if needed)
+# Large/generated scientific data products. Keep small reference CSV/coil files
+# trackable under input_files/, but keep generated fields/profiles out of git.
+input_files/**/*.npy
+input_files/**/*.npz
+input_files/**/*.h5
+input_files/**/*.hdf5
+input_files/**/*.txt
+input_files/**/*.pdf
+input_files/RLP_Results/
+input_files/contravariant_meshes/
 Bfield_RTP_contravariant*.npy
+
+# Local installers, scratch dirs, and editor state
+NPR598/
+Miniforge3-Linux-x86_64.sh
+.codex/
+.agents/
+*.code-workspace

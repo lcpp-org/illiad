@@ -16,7 +16,7 @@
 import numpy as np
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
-from classes.fluxCalc import FluxCalculator
+from classes.calculate_flux import FluxCalculator
 
 #################
 ## USER INPUTS ##

@@ -6,7 +6,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 os.chdir(_PROJECT_ROOT)
 
-from matplotlib.ticker import StrMethodFormatter
+from matplotlib.ticker import AutoMinorLocator, StrMethodFormatter
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,7 +20,7 @@ from utility.coordtrans import RTP_XYZ_JAC
 
 def main():
     ## SET UP RUN DIRECTORY (DATA AND PLOTS *WILL* BE OVERWRITTEN IF DIR ALREADY EXISTS!!)
-    simIO = out.IOHandler("BFIELD_VALIDATION_PLOTS")
+    simIO = out.IOHandler("BFIELD_VALIDATION_PLOTS_3")
     simIO.startLog()
     anlys_dir = 'It486_Ih900_Iv000'
     simIO.createSubDir(anlys_dir)
@@ -204,14 +204,14 @@ def main():
     for i, phi in enumerate(PHI_PLOT):
 
         B_rtp[i] = compBfield(phi_deg=phi, errMag=calc_errMag, errDir=calc_errDir, torMult=calc_torMult, helMult=calc_helMult, assumed_rad=0.0, assumed_theta=0.0)
-        B_rtp_ideal[i] = compBfield(phi_deg=phi, errMag = 0.0, errDir=0.0, torMult = 1.0, helMult = 1.0, assumed_rad=0.0, assumed_theta=0.0)
+        B_rtp_ideal[i] = compBfield(phi_deg=phi, errMag=0.0, errDir=0.0, torMult=1.0, helMult=1.0, assumed_rad=0.0, assumed_theta=0.0)
         B_rtp_onlyScale[i] = compBfield(phi_deg=phi, errMag=0.0, errDir=0.0, torMult=calc_torMult, helMult=calc_helMult, assumed_rad=0.0, assumed_theta=0.0)
 
-        B_rtp_LF[i] = compBfield(phi_deg=phi, errMag = calc_errMag, errDir=calc_errDir, torMult = calc_torMult, helMult = calc_helMult, assumed_rad=0.10, assumed_theta=0.0)
-        B_rtp_LF_ideal[i] = compBfield(phi_deg=phi, errMag = 0.0, errDir=0.0, torMult = 1.0, helMult = 1.0, assumed_rad=0.10, assumed_theta=0.0)
-        B_rtp_LF_onlyScale[i] = compBfield(phi_deg=phi, errMag = 0.0, errDir=0.0, torMult = calc_torMult, helMult = calc_helMult, assumed_rad=0.10, assumed_theta=0.0)
+        B_rtp_LF[i] = compBfield(phi_deg=phi, errMag=calc_errMag, errDir=calc_errDir, torMult = calc_torMult, helMult = calc_helMult, assumed_rad=0.10, assumed_theta=0.0)
+        B_rtp_LF_ideal[i] = compBfield(phi_deg=phi, errMag=0.0, errDir=0.0, torMult=1.0, helMult=1.0, assumed_rad=0.10, assumed_theta=0.0)
+        B_rtp_LF_onlyScale[i] = compBfield(phi_deg=phi, errMag=0.0, errDir=0.0, torMult=calc_torMult, helMult=calc_helMult, assumed_rad=0.10, assumed_theta=0.0)
                                            
-        B_rtp_HF[i] = compBfield(phi_deg=phi, errMag = calc_errMag, errDir=calc_errDir, torMult = calc_torMult, helMult = calc_helMult, assumed_rad=0.10, assumed_theta=np.pi)
+        B_rtp_HF[i] = compBfield(phi_deg=phi, errMag=calc_errMag, errDir=calc_errDir, torMult=calc_torMult, helMult=calc_helMult, assumed_rad=0.10, assumed_theta=np.pi)
         B_rtp_HF[i][:2] *= -1
 
 
@@ -219,13 +219,14 @@ def main():
         # --- fonts & text (IOP-friendly, ~8–12 pt at final size) ---
         "font.family": "serif",
         "font.serif": ["Times New Roman", "Times", "Nimbus Roman", "DejaVu Serif"],
-        "mathtext.fontset": "dejavusans",
-        "axes.titlesize": 10,
-        "axes.labelsize": 12,
-        "axes.labelweight": "bold",
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 12,
-        "lines.linewidth": 1.0,
+        "mathtext.fontset": "dejavuserif",
+        "axes.labelsize": 9,
+        "axes.linewidth": 0.8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "legend.fontsize": 8,
+        "lines.linewidth": 1.2,
+        "savefig.bbox": "tight",
     })
 
 
@@ -300,30 +301,91 @@ def main():
 
 
     ### ARTICLE PLOT 1 ###
-    fig = plt.figure()
-    axSolo = fig.add_subplot(111)
-    r0_ideal, = axSolo.plot(PHI_PLOT, np.sqrt( B_rtp_ideal[:,0]**2 + B_rtp_ideal[:,1]**2 + B_rtp_ideal[:,2]**2),
-                             '--k', label='Ideal Field', zorder=4)
+    #fig, axSolo = plt.subplots(figsize=(6.4, 3.8), constrained_layout=True)
+    fig, axSolo = plt.subplots(constrained_layout=True)
+    r0_ideal_mag = np.sqrt(B_rtp_ideal[:,0]**2 + B_rtp_ideal[:,1]**2 + B_rtp_ideal[:,2]**2)
+    r0_scale_mag = np.sqrt(B_rtp_onlyScale[:,0]**2 + B_rtp_onlyScale[:,1]**2 + B_rtp_onlyScale[:,2]**2)
+    r0_fit_mag = np.sqrt(B_rtp[:,0]**2 + B_rtp[:,1]**2 + B_rtp[:,2]**2)
+    fit_color = '#0072B2'
+
+    r0_ideal, = axSolo.plot(PHI_PLOT, r0_ideal_mag,
+                             color='0.05', ls='--', lw=1.2,
+                             label='Ideal field', zorder=4)
     
-    r0_scale, = axSolo.plot(PHI_PLOT, np.sqrt( B_rtp_onlyScale[:,0]**2 + B_rtp_onlyScale[:,1]**2 + B_rtp_onlyScale[:,2]**2),
-                             ':b', label='w/ scalars', zorder=4)
+    r0_scale, = axSolo.plot(PHI_PLOT, r0_scale_mag,
+                             color='0.65', ls=':', lw=1.5,
+                             label='Scalar attenuation only',
+                             zorder=4)
 
     
-    r0_fit, = axSolo.plot(PHI_PLOT, np.sqrt( B_rtp[:,0]**2 + B_rtp[:,1]**2 + B_rtp[:,2]**2),
-                           'b', label='w/ scalars & $\mathbf{B}_{err}$', zorder=5)
+    r0_fit, = axSolo.plot(PHI_PLOT, r0_fit_mag,
+                           color=fit_color, ls='-', lw=1.4,
+                           label=r'$\mathbf{B}_{\mathrm{HIDRA}}$ (LS-fit)', zorder=5)
     r0_data = axSolo.errorbar( np.degrees(ind_measured[i_r0_points,1]), dep_measured[i_r0_points], yerr=sigma_measured[i_r0_points],
-                                fmt='s', markersize=2, color='k', fillstyle='none',
-                                capsize=3, ecolor='k', zorder=5, label='Measurements')
+                                fmt='s', markersize=3.2, color='k', fillstyle='none',
+                                capsize=2.5, capthick=0.8, elinewidth=0.8,
+                                ecolor='k', zorder=5, label='Measurement Data')
 
-    axSolo.set_xlabel('$\phi \: [ \degree CW\,from\:North\:Split] $')
-    axSolo.set_ylabel('$\| \mathbf{B} \| \:[G]$')
-    axSolo.grid(which='both')
-    axSolo.legend(handles=[r0_ideal, r0_scale, r0_fit, r0_data], loc='upper right')
+    ann_color = '0.40'
+    atten_phi = 150.0
+    atten_y_ideal = np.interp(atten_phi, PHI_PLOT, r0_ideal_mag)
+    atten_y_scale = np.interp(atten_phi, PHI_PLOT, r0_scale_mag)
+    atten_y_mid = 0.5 * (atten_y_ideal + atten_y_scale)
+    axSolo.annotate('', xy=(atten_phi, atten_y_ideal), xytext=(atten_phi, atten_y_scale),
+                    arrowprops=dict(arrowstyle='<|-', color=ann_color, lw=1.0,
+                                    shrinkA=0, shrinkB=0),
+                    zorder=2)
+    axSolo.annotate('Attenuation\nEffect', xy=(atten_phi, atten_y_mid),
+                    xytext=(atten_phi, atten_y_mid + 1.2), ha='center', va='center',
+                    fontsize=8, color=ann_color,
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=1.0, pad=0.5))
 
+    berr_idx = np.argmax(np.abs(r0_fit_mag - r0_scale_mag))
+    berr_phi = PHI_PLOT[berr_idx]
+    berr_y_fit = r0_fit_mag[berr_idx]
+    berr_y_scale = r0_scale_mag[berr_idx]
+    berr_y_mid = 0.5 * (berr_y_fit + berr_y_scale)
+    berr_text_x = berr_phi
+    axSolo.annotate('', xy=(berr_phi, berr_y_fit), xytext=(berr_phi, berr_y_scale),
+                    arrowprops=dict(arrowstyle='-|>', color=ann_color, lw=0.8,
+                                    shrinkA=0, shrinkB=0),
+                    zorder=6)
+    axSolo.annotate('Effect\nof $\mathbf{B}_{\mathrm{err}}$',
+                    xy=(berr_phi, berr_y_mid), xytext=(berr_text_x, berr_y_mid + 4.0),
+                    ha='center', va='center', fontsize=8, color=ann_color,
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.85, pad=0.5),
+                    zorder=6)
+
+    axSolo.set_xlabel(r'$\phi$ [$^\circ$ CW from North Split]')
+    axSolo.set_ylabel(r'$|\mathbf{B}|$ [G]')
     axSolo.set_xlim(0, 360)
     axSolo.set_xticks(np.arange(0, 361, 90))
-    plt.tight_layout()
+    # axSolo.set_ylim(
+    #     min(np.min(r0_fit_mag), np.min(r0_scale_mag),
+    #         np.min(dep_measured[i_r0_points] - sigma_measured[i_r0_points])) - 2.0,
+    #     max(np.max(r0_ideal_mag),
+    #         np.max(dep_measured[i_r0_points] + sigma_measured[i_r0_points])) + 2.0,
+    # )
+    axSolo.set_ylim(650.0,720.0)
+
+
+    axSolo.xaxis.set_minor_locator(AutoMinorLocator(3))
+    axSolo.yaxis.set_minor_locator(AutoMinorLocator(2))
+    axSolo.tick_params(which='major', direction='in', top=True, right=True,
+                       length=4.0, width=0.8)
+    axSolo.tick_params(which='minor', direction='in', top=True, right=True,
+                       length=2.2, width=0.6)
+    axSolo.grid(which='major', color='0.87', lw=0.5)
+    #axSolo.legend(handles=[r0_ideal, r0_scale, r0_fit, r0_data],
+    axSolo.legend(handles=[r0_ideal, r0_fit, r0_data],
+                  loc='right', frameon=True, framealpha=0.92,
+                  facecolor='white', edgecolor='0.75',
+                  borderpad=0.35, labelspacing=0.35,
+                  handlelength=2.4, handletextpad=0.8)
     simIO.saveFig('solo_' + plot_name + '_r0.png', dpi=400)
+
+
+
 
 
     ### ARTICLE PLOT 2 ###

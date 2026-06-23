@@ -1,0 +1,13 @@
+{
+  "output_name": "It0000_Ih1000_Iv000_1p000_1p000_64bit",
+  "mesh_size": [191, 180, 360],
+
+  "I_toro": 0.0,
+  "I_heli": 1000.0,
+  "I_vert": 0.0,
+
+  "coilfile": "input_files/coils.wega_with_VFCoils",
+  "RMAJOR": 0.72,
+  "RMINOR": 0.19,
+  "mesh_periodicity": [0, 1, 5]
+}

@@ -1,0 +1,36 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include docs *.md
+include boris_inputs.json
+include animation_inputs.json
+include fieldsolver_inputs.json
+include poincare_inputs.json
+include flux_calc_inputs.json
+include flux_grad_inputs.json
+
+recursive-include illiad *.py
+recursive-include classes *.py
+recursive-include utility *.py
+recursive-include plot_funcs *.py
+recursive-include fastplotlib_tests *.py *.args
+
+include runBoris_new.py
+include runFieldsolver.py
+include runFluxCalc.py
+include runFluxGrad.py
+include runPoincare.py
+
+include input_files/*.csv
+include input_files/coils.wega_with_VFCoils
+
+prune output
+prune __pycache__
+prune .git
+prune .vscode
+prune misc_runFiles
+prune input_files/RLP_Results
+recursive-exclude * __pycache__
+recursive-exclude * *.py[cod]
+recursive-exclude input_files *.npy *.npz *.h5 *.hdf5 *.txt *.pdf *.png *.jpg *.jpeg
+global-exclude *.o4* *.e4* *.sbatch *.log *.mp4 *.avi *.mov *.gif *.xlsx *.pdf

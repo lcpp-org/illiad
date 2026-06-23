@@ -44,7 +44,12 @@ def fluxGradientor(input_params=None):
     b_hidra.set_nonPer_errField()
 
     # load density data from flux inteprolator step
+<<<<<<< HEAD
     density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy') #'/big_grid_linear.npy')
+=======
+    #density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/density_field.npy') #'/big_grid_linear.npy')
+    density_grid = simIO.loadNumpyData(ANLYS_SUBDIR + '/' + 'nField_' + OUTPUT_FILE_NAME + '.npy') #'/big_grid_linear.npy')
+>>>>>>> origin/main
 
     # Create a meshgrid for the interpolation
     RADS = np.linspace(b_hidra.r_min, b_hidra.r_max, b_hidra.nr)
@@ -133,7 +138,7 @@ def fluxGradientor(input_params=None):
     Efield_xyzArray_linear[0] = Ex_linear.reshape(Efield_xyzArray_linear[0].shape)
     Efield_xyzArray_linear[1] = Ey_linear.reshape(Efield_xyzArray_linear[1].shape)
     Efield_xyzArray_linear[2] = Ez_linear.reshape(Efield_xyzArray_linear[2].shape)
-    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/' + OUTPUT_FILE_NAME + '.npy')
+    simIO.saveNumpyData(Efield_xyzArray_linear, ANLYS_SUBDIR + '/' + 'Efield_' + OUTPUT_FILE_NAME + '.npy')
 
     ## LOOP THROUGH PHI ANGLES forplotting
     #colortest = 'seismic'

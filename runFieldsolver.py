@@ -1,7 +1,10 @@
 ## IMPORTS
+import argparse
 import pandas as pd
 import numpy as np
 from time import perf_counter
+
+from utility.run_config import load_inputs_json, merge_input_params
 
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -77,6 +80,30 @@ I_vert *= s_vert
 ## END OF USER INPUTS ##
 ########################
 
+DEFAULT_INPUTS = {
+    "output_name": output_name,
+    "mesh_size": mesh_size,
+    "I_toro": I_toro,
+    "I_heli": I_heli,
+    "I_vert": I_vert,
+    "coilfile": "input_files/coils.wega_with_VFCoils",
+    "RMAJOR": 0.72,
+    "RMINOR": 0.19,
+    "mesh_periodicity": [0, 1, 5],
+}
+
+_CLI_INPUTS = object()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD Biot-Savart magnetic field generation.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runFieldsolver.py defaults.",
+    )
+    return parser.parse_args()
+
 def biotsavart_mesh(mesh, filament, current, Npoints):
     """Calculates the magnetic field on a mesh of Cartesian points using the Biot-Savart Law for a single current filament.
     Args:
@@ -149,6 +176,7 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
 
     #return Bxyz
 
+<<<<<<< HEAD
 def main():
     """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
     It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
@@ -157,6 +185,20 @@ def main():
     ## READ COIL INPUT FILE
     coildata = pd.read_csv(
     coilfile,
+=======
+def main(input_params=_CLI_INPUTS):
+    """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
+    It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
+    The results are saved to a specified output file."""
+    if input_params is _CLI_INPUTS:
+        args = parse_args()
+        input_params = load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None
+    globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
+
+    ## READ COIL INPUT FILE
+    coildata = pd.read_csv(
+    coilfile,
+>>>>>>> origin/main
     header=None,
     skiprows=3,
     index_col=None,
@@ -175,7 +217,17 @@ def main():
         else:
             mycoils[i] = coildata.iloc[coil_delim[i-1]+1:coil_delim[i], 0:4]
 
+<<<<<<< HEAD
     nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
+=======
+
+    ## DEFINE MESH PERIODICITY
+    ## 0: NOT PERIODIC
+    ## 1: 2PI PERIODIC
+    ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
+
+    nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
+>>>>>>> origin/main
     ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
     nphi   = int( mesh_size[2] / max(1, mesh_periodicity[2]) )
 

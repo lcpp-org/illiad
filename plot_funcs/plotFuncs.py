@@ -503,7 +503,7 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
 
     # convert to degrees
     # shift to physical phi=0 at at the South-side split
-    a_phi = -18. # degrees, phi_comp is 18 CW from south-side split
+    a_phi = 18 #positive for consitency w/ histogram func! -18. # degrees, phi_comp is 18 CW from south-side split
     phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
     theta_plot_deg = theta_plot*(180/np.pi)
 
@@ -662,12 +662,17 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
         this_r = this_ion_rtp[:,0] #ion_traces[:, i, 0]
         this_theta = this_ion_rtp[:,1] #ion_traces[:, i, 1]
 
-        skip_indices = [0,1,3,5,6,7,8,10]
+        skip_indices = [1] #[0,1,3,5,6,7,8,10]
         if i not in skip_indices:
             ax.plot(this_theta, this_r, linewidth=0.5, zorder=5)
 
     ax.set_rlim([0., b_hidra.a])#[-1, 1])
-
+    ax.set_rgrids([0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175],
+                labels=['', '', '', '', '', '', ''], angle=0, fontsize=4)
+    ax.set_thetagrids([0, 45, 90, 135, 180, 225, 270, 315],
+                #labels=['Low\nField', '', '', '', 'High\nField', '', '', ''], fontsize=12)
+                labels=['', '', '', '', '', '', '', ''], fontsize=12)
+    
     plotname = 'IonTracesPoin.png'
     simIO.saveFig(plotname, dpi=600)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
