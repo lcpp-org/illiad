@@ -124,8 +124,8 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 1. Clone the repository and create a Python 3.11 environment.
 
    ```bash
-   git clone https://github.com/lcpp-org/fieldlines-uiuc.git
-   cd fieldlines-uiuc
+   git clone https://github.com/lcpp-org/illiad.git
+   cd illiad
    python -m venv .venv
    source .venv/bin/activate
    pip install numpy scipy matplotlib pandas tqdm pillow torch torchrbf
