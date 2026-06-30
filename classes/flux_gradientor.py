@@ -128,7 +128,7 @@ class FluxGradientor:
     def load_poincare_data(self, phi_gen_deg):
         """Load LCFS Poincare data for one toroidal angle."""
         filename = 'Poincare_{:03d}.npy'.format(int(phi_gen_deg))
-        lcfs_points = self.simIO.loadNumpyData(filename)[self.lcfs_index]
+        lcfs_points = self.simIO.loadNumpyData(filename, subdir="Poincare")[self.lcfs_index]
         th_in, r_in = lcfs_points
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]

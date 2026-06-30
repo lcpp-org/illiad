@@ -213,7 +213,7 @@ class FluxInterpolator:
     def obtain_poincare_data(self, phi_deg):
         """Load Poincare points and matching flux values for one phi angle."""
         filename = 'Poincare_{:03d}.npy'.format(int(phi_deg))
-        flux_surfaces = self.simIO.loadNumpyData(filename)
+        flux_surfaces = self.simIO.loadNumpyData(filename, subdir="Poincare")
         points = np.zeros([1,2])
         flux_norm = np.ones(1)
         points[0] = self.axis_array[0][0]
