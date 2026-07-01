@@ -54,6 +54,9 @@ from boris_trace_data import (
     infer_valid_lengths,
     load_boris_trace_files,
     normalize_trace_paths,
+    make_compass_rose_lines,
+    make_port_boundary_lines,
+    make_port_label_positions,
     make_synthetic_boris_traces,
     make_torus_mesh,
     select_trace_particles,
@@ -217,6 +220,27 @@ def build_arg_parser() -> ArgFileParser:
     parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
     parser.add_argument("--hide-zero-rows", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--show-torus", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--show-ports", action=argparse.BooleanOptionalAction, default=True, help="Show HIDRA port outlines on the torus wall.")
+    parser.add_argument("--port-file", type=Path, default=Path("input_files/HIDRA_ports.csv"), help="CSV file with HIDRA port locations.")
+    parser.add_argument("--port-color", default="#F5F7FA", help="Port outline color.")
+    parser.add_argument("--port-alpha", type=float, default=0.85, help="Port outline alpha.")
+    parser.add_argument("--port-line-thickness", type=float, default=1.0, help="Port outline line thickness.")
+    parser.add_argument("--port-samples", type=int, default=96, help="Samples per wrapped port outline.")
+    parser.add_argument("--port-surface-offset", type=float, default=0.003, help="Outward offset from the torus surface for port outlines.")
+    parser.add_argument("--port-phi-zero-offset", type=float, default=162.0, help="CSV phi, in degrees, corresponding to repo phi=0.")
+    parser.add_argument("--label-ports", action=argparse.BooleanOptionalAction, default=False, help="Label matching HIDRA ports.")
+    parser.add_argument("--port-label-filter", default="HIDRA-MAT;RLP", help="Semicolon-separated component substrings to label.")
+    parser.add_argument("--port-label-color", default="#F5F7FA", help="Port label color.")
+    parser.add_argument("--port-label-font-size", type=float, default=16.0, help="Port label font size.")
+    parser.add_argument("--port-label-surface-offset", type=float, default=0.045, help="Outward offset from the torus surface for port labels.")
+    parser.add_argument("--show-compass", action=argparse.BooleanOptionalAction, default=True, help="Show a floor-plane north compass in the torus center.")
+    parser.add_argument("--compass-size", type=float, default=0.18, help="Compass rose radius in meters.")
+    parser.add_argument("--compass-z", type=float, default=None, help="Compass z location. Defaults to -a - 0.015.")
+    parser.add_argument("--compass-color", default="#F5F7FA", help="Compass rose color.")
+    parser.add_argument("--compass-alpha", type=float, default=0.80, help="Compass rose alpha.")
+    parser.add_argument("--compass-line-thickness", type=float, default=2.0, help="Compass line thickness.")
+    parser.add_argument("--compass-label-color", default="#F5F7FA", help="Compass north label color.")
+    parser.add_argument("--compass-font-size", type=float, default=18.0, help="Compass north label font size.")
     parser.add_argument(
         "--torus-style",
         choices=("mesh", "wireframe", "both"),
@@ -576,13 +600,13 @@ def torus_wire_lines(
 
     for phi in np.linspace(0.0, 2.0 * np.pi, max(1, int(wire_phi)), endpoint=False, dtype=np.float32):
         x = (R0 + a * np.cos(theta_curve)) * np.cos(phi)
-        y = (R0 + a * np.cos(theta_curve)) * np.sin(phi)
+        y = -(R0 + a * np.cos(theta_curve)) * np.sin(phi)
         z = a * np.sin(theta_curve)
         lines.append(np.column_stack([x, y, z]).astype(np.float32))
 
     for theta in np.linspace(theta_min, theta_max, max(1, int(wire_theta)), dtype=np.float32):
         x = (R0 + a * np.cos(theta)) * np.cos(phi_curve)
-        y = (R0 + a * np.cos(theta)) * np.sin(phi_curve)
+        y = -(R0 + a * np.cos(theta)) * np.sin(phi_curve)
         z = np.full_like(phi_curve, a * np.sin(theta))
         lines.append(np.column_stack([x, y, z]).astype(np.float32))
 
@@ -646,7 +670,7 @@ def setup_camera(subplot, R0: float, a: float) -> None:
         #subplot.camera.local.position = (1.45, -1.85, 0.75)
         subplot.camera.local.position = (0.0, -1.35, 0.57)
         subplot.camera.look_at((0.0, 0.0, -0.04))
-        subplot.camera.fov = 85.0
+        subplot.camera.fov = 60.0
         subplot.camera.zoom = 1.0
 
     except Exception:
@@ -951,6 +975,76 @@ def add_scene_torus(subplot, args: argparse.Namespace) -> None:
     )
 
 
+def add_scene_ports(subplot, args: argparse.Namespace) -> None:
+    if not args.show_ports and not args.label_ports:
+        return
+
+    if args.show_ports:
+        lines = make_port_boundary_lines(
+            args.port_file,
+            R0=args.R0,
+            a=args.a,
+            samples=args.port_samples,
+            half_shell=(args.torus_half == "bottom"),
+            surface_offset=args.port_surface_offset,
+            phi_zero_offset_deg=args.port_phi_zero_offset,
+        )
+        if lines:
+            subplot.add_line_collection(
+                lines,
+                colors=parse_rgba(args.port_color, args.port_alpha),
+                thickness=float(args.port_line_thickness),
+            )
+
+    if args.label_ports:
+        labels = make_port_label_positions(
+            args.port_file,
+            R0=args.R0,
+            a=args.a,
+            label_filters=args.port_label_filter,
+            surface_offset=args.port_label_surface_offset,
+            phi_zero_offset_deg=args.port_phi_zero_offset,
+        )
+        for text, position in labels:
+            subplot.add_text(
+                text,
+                font_size=float(args.port_label_font_size),
+                face_color=parse_rgba(args.port_label_color, 1.0),
+                outline_color=parse_rgba(args.plot_background, 1.0),
+                outline_thickness=0.15,
+                screen_space=True,
+                offset=tuple(float(value) for value in position),
+                anchor="middle-center",
+            )
+
+
+def add_scene_compass(subplot, args: argparse.Namespace) -> None:
+    if not args.show_compass:
+        return
+
+    compass_z = -float(args.a) - 0.015 if args.compass_z is None else float(args.compass_z)
+    lines, label_pos = make_compass_rose_lines(
+        size=args.compass_size,
+        z=compass_z,
+        north_phi_deg=args.port_phi_zero_offset,
+    )
+    subplot.add_line_collection(
+        lines,
+        colors=parse_rgba(args.compass_color, args.compass_alpha),
+        thickness=float(args.compass_line_thickness),
+    )
+    subplot.add_text(
+        "N",
+        font_size=float(args.compass_font_size),
+        face_color=parse_rgba(args.compass_label_color, 1.0),
+        outline_color=parse_rgba(args.plot_background, 1.0),
+        outline_thickness=0.15,
+        screen_space=True,
+        offset=tuple(float(value) for value in label_pos),
+        anchor="middle-center",
+    )
+
+
 def add_scene_particles(
     subplot,
     args: argparse.Namespace,
@@ -1057,6 +1151,8 @@ def export_mp4(
     except Exception:
         pass
     add_scene_torus(subplot, args)
+    add_scene_ports(subplot, args)
+    add_scene_compass(subplot, args)
     scatter, trail_scatter, trail_buffer = add_scene_particles(
         subplot,
         args,
@@ -1185,23 +1281,9 @@ def main() -> int:
     except Exception:
         pass
 
-    if args.show_torus:
-        add_torus(
-            subplot,
-            args.R0,
-            args.a,
-            style=args.torus_style,
-            mesh_color=args.torus_color,
-            mesh_alpha=args.torus_alpha,
-            wire_color=args.torus_wire_color,
-            wire_alpha=args.torus_wire_alpha,
-            wire_thickness=args.torus_wire_thickness,
-            half_shell=(args.torus_half == "bottom"),
-            nphi=args.torus_nphi,
-            ntheta=args.torus_ntheta,
-            wire_phi=args.torus_wire_phi,
-            wire_theta=args.torus_wire_theta,
-        )
+    add_scene_torus(subplot, args)
+    add_scene_ports(subplot, args)
+    add_scene_compass(subplot, args)
 
     frame_positions(traces, initial_frame, valid_lengths, args.hide_zero_rows, frame_buffer)
     if args.color_mode == "solid":

@@ -26,6 +26,9 @@ from boris_trace_data import (
     frame_count,
     infer_valid_lengths,
     load_boris_trace_file,
+    make_compass_rose_lines,
+    make_port_boundary_lines,
+    make_port_label_positions,
     make_synthetic_boris_traces,
     make_torus_mesh,
     select_trace_particles,
@@ -60,6 +63,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--show-static-lines", action="store_true", help="Draw full selected traces once.")
     parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
     parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
+    parser.add_argument("--torus-half", choices=("bottom", "full"), default="bottom", help="Render only the bottom half of the torus or the full torus.")
+    parser.add_argument("--show-ports", action=argparse.BooleanOptionalAction, default=True, help="Show HIDRA port outlines on the torus wall.")
+    parser.add_argument("--port-file", type=Path, default=Path("input_files/HIDRA_ports.csv"), help="CSV file with HIDRA port locations.")
+    parser.add_argument("--port-color", default="#F5F7FA", help="Port outline color.")
+    parser.add_argument("--port-alpha", type=float, default=0.85, help="Port outline alpha.")
+    parser.add_argument("--port-line-thickness", type=float, default=1.0, help="Port outline line thickness.")
+    parser.add_argument("--port-samples", type=int, default=96, help="Samples per wrapped port outline.")
+    parser.add_argument("--port-surface-offset", type=float, default=0.003, help="Outward offset from the torus surface for port outlines.")
+    parser.add_argument("--port-phi-zero-offset", type=float, default=162.0, help="CSV phi, in degrees, corresponding to repo phi=0.")
+    parser.add_argument("--label-ports", action=argparse.BooleanOptionalAction, default=False, help="Label matching HIDRA ports.")
+    parser.add_argument("--port-label-filter", default="HIDRA-MAT;RLP", help="Semicolon-separated component substrings to label.")
+    parser.add_argument("--port-label-color", default="#F5F7FA", help="Port label color.")
+    parser.add_argument("--port-label-font-size", type=float, default=16.0, help="Port label font size.")
+    parser.add_argument("--port-label-surface-offset", type=float, default=0.045, help="Outward offset from the torus surface for port labels.")
+    parser.add_argument("--show-compass", action=argparse.BooleanOptionalAction, default=True, help="Show a floor-plane north compass in the torus center.")
+    parser.add_argument("--compass-size", type=float, default=0.18, help="Compass rose radius in meters.")
+    parser.add_argument("--compass-z", type=float, default=None, help="Compass z location. Defaults to -a - 0.015.")
+    parser.add_argument("--compass-color", default="#F5F7FA", help="Compass rose color.")
+    parser.add_argument("--compass-alpha", type=float, default=0.80, help="Compass rose alpha.")
+    parser.add_argument("--compass-line-thickness", type=float, default=2.0, help="Compass line thickness.")
+    parser.add_argument("--compass-label-color", default="#F5F7FA", help="Compass north label color.")
+    parser.add_argument("--compass-font-size", type=float, default=18.0, help="Compass north label font size.")
     parser.add_argument("--size", default="1280x720", help="Window size as WIDTHxHEIGHT.")
     parser.add_argument("--synthetic-steps", type=int, default=4_000, help="Synthetic trace steps.")
     parser.add_argument("--synthetic-particles", type=int, default=512, help="Synthetic particle count.")
@@ -113,14 +138,51 @@ def particle_colors(n_particles: int, alpha: float = 1.0) -> np.ndarray:
     return np.column_stack([r, g, b, np.full_like(r, float(alpha))]).astype(np.float32)
 
 
+def parse_rgba(value: str, alpha: float = 1.0) -> np.ndarray:
+    named = {
+        "white": (1.0, 1.0, 1.0),
+        "black": (0.0, 0.0, 0.0),
+        "red": (1.0, 0.0, 0.0),
+        "green": (0.0, 0.8, 0.0),
+        "blue": (0.0, 0.25, 1.0),
+        "cyan": (0.0, 1.0, 1.0),
+        "magenta": (1.0, 0.0, 1.0),
+        "yellow": (1.0, 1.0, 0.0),
+        "orange": (1.0, 0.55, 0.0),
+        "purple": (0.55, 0.25, 0.95),
+    }
+    text = value.strip().lower()
+    if text in named:
+        return np.asarray((*named[text], alpha), dtype=np.float32)
+
+    if text.startswith("#") and len(text) in (7, 9):
+        channels = [int(text[i : i + 2], 16) / 255.0 for i in range(1, len(text), 2)]
+        if len(channels) == 3:
+            channels.append(alpha)
+        else:
+            channels[3] *= alpha
+        return np.asarray(channels, dtype=np.float32)
+
+    parts = [float(part.strip()) for part in text.split(",") if part.strip()]
+    if len(parts) not in (3, 4):
+        raise ValueError(f"Could not parse color {value!r}.")
+    if max(parts) > 1.0:
+        parts = [channel / 255.0 for channel in parts]
+    if len(parts) == 3:
+        parts.append(alpha)
+    else:
+        parts[3] *= alpha
+    return np.asarray(parts, dtype=np.float32)
+
+
 def make_nan_buffer(shape: tuple[int, ...]) -> np.ndarray:
     out = np.empty(shape, dtype=np.float32)
     out[:] = np.nan
     return out
 
 
-def add_torus(subplot, R0: float, a: float) -> None:
-    positions, indices = make_torus_mesh(R0=R0, a=a)
+def add_torus(subplot, R0: float, a: float, half_shell: bool = True) -> None:
+    positions, indices = make_torus_mesh(R0=R0, a=a, half_shell=half_shell)
     if hasattr(subplot, "add_mesh"):
         try:
             subplot.add_mesh(
@@ -137,15 +199,86 @@ def add_torus(subplot, R0: float, a: float) -> None:
 
     # Older fastplotlib versions may not expose add_mesh. Use sparse rings as a fallback.
     ring_count = 16
-    theta = np.linspace(-np.pi, 0.0, 128, dtype=np.float32)
+    theta_min, theta_max = (-np.pi, 0.0) if half_shell else (-np.pi, np.pi)
+    theta = np.linspace(theta_min, theta_max, 128, dtype=np.float32)
     phi_values = np.linspace(0.0, 2.0 * np.pi, ring_count, endpoint=False, dtype=np.float32)
     rings = []
     for phi in phi_values:
         x = (R0 + a * np.cos(theta)) * np.cos(phi)
-        y = (R0 + a * np.cos(theta)) * np.sin(phi)
+        y = -(R0 + a * np.cos(theta)) * np.sin(phi)
         z = a * np.sin(theta)
         rings.append(np.column_stack([x, y, z]).astype(np.float32))
     subplot.add_line_collection(rings, colors=(0.18, 0.42, 0.72, 0.45), thickness=1.0)
+
+
+def add_ports(subplot, args: argparse.Namespace) -> None:
+    if not args.show_ports and not args.label_ports:
+        return
+
+    if args.show_ports:
+        lines = make_port_boundary_lines(
+            args.port_file,
+            R0=args.R0,
+            a=args.a,
+            samples=args.port_samples,
+            half_shell=(args.torus_half == "bottom"),
+            surface_offset=args.port_surface_offset,
+            phi_zero_offset_deg=args.port_phi_zero_offset,
+        )
+        if lines:
+            subplot.add_line_collection(
+                lines,
+                colors=parse_rgba(args.port_color, args.port_alpha),
+                thickness=float(args.port_line_thickness),
+            )
+
+    if args.label_ports:
+        labels = make_port_label_positions(
+            args.port_file,
+            R0=args.R0,
+            a=args.a,
+            label_filters=args.port_label_filter,
+            surface_offset=args.port_label_surface_offset,
+            phi_zero_offset_deg=args.port_phi_zero_offset,
+        )
+        for text, position in labels:
+            subplot.add_text(
+                text,
+                font_size=float(args.port_label_font_size),
+                face_color=parse_rgba(args.port_label_color, 1.0),
+                outline_color=parse_rgba("#02070D", 1.0),
+                outline_thickness=0.15,
+                screen_space=True,
+                offset=tuple(float(value) for value in position),
+                anchor="middle-center",
+            )
+
+
+def add_compass(subplot, args: argparse.Namespace) -> None:
+    if not args.show_compass:
+        return
+
+    compass_z = -float(args.a) - 0.015 if args.compass_z is None else float(args.compass_z)
+    lines, label_pos = make_compass_rose_lines(
+        size=args.compass_size,
+        z=compass_z,
+        north_phi_deg=args.port_phi_zero_offset,
+    )
+    subplot.add_line_collection(
+        lines,
+        colors=parse_rgba(args.compass_color, args.compass_alpha),
+        thickness=float(args.compass_line_thickness),
+    )
+    subplot.add_text(
+        "N",
+        font_size=float(args.compass_font_size),
+        face_color=parse_rgba(args.compass_label_color, 1.0),
+        outline_color=parse_rgba("#02070D", 1.0),
+        outline_thickness=0.15,
+        screen_space=True,
+        offset=tuple(float(value) for value in label_pos),
+        anchor="middle-center",
+    )
 
 
 def add_static_lines(subplot, traces: np.ndarray, valid_lengths: np.ndarray, stride: int) -> None:
@@ -214,6 +347,7 @@ def setup_camera(subplot, R0: float, a: float) -> None:
         #subplot.camera.local.position = (1.45, -1.85, 0.75)
         subplot.camera.position.set = (-1.85, -1.85, 0.75)
         subplot.camera.look_at((0.0, 0.0, 0.0))
+        subplot.camera.fov = 60.0
     except Exception:
         pass
     try:
@@ -273,7 +407,9 @@ def main() -> int:
     except Exception:
         pass
 
-    add_torus(subplot, args.R0, args.a)
+    add_torus(subplot, args.R0, args.a, half_shell=(args.torus_half == "bottom"))
+    add_ports(subplot, args)
+    add_compass(subplot, args)
     if args.show_static_lines:
         add_static_lines(subplot, traces, valid_lengths, args.stride)
 
