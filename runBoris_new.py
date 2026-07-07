@@ -30,6 +30,8 @@ from classes.boris import Boris
 from plot_funcs import plotFuncs
 from utility.coordtrans import *
 from utility.point_generators import ionInitializer
+from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
@@ -76,47 +78,71 @@ OUTPUT_DIRECTORY_NAME: str
 TAG: str
 
 
-def load_boris_inputs(path):
-    """Load Boris runner inputs from a JSON object."""
-    path = Path(path)
-    try:
-        with path.open("r", encoding="utf-8") as stream:
-            input_params = json.load(stream)
-    except OSError as exc:
-        raise SystemExit(f"Could not read inputs file {path}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"Could not parse inputs file {path}: {exc}") from exc
+input_params = {
+    "CONFIG_TOR": "default_toroidal",
+    "CONFIG_HEL": "default_helical",
+    "ENABLE_ERRFIELD": True,
+    "TOROIDAL_CURRENT": 0.486,
+    "HELICAL_CURRENT": 0.900,
 
-    if not isinstance(input_params, dict):
-        raise SystemExit("Boris inputs JSON must contain an object.")
-    return input_params
+    "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
+    "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
+    "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
+    "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
+    "FIELD_SCALE_ELECTRIC": 60.0,
+    "NEUTRAL_GAS_DENSITY": 3e18,
+    "PLASMA_DENSITY": 5e18,
+
+    "ION_MASS": 6.941,
+    "ION_TEMP": 2.0,
+    "CHARGE_NUM": 1,
+
+    "LCFS_INDEX": 20,
+    "DELTRS": [0.0],
+    "NPHI": 180,
+    "NTHETA": 120,
+    "NPARTICLES_PER_EMITTER": 5,
+
+    "DT": 1e-8,
+    "TMAX": 0.001,
+
+    "TRACK_NPHI": 180,
+    "TRACK_NTHETA": 120,
+    "TRACK_NPARTICLES_PER_EMITTER": 1,
+    "STRIDE": 13,
+
+    "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306_LSODA",
+    "TAG": "pipelineTest"
+    }
+
+
+_CLI_INPUTS = object()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Boris ion tracking from a JSON input file.")
     parser.add_argument(
         "--inputs-json",
-        type=Path,
-        default=Path("boris_inputs.json"),
+        default=None,
         help="Path to Boris runner inputs JSON.",
     )
     return parser.parse_args()
 
 
 ## RUN SIMULATION:
-def boris_runner(input_params=None):
+def boris_runner(params):
      ## LOAD INPUT PARAMETERS
-    if input_params is not None:
-        print(f'{input_params.keys()=}')
-        for key, value in input_params.items():
+    if params is not None:
+        print(f'{params.keys()=}')
+        for key, value in params.items():
             print(f'{key}: {value}')
             globals()[str(key)] = value
 
-    STRIDE = int(globals().get("STRIDE", globals().get("TRACE_STRIDE", 1)))
+    STRIDE = int(params.get("STRIDE", params.get("TRACE_STRIDE", 1)))
     if STRIDE < 1:
         raise ValueError("STRIDE must be a positive integer")
-    globals()["STRIDE"] = STRIDE
-    globals()["TRACE_STRIDE"] = STRIDE
+    params["TRACE_STRIDE"] = STRIDE
+    params["STRIDE"] = STRIDE
 
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
@@ -124,13 +150,13 @@ def boris_runner(input_params=None):
     cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
                                                                int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
     boris_subdir = cond_string + TAG
-    globals()["NSTEPS"] = int(TMAX / DT)
+    params["NSTEPS"] = int(TMAX / DT)
 
     ## SET UP RUN DIRECTORY AND LOGGING
     simIO = IOHandler(OUTPUT_DIRECTORY_NAME)
     simIO.setActiveSubDir(boris_subdir)
     simIO.startLog(log_name="boris.log", subdir=boris_subdir, logger_name="Boris")
-    simIO.borisBoilerplate(globals())
+    simIO.borisBoilerplate(params)
 
     ## CALCULATE SOME CONSTANTS
     N_emitters = len(DELTRS) * NTHETA * NPHI
@@ -220,9 +246,12 @@ def boris_runner(input_params=None):
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
 
-def main():
-    args = parse_args()
-    boris_runner(load_boris_inputs(args.inputs_json))
+def main(input_params_override=_CLI_INPUTS):
+    if input_params_override is _CLI_INPUTS:
+            args = parse_args()
+            input_params_override = load_inputs_json(args.inputs_json, "Boris inputs") if args.inputs_json else None
+    params = merge_input_params(input_params, input_params_override)
+    boris_runner(params)
 
 
 if __name__ == "__main__":
