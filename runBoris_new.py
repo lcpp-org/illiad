@@ -52,7 +52,12 @@ FIELD_FILE_ELECTRIC: str
 FIELD_SCALE_ELECTRIC: float
 ION_NEUTRAL_COLLISIONS: Optional[str]
 ION_ION_COLLISIONS: Optional[str]
+
+FIELD_SCALE_ELECTRIC: float
+BACKGROUND_GAS_SPECIES: str
+NEUTRAL_GAS_TEMP_EV: float
 NEUTRAL_GAS_DENSITY: float
+BACKGROUND_ION_TEMP_EV: float
 PLASMA_DENSITY: float
 
 ION_MASS: float
@@ -91,7 +96,10 @@ input_params = {
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
     "FIELD_SCALE_ELECTRIC": 60.0,
+    "BACKGROUND_GAS_SPECIES": "He", 
+    "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
+    "BACKGROUND_ION_TEMP_EV": 2.0,
     "PLASMA_DENSITY": 5e18,
 
     "ION_MASS": 6.941,
@@ -203,8 +211,8 @@ def boris_runner(params):
                                 for p in _track_p_idx]
 
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
-    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX,
-                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY)
+    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX, NEUTRAL_GAS_TEMP_EV, BACKGROUND_ION_TEMP_EV,
+                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY, bg_gas_species=BACKGROUND_GAS_SPECIES)
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
                                                                                     nfield=n_hidra,

@@ -19,6 +19,25 @@ from classes.collisions import Collisions, kg_per_amu, kboltz, eps0, sqrt_pi, Li
 #from plot_funcs import plotFuncs
 
 
+def _get_species_mass_amu(species):
+    species_masses_amu = {
+        "H": 1.00784,
+        "D": 2.01410,
+        "He": 4.002602,
+        "Li": 6.941,
+        "Ar": 39.948,
+    }
+
+    try:
+        return species_masses_amu[species]
+    except KeyError as exc:
+        valid_species = ", ".join(species_masses_amu)
+        raise ValueError(
+            f"Unknown background gas species '{species}'. "
+            f"Valid options are: {valid_species}"
+        ) from exc
+
+
 class Boris(Collisions):
     """Class to handle Boris analysis of magnetic field lines."""
     def __init__(self, io_handler, anlys_name='Boris', tag=None):
@@ -53,7 +72,7 @@ class Boris(Collisions):
         # self.IO.log.info(f"| TAG            | {str(self.tag):<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
-    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3, T_gas_eV=0.025, n_gas=3e18, n_e=1e18):
+    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3, T_gas_eV=0.025, Ti_eV=2.0, n_gas=3e18, n_e=1e18, bg_gas_species="He"):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
@@ -70,10 +89,13 @@ class Boris(Collisions):
         self.tmax = tmax
         self.nsteps = int(tmax // dt) + 1
         self.ion_list = ion_list
+
+        background_mass_amu = _get_species_mass_amu(bg_gas_species)
+        
         self.T_gas_eV = T_gas_eV # eV, room temperature
-        self.m_gas_amu = 4.002602 #amu, Helium
-        self.Ti_eV = 2.0 # eV, ion temperature for ion-ion collision model
-        self.m_ion_amu = 4.002602 #amu, ion mass for ion-ion collision model
+        self.m_gas_amu = background_mass_amu #amu, background gas mass
+        self.Ti_eV = Ti_eV # eV, ion temperature for ion-ion collision model
+        self.m_ion_amu = background_mass_amu #amu, ion mass for ion-ion collision model
         self.n_gas = n_gas
         self.n_e = n_e
 
