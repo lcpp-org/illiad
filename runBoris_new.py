@@ -38,6 +38,8 @@ kg_per_amu = 1.660_539_068E-27
 kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
+electron_mass = 9.109_383_7015E-31 # kg
+alpha = 0.5 # ratio of ion to electron saturation currents
 
 # JSON-provided run inputs. These are assigned dynamically in boris_runner();
 # the annotations keep static analyzers from reporting them as undefined.
@@ -49,11 +51,11 @@ HELICAL_CURRENT: float
 
 FIELD_FILE_DENSITY: str
 FIELD_FILE_ELECTRIC: str
-FIELD_SCALE_ELECTRIC: float
 ION_NEUTRAL_COLLISIONS: Optional[str]
 ION_ION_COLLISIONS: Optional[str]
 
-FIELD_SCALE_ELECTRIC: float
+PLASMA_POTENTIAL: float
+ELECTRON_TEMP_EV: Optional[float]
 BACKGROUND_GAS_SPECIES: str
 NEUTRAL_GAS_TEMP_EV: float
 NEUTRAL_GAS_DENSITY: float
@@ -95,7 +97,8 @@ input_params = {
     "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
-    "FIELD_SCALE_ELECTRIC": 60.0,
+    "PLASMA_POTENTIAL": 60.0,
+    "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He", 
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
@@ -137,6 +140,40 @@ def parse_args():
     return parser.parse_args()
 
 
+def resolve_plasma_potential(params):
+    field_scale = params.get("PLASMA_POTENTIAL", None)
+
+    if field_scale is not None:
+        return field_scale, "input"
+    else:
+        electron_temp_ev = params.get("ELECTRON_TEMP_EV", None)
+        background_ion_mass_amu = params.get("M_GAS_AMU", None)
+        background_ion_mass_kg = background_ion_mass_amu * kg_per_amu
+
+        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / alpha) 
+                    * (background_ion_mass_kg / (2 * np.pi * electron_mass)))
+
+    return field_scale, "calculated"
+
+def get_species_mass_amu(species):
+    species_masses_amu = {
+        "H":  1.007825,
+        "D":  2.014101,
+        "T":  3.016049,
+        "He": 4.002603,
+        "Ar": 39.962383,
+    }
+
+    try:
+        return species_masses_amu[species]
+    except KeyError as exc:
+        valid_species = ", ".join(species_masses_amu)
+        raise ValueError(
+            f"Unknown background gas species '{species}'. "
+            f"Valid options are: {valid_species}"
+        ) from exc
+        
+
 ## RUN SIMULATION:
 def boris_runner(params):
      ## LOAD INPUT PARAMETERS
@@ -152,11 +189,28 @@ def boris_runner(params):
     params["TRACE_STRIDE"] = STRIDE
     params["STRIDE"] = STRIDE
 
+    m_gas_amu = get_species_mass_amu(BACKGROUND_GAS_SPECIES)
+    params["M_GAS_AMU"] = m_gas_amu
+    globals()["M_GAS_AMU"] = m_gas_amu
+
+    plasma_potential, resolve_method = resolve_plasma_potential(params)
+    params["PLASMA_POTENTIAL"] = plasma_potential
+    globals()["PLASMA_POTENTIAL"] = plasma_potential
+
+    if resolve_method == "input":
+        print(f"Using user provided PLASMA_POTENTIAL: {plasma_potential:.6g} V")
+    else:
+        print(
+            f"Using calculated PLASMA_POTENTIAL: {plasma_potential:.6g} V "
+            f"from ELECTRON_TEMP_EV = {params.get('ELECTRON_TEMP_EV')} eV, "
+            f"BACKGROUND_GAS_SPECIES = {BACKGROUND_GAS_SPECIES}, "
+            f"M_GAS_AMU = {m_gas_amu:.6g}")
+
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
     dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
     cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
-                                                               int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
+                                                               int(plasma_potential), int(CHARGE_NUM))
     boris_subdir = cond_string + TAG
     params["NSTEPS"] = int(TMAX / DT)
 
@@ -177,7 +231,7 @@ def boris_runner(params):
     b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
     e_hidra = Mesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                    att_mult=FIELD_SCALE_ELECTRIC)
+                                    att_mult=plasma_potential)
     if ION_ION_COLLISIONS:
       n_hidra = Mesh(R0=0.72, a=0.19)
       n_hidra.loadScalarField(FIELD_FILE_DENSITY, period_=np.array([0, 1, 1]),
@@ -212,7 +266,7 @@ def boris_runner(params):
 
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
     ion_tracer.setConditions(ion_list, cond_string, DT, TMAX, NEUTRAL_GAS_TEMP_EV, BACKGROUND_ION_TEMP_EV,
-                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY, bg_gas_species=BACKGROUND_GAS_SPECIES)
+                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY, m_gas_amu=m_gas_amu)
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
                                                                                     nfield=n_hidra,
