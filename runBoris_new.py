@@ -92,8 +92,8 @@ input_params = {
     "TOROIDAL_CURRENT": 0.486,
     "HELICAL_CURRENT": 0.900,
 
-    "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
-    "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
+    "FIELD_FILE_DENSITY": "output/iota3_entire_pipeline_test/data/test1/nField_test1.npy",
+    "FIELD_FILE_ELECTRIC": "output/iota3_entire_pipeline_test/data/test1/Efield_test1.npy",
     "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
@@ -109,11 +109,11 @@ input_params = {
     "ION_TEMP": 2.0,
     "CHARGE_NUM": 1,
 
-    "LCFS_INDEX": 20,
+    "LCFS_INDEX": 1,
     "DELTRS": [0.0],
-    "NPHI": 180,
-    "NTHETA": 120,
-    "NPARTICLES_PER_EMITTER": 5,
+    "NPHI": 2,
+    "NTHETA": 2,
+    "NPARTICLES_PER_EMITTER": 1,
 
     "DT": 1e-8,
     "TMAX": 0.001,
@@ -123,8 +123,8 @@ input_params = {
     "TRACK_NPARTICLES_PER_EMITTER": 1,
     "STRIDE": 13,
 
-    "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306_LSODA",
-    "TAG": "pipelineTest"
+    "OUTPUT_DIRECTORY_NAME": "iota3_entire_pipeline_test",
+    "TAG": "test1_boris"
     }
 
 
@@ -178,9 +178,9 @@ def get_species_mass_amu(species):
 def boris_runner(params):
      ## LOAD INPUT PARAMETERS
     if params is not None:
-        print(f'{params.keys()=}')
+        #print(f'{params.keys()=}')
         for key, value in params.items():
-            print(f'{key}: {value}')
+            #print(f'{key}: {value}')
             globals()[str(key)] = value
 
     STRIDE = int(params.get("STRIDE", params.get("TRACE_STRIDE", 1)))
@@ -198,7 +198,7 @@ def boris_runner(params):
     globals()["PLASMA_POTENTIAL"] = plasma_potential
 
     if resolve_method == "input":
-        print(f"Using user provided PLASMA_POTENTIAL: {plasma_potential:.6g} V")
+        print(f"Using user provided PLASMA_POTENTIAL: {plasma_potential:.6g} V (ELECTRON_TEMP_EV ignored!)")
     else:
         print(
             f"Using calculated PLASMA_POTENTIAL: {plasma_potential:.6g} V "

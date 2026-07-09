@@ -286,7 +286,7 @@ class IOHandler:
             "ERRFIELD_MAG",
             "ERRFIELD_DIR_DEG",
             "FIELD_FILE_ELECTRIC",
-            "ELECTRIC_POTENTIAL",
+            "PLASMA_POTENTIAL",
             "ELECTRON_TEMP_EV",
             "BACKGROUND_GAS_SPECIES",
             "M_GAS_AMU",
@@ -340,10 +340,10 @@ class IOHandler:
                       +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
                       +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
                       +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
-                      +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {}'.format(param_values["ELECTRIC_POTENTIAL"])
-                      +'\n| LOADED ELECTRON TEMPERATURE: {} eV'.format(param_values["ELECTRON_TEMP_EV"])
+                      +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {:.6f}'.format(param_values["PLASMA_POTENTIAL"])
+                      +'\n| LOADED ELECTRON TEMPERATURE: {:.6f} eV'.format(param_values["ELECTRON_TEMP_EV"])
                       +'\n| LOADED BACKGROUND GAS SPECIES: {}'.format(param_values["BACKGROUND_GAS_SPECIES"])
-                      +'\n| LOADED BACKGROUND GAS MASS: {} amu'.format(param_values["M_GAS_AMU"])
+                      +'\n| LOADED BACKGROUND GAS MASS: {:.6f} amu'.format(param_values["M_GAS_AMU"])
                       +'\n| LOADED DENSITY FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_DENSITY"])
                       +'\n| ION-NEUTRAL COLLISIONS: {}'.format(param_values["ION_NEUTRAL_COLLISIONS"])
                       +'\n| ION-ION COLLISIONS: {}'.format(param_values["ION_ION_COLLISIONS"])
