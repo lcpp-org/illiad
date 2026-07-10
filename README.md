@@ -7,13 +7,13 @@
     |  ██║███████╗███████╗██║██║  ██║██████╔╝                 |
     |  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═╝╚═════╝                  |
     |                                                         |
-    |  Illinois Lagrangian Impurity Advection and Deposition  |
+    |  Illinois Lagrangian Ion Advection and Deposition  |
     -----------------------------------------------------------
 ```
 
 # ILLIAD
 
-**ILLIAD** (*Illinois Lagrangian Impurity Advection and Deposition*) is a
+**ILLIAD** (*Illinois Lagrangian Ion Advection and Deposition*) is a
 Python modeling framework for reconstructing three-dimensional HIDRA magnetic
 and electrostatic fields and simulating trace impurity-ion transport through the
 scrape-off layer (SOL).
