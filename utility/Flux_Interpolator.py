@@ -110,8 +110,8 @@ def fluxInterpolator(input_params=None):
     else:
         best_phi_index = np.argsort(sum_flux)[-5]
     linear_flux_array = flux_norm_array[:, best_phi_index]
-    # Adjust profile with ALPHA parameter
-    linear_flux_array = 1 - (1 - linear_flux_array)**ALPHA
+    # Adjust profile with ALPHA parameter, keeping 0.1 at the LCFS and 1.0 at the axis
+    linear_flux_array = 0.1 + 0.9 * (1 - (1 - linear_flux_array)**ALPHA)
 
     if valid_surface.ndim == 2: # if valid_surface has multiple phi angles
         valid_surface = valid_surface[:, best_phi_index]
@@ -208,6 +208,26 @@ def fluxInterpolator(input_params=None):
         fred3[fred3==0] = fred4[fred3==0]
         grid_linear.T[1] = fred3
         grid_linear.T[0] = grid_linear.T[1]
+
+        # Exponentially decay from 0.1 at the actual LCFS contour to 0.01 at the wall
+        lcfs_thetas, lcfs_rads = flux_surfaces[LCFS_INDEX]
+        lcfs_valid = np.isfinite(lcfs_thetas) & np.isfinite(lcfs_rads)
+        lcfs_thetas = lcfs_thetas[lcfs_valid]
+        lcfs_rads = lcfs_rads[lcfs_valid]
+        theta_distances = np.abs((lcfs_thetas[:, None] - THETAS[None, :] + np.pi) % (2*np.pi) - np.pi)
+        lcfs_rads_on_grid = lcfs_rads[np.argmin(theta_distances, axis=0)]
+        distance_fraction = np.clip(
+            (grid_rad - lcfs_rads_on_grid[:, None]) / (b_hidra.r_max - lcfs_rads_on_grid[:, None]),
+            0.0,
+            1.0,
+        )
+        outside_lcfs = grid_rad >= lcfs_rads_on_grid[:, None]
+        exterior_profile = 0.1 * np.exp(np.log(0.01 / 0.1) * distance_fraction)
+        grid_linear = torch.where(
+            torch.as_tensor(outside_lcfs, device=device),
+            torch.as_tensor(exterior_profile, device=device, dtype=grid_linear.dtype),
+            grid_linear,
+        )
 
         """       # set all points outside the LCFS to zero
         ## GET LCFS POINTS

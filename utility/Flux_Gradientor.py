@@ -71,36 +71,24 @@ def fluxGradientor(input_params=None):
     # lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX))
     # lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
 
-    # set all points outside the LCFS to zero
-    for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
-        #lcfs_points = lcfs_points_full[phi_index]
-        # keep only 1st subset of points (360 points)
-        # lcfs_points= lcfs_points[:360].T
-        #print(f'{phi_index=}')
-
-        ## LOAD POINCARE DATA
-        filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
-        lcfs_points = simIO.loadNumpyData(filename)[LCFS_INDEX]
-        th_in, r_in = lcfs_points
-        r_in = r_in[~np.isnan(r_in)]
-        th_in = th_in[~np.isnan(th_in)]
-        #th_size = th_in.size
-
-        for theta_index, this_theta in enumerate(THETAS):
-            # find the index of the value in lcfs_points[0] closest to this_theta
-            mintheta1 = np.abs(th_in - this_theta) #lcfs_points[0]
-            mintheta2 = np.abs(th_in - this_theta + 2*np.pi) #lcfs_points[0]
-
-            # calculate the minimum of the two
-            mintheta3 = np.fmin(mintheta1, mintheta2)
-            lcfs_theta_index = np.argmin(mintheta3)
-            lcfs_rad = r_in[lcfs_theta_index] #lcfs_points[1]
-
-            # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
-            mask = RADS > (lcfs_rad + 0.01) # add buffer to avoid numerical issues
-            flux_gradient_radial[phi_index][theta_index][mask] = 0.0
-            flux_gradient_poloidal[phi_index][theta_index][mask] = 0.0
-            flux_gradient_toroidal[phi_index][theta_index][mask] = 0.0
+    # The exterior decay in Flux_Interpolator makes the old LCFS masking unnecessary.
+    # for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
+    #     filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
+    #     lcfs_points = simIO.loadNumpyData(filename)[LCFS_INDEX]
+    #     th_in, r_in = lcfs_points
+    #     r_in = r_in[~np.isnan(r_in)]
+    #     th_in = th_in[~np.isnan(th_in)]
+    #
+    #     for theta_index, this_theta in enumerate(THETAS):
+    #         mintheta1 = np.abs(th_in - this_theta)
+    #         mintheta2 = np.abs(th_in - this_theta + 2*np.pi)
+    #         mintheta3 = np.fmin(mintheta1, mintheta2)
+    #         lcfs_theta_index = np.argmin(mintheta3)
+    #         lcfs_rad = r_in[lcfs_theta_index]
+    #         mask = RADS > (lcfs_rad + 0.01)
+    #         flux_gradient_radial[phi_index][theta_index][mask] = 0.0
+    #         flux_gradient_poloidal[phi_index][theta_index][mask] = 0.0
+    #         flux_gradient_toroidal[phi_index][theta_index][mask] = 0.0
 
     flux_gradient_magnitude = np.sqrt(flux_gradient_radial**2 + flux_gradient_poloidal**2 + flux_gradient_toroidal**2)
 
