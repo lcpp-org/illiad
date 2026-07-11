@@ -267,9 +267,9 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     """
     Generates initial velocities for particles following a Maxwell-Boltzmann energy distribution.
 
-    The function samples random directions uniformly over a hemisphere and scales the velocities
-    according to the specified ion temperature. The resulting velocity vectors are rotated to align
-    with the provided surface normals.
+    The function samples a cosine-weighted angular distribution over a hemisphere and scales the
+    velocities according to the specified ion temperature. The resulting velocity vectors are
+    stored in emitter-major order and rotated to align with the provided surface normals.
 
     Args:
         N_particles (int): Number of particles to generate velocities for.
@@ -284,7 +284,9 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     outputHandler.log.info(f'GENERATING INITIAL VELOCITIES (MAXWELLIAN DIST., T={ion_temp}eV):')
     kg_per_amu = 1.660_539_068E-27
     kboltz = 1.602_176_634E-19 # Joules/eV
-    r = np.random.uniform(0, 1, N_particles)
+    # Uniform sampling of the projected unit disk gives the cosine-weighted
+    # hemispherical distribution p(alpha) = 2 sin(alpha) cos(alpha).
+    r = np.sqrt(np.random.uniform(0, 1, N_particles))
 
     z = np.sqrt(1 - r**2)
     phi = np.random.uniform(0, 2*np.pi, N_particles)
@@ -322,7 +324,7 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     return velocity_array
 
 
-def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO'):
+def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO', return_normals=False):
 
     mass, charge, temperature = ion_properties
     lcfs_index, nphi, ntheta, deltrs, nparticles_per_emitter = initial_conditions
@@ -341,20 +343,23 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
                                            ion_temp=temperature, ion_mass=mass,
                                            nparticles_per_emitter=nparticles_per_emitter, outputHandler=outputHandler)
 
-    initVelPos = np.zeros((nparticles_per_emitter*n_emitters, 6))
-    ion_list = []
-    for i in range(nparticles_per_emitter):
-        # instantiating ions in a list
-        ion_list += [Ion(seed_pt, mass, charge) for seed_pt in seed_list]
-        # parsing the initial velocities and positions into a single array for output
-        starti = i*n_emitters
-        stopi = starti + n_emitters
-        initVelPos[starti:stopi, 0:3] = initVel_array[starti:stopi]
-        initVelPos[starti:stopi, 3:6] = np.array(seed_list)
+    # Keep every initial-condition product in emitter-major order:
+    # [emitter 0 particle 0..N, emitter 1 particle 0..N, ...].
+    seed_array = np.asarray(seed_list, dtype=np.float64)
+    normals_array = np.asarray(normals_list, dtype=np.float64)
+    particle_positions = np.repeat(seed_array, nparticles_per_emitter, axis=0)
+    particle_normals = np.repeat(normals_array, nparticles_per_emitter, axis=0)
+
+    initVelPos = np.empty((n_particles, 6), dtype=np.float64)
+    initVelPos[:, 0:3] = initVel_array
+    initVelPos[:, 3:6] = particle_positions
+    ion_list = [Ion(seed_pt, mass, charge) for seed_pt in particle_positions]
 
     ## SET INITIAL STATES AND OUTPUT(?necessary?)
     for ion, v_0 in zip(ion_list, initVel_array):
         ion.initVelocity(v_0)
         #ion.initOutput(DT, TMAX)
 
+    if return_normals:
+        return ion_list, initVelPos, particle_normals
     return ion_list, initVelPos

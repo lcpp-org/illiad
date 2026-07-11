@@ -232,7 +232,10 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     # if simIO:
     #     init_conds = simIO.loadNumpyData(init_file)
     # else:
-    init_conds = simIO.loadNumpyData(init_file)
+    if isinstance(init_file, np.ndarray):
+        init_conds = init_file
+    else:
+        init_conds = simIO.loadNumpyData(init_file)
 
     # extract initial velocities, calculate initial energies in eV
     v0s = init_conds[:,0:3].T
@@ -242,13 +245,18 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     counts, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    lnE = np.log(counts[counts > 0])  # take log of only positive values to avoid log(0)
-    startfit_i = np.where(counts == np.max(counts))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
-    stopfit_i = np.where(counts < 1)[0][0]
-    if stopfit_i > startfit_i:
-        slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
+    startfit_i = min(np.where(counts == np.max(counts))[0][0] + 100, len(counts) - 2)
+    empty_tail = np.where(counts[startfit_i:] < 1)[0]
+    stopfit_i = startfit_i + empty_tail[0] if empty_tail.size else len(counts)
+    fit_slice = slice(startfit_i, stopfit_i)
+    fit_mask = counts[fit_slice] > 0
+    if np.count_nonzero(fit_mask) >= 2:
+        slope, intercept = np.polyfit(
+            bin_centers[fit_slice][fit_mask], np.log(counts[fit_slice][fit_mask]), 1
+        )
     else:
-        slope, intercept = np.polyfit(bin_centers, lnE, 1)
+        positive = counts > 0
+        slope, intercept = np.polyfit(bin_centers[positive], np.log(counts[positive]), 1)
     Te_calc = -1/slope
 
     plt.figure()
@@ -270,6 +278,86 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
+
+def boris_plotInitVelocities(init_vel_pos, normals, Rmajor=0.72, runString='default', simIO=None,
+                             max_samples=500_000):
+    """Plot initial velocity components and angle relative to the assigned launch normal."""
+    init_vel_pos = np.asarray(init_vel_pos, dtype=np.float64)
+    normals = np.asarray(normals, dtype=np.float64)
+    velocities = init_vel_pos[:, 0:3]
+    positions = init_vel_pos[:, 3:6]
+
+    if velocities.shape != normals.shape:
+        raise ValueError('Initial velocities and normals must have matching (N, 3) shapes')
+
+    total_particles = len(velocities)
+    if total_particles > max_samples:
+        sample_indices = np.linspace(0, total_particles - 1, max_samples, dtype=np.int64)
+        velocities = velocities[sample_indices]
+        positions = positions[sample_indices]
+        normals = normals[sample_indices]
+
+    x, y, z = positions.T
+    major_r = np.sqrt(x*x + y*y)
+    theta = np.arctan2(z, major_r - Rmajor)
+    phi = -np.arctan2(y, x)
+
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+    cos_phi = np.cos(phi)
+    sin_phi = np.sin(phi)
+    e_rho = np.column_stack((cos_theta*cos_phi, -cos_theta*sin_phi, sin_theta))
+    e_theta = np.column_stack((-sin_theta*cos_phi, sin_theta*sin_phi, cos_theta))
+    e_phi = np.column_stack((-sin_phi, -cos_phi, np.zeros_like(phi)))
+
+    velocity_rtp = np.column_stack((
+        np.einsum('ij,ij->i', velocities, e_rho),
+        np.einsum('ij,ij->i', velocities, e_theta),
+        np.einsum('ij,ij->i', velocities, e_phi),
+    ))
+
+    speeds = np.linalg.norm(velocities, axis=1)
+    normal_magnitudes = np.linalg.norm(normals, axis=1)
+    valid = (speeds > 0.0) & (normal_magnitudes > 0.0)
+    cos_angle = np.full(len(speeds), np.nan, dtype=np.float64)
+    cos_angle[valid] = (
+        np.einsum('ij,ij->i', velocities[valid], normals[valid])
+        / (speeds[valid] * normal_magnitudes[valid])
+    )
+    angles_deg = np.degrees(np.arccos(np.clip(cos_angle[valid], -1.0, 1.0)))
+
+    labels = (r'$v_{\rho}$ (m/s)', r'$v_{\theta}$ (m/s)', r'$v_{\phi}$ (m/s)')
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    for component, label, ax in zip(velocity_rtp.T, labels, axes.flat[:3]):
+        ax.hist(component, bins=100, density=True,
+                color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], linewidth=0.35)
+        ax.axvline(np.mean(component), color=UIUC['il_blue'], linestyle='--', linewidth=1.0,
+                   label=f'mean = {np.mean(component):.2e} m/s')
+        ax.set_xlabel(label)
+        ax.set_ylabel('Probability density')
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=8)
+
+    angle_ax = axes[1, 1]
+    angle_ax.hist(angles_deg, bins=np.linspace(0.0, 90.0, 91), density=True,
+                  color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], linewidth=0.35,
+                  label='Sampled')
+    angle_grid = np.linspace(0.0, 90.0, 361)
+    expected_density = np.sin(2.0*np.radians(angle_grid)) * np.pi / 180.0
+    angle_ax.plot(angle_grid, expected_density, color=UIUC['il_blue'], linewidth=1.5,
+                  label=r'Cosine weighted: $\sin(2\alpha)$')
+    angle_ax.set_xlim(0.0, 90.0)
+    angle_ax.set_xlabel(r'Angle from assigned normal, $\alpha$ (deg)')
+    angle_ax.set_ylabel('Probability density (1/deg)')
+    angle_ax.grid(alpha=0.3)
+    angle_ax.legend(fontsize=8)
+
+    fig.suptitle(f'Initial Velocity Distributions ({len(velocities):,} of {total_particles:,} particles)')
+    fig.tight_layout()
+    plotname = 'Initial_Velocity_Distributions.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close(fig)
 
 def boris_plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     """Plots the final energy distribution of particles."""

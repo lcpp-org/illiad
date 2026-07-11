@@ -154,24 +154,32 @@ def boris_runner(input_params=None):
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
     init_conds = [LCFS_INDEX, NPHI, NTHETA, DELTRS, NPARTICLES_PER_EMITTER]
     ion_properties = [ION_MASS, CHARGE_NUM, ION_TEMP]
-    ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
+    ion_list, initVelPos, init_normals = ionInitializer(
+        init_conds, ion_properties, b_hidra, e_hidra,
+        outputHandler=simIO, return_normals=True,
+    )
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
     IC_filename = 'initVelPos'
     simIO.saveNumpyData(initVelPos, IC_filename)
     simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 
+    ## DEFAULT INITIAL-CONDITION VERIFICATION PLOTS
+    plotFuncs.boris_plotInitEnergies(initVelPos, ION_MASS,
+                                     runString='InitEnergies', simIO=simIO)
+    plotFuncs.boris_plotInitVelocities(initVelPos, init_normals, Rmajor=b_hidra.R0,
+                                      runString='InitVelocities', simIO=simIO)
+
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## RUN BORIS SOLVER FOR PARTICLES ##
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## Regularly-spaced tracker grid: adjust TRACK_NPHI and TRACK_NTHETA as needed.
     ## Selects all NPARTICLES_PER_EMITTER copies for each grid location.
-    ## Particle layout: block p (0..NPARTICLES_PER_EMITTER-1) starts at p*N_emitters;
-    ## within a block: phi_i * len(DELTRS) * NTHETA + dr_j * NTHETA + theta_k
+    ## Particle layout is emitter-major: all particle copies for one emitter are contiguous.
     _track_phi_idx   = np.round(np.linspace(0, NPHI                  - 1, TRACK_NPHI                  )).astype(int)
     _track_theta_idx = np.round(np.linspace(0, NTHETA                - 1, TRACK_NTHETA                )).astype(int)
     _track_p_idx     = np.round(np.linspace(0, NPARTICLES_PER_EMITTER- 1, TRACK_NPARTICLES_PER_EMITTER)).astype(int)
-    particle_tracker_list = [int(p) * N_emitters + int(pi * len(DELTRS) * NTHETA + theta_i)
+    particle_tracker_list = [int(pi * len(DELTRS) * NTHETA + theta_i) * NPARTICLES_PER_EMITTER + int(p)
                                 for pi in _track_phi_idx
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
@@ -214,8 +222,6 @@ def boris_runner(input_params=None):
     #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString='WallPoints3D', simIO=simIO)
     ion_tracer.plotTraces(traces, b_hidra, runString='Traces', simIO=simIO)
     #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString='WallPoints', simIO=simIO)
-    #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString='InitEnergies', simIO=simIO)
-
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
