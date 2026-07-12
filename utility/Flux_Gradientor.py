@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from classes.mesh import *
 from classes.iohandler import IOHandler
 from utility.coordtrans import RTP_XYZ_JAC
+from utility.gradient_utils import scalar_gradient_periodic_angles
 
 def fluxGradientor(input_params=None):
     ## LOAD INPUT PARAMETERS
@@ -55,16 +56,18 @@ def fluxGradientor(input_params=None):
     # GRADIENT CALCULATION: remember to divide by Jacobian determinant:
     #  gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
     simIO.log.info("## Starting flux gradient calculation. ##")
-    flux_gradient = np.gradient(density_grid, PHI_GENs, THETAS, RADS, edge_order=2)#, [grid_rad, grid_theta])
+    dp_dphi, dp_dtheta, dp_drho = scalar_gradient_periodic_angles(
+        density_grid, PHI_GENs, THETAS, RADS
+    )
     simIO.log.info("## Flux gradient calculation complete. ##")
 
     # Calculate RTP basis vectors and apply the Jacobian factors to get the physical gradient in each direction
-    flux_gradient_radial = -flux_gradient[2]  # E = -grad[V]
+    flux_gradient_radial = -dp_drho  # E = -grad[V]
 
-    flux_gradient_poloidal = np.zeros_like(flux_gradient[1])
-    flux_gradient_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / grid_rad[:,1:]
+    flux_gradient_poloidal = np.zeros_like(dp_dtheta)
+    flux_gradient_poloidal[:,:,1:] = -dp_dtheta[:,:,1:] / grid_rad[:,1:]
 
-    flux_gradient_toroidal = -flux_gradient[0] / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
+    flux_gradient_toroidal = -dp_dphi / (b_hidra.R0 + grid_rad * np.cos(grid_theta))
     simIO.log.info(f'{flux_gradient_radial.shape=}')
 
     # # Load LCFS file:

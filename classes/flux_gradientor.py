@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from utility.coordtrans import RTP_XYZ_JAC
+from utility.gradient_utils import scalar_gradient_periodic_angles
 
 
 class FluxGradientor:
@@ -71,16 +72,18 @@ class FluxGradientor:
         # gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
         density_grid = self.load_density_data()
         self.simIO.log.info("## Starting flux gradient calculation. ##")
-        flux_gradient = np.gradient(density_grid, self.phi_gens, self.thetas, self.rads, edge_order=2)#, [grid_rad, grid_theta])
+        dp_dphi, dp_dtheta, dp_drho = scalar_gradient_periodic_angles(
+            density_grid, self.phi_gens, self.thetas, self.rads
+        )
         self.simIO.log.info("## Flux gradient calculation complete. ##")
 
         # Calculate RTP basis vectors and apply the Jacobian factors to get the physical gradient in each direction
-        flux_grad_radial = -flux_gradient[2]  # E = -grad[V]
+        flux_grad_radial = -dp_drho  # E = -grad[V]
 
-        flux_grad_poloidal = np.zeros_like(flux_gradient[1])
-        flux_grad_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / self.grid_rad[:,1:]
+        flux_grad_poloidal = np.zeros_like(dp_dtheta)
+        flux_grad_poloidal[:,:,1:] = -dp_dtheta[:,:,1:] / self.grid_rad[:,1:]
 
-        flux_grad_toroidal = -flux_gradient[0] / (self.field.R0 + self.grid_rad * np.cos(self.grid_theta))
+        flux_grad_toroidal = -dp_dphi / (self.field.R0 + self.grid_rad * np.cos(self.grid_theta))
         self.simIO.log.info(f'{flux_grad_radial.shape=}')
         self.flux_grad_radial = flux_grad_radial
         self.flux_grad_poloidal = flux_grad_poloidal
@@ -216,7 +219,6 @@ class FluxGradientor:
         """Run the full flux gradient calculation workflow."""
         self.build_coordinate_grid()
         self.calculate_gradients()
-        self.filter_gradients()
         self.calculate_gradient_magnitude()
         self.convert_gradient_to_xyz()
         self.save_and_plot_data()
