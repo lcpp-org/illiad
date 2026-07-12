@@ -67,6 +67,11 @@ def main(input_params_override=_CLI_INPUTS):
     params.setdefault('INV_SURF_INDICES', [20])
     params.setdefault('GUESS_PHI_INDEX', -3)
     params.setdefault('OUTPUT_FILE_NAME', "Efield_LCFS15")
+    params.setdefault('FLUX_INTERPOLATION_MODE', 'per_plane_2d')
+    params.setdefault('RBF_PHI_HALF_WINDOW', 2)
+    params.setdefault('RBF_PHI_SCALE', 0.72)
+    params.setdefault('RBF_POINTS_PER_SURFACE_PER_PHI', 72)
+    params.setdefault('RBF_NEIGHBORS_3D', 256)
     normalize_phi_gens(params)
 
     ## RUN ANALYSIS

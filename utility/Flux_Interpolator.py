@@ -17,10 +17,71 @@ def _polar_interp_points(thetas, rads):
     return np.array([rads * np.cos(thetas), rads * np.sin(thetas)]).T
 
 
+def _wrap_to_pi(angle):
+    """Wrap angular differences to [-pi, pi)."""
+    return (angle + np.pi) % (2*np.pi) - np.pi
+
+
 def _surface_indices(indices):
     if indices is None:
         return np.array([], dtype=int)
     return np.atleast_1d(np.asarray(indices, dtype=int))
+
+
+def _axis_point_at_phi(axis_array, phi_deg):
+    """Periodically interpolate the stored magnetic-axis anchors to phi_deg."""
+    axis_points = np.asarray(axis_array)[:, 0]
+    axis_xy = _polar_interp_points(axis_points[:, 0], axis_points[:, 1])
+    axis_phi = np.linspace(360.0/len(axis_points), 360.0, len(axis_points))
+    periodic_phi = np.concatenate(([0.0], axis_phi, [axis_phi[0] + 360.0]))
+    periodic_xy = np.vstack((axis_xy[-1], axis_xy, axis_xy[0]))
+    target_phi = float(phi_deg) % 360.0
+    axis_u = np.interp(target_phi, periodic_phi, periodic_xy[:, 0])
+    axis_v = np.interp(target_phi, periodic_phi, periodic_xy[:, 1])
+    axis_r = np.hypot(axis_u, axis_v)
+    axis_theta = np.arctan2(axis_v, axis_u) % (2*np.pi)
+    return np.array([axis_theta, axis_r])
+
+
+def _thin_surface_points(thetas, rads, max_points):
+    """Select at most max_points approximately angle-balanced contour samples."""
+    finite = np.isfinite(thetas) & np.isfinite(rads)
+    thetas = np.asarray(thetas)[finite]
+    rads = np.asarray(rads)[finite]
+    if max_points is None or len(thetas) <= max_points:
+        return thetas, rads
+    order = np.argsort(thetas, kind='stable')
+    select = np.linspace(0, len(order) - 1, max_points, dtype=int)
+    selected = order[select]
+    return thetas[selected], rads[selected]
+
+
+def _load_plane_samples(simIO, phi_deg, axis_array, linear_flux_array,
+                        valid_surface, lcfs_index, n_surfaces, max_points=None):
+    """Load labeled Poincare samples and the LCFS contour for one phi plane."""
+    filename = 'Poincare_{:03d}.npy'.format(int(phi_deg))
+    flux_surfaces = simIO.loadNumpyData(filename)
+    point_blocks = [_axis_point_at_phi(axis_array, phi_deg)[None, :]]
+    value_blocks = [np.ones(1)]
+
+    for surface_index in range(lcfs_index, n_surfaces):
+        if not valid_surface[surface_index]:
+            continue
+        thetas, rads = _thin_surface_points(
+            flux_surfaces[surface_index][0], flux_surfaces[surface_index][1], max_points
+        )
+        if len(thetas) == 0:
+            continue
+        point_blocks.append(np.column_stack((thetas, rads)))
+        value_blocks.append(np.full(len(thetas), linear_flux_array[surface_index]))
+
+    lcfs_thetas, lcfs_rads = flux_surfaces[lcfs_index]
+    lcfs_valid = np.isfinite(lcfs_thetas) & np.isfinite(lcfs_rads)
+    return (
+        np.concatenate(point_blocks),
+        np.concatenate(value_blocks),
+        (lcfs_thetas[lcfs_valid], lcfs_rads[lcfs_valid]),
+    )
 
 
 def fluxInterpolator(input_params=None):
@@ -35,6 +96,17 @@ def fluxInterpolator(input_params=None):
     rbf_neighbors = globals().get("RBF_NEIGHBORS", 45)
     rbf_smoothing = globals().get("RBF_SMOOTHING", 1e-0)
     rbf_epsilon = globals().get("RBF_EPSILON", 1000)
+    interpolation_mode = str(globals().get("FLUX_INTERPOLATION_MODE", "per_plane_2d")).lower()
+    rbf_phi_half_window = int(globals().get("RBF_PHI_HALF_WINDOW", 2))
+    rbf_phi_scale = float(globals().get("RBF_PHI_SCALE", 0.72))
+    rbf_points_per_surface = int(globals().get("RBF_POINTS_PER_SURFACE_PER_PHI", 72))
+    rbf_neighbors_3d = int(globals().get("RBF_NEIGHBORS_3D", 256))
+    if interpolation_mode not in {"per_plane_2d", "periodic_3d"}:
+        raise ValueError("FLUX_INTERPOLATION_MODE must be 'per_plane_2d' or 'periodic_3d'")
+    if rbf_phi_half_window < 1:
+        raise ValueError("RBF_PHI_HALF_WINDOW must be at least 1")
+    if rbf_points_per_surface < 1 or rbf_neighbors_3d < 1:
+        raise ValueError("3-D RBF point and neighbor counts must be positive")
     inv_surf_indices = _surface_indices(globals().get("INV_SURF_INDICES", []))
     input_log_params = globals().copy()
     input_log_params.update({
@@ -42,6 +114,11 @@ def fluxInterpolator(input_params=None):
         "RBF_NEIGHBORS": rbf_neighbors,
         "RBF_SMOOTHING": rbf_smoothing,
         "RBF_EPSILON": rbf_epsilon,
+        "FLUX_INTERPOLATION_MODE": interpolation_mode,
+        "RBF_PHI_HALF_WINDOW": rbf_phi_half_window,
+        "RBF_PHI_SCALE": rbf_phi_scale,
+        "RBF_POINTS_PER_SURFACE_PER_PHI": rbf_points_per_surface,
+        "RBF_NEIGHBORS_3D": rbf_neighbors_3d,
         "INV_SURF_INDICES": inv_surf_indices.tolist(),
     })
 
@@ -72,6 +149,11 @@ def fluxInterpolator(input_params=None):
             "RBF_NEIGHBORS",
             "RBF_SMOOTHING",
             "RBF_EPSILON",
+            "FLUX_INTERPOLATION_MODE",
+            "RBF_PHI_HALF_WINDOW",
+            "RBF_PHI_SCALE",
+            "RBF_POINTS_PER_SURFACE_PER_PHI",
+            "RBF_NEIGHBORS_3D",
         ],
     )
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
@@ -96,10 +178,6 @@ def fluxInterpolator(input_params=None):
     # if SMALLEST_ISLAND_INDEX:
     #     filename_center_island = filepath + 'fSurf_{:03d}_center.npy'.format(SMALLEST_ISLAND_INDEX)
     #     island_axis_array = simIO.loadNumpyData(filename_center_island)
-
-    # Load LCFS file:
-    lcfs_filename = ANLYS_SUBDIR + '/fSurf_{:03d}_POINTmesh.npy'.format(int(LCFS_INDEX))
-    lcfs_points_full = simIO.loadNumpyData(lcfs_filename)
 
     # CHOOSING ONE 'WELL-BEHAVED' ANGLE FOR THE CALCULATION (NO FAILED CALCULATIONS)
     # sum flux_norm_array along first axis and find index of max value
@@ -140,57 +218,60 @@ def fluxInterpolator(input_params=None):
     THETAS = np.linspace(0, b_hidra.theta_max, b_hidra.ntheta+1) #add theta=0 for proper interpolation
     grid_theta, grid_rad = np.meshgrid(THETAS, RADS, indexing='ij')
     grid_shape = grid_theta.shape
-    interpol_pts = _polar_interp_points(grid_theta.ravel(), grid_rad.ravel())
-    interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float32)
+    interpol_pts_2d = _polar_interp_points(grid_theta.ravel(), grid_rad.ravel())
+    interpol_pts_2d = torch.as_tensor(interpol_pts_2d, device=device, dtype=torch.float32)
+    interpol_pts_3d = torch.column_stack((
+        interpol_pts_2d,
+        torch.zeros(len(interpol_pts_2d), device=device, dtype=torch.float32),
+    ))
 
     big_grid_linear = torch.zeros([len(PHI_GENs), len(THETAS)-1, len(RADS)], device=device, dtype=torch.float32)
+    plane_sample_cache = {}
 
     ## LOOP THROUGH PHI ANGLES
     for phi_index, PHI_GEN_DEG in enumerate(PHI_GENs):
+        if interpolation_mode == "per_plane_2d":
+            points, flux_norm, target_lcfs = _load_plane_samples(
+                simIO, PHI_GEN_DEG, axis_array, linear_flux_array, valid_surface,
+                LCFS_INDEX, N_surfaces,
+            )
+            interp_points = _polar_interp_points(points[:, 0], points[:, 1])
+            query_points = interpol_pts_2d
+            neighbor_count = min(rbf_neighbors, len(interp_points))
+        else:
+            source_blocks = []
+            value_blocks = []
+            target_lcfs = None
+            for phi_offset in range(-rbf_phi_half_window, rbf_phi_half_window + 1):
+                source_index = (phi_index + phi_offset) % len(PHI_GENs)
+                if source_index not in plane_sample_cache:
+                    plane_sample_cache[source_index] = _load_plane_samples(
+                        simIO, PHI_GENs[source_index], axis_array, linear_flux_array,
+                        valid_surface, LCFS_INDEX, N_surfaces,
+                        max_points=rbf_points_per_surface,
+                    )
+                source_points, source_values, source_lcfs = plane_sample_cache[source_index]
+                if source_index == phi_index:
+                    target_lcfs = source_lcfs
+                source_uv = _polar_interp_points(source_points[:, 0], source_points[:, 1])
+                delta_phi = _wrap_to_pi(
+                    np.radians(float(PHI_GENs[source_index]) - float(PHI_GEN_DEG))
+                )
+                source_w = np.full((len(source_uv), 1), rbf_phi_scale*delta_phi)
+                source_blocks.append(np.column_stack((source_uv, source_w)))
+                value_blocks.append(source_values)
 
-        # CAN GET AWAY WITH FUXING NPHI<360!
-        # # LOAD AXES POINTS
-        # if SMALLEST_ISLAND_INDEX:
-        #     points = np.zeros([MAX_SUBSETS+1,2])
-        #     flux_norm = np.ones([MAX_SUBSETS+1]) # peak values for the axes points
-        #     points[1:] = island_axis_array[phi_index]
-        # else:
-        points = np.zeros([1,2])
-        flux_norm = np.ones(1) # peak values for the axes points
-        # CAN GET AWAY WITH FUXING NPHI<360!
-        #points[0] = axis_array[phi_index][0]
-        points[0] = axis_array[0][0]
+            interp_points = np.concatenate(source_blocks)
+            flux_norm = np.concatenate(value_blocks)
+            query_points = interpol_pts_3d
+            neighbor_count = min(rbf_neighbors_3d, len(interp_points))
 
-        ## LOAD SCATTER POINTS (POINCARE DATA)
-        filename = 'Poincare_{:03d}.npy'.format(int(PHI_GEN_DEG))
-        flux_surfaces = simIO.loadNumpyData(filename)
-
-        ## LOOP THROUGH SURFACES
-        for surface_index in range(LCFS_INDEX, N_surfaces):
-            if valid_surface[surface_index] == False:
-                simIO.log.info(f'Skipping surface {surface_index} (not valid)')
-            else:
-                ### GET VALUES
-                thetas = flux_surfaces[surface_index][0]
-                rads = flux_surfaces[surface_index][1]
-                # filter NaNs
-                thetas = thetas[~np.isnan(thetas)]
-                rads = rads[~np.isnan(rads)]
-                N_pts = len(thetas)
-
-                # concatenate to big array of points
-                these_points = np.array([thetas, rads]).T
-                points = np.concatenate((points, these_points))
-
-                these_flux_norms = np.full(N_pts, linear_flux_array[surface_index])
-                flux_norm = np.concatenate((flux_norm, these_flux_norms))
-
-        #grid_linear = griddata(points, flux_norm, (grid_theta, grid_rad), method='linear', fill_value=0.0, rescale=True)
-        interp_points = _polar_interp_points(points[:, 0], points[:, 1])
         points_torch = torch.as_tensor(interp_points, device=device, dtype=torch.float32)
         flux_norm_torch = torch.as_tensor(flux_norm, device=device, dtype=torch.float32)
-        #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='multiquadric', neighbors=25, smoothing=1e-0, epsilon=1000)
-        interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel=rbf_kernel, neighbors=rbf_neighbors, smoothing=rbf_smoothing, epsilon=rbf_epsilon)
+        interpolation = RBFInterpolator(
+            points_torch, flux_norm_torch, kernel=rbf_kernel,
+            neighbors=neighbor_count, smoothing=rbf_smoothing, epsilon=rbf_epsilon,
+        )
         
         #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='linear', neighbors=15, smoothing=1e-5, degree=1) #, epsilon=1e4)
         #interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel='linear', neighbors=55, smoothing=1e-5, degree=1) #, epsilon=1e4)
@@ -199,7 +280,7 @@ def fluxInterpolator(input_params=None):
         interpolation = interpolation.to(device)
         interpolation.smoothing = interpolation.smoothing.to(device)
 
-        grid_linear = interpolation(interpol_pts).reshape(grid_shape)
+        grid_linear = interpolation(query_points).reshape(grid_shape)
 
         ## HACKY SOLUTIONS HERE!!!
         # copying values out for r=0.0
@@ -208,12 +289,11 @@ def fluxInterpolator(input_params=None):
         fred3[fred3==0] = fred4[fred3==0]
         grid_linear.T[1] = fred3
         grid_linear.T[0] = grid_linear.T[1]
+        if interpolation_mode == "periodic_3d":
+            grid_linear = torch.clamp(grid_linear, min=0.1, max=1.0)
 
         # Exponentially decay from 0.1 at the actual LCFS contour to 0.01 at the wall
-        lcfs_thetas, lcfs_rads = flux_surfaces[LCFS_INDEX]
-        lcfs_valid = np.isfinite(lcfs_thetas) & np.isfinite(lcfs_rads)
-        lcfs_thetas = lcfs_thetas[lcfs_valid]
-        lcfs_rads = lcfs_rads[lcfs_valid]
+        lcfs_thetas, lcfs_rads = target_lcfs
         theta_distances = np.abs((lcfs_thetas[:, None] - THETAS[None, :] + np.pi) % (2*np.pi) - np.pi)
         lcfs_rads_on_grid = lcfs_rads[np.argmin(theta_distances, axis=0)]
         distance_fraction = np.clip(
@@ -260,7 +340,6 @@ def fluxInterpolator(input_params=None):
         # Add to big mesh array (3D)
         big_grid_linear[phi_index] = grid_linear[1:]  # skip the first row (theta=0) to match the shape of the b_hidra mesh
 
-        del flux_surfaces
         if phi_index % 10 == 0: gc.collect()
     #### END OF LOOP THROUGH PHI ANGLES ####
     # save numpy data using simIO method
