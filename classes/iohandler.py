@@ -300,6 +300,8 @@ class IOHandler:
             "NPHI",
             "NTHETA",
             "NPARTICLES_PER_EMITTER",
+            "EMITTER_SPACING",
+            "SAVE_EMITTER_LOCATIONS",
             "DT",
             "TMAX",
             "NSTEPS",
@@ -356,6 +358,8 @@ class IOHandler:
                             (len(param_values["DELTRS"]) * param_values["NPHI"] * param_values["NTHETA"] * param_values["NPARTICLES_PER_EMITTER"])
                             if all(param_values[x] != '*DEFAULT*' for x in ["DELTRS", "NPHI", "NTHETA", "NPARTICLES_PER_EMITTER"])
                             else '*DEFAULT*')
+                      +'\n| EMITTER SPACING: {}'.format(param_values["EMITTER_SPACING"])
+                      +'\n| SAVE EMITTER LOCATIONS: {}'.format(param_values["SAVE_EMITTER_LOCATIONS"])
                       +'\n|---------------------------------------------------------------------------------------|'
                       +'\n| TIME STEP: {} sec'.format(param_values["DT"])
                       +'\n| TOTAL TIME: {:.6f} sec'.format(param_values["TMAX"] if param_values["TMAX"] != '*DEFAULT*' else 0)

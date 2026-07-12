@@ -23,6 +23,8 @@
   "NPHI": 180,
   "NTHETA": 120,
   "NPARTICLES_PER_EMITTER": 5,
+  "EMITTER_SPACING": "equal_theta",
+  "SAVE_EMITTER_LOCATIONS": false,
 
   "DT": 1e-8,
   "TMAX": 0.001,

@@ -13,7 +13,65 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, genNormals=False, Efield=None, outputHandler='simIO'):
+def _equal_area_theta_samples(surface_spline, magnetic_to_geometric_shift, ntheta,
+                              major_radius, dense_count=4096):
+    """Return approximately equal-area poloidal samples for one toroidal plane."""
+    theta_dense = np.linspace(0.0, 2.0*np.pi, dense_count + 1)
+    radius_dense = splev(theta_dense, surface_spline)
+    theta_geo, radius_geo = axisShift(
+        theta_dense, radius_dense, *magnetic_to_geometric_shift
+    )
+
+    major_r = major_radius + radius_geo*np.cos(theta_geo)
+    vertical = radius_geo*np.sin(theta_geo)
+    segment_length = np.hypot(np.diff(major_r), np.diff(vertical))
+    segment_area = 0.5*(major_r[:-1] + major_r[1:])*segment_length
+    cumulative_area = np.concatenate(([0.0], np.cumsum(segment_area)))
+
+    if not np.all(np.isfinite(cumulative_area)) or cumulative_area[-1] <= 0.0:
+        raise ValueError('Could not construct a finite, positive LCFS area distribution')
+
+    cumulative_area /= cumulative_area[-1]
+    targets = (np.arange(ntheta, dtype=np.float64) + 0.5) / ntheta
+    return np.interp(targets, cumulative_area, theta_dense)
+
+
+def _plot_emitter_spacing_comparison(surface_spline, magnetic_to_geometric_shift,
+                                     theta_equal, theta_area, phi_deg, outputHandler):
+    """Save one cross-section comparison of equal-theta and equal-area emitters."""
+    theta_curve = np.linspace(0.0, 2.0*np.pi, 2000)
+    radius_curve = splev(theta_curve, surface_spline)
+    curve_geo = axisShift(theta_curve, radius_curve, *magnetic_to_geometric_shift)
+
+    radius_equal = splev(theta_equal, surface_spline)
+    equal_geo = axisShift(theta_equal, radius_equal, *magnetic_to_geometric_shift)
+    radius_area = splev(theta_area, surface_spline)
+    area_geo = axisShift(theta_area, radius_area, *magnetic_to_geometric_shift)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.plot(curve_geo[1]*np.cos(curve_geo[0]), curve_geo[1]*np.sin(curve_geo[0]),
+            color='black', linewidth=1.0, label='Fitted LCFS')
+    ax.scatter(equal_geo[1]*np.cos(equal_geo[0]), equal_geo[1]*np.sin(equal_geo[0]),
+               marker='x', s=24, color='tab:blue', label=r'Equal $\theta$')
+    ax.scatter(area_geo[1]*np.cos(area_geo[0]), area_geo[1]*np.sin(area_geo[0]),
+               marker='o', s=14, facecolors='none', edgecolors='tab:orange',
+               label='Approx. equal area')
+    ax.set_aspect('equal')
+    ax.set_xlabel(r'$R-R_0$ (m)')
+    ax.set_ylabel('$Z$ (m)')
+    ax.set_title(r'Emitter-spacing comparison at $\phi={:.0f}^\circ$'.format(phi_deg))
+    ax.grid(alpha=0.3)
+    ax.legend()
+    fig.tight_layout()
+    plot_name = 'EmitterSpacingComparison_phi={:03.0f}.png'.format(phi_deg)
+    outputHandler.saveFig(plot_name, dpi=300)
+    outputHandler.log.info('OUTPUT PLOT: {}'.format(plot_name))
+    plt.close(fig)
+
+
+def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
+                       genNormals=False, Efield=None, outputHandler='simIO',
+                       emitter_spacing='equal_theta'):
     """
     Generates seed points on the last closed flux surface (LCFS) for a given magnetic field configuration.
 
@@ -27,6 +85,9 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         genNormals (bool, optional): If True, generate normal vectors at seed points using Efield. Defaults to False.
         Efield (object, optional): Electric field object with interpField method for normal calculation. Required if genNormals is True.
         outputHandler (object, optional): Handler for logging, saving data, and figures. Defaults to 'simIO'.
+        emitter_spacing (str, optional): ``equal_theta`` for the legacy angular grid or
+            ``equal_area`` for approximate equal-area poloidal sampling. Defaults to
+            ``equal_theta``.
 
     Returns:
         tuple: A tuple containing:
@@ -35,8 +96,12 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
     """
     seed_list = []
     normals_list = []
+    emitter_spacing = str(emitter_spacing).lower()
+    if emitter_spacing not in {'equal_theta', 'equal_area'}:
+        raise ValueError("emitter_spacing must be 'equal_theta' or 'equal_area'")
     outputHandler.createSubDir(filename)
     outputHandler.log.info('GENERATING SEED POINTS FOR LCFS INDEX: {}'.format(lcfs_index))
+    outputHandler.log.info('EMITTER SPACING: {}'.format(emitter_spacing))
 
     for phi_gen_deg in phi_array:
         input_filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
@@ -87,7 +152,18 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         ## SPLINING
         #fSurface_splineParms = splrep(theta_spl, rad_spl, s=1e-4, k=3, per=False, quiet=1)
         fSurface_splineParms = splrep(theta_spl, rad_spl, s=8e-6, k=3, per=False, quiet=1) # 's' from fluxTest4.py
-        theta_evals = np.linspace(0, 2*np.pi*(1 - 1/Ntheta), Ntheta)
+        theta_equal = np.linspace(0, 2*np.pi*(1 - 1/Ntheta), Ntheta)
+        if emitter_spacing == 'equal_area':
+            theta_evals = _equal_area_theta_samples(
+                fSurface_splineParms, RTP_delta_rev, Ntheta, Bfield.R0
+            )
+            if phi_gen_deg == phi_array[0]:
+                _plot_emitter_spacing_comparison(
+                    fSurface_splineParms, RTP_delta_rev, theta_equal, theta_evals,
+                    phi_gen_deg, outputHandler,
+                )
+        else:
+            theta_evals = theta_equal
         seedPts_0 = splev(theta_evals, fSurface_splineParms)
         derivs =  splev(theta_evals, fSurface_splineParms, der=1)
 
@@ -324,7 +400,9 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     return velocity_array
 
 
-def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO', return_normals=False):
+def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHandler='simIO',
+                   return_normals=False, emitter_spacing='equal_theta',
+                   save_emitter_locations=False):
 
     mass, charge, temperature = ion_properties
     lcfs_index, nphi, ntheta, deltrs, nparticles_per_emitter = initial_conditions
@@ -337,7 +415,18 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
     ## GENERATE INITIAL POSITIONS
     phiGen_arr = np.arange(360//nphi, 361, 360//nphi, dtype=int).tolist()
     seed_list, normals_list =  generateSeedShells(deltrs, ntheta, phiGen_arr, lcfs_index, 'IonSeedPts_{}mm'.format(dr_String),
-                                                    bfield, Efield=efield, genNormals=True, outputHandler=outputHandler)
+                                                    bfield, Efield=efield, genNormals=True, outputHandler=outputHandler,
+                                                    emitter_spacing=emitter_spacing)
+    if save_emitter_locations:
+        emitter_locations = np.asarray(seed_list, dtype=np.float64).reshape(
+            nphi, len(deltrs), ntheta, 3
+        )
+        outputHandler.saveNumpyData(emitter_locations, 'EmitterLocations_XYZ')
+        outputHandler.log.info(
+            'OUTPUT EMITTER LOCATIONS: EmitterLocations_XYZ.npy, shape={}'.format(
+                emitter_locations.shape
+            )
+        )
     ## GENERATE INITIAL VELOCITIES
     initVel_array = generate_MB_velocities(N_particles=n_particles, normals_list=normals_list,
                                            ion_temp=temperature, ion_mass=mass,

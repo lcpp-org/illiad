@@ -62,6 +62,8 @@ DELTRS: list[float]
 NPHI: int
 NTHETA: int
 NPARTICLES_PER_EMITTER: int
+EMITTER_SPACING: str
+SAVE_EMITTER_LOCATIONS: bool
 
 DT: float
 TMAX: float
@@ -117,6 +119,8 @@ def boris_runner(input_params=None):
         raise ValueError("STRIDE must be a positive integer")
     globals()["STRIDE"] = STRIDE
     globals()["TRACE_STRIDE"] = STRIDE
+    emitter_spacing = globals().get("EMITTER_SPACING", "equal_theta")
+    save_emitter_locations = bool(globals().get("SAVE_EMITTER_LOCATIONS", False))
 
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
@@ -157,6 +161,8 @@ def boris_runner(input_params=None):
     ion_list, initVelPos, init_normals = ionInitializer(
         init_conds, ion_properties, b_hidra, e_hidra,
         outputHandler=simIO, return_normals=True,
+        emitter_spacing=emitter_spacing,
+        save_emitter_locations=save_emitter_locations,
     )
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
