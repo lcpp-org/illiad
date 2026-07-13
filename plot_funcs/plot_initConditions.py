@@ -85,7 +85,7 @@ def main():
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
                                     att_mult=FIELD_SCALE_ELECTRIC)
     ## GENERATE INITIAL POSITIONS
-    phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist()
+    phiGen_arr = np.linspace(360.0 / NPHI, 360.0, NPHI).tolist()
     generateSeedShells(DELTRS, NTHETA, phiGen_arr, LCFS_INDEX, 'IonSeedPts_{}mm'.format(dr_String),
                          b_hidra, Efield=e_hidra, genNormals=True, outputHandler=simIO)
 
