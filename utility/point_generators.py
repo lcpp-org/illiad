@@ -107,16 +107,23 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
     for phi_gen_deg in phi_array:
         input_filename = 'Poincare_{:03.0f}.npy'.format(phi_gen_deg)
         th_in, r_in = outputHandler.loadNumpyData(input_filename, mmap_mode='r')[lcfs_index]
-        r_in = r_in[~np.isnan(r_in)]
-        th_in = th_in[~np.isnan(th_in)]
+        finite = np.isfinite(th_in) & np.isfinite(r_in)
+        poincare_points = np.column_stack((th_in[finite], r_in[finite]))
+        _, first_indices = np.unique(poincare_points, axis=0, return_index=True)
+        first_indices.sort()
+        duplicate_count = len(poincare_points) - len(first_indices)
+        poincare_points = poincare_points[first_indices]
+        th_in = poincare_points[:, 0]
+        r_in = poincare_points[:, 1]
+        if duplicate_count:
+            outputHandler.log.warning(
+                '{}: removed {} duplicate Poincare point(s) from LCFS {} at phi={:.6g} deg'.format(
+                    input_filename, duplicate_count, lcfs_index, phi_gen_deg
+                )
+            )
 
         phi_deg = int(phi_gen_deg)
         phi_rad = phi_gen_deg * np.pi / 180.
-
-        # hack solution, need to determine why an extra 30 copies of 1 initial condition are being appended to this event
-        if phi_deg == 324:
-            r_in = r_in[30:]
-            th_in = th_in[30:]
         th_size = th_in.size
 
         # find the centroid(?) by average positions
