@@ -9,6 +9,9 @@ plt.rcParams.update({'font.size': 10})
 from classes.particle import Ion
 from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP, RTP_XYZ_JAC, axisShift, align_z_to_vector
 
+import torch
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 def _equal_area_theta_samples(surface_spline, magnetic_to_geometric_shift, ntheta,
                               major_radius, dense_count=4096):
     """Return approximately equal-area poloidal samples for one toroidal plane."""
@@ -66,7 +69,7 @@ def _plot_emitter_spacing_comparison(surface_spline, magnetic_to_geometric_shift
 
 
 def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
-                       genNormals=False, outputHandler='simIO',
+                       genNormals=False, Efield=None, outputHandler='simIO',
                        emitter_spacing='equal_theta'):
     """
     Generates seed points on the last closed flux surface (LCFS) for a given magnetic field configuration.
@@ -78,8 +81,10 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
         lcfs_index (int): Index of the LCFS in the loaded Poincare data.
         filename (str): Directory name for saving output data and plots.
         Bfield (object): Magnetic field object containing geometry and parameters (e.g., R0, a).
-        genNormals (bool, optional): If True, generate outward geometric normals
-            from the fitted LCFS. Defaults to False.
+        genNormals (bool, optional): If True, use the local electric-field direction
+            with the outward geometric LCFS normal as a fallback. Defaults to False.
+        Efield (object, optional): Electric field used to define the preferred launch
+            direction when ``genNormals`` is True.
         outputHandler (object, optional): Handler for logging, saving data, and figures. Defaults to 'simIO'.
         emitter_spacing (str, optional): ``equal_theta`` for the legacy angular grid or
             ``equal_area`` for approximate equal-area poloidal sampling. Defaults to
@@ -163,7 +168,7 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
         seedPts_0 = splev(theta_evals, fSurface_splineParms)
         derivs =  splev(theta_evals, fSurface_splineParms, der=1)
 
-        # Geometry-based surface normals.
+        # Geometry-based surface normals used when the electric-field direction is invalid.
         # LCFS in poloidal plane is parameterized by r(θ). In the cross-section (x,z):
         #   x(θ) = r cosθ, z(θ) = r sinθ
         # tangent t = d/dθ[x,z], normal n = [dz/dθ, -dx/dθ]. Choose outward via dot(n, e_r)>0.
@@ -181,8 +186,7 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
         nx = np.where(outward, nx, -nx)
         nz = np.where(outward, nz, -nz)
         n2_norm = np.sqrt(nx * nx + nz * nz)
-        if np.any(~np.isfinite(n2_norm)) or np.any(n2_norm <= 1e-15):
-            raise ValueError('Fitted LCFS produced an invalid geometric surface normal')
+        n2_norm = np.where(n2_norm > 0, n2_norm, 1.0)
         nxu = nx / n2_norm
         nzu = nz / n2_norm
         # Rotate cross-section normal into XYZ at this phi (note sign convention matches RTP_to_XYZ)
@@ -210,6 +214,10 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
         plot_norm_rtp_REF = np.zeros((Ntheta, 3))
         outData = []
         outNormals = []
+        n_invalid_normals = 0
+        n_geom_fallback = 0
+        n_default_fallback = 0
+        tensor_ind_XYZ = torch.zeros((Ntheta, 3), dtype=torch.float32, device=device)
         for dr in drList:
             for i, theta in enumerate(theta_evals):
                 # scale delta-r to achieve uniform expansion normal to surface
@@ -224,9 +232,23 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
                 # convert rtp vector to xyz
                 output_ind[i] = np.array([output_ind_geo[i][1], output_ind_geo[i][0], output_ind_geo[i][2]])
                 output_ind_XYZ[i] = RTP_to_XYZ(output_ind[i], Bfield.R0)
+                tensor_ind_XYZ[i] = torch.tensor(output_ind_XYZ[i], dtype=torch.float32, device=device)
 
                 if genNormals:
-                    output_ind_normal[i] = geom_normals[i]
+                    vec = Efield.interpField(tensor_ind_XYZ[i], Cart=True).cpu().numpy()
+                    vec_norm = np.linalg.norm(vec)
+                    if np.isfinite(vec_norm) and vec_norm > 0:
+                        output_ind_normal[i] = vec / vec_norm
+                    else:
+                        geom_normal = geom_normals[i]
+                        geom_norm = np.linalg.norm(geom_normal)
+                        if np.isfinite(geom_norm) and geom_norm > 0:
+                            output_ind_normal[i] = geom_normal / geom_norm
+                            n_geom_fallback += 1
+                        else:
+                            output_ind_normal[i] = np.array([0.0, 0.0, 1.0])
+                            n_default_fallback += 1
+                        n_invalid_normals += 1
 
             ## PLOTTING THE SEED POINTS
             ax.plot(*output_ind_geo.T[:2], '--ok', linewidth=0.25, markersize=2)
@@ -235,6 +257,11 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield,
                 outNormals.extend(np.copy(output_ind_normal))
 
         if genNormals:
+            if n_invalid_normals > 0:
+                outputHandler.log.warning(
+                    f"{filename}: {n_invalid_normals}/{Ntheta*len(drList)} electric-field launch directions were invalid at phi={phi_deg} deg; "
+                    f"using geometric fallback for {n_geom_fallback} and default [0,0,1] for {n_default_fallback}"
+                )
             # CONVERT NORMAL VECTORS TO RTP FOR PLOTTING
             for i in range(len(output_ind_normal)):
                 plot_norm_rtp[i] = RTP_XYZ_JAC(output_ind_geo[i], output_ind_normal[i], form='xyz2rtp')
@@ -383,7 +410,7 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
     ## GENERATE INITIAL POSITIONS
     phiGen_arr = np.arange(360//nphi, 361, 360//nphi, dtype=int).tolist()
     seed_list, normals_list =  generateSeedShells(deltrs, ntheta, phiGen_arr, lcfs_index, 'IonSeedPts_{}mm'.format(dr_String),
-                                                    bfield, genNormals=True, outputHandler=outputHandler,
+                                                    bfield, Efield=efield, genNormals=True, outputHandler=outputHandler,
                                                     emitter_spacing=emitter_spacing)
     if save_emitter_locations:
         emitter_locations = np.asarray(seed_list, dtype=np.float64).reshape(

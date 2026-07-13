@@ -132,6 +132,7 @@ def fluxInterpolator(input_params=None):
         [
             "ANLYS_DIR",
             "ANLYS_SUBDIR",
+            "TAG",
             "CURRENT_TOR",
             "CURRENT_HEL",
             "CONFIG_TOR",
@@ -282,13 +283,16 @@ def fluxInterpolator(input_params=None):
 
         grid_linear = interpolation(query_points).reshape(grid_shape)
 
-        ## HACKY SOLUTIONS HERE!!!
-        # copying values out for r=0.0
+        # Repair any missing values on the innermost finite-radius shell, then
+        # enforce a single poloidally averaged value on the magnetic axis.
         fred3 = grid_linear.T[1]
         fred4 = grid_linear.T[2]
         fred3[fred3==0] = fred4[fred3==0]
         grid_linear.T[1] = fred3
-        grid_linear.T[0] = grid_linear.T[1]
+        finite_inner = torch.isfinite(fred3)
+        if not torch.any(finite_inner):
+            raise ValueError('Innermost radial shell contains no finite values')
+        grid_linear.T[0] = torch.mean(fred3[finite_inner])
         if interpolation_mode == "periodic_3d":
             grid_linear = torch.clamp(grid_linear, min=0.1, max=1.0)
 

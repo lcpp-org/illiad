@@ -28,6 +28,7 @@ def fluxGradientor(input_params=None):
         [
             "ANLYS_DIR",
             "ANLYS_SUBDIR",
+            "TAG",
             "CURRENT_TOR",
             "CURRENT_HEL",
             "CONFIG_TOR",
@@ -135,7 +136,7 @@ def fluxGradientor(input_params=None):
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_magnitude[phi_index], 'FluxGradMagnitude', ANLYS_SUBDIR, simIO, colortest, 0.0, 200.0)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_radial[phi_index], 'FluxGradRadial', ANLYS_SUBDIR, simIO, colortest, -200., 200)
         output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_poloidal[phi_index], 'FluxGradPoloidal', ANLYS_SUBDIR, simIO, colortest, -100.0, 100.0)
-        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_toroidal[phi_index], 'FluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -0.3, 0.3)
+        output_phi_plots(PHI_GEN_DEG, grid_theta, grid_rad, flux_gradient_toroidal[phi_index], 'FluxGradToroidal', ANLYS_SUBDIR, simIO, colortest, -3.0, 3.0)
 
     simIO.log.info("## Flux gradienting complete. ##")
 

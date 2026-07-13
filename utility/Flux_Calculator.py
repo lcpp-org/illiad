@@ -39,6 +39,7 @@ def fluxCalculator(input_params=None):
         [
             "ANLYS_DIR",
             "ANLYS_SUBDIR",
+            "TAG",
             "FIELD_FILE_TOR",
             "FIELD_FILE_HEL",
             "CURRENT_TOR",

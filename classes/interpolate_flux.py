@@ -188,13 +188,16 @@ class FluxInterpolator:
         interpolation.smoothing = interpolation.smoothing.to(device)
         interpolated_angle = interpolation(interpol_pts).reshape(grid_shape)
         
-        ## HACKY SOLUTIONS HERE!!!
-        # copying values out for r=0.0
+        # Repair any missing values on the innermost finite-radius shell, then
+        # enforce a single poloidally averaged value on the magnetic axis.
         fred3 = interpolated_angle.T[1]
         fred4 = interpolated_angle.T[2]
         fred3[fred3==0] = fred4[fred3==0]
         interpolated_angle.T[1] = fred3
-        interpolated_angle.T[0] = interpolated_angle.T[1]
+        finite_inner = torch.isfinite(fred3)
+        if not torch.any(finite_inner):
+            raise ValueError('Innermost radial shell contains no finite values')
+        interpolated_angle.T[0] = torch.mean(fred3[finite_inner])
 
         return interpolated_angle
 

@@ -81,10 +81,13 @@ def main():
     b_hidra.setErrorField()
     b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=True, att_mult=CONFIG_TOR)
     b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
+    e_hidra = Mesh(R0=0.72, a=0.19)
+    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
+                                    att_mult=FIELD_SCALE_ELECTRIC)
     ## GENERATE INITIAL POSITIONS
     phiGen_arr = np.arange(360//NPHI, 361, 360//NPHI, dtype=int).tolist()
     generateSeedShells(DELTRS, NTHETA, phiGen_arr, LCFS_INDEX, 'IonSeedPts_{}mm'.format(dr_String),
-                         b_hidra, genNormals=True, outputHandler=simIO)
+                         b_hidra, Efield=e_hidra, genNormals=True, outputHandler=simIO)
 
 
     simIO.log.info('FINISHED PLOTTINGT IC DATA:')
