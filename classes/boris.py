@@ -53,7 +53,7 @@ class Boris(Collisions):
         # self.IO.log.info(f"| TAG            | {str(self.tag):<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
-    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3, T_gas_eV=0.025, n_gas=3e18, n_e=1e18):
+    def setConditions(self, ion_list, cond_string, dt=1e-8, tmax=1e-3, T_gas_eV=0.025, Ti_eV=2.0, n_gas=3e18, n_e=1e18, m_gas_amu=4.002603):
         """Sets the initial conditions and events for Poincare analysis.
 
         Args:
@@ -62,6 +62,7 @@ class Boris(Collisions):
             tmax (float, optional): Maximum time for the simulation. Defaults to 1e-3.
             n_gas (float, optional): Neutral gas density for neutral collision models.
             n_e (float, optional): Plasma density for ion-ion collision models.
+            m_gas_amu (float, optional): Mass of the background gas species in atomic mass units.
 
         Returns:
             None
@@ -70,10 +71,11 @@ class Boris(Collisions):
         self.tmax = tmax
         self.nsteps = int(tmax // dt) + 1
         self.ion_list = ion_list
+        
         self.T_gas_eV = T_gas_eV # eV, room temperature
-        self.m_gas_amu = 4.002602 #amu, Helium
-        self.Ti_eV = 2.0 # eV, ion temperature for ion-ion collision model
-        self.m_ion_amu = 4.002602 #amu, ion mass for ion-ion collision model
+        self.m_gas_amu = m_gas_amu #amu, background gas mass
+        self.Ti_eV = Ti_eV # eV, ion temperature for ion-ion collision model
+        self.m_ion_amu = m_gas_amu #amu, ion mass for ion-ion collision model
         self.n_gas = n_gas
         self.n_e = n_e
 

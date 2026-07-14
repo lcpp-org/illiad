@@ -13,19 +13,22 @@
 #  MAX.  |  3500   |  7000   |    ??   |    ???/???    #
 #------------------------------------------------------#
 """
+import argparse
 import numpy as np
 from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.calculate_flux import FluxCalculator
+from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+
 
 #################
 ## USER INPUTS ##
 #################
 
-NPHI = 10 # Number of phi planes to evaluate
+NPHI = 3 # Number of phi planes to evaluate
 input_params = {
-    'ANLYS_DIR': "iota3_1200spins_53Lines_LSODA_165deg", # Existing Poincare input directory
-    'ANLYS_SUBDIR': "iota3_test12_170deg", # Name of new output subdirectory inside ANLYS_DIR
+    'ANLYS_DIR': "iota3_entire_pipeline_test", # Existing Poincare input directory
+    'ANLYS_SUBDIR': "test9", # Name of new output subdirectory inside ANLYS_DIR
     'FIELD_FILE_TOR': 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
     'FIELD_FILE_HEL': 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy',
     'CURRENT_TOR': 0.486, #[kA]
@@ -33,10 +36,9 @@ input_params = {
     'CONFIG_TOR': 'default_toroidal',
     'CONFIG_HEL': 'default_helical',
     'ENABLE_ERRFIELD': True,
-    'LCFS_INDEX': 10, # Surface index selected from Poincare log
+    'LCFS_INDEX': 1, # Surface index selected from Poincare log
     'NPHI': NPHI,
     'NTHETA': 180,
-    'PHI_GENs': np.linspace(360//NPHI, 360, NPHI),
     'MAX_SUBSETS': 3, # Number of magnetic islands
     'SMOOTH_FCTR': 7.5e-5, #7.5e-6, 3e-5 #baseline 1e-6
     'INTEGRATE_EPSABS': 5e-2,
@@ -47,17 +49,33 @@ input_params = {
     'BIG_MESH': True,
 }
 
+_CLI_INPUTS = object()
 
-def main():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run ILLIAD flux-surface integration.")
+    parser.add_argument(
+        "--inputs-json",
+        default=None,
+        help="Optional path to a JSON object overriding runFluxCalc.py defaults.",
+    )
+    return parser.parse_args()
+
+
+def main(input_params_override=_CLI_INPUTS):
+    if input_params_override is _CLI_INPUTS:
+        args = parse_args()
+        input_params_override = load_inputs_json(args.inputs_json, "Flux calculator inputs") if args.inputs_json else None
+    params = merge_input_params(input_params, input_params_override)
+    normalize_phi_gens(params)
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
-    ANLYS_DIR = input_params['ANLYS_DIR']
-    ANLYS_SUBDIR = input_params['ANLYS_SUBDIR']
+    ANLYS_DIR = params['ANLYS_DIR']
+    ANLYS_SUBDIR = params['ANLYS_SUBDIR']
     simIO = IOHandler(ANLYS_DIR)
     simIO.setActiveSubDir(ANLYS_SUBDIR)
     simIO.startLog(log_name="fluxCalc.log", subdir=ANLYS_SUBDIR, logger_name="FluxCalculator")
     simIO.inputsBoilerplate(
         "FLUX CALCULATOR INPUTS",
-        input_params,
+        params,
         [
             "ANLYS_DIR",
             "ANLYS_SUBDIR",
@@ -86,13 +104,13 @@ def main():
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.setErrorField()
-    b_hidra.loadCartesianField(coilCurrent=input_params['CURRENT_TOR'],
-                               errField=input_params['ENABLE_ERRFIELD'],
-                               att_mult=input_params['CONFIG_TOR'])
-    b_hidra.addFieldPerturbation(coilCurrent=input_params['CURRENT_HEL'],
-                                 att_mult=input_params['CONFIG_HEL'])
+    b_hidra.loadCartesianField(coilCurrent=params['CURRENT_TOR'],
+                               errField=params['ENABLE_ERRFIELD'],
+                               att_mult=params['CONFIG_TOR'])
+    b_hidra.addFieldPerturbation(coilCurrent=params['CURRENT_HEL'],
+                                 att_mult=params['CONFIG_HEL'])
     ## RUN ANALYSIS
-    flux_calc = FluxCalculator(simIO, b_hidra, input_params)
+    flux_calc = FluxCalculator(simIO, b_hidra, params)
     flux_calc.run()
 
 

@@ -40,7 +40,7 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
 
     for phi_gen_deg in phi_array:
         input_filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
-        th_in, r_in = outputHandler.loadNumpyData(input_filename, mmap_mode='r')[lcfs_index]
+        th_in, r_in = outputHandler.loadNumpyData(input_filename, subdir="Poincare", mmap_mode='r')[lcfs_index]
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]
 

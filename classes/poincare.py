@@ -453,7 +453,7 @@ class Poincare():
 
         if saveData:
             fname = self.anlys_name + '_{:03.0f}'.format(phi_deg)
-            self.IO.saveNumpyData(radtheta_pts, fname)
+            self.IO.saveNumpyData(radtheta_pts, fname, subdir=self.anlys_name)
 
         # plotting
         self.plotPoincareBW(radtheta_pts, point_total, phi_deg, self.field, self.anlys_name, simIO=self.IO, plot_args=plot_args)

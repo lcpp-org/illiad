@@ -427,8 +427,7 @@ class Mesh:
             vecOUT = self.rot_vecXYZ_byPHI(vecOUT, -phi_rotation)
 
         if self.errField:
-            vecOUT += self.err_adder.unsqueeze(-1) if Npts > 1 else self.err_adder
-
+            vecOUT += self.err_adder.unsqueeze(-1) if vecOUT.ndim == 2 else self.err_adder
         return vecOUT
 
     def return_scalars(self, weights, corner_idx):

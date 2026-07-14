@@ -30,12 +30,16 @@ from classes.boris import Boris
 from plot_funcs import plotFuncs
 from utility.coordtrans import *
 from utility.point_generators import ionInitializer
+from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27
 kboltz = 1.602_176_634E-19 # Joules/eV
 Li_mass = 6.941 #amu
 He_mass = 4.002602 #amu
+electron_mass = 9.109_383_7015E-31 # kg
+alpha = 0.5 # ratio of ion to electron saturation currents
 
 # JSON-provided run inputs. These are assigned dynamically in boris_runner();
 # the annotations keep static analyzers from reporting them as undefined.
@@ -47,10 +51,15 @@ HELICAL_CURRENT: float
 
 FIELD_FILE_DENSITY: str
 FIELD_FILE_ELECTRIC: str
-FIELD_SCALE_ELECTRIC: float
 ION_NEUTRAL_COLLISIONS: Optional[str]
 ION_ION_COLLISIONS: Optional[str]
+
+PLASMA_POTENTIAL: float
+ELECTRON_TEMP_EV: Optional[float]
+BACKGROUND_GAS_SPECIES: str
+NEUTRAL_GAS_TEMP_EV: float
 NEUTRAL_GAS_DENSITY: float
+BACKGROUND_ION_TEMP_EV: float
 PLASMA_DENSITY: float
 
 ION_MASS: float
@@ -76,61 +85,140 @@ OUTPUT_DIRECTORY_NAME: str
 TAG: str
 
 
-def load_boris_inputs(path):
-    """Load Boris runner inputs from a JSON object."""
-    path = Path(path)
-    try:
-        with path.open("r", encoding="utf-8") as stream:
-            input_params = json.load(stream)
-    except OSError as exc:
-        raise SystemExit(f"Could not read inputs file {path}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"Could not parse inputs file {path}: {exc}") from exc
+input_params = {
+    "CONFIG_TOR": "default_toroidal",
+    "CONFIG_HEL": "default_helical",
+    "ENABLE_ERRFIELD": True,
+    "TOROIDAL_CURRENT": 0.486,
+    "HELICAL_CURRENT": 0.900,
 
-    if not isinstance(input_params, dict):
-        raise SystemExit("Boris inputs JSON must contain an object.")
-    return input_params
+    "FIELD_FILE_DENSITY": "output/iota3_entire_pipeline_test/data/test1/nField_test1.npy",
+    "FIELD_FILE_ELECTRIC": "output/iota3_entire_pipeline_test/data/test1/Efield_test1.npy",
+    "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
+    "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
+    "PLASMA_POTENTIAL": 60.0,
+    "ELECTRON_TEMP_EV": 2.0,
+    "BACKGROUND_GAS_SPECIES": "He", 
+    "NEUTRAL_GAS_TEMP_EV": 0.025,
+    "NEUTRAL_GAS_DENSITY": 3e18,
+    "BACKGROUND_ION_TEMP_EV": 2.0,
+    "PLASMA_DENSITY": 5e18,
+
+    "ION_MASS": 6.941,
+    "ION_TEMP": 2.0,
+    "CHARGE_NUM": 1,
+
+    "LCFS_INDEX": 1,
+    "DELTRS": [0.0],
+    "NPHI": 2,
+    "NTHETA": 2,
+    "NPARTICLES_PER_EMITTER": 1,
+
+    "DT": 1e-8,
+    "TMAX": 0.001,
+
+    "TRACK_NPHI": 180,
+    "TRACK_NTHETA": 120,
+    "TRACK_NPARTICLES_PER_EMITTER": 1,
+    "STRIDE": 13,
+
+    "OUTPUT_DIRECTORY_NAME": "iota3_entire_pipeline_test",
+    "TAG": "test1_boris"
+    }
+
+
+_CLI_INPUTS = object()
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Boris ion tracking from a JSON input file.")
     parser.add_argument(
         "--inputs-json",
-        type=Path,
-        default=Path("boris_inputs.json"),
+        default=None,
         help="Path to Boris runner inputs JSON.",
     )
     return parser.parse_args()
 
 
+def resolve_plasma_potential(params):
+    field_scale = params.get("PLASMA_POTENTIAL", None)
+
+    if field_scale is not None:
+        return field_scale, "input"
+    else:
+        electron_temp_ev = params.get("ELECTRON_TEMP_EV", None)
+        background_ion_mass_amu = params.get("M_GAS_AMU", None)
+        background_ion_mass_kg = background_ion_mass_amu * kg_per_amu
+
+        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / alpha) 
+                    * (background_ion_mass_kg / (2 * np.pi * electron_mass)))
+
+    return field_scale, "calculated"
+
+def get_species_mass_amu(species):
+    species_masses_amu = {
+        "H":  1.007825,
+        "D":  2.014101,
+        "T":  3.016049,
+        "He": 4.002603,
+        "Ar": 39.962383,
+    }
+
+    try:
+        return species_masses_amu[species]
+    except KeyError as exc:
+        valid_species = ", ".join(species_masses_amu)
+        raise ValueError(
+            f"Unknown background gas species '{species}'. "
+            f"Valid options are: {valid_species}"
+        ) from exc
+        
+
 ## RUN SIMULATION:
-def boris_runner(input_params=None):
+def boris_runner(params):
      ## LOAD INPUT PARAMETERS
-    if input_params is not None:
-        print(f'{input_params.keys()=}')
-        for key, value in input_params.items():
-            print(f'{key}: {value}')
+    if params is not None:
+        #print(f'{params.keys()=}')
+        for key, value in params.items():
+            #print(f'{key}: {value}')
             globals()[str(key)] = value
 
-    STRIDE = int(globals().get("STRIDE", globals().get("TRACE_STRIDE", 1)))
+    STRIDE = int(params.get("STRIDE", params.get("TRACE_STRIDE", 1)))
     if STRIDE < 1:
         raise ValueError("STRIDE must be a positive integer")
-    globals()["STRIDE"] = STRIDE
-    globals()["TRACE_STRIDE"] = STRIDE
+    params["TRACE_STRIDE"] = STRIDE
+    params["STRIDE"] = STRIDE
+
+    m_gas_amu = get_species_mass_amu(BACKGROUND_GAS_SPECIES)
+    params["M_GAS_AMU"] = m_gas_amu
+    globals()["M_GAS_AMU"] = m_gas_amu
+
+    plasma_potential, resolve_method = resolve_plasma_potential(params)
+    params["PLASMA_POTENTIAL"] = plasma_potential
+    globals()["PLASMA_POTENTIAL"] = plasma_potential
+
+    if resolve_method == "input":
+        print(f"Using user provided PLASMA_POTENTIAL: {plasma_potential:.6g} V (ELECTRON_TEMP_EV ignored!)")
+    else:
+        print(
+            f"Using calculated PLASMA_POTENTIAL: {plasma_potential:.6g} V "
+            f"from ELECTRON_TEMP_EV = {params.get('ELECTRON_TEMP_EV')} eV, "
+            f"BACKGROUND_GAS_SPECIES = {BACKGROUND_GAS_SPECIES}, "
+            f"M_GAS_AMU = {m_gas_amu:.6g}")
 
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
     dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
     cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
-                                                               int(FIELD_SCALE_ELECTRIC), int(CHARGE_NUM))
+                                                               int(plasma_potential), int(CHARGE_NUM))
     boris_subdir = cond_string + TAG
-    globals()["NSTEPS"] = int(TMAX / DT)
+    params["NSTEPS"] = int(TMAX / DT)
 
     ## SET UP RUN DIRECTORY AND LOGGING
     simIO = IOHandler(OUTPUT_DIRECTORY_NAME)
     simIO.setActiveSubDir(boris_subdir)
     simIO.startLog(log_name="boris.log", subdir=boris_subdir, logger_name="Boris")
-    simIO.borisBoilerplate(globals())
+    simIO.borisBoilerplate(params)
 
     ## CALCULATE SOME CONSTANTS
     N_emitters = len(DELTRS) * NTHETA * NPHI
@@ -143,7 +231,7 @@ def boris_runner(input_params=None):
     b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
     e_hidra = Mesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                    att_mult=FIELD_SCALE_ELECTRIC)
+                                    att_mult=plasma_potential)
     if ION_ION_COLLISIONS:
       n_hidra = Mesh(R0=0.72, a=0.19)
       n_hidra.loadScalarField(FIELD_FILE_DENSITY, period_=np.array([0, 1, 1]),
@@ -177,8 +265,8 @@ def boris_runner(input_params=None):
                                 for p in _track_p_idx]
 
     ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
-    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX,
-                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY)
+    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX, NEUTRAL_GAS_TEMP_EV, BACKGROUND_ION_TEMP_EV,
+                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY, m_gas_amu=m_gas_amu)
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
                                                                                     nfield=n_hidra,
@@ -220,9 +308,12 @@ def boris_runner(input_params=None):
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
 
 
-def main():
-    args = parse_args()
-    boris_runner(load_boris_inputs(args.inputs_json))
+def main(input_params_override=_CLI_INPUTS):
+    if input_params_override is _CLI_INPUTS:
+            args = parse_args()
+            input_params_override = load_inputs_json(args.inputs_json, "Boris inputs") if args.inputs_json else None
+    params = merge_input_params(input_params, input_params_override)
+    boris_runner(params)
 
 
 if __name__ == "__main__":
