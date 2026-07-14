@@ -1,4 +1,4 @@
-"""Illinois Lagrangian Impurity Advection and Deposition."""
+"""Illinois Lagrangian Ion Advection and Deposition."""
 
 __version__ = "0.1.0"
 

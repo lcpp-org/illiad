@@ -39,10 +39,10 @@ class FluxGradientor:
         self.grid_theta = None
 
         # Gradient arrays in RTP coordinates
-        self.flux_gradient_radial = None
-        self.flux_gradient_poloidal = None
-        self.flux_gradient_toroidal = None
-        self.flux_gradient_magnitude = None
+        self.flux_grad_radial = None
+        self.flux_grad_poloidal = None
+        self.flux_grad_toroidal = None
+        self.flux_grad_magnitude = None
 
         # Final output array in XYZ coordinates
         self.efield_xyz_array_linear = None
@@ -62,9 +62,9 @@ class FluxGradientor:
         """Calculate the RTP components of -grad(flux).
 
         Stores:
-            self.flux_gradient_radial: Radial component of -grad(flux).
-            self.flux_gradient_poloidal: Poloidal component of -grad(flux).
-            self.flux_gradient_toroidal: Toroidal component of -grad(flux).
+            self.flux_grad_radial: Radial component of -grad(flux).
+            self.flux_grad_poloidal: Poloidal component of -grad(flux).
+            self.flux_grad_toroidal: Toroidal component of -grad(flux).
         """
 
         # GRADIENT CALCULATION: remember to divide by Jacobian determinant:
@@ -75,16 +75,16 @@ class FluxGradientor:
         self.simIO.log.info("## Flux gradient calculation complete. ##")
 
         # Calculate RTP basis vectors and apply the Jacobian factors to get the physical gradient in each direction
-        flux_gradient_radial = -flux_gradient[2]  # E = -grad[V]
+        flux_grad_radial = -flux_gradient[2]  # E = -grad[V]
 
-        flux_gradient_poloidal = np.zeros_like(flux_gradient[1])
-        flux_gradient_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / self.grid_rad[:,1:]
+        flux_grad_poloidal = np.zeros_like(flux_gradient[1])
+        flux_grad_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / self.grid_rad[:,1:]
 
-        flux_gradient_toroidal = -flux_gradient[0] / (self.field.R0 + self.grid_rad * np.cos(self.grid_theta))
-        self.simIO.log.info(f'{flux_gradient_radial.shape=}')
-        self.flux_gradient_radial = flux_gradient_radial
-        self.flux_gradient_poloidal = flux_gradient_poloidal
-        self.flux_gradient_toroidal = flux_gradient_toroidal
+        flux_grad_toroidal = -flux_gradient[0] / (self.field.R0 + self.grid_rad * np.cos(self.grid_theta))
+        self.simIO.log.info(f'{flux_grad_radial.shape=}')
+        self.flux_grad_radial = flux_grad_radial
+        self.flux_grad_poloidal = flux_grad_poloidal
+        self.flux_grad_toroidal = flux_grad_toroidal
 
 
     def load_density_data(self):
@@ -100,9 +100,9 @@ class FluxGradientor:
         LCFS plus a small buffer.
 
         Modifies:
-            self.flux_gradient_radial: Values outside the LCFS are set to zero.
-            self.flux_gradient_poloidal: Values outside the LCFS are set to zero.
-            self.flux_gradient_toroidal: Values outside the LCFS are set to zero.
+            self.flux_grad_radial: Values outside the LCFS are set to zero.
+            self.flux_grad_poloidal: Values outside the LCFS are set to zero.
+            self.flux_grad_toroidal: Values outside the LCFS are set to zero.
         """
         # set all points outside the LCFS to zero
         for phi_index, phi_gen_deg in enumerate(self.phi_gens):
@@ -120,9 +120,9 @@ class FluxGradientor:
 
                 # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
                 mask = self.rads > (lcfs_rad + 0.01) # add buffer to avoid numerical issues
-                self.flux_gradient_radial[phi_index][theta_index][mask] = 0.0
-                self.flux_gradient_poloidal[phi_index][theta_index][mask] = 0.0
-                self.flux_gradient_toroidal[phi_index][theta_index][mask] = 0.0
+                self.flux_grad_radial[phi_index][theta_index][mask] = 0.0
+                self.flux_grad_poloidal[phi_index][theta_index][mask] = 0.0
+                self.flux_grad_toroidal[phi_index][theta_index][mask] = 0.0
 
 
     def load_poincare_data(self, phi_gen_deg):
@@ -138,18 +138,18 @@ class FluxGradientor:
 
     def calculate_gradient_magnitude(self):
         """Calculate the magnitude of the flux gradient."""
-        self.flux_gradient_magnitude = np.sqrt(self.flux_gradient_radial**2 
-                                               + self.flux_gradient_poloidal**2 
-                                               + self.flux_gradient_toroidal**2)
+        self.flux_grad_magnitude = np.sqrt(self.flux_grad_radial**2 
+                                           + self.flux_grad_poloidal**2 
+                                           + self.flux_grad_toroidal**2)
 
 
     def convert_gradient_to_xyz(self):
         """Convert the RTP gradient components to XYZ coordinates."""
         # reshape the arrays to match the dimensions of input B-fields
-        reshaped_flux_gradient_radial = np.transpose(self.flux_gradient_radial, (2, 1, 0))
-        reshaped_flux_gradient_poloidal = np.transpose(self.flux_gradient_poloidal, (2, 1, 0))
-        reshaped_flux_gradient_toroidal = np.transpose(self.flux_gradient_toroidal, (2, 1, 0))
-        Efield_rtpArray_linear = np.array([reshaped_flux_gradient_radial, reshaped_flux_gradient_poloidal, reshaped_flux_gradient_toroidal])
+        reshaped_flux_grad_radial = np.transpose(self.flux_grad_radial, (2, 1, 0))
+        reshaped_flux_grad_poloidal = np.transpose(self.flux_grad_poloidal, (2, 1, 0))
+        reshaped_flux_grad_toroidal = np.transpose(self.flux_grad_toroidal, (2, 1, 0))
+        Efield_rtpArray_linear = np.array([reshaped_flux_grad_radial, reshaped_flux_grad_poloidal, reshaped_flux_grad_toroidal])
 
 
         self.efield_xyz_array_linear = np.zeros_like(Efield_rtpArray_linear)
@@ -162,9 +162,9 @@ class FluxGradientor:
         for i, (rad, theta, phi, E_rad_lin, E_theta_lin, E_phi_lin) in enumerate(zip(xform_rad.flatten(),
                                                                             xform_theta.flatten(),
                                                                             xform_phi.flatten(),
-                                                                            reshaped_flux_gradient_radial.flatten(),
-                                                                            reshaped_flux_gradient_poloidal.flatten(), 
-                                                                            reshaped_flux_gradient_toroidal.flatten())):
+                                                                            reshaped_flux_grad_radial.flatten(),
+                                                                            reshaped_flux_grad_poloidal.flatten(), 
+                                                                            reshaped_flux_grad_toroidal.flatten())):
             ErtpLin = np.array([E_rad_lin, E_theta_lin, E_phi_lin])
             p_RTP = np.array([rad, theta, np.radians(phi)])
             Ex_linear[i], Ey_linear[i], Ez_linear[i] = RTP_XYZ_JAC(p_RTP, ErtpLin, form='rtp2xyz')
@@ -182,10 +182,10 @@ class FluxGradientor:
         # loop through PHI ANGLES for plotting
         colortest = 'afmhot_r'
         for phi_index, phi_gen_deg in enumerate(self.phi_gens):
-            self.output_phi_plots(phi_gen_deg, self.flux_gradient_magnitude[phi_index], 'FluxGradMagnitude', self.anlys_subdir, self.simIO, colortest, 0.0, 200.0)
-            self.output_phi_plots(phi_gen_deg, self.flux_gradient_radial[phi_index], 'FluxGradRadial', self.anlys_subdir, self.simIO, colortest, -200., 200)
-            self.output_phi_plots(phi_gen_deg, self.flux_gradient_poloidal[phi_index], 'FluxGradPoloidal', self.anlys_subdir, self.simIO, colortest, -100.0, 100.0)
-            self.output_phi_plots(phi_gen_deg, self.flux_gradient_toroidal[phi_index], 'FluxGradToroidal', self.anlys_subdir, self.simIO, colortest, -0.3, 0.3)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_magnitude[phi_index], 'FluxGradMagnitude', self.anlys_subdir, self.simIO, colortest, 0.0, 200.0)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_radial[phi_index], 'FluxGradRadial', self.anlys_subdir, self.simIO, colortest, -200., 200)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_poloidal[phi_index], 'FluxGradPoloidal', self.anlys_subdir, self.simIO, colortest, -100.0, 100.0)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_toroidal[phi_index], 'FluxGradToroidal', self.anlys_subdir, self.simIO, colortest, -0.3, 0.3)
 
         self.simIO.log.info("## Flux gradienting complete. ##")
 

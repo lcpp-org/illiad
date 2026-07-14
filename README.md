@@ -7,13 +7,13 @@
     |  ██║███████╗███████╗██║██║  ██║██████╔╝                 |
     |  ╚═╝╚══════╝╚══════╝╚═╝╚═╝  ╚═╝╚═════╝                  |
     |                                                         |
-    |  Illinois Lagrangian Impurity Advection and Deposition  |
+    |  Illinois Lagrangian Ion Advection and Deposition  |
     -----------------------------------------------------------
 ```
 
 # ILLIAD
 
-**ILLIAD** (*Illinois Lagrangian Impurity Advection and Deposition*) is a
+**ILLIAD** (*Illinois Lagrangian Ion Advection and Deposition*) is a
 Python modeling framework for reconstructing three-dimensional HIDRA magnetic
 and electrostatic fields and simulating trace impurity-ion transport through the
 scrape-off layer (SOL).
@@ -124,8 +124,8 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 1. Clone the repository and create a Python 3.11 environment.
 
    ```bash
-   git clone https://github.com/lcpp-org/fieldlines-uiuc.git
-   cd fieldlines-uiuc
+   git clone https://github.com/lcpp-org/illiad.git
+   cd illiad
    python -m venv .venv
    source .venv/bin/activate
    pip install numpy scipy matplotlib pandas tqdm pillow torch torchrbf

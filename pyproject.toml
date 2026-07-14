@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "illiad-fieldlines"
 dynamic = ["version"]
-description = "Illinois Lagrangian Impurity Advection and Deposition modeling tools for HIDRA field-line and impurity-ion transport analysis."
+description = "Illinois Lagrangian Ion Advection and Deposition modeling tools for HIDRA field-line and impurity-ion transport analysis."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
@@ -69,8 +69,8 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lcpp-org/fieldlines-uiuc"
-Repository = "https://github.com/lcpp-org/fieldlines-uiuc"
+Homepage = "https://github.com/lcpp-org/illiad"
+Repository = "https://github.com/lcpp-org/illiad"
 
 [project.scripts]
 illiad-fieldsolver = "runFieldsolver:main"

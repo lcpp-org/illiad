@@ -42,6 +42,13 @@ class FluxInterpolator:
         self.output_file_name = input_params.get("OUTPUT_FILE_NAME", "default")
         self.debug = input_params.get("DEBUG", False)
 
+        self.rbf_kernel = input_params.get("RBF_KERNEL", "multiquadric")
+        self.rbf_neighbors = input_params.get("RBF_NEIGHBORS", 45)
+        self.rbf_smoothing = input_params.get("RBF_SMOOTHING", 1e-0)
+        self.rbf_epsilon = input_params.get("RBF_EPSILON", 1000)
+
+
+
         # Loaded data
         self.flux_norm_array = None
         self.n_surfaces = None
@@ -56,7 +63,7 @@ class FluxInterpolator:
         # Interpolation output
         self.grid_theta = None
         self.grid_rad = None
-        self.big_grid_linear = None
+        self.interpolated_surface_parm = None
         
 
     def load_flux_data(self):
@@ -105,8 +112,9 @@ class FluxInterpolator:
 
         self.linear_flux_array = linear_flux_array
         self.profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(int(self.phi_gens[self.best_phi_index]))
-        print(self.profile_select_str)
-        print(f'{self.valid_surface=}')
+        self.simIO.log.info(self.profile_select_str)
+
+        self.simIO.log.info(f'Valid Surfaces: {self.valid_surface}')
         
 
     def save_best_flux_profile(self):
@@ -134,28 +142,30 @@ class FluxInterpolator:
         .npy file, and writes one polar plot for each toroidal angle.
         """
 
-        big_grid_linear_np = self.big_grid_linear.detach().to("cpu").numpy()
-        self.simIO.saveNumpyData(big_grid_linear_np, self.anlys_subdir + '/' + 'nField_' + self.output_file_name  + '.npy')
+        interpolated_surface_parm_np = self.interpolated_surface_parm.detach().to("cpu").numpy()
+        self.simIO.saveNumpyData(interpolated_surface_parm_np,
+                                 self.anlys_subdir + '/' + 'nField_' + self.output_file_name  + '.npy')
 
         for phi_index, phi_deg in enumerate(self.phi_gens):
-            self.output_phi_plots(phi_deg, big_grid_linear_np[phi_index], 'LinearFluxNorm', self.anlys_subdir, self.simIO, 'Blues', 0.0, 1.0)
+            self.output_phi_plots(phi_deg, interpolated_surface_parm_np[phi_index],
+                                  name='LinearFluxNorm',
+                                  subdir=self.anlys_subdir, output_handler=self.simIO,
+                                  colormap='Blues', plotmin=0.0, plotmax=1.0)
 
-        self.simIO.log.info("## Flux interpolation complete. ##")
-        
 
     def perform_interpolation(self):
         """Interpolate the selected flux profile onto the mesh for every phi.
 
         Method loops through all toroidal angles in self.phi_gens, interpolates 
-        each angle independently, and stores the results in self.big_grid_linear.
+        each angle independently, and stores the results in self.interpolated_surface_parm.
         """
 
-        grid_shape, self.grid_theta, self.grid_rad, interpol_pts = self.create_meshgrid_for_interpolation()
+        grid_shape, self.grid_theta, self.grid_rad, interpol_pts = self.create_meshgrid()
         for phi_index, phi_deg in enumerate(self.phi_gens):
-            grid_linear = self.interpolate_one_phi(phi_deg, grid_shape, interpol_pts)
+            interpolated_angle = self.interpolate_one_phi(phi_deg, grid_shape, interpol_pts)
 
             # Skip theta=0 row because it was only added for interpolation periodicity.
-            self.big_grid_linear[phi_index] = grid_linear[1:]
+            self.interpolated_surface_parm[phi_index] = interpolated_angle[1:]
 
             if phi_index % 10 == 0:
                 gc.collect()
@@ -170,31 +180,31 @@ class FluxInterpolator:
         points_torch = torch.as_tensor(source_points_xy, device=device, dtype=torch.float32)
         flux_norm_torch = torch.as_tensor(flux_norm, device=device, dtype=torch.float32)
 
-        interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel="multiquadric",
-                                            neighbors=45, smoothing=1e-0, epsilon=1000)
+        interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel=self.rbf_kernel,
+                                            neighbors=self.rbf_neighbors, smoothing=self.rbf_smoothing, epsilon=self.rbf_epsilon)
         
         # Work around torchrbf device placement: ensure internal tensors/buffers are on the same device.
         interpolation = interpolation.to(device)
         interpolation.smoothing = interpolation.smoothing.to(device)
-        grid_linear = interpolation(interpol_pts).reshape(grid_shape)
+        interpolated_angle = interpolation(interpol_pts).reshape(grid_shape)
         
         ## HACKY SOLUTIONS HERE!!!
         # copying values out for r=0.0
-        fred3 = grid_linear.T[1]
-        fred4 = grid_linear.T[2]
+        fred3 = interpolated_angle.T[1]
+        fred4 = interpolated_angle.T[2]
         fred3[fred3==0] = fred4[fred3==0]
-        grid_linear.T[1] = fred3
-        grid_linear.T[0] = grid_linear.T[1]
+        interpolated_angle.T[1] = fred3
+        interpolated_angle.T[0] = interpolated_angle.T[1]
 
-        return grid_linear
+        return interpolated_angle
 
     
-    def create_meshgrid_for_interpolation(self):
+    def create_meshgrid(self):
         """Create the target mesh used by the RBF interpolator.
 
         Method builds a (theta, r) mesh from the field mesh limits, converts the
         mesh points to Cartesian (x, y) points, and initializes
-        self.big_grid_linear to store the final interpolated output.
+        self.interpolated_surface_parm to store the final interpolated output.
         """
         
         # Create a meshgrid for the interpolation
@@ -205,7 +215,7 @@ class FluxInterpolator:
         interpol_pts = _polar_interp_points_to_xy(grid_theta.ravel(), grid_rad.ravel())
         interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float32)
 
-        self.big_grid_linear = torch.zeros([len(self.phi_gens), len(thetas)-1, len(rads)], device=device, dtype=torch.float32)
+        self.interpolated_surface_parm = torch.zeros([len(self.phi_gens), len(thetas)-1, len(rads)], device=device, dtype=torch.float32)
     
         return grid_shape, grid_theta, grid_rad, interpol_pts
     
@@ -263,3 +273,4 @@ class FluxInterpolator:
         self.save_best_flux_profile()
         self.perform_interpolation()
         self.save_interpolated_data()
+        self.simIO.log.info("## Flux interpolation complete. ##")
