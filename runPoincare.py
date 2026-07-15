@@ -22,61 +22,33 @@
 """
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
-from classes.iohandler import IOHandler
 from classes.mesh import Mesh
 from classes.poincare import Poincare
-import utility.phi_events as phi_event_defs
+from classes.iohandler import IOHandler
 from utility.run_config import load_inputs_json, merge_input_params
 
-
-
-# DEFINE FIELDS #
-CURRENT_TOR = 0.486 #[kA]
-CURRENT_HEL = 0.900 #[kA]
-CONFIG_TOR = "default_toroidal"
-CONFIG_HEL = "default_helical"
-ENABLE_ERRFIELD = True
-
-# DEFINE INITIAL CONDITIONS #
-IC_PHI_DEG = 306. #[deg]
-IC_THETA_DEG = 180. #[deg]
-START_RADIUS = 0.150 #[m]
-END_RADIUS = 0.020 #[m]
-NLINES = 14 + 13 + 26 #+ 52 + 104
-SPINS = 600#1500 # max length, SPIN = 2pi*R0 [meters]
-NPLANES = 360
-
-# DEFINE SOLVER PARAMETERS #
-SOLVER = "LSODA"#"RK45"#
-RTOL = 2.49e-12
-ATOL = 1e-8
-NTHREADS = -1
-DOUBLE_LINE = False
-# DEFINE OUTPUT DIRECTORY #
-#OUTPUT_DIR = f"Iota4FWD_{SPINS}spins_{NLINES}Lines_RK45_1e8_newEvents"
-OUTPUT_DIR = f"AAAnewIO_iota3FWD_phi306_LSODA"
-
-
 DEFAULT_INPUTS = {
-    "CURRENT_TOR": CURRENT_TOR,
-    "CURRENT_HEL": CURRENT_HEL,
-    "CONFIG_TOR": CONFIG_TOR,
-    "CONFIG_HEL": CONFIG_HEL,
-    "ENABLE_ERRFIELD": ENABLE_ERRFIELD,
-    "IC_PHI_DEG": IC_PHI_DEG,
-    "IC_THETA_DEG": IC_THETA_DEG,
-    "START_RADIUS": START_RADIUS,
-    "END_RADIUS": END_RADIUS,
-    "NLINES": NLINES,
-    "SPINS": SPINS,
-    "NPLANES": NPLANES,
-    "SOLVER": SOLVER,
-    "RTOL": RTOL,
-    "ATOL": ATOL,
-    "NTHREADS": NTHREADS,
-    "DOUBLE_LINE": DOUBLE_LINE,
-    "OUTPUT_DIR": OUTPUT_DIR,
+    "CURRENT_TOR": 0.486,  # [kA]
+    "CURRENT_HEL": 0.900,  # [kA]
+    "CONFIG_TOR": "default_toroidal",
+    "CONFIG_HEL": "default_helical",
+    "ENABLE_ERRFIELD": True,
+
+    "IC_PHI_DEG": 306.0,  # [deg]
+    "IC_THETA_DEG": 180.0,  # [deg]
+    "START_RADIUS": 0.150,  # [m]
+    "END_RADIUS": 0.020,  # [m]
+    "NLINES": 53,
+    "SPINS": 600,
+    "NPLANES": 360,
+    "SOLVER": "LSODA",
+
+    "RTOL": 2.49e-12,
+    "ATOL": 1e-8,
+    "NTHREADS": -1,
+    "DOUBLE_LINE": False,
+
+    "OUTPUT_DIR": "AAAnewIO_iota3FWD_phi306_LSODA",
 }
 
 _CLI_INPUTS = object()
@@ -92,23 +64,21 @@ def parse_args():
     return parser.parse_args()
 
 
-def main(input_params=_CLI_INPUTS):
-    
+def main(input_overrides=_CLI_INPUTS):
     """
     Main function to set up the mesh, load magnetic field data, and generate Poincare plots.
     """
-    if input_params is _CLI_INPUTS:
+    if input_overrides is _CLI_INPUTS:
         args = parse_args()
-        input_params = load_inputs_json(args.inputs_json, "Poincare inputs") if args.inputs_json else None
-    if input_params is not None:
-        globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
-
+        input_overrides = load_inputs_json(args.inputs_json, "Poincare inputs") if args.inputs_json else None
+    params = merge_input_params(DEFAULT_INPUTS, input_overrides)
+   
     ## SET UP RUN DIRECTORY (*DATA AND PLOTS WILL BE OVERWRITTEN IF THE DIRECTORY ALREADY EXISTS!*)
-    simIO = IOHandler(OUTPUT_DIR) 
+    simIO = IOHandler(params["OUTPUT_DIR"]) 
     simIO.startLog(log_name="poincare.log", subdir="Poincare", logger_name="Poincare")
     simIO.inputsBoilerplate(
         "POINCARE INPUTS",
-        globals(),
+        params,
         [
             "CURRENT_TOR",
             "CURRENT_HEL",
@@ -133,24 +103,27 @@ def main(input_params=_CLI_INPUTS):
 
     ## DEFINE MESH AND LOAD MAGNETIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
-    b_hidra.loadCartesianField(coilCurrent=CURRENT_TOR, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
+    b_hidra.loadCartesianField(coilCurrent=params["CURRENT_TOR"], 
+                               errField=params["ENABLE_ERRFIELD"], 
+                               att_mult=params["CONFIG_TOR"])
     b_hidra.set_nonPer_errField()
-    b_hidra.addFieldPerturbation(coilCurrent=CURRENT_HEL, att_mult=CONFIG_HEL)
+    b_hidra.addFieldPerturbation(coilCurrent=params["CURRENT_HEL"], 
+                                 att_mult=params["CONFIG_HEL"])
 
     ## SET UP INITIAL CONDITIONS
-    ic_radii = np.array(np.linspace(START_RADIUS, END_RADIUS, NLINES))
-    ic_theta = IC_THETA_DEG * np.pi/180.
-    ic_phi = IC_PHI_DEG * np.pi/180.
+    ic_radii = np.array(np.linspace(params["START_RADIUS"], params["END_RADIUS"], params["NLINES"]))
+    ic_theta = params["IC_THETA_DEG"] * np.pi/180.
+    ic_phi = params["IC_PHI_DEG"] * np.pi/180.
     init_conds_rtp = np.array([[ic_r, ic_theta, ic_phi] for ic_r in ic_radii])
 
     ## GENERATE POINCARE PLOTS
-    solver_args = [SOLVER, RTOL, ATOL, NTHREADS, DOUBLE_LINE]
-    PoinCare = Poincare(simIO, *solver_args)
-    PoinCare.set_conditions(init_conds_rtp, SPINS, b_hidra, nplanes=NPLANES)
-    out_tMax = PoinCare.run()[0]
+    solver_args = [params["SOLVER"], params["RTOL"], params["ATOL"], params["NTHREADS"], params["DOUBLE_LINE"]]
+    poincare = Poincare(simIO, *solver_args)
+    poincare.set_conditions(init_conds_rtp, params["SPINS"], b_hidra, nplanes=params["NPLANES"])
+    out_tMax = poincare.run()[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    PoinCare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
+    poincare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')
