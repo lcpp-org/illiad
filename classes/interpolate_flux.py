@@ -42,10 +42,10 @@ class FluxInterpolator:
         self.output_file_name = input_params.get("OUTPUT_FILE_NAME", "default")
         self.debug = input_params.get("DEBUG", False)
 
-        self.rbf_kernel = input_params.get("RBF_KERNEL", "multiquadric")
-        self.rbf_neighbors = input_params.get("RBF_NEIGHBORS", 45)
-        self.rbf_smoothing = input_params.get("RBF_SMOOTHING", 1e-0)
-        self.rbf_epsilon = input_params.get("RBF_EPSILON", 1000)
+        self.rbf_kernel = input_params.get("RBF_KERNEL")
+        self.rbf_neighbors = input_params.get("RBF_NEIGHBORS")
+        self.rbf_smoothing = input_params.get("RBF_SMOOTHING")
+        self.rbf_epsilon = input_params.get("RBF_EPSILON")
 
 
 
