@@ -72,16 +72,17 @@ trajectory traces, residence-time estimates, and collisionality comparisons.
   standalone fastplotlib trace viewers.
 
 ## Repository Layout
+The runner scripts are JSON-configured, with built-in defaults that also allow each script to be run directly.
 
 - `runFieldsolver.py`: optional magnetic-field generation from coil geometry.
 - `runPoincare.py`: field-line tracing and LCFS identification.
 - `runFluxCalc.py`: flux-surface integration from Poincare output.
 - `runFluxGrad.py`: flux interpolation plus electric-field generation.
-- `runBoris_new.py`: JSON-configured lithium ion transport runner.
-- `boris_inputs.json`: example Boris runner input file.
-- `classes/`: mesh, field-line, particle, collision, Boris, and IO helpers.
-- `utility/`: coordinate transforms, point generation, flux calculation,
-  interpolation, and gradient tools.
+- `runBoris.py`: lithium ion transport runner.
+- `*_inputs.json`: example JSON configuration files for the corresponding runner scripts.
+- `classes/`: mesh, field-line, particle, collision, Boris, IO helpers, 
+  flux calculation, interpolation, and gradient tools.
+- `utility/`: coordinate transforms, point generation, physical_constants.
 - `plot_funcs/`: plotting scripts and reusable plotting helpers.
 - `input_files/`: coil geometry, pre-generated fields, fitted profiles, and
   supporting CSV/NumPy inputs.
