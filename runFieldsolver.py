@@ -1,67 +1,24 @@
-## IMPORTS
+import torch
 import argparse
-import pandas as pd
 import numpy as np
+import pandas as pd
 from time import perf_counter
-
 from utility.run_config import load_inputs_json, merge_input_params
 
-import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#device = torch.device('cpu')
-#from coordtrans import RTP_to_XYZ
-
-#################
-## USER INPUTS ##
-#################
-
-## NAME YOUR OUTPUT FILE
-output_name = 'It0000_Ih1000_Iv000_1p000_1p000_64bit'
-
-## DEFINE MESH RESOLUTION
-test = [20, 4, 10]
-rough  = [  96,  90,  90 ] # dr=0.002m., dtheta=4deg., dphi=4deg.
-lo_res = [  96,  90, 180 ] # dr=0.002m., dtheta=4deg., dphi=2deg.
-hi_res = [ 191, 180, 360 ] # dr=0.001m., dtheta=2deg., dphi=1deg.
-mesh_size = hi_res
-
-# REF. COIL CURRENTS NORMALLY RUN ON HIDRA
-#############################
-#      | [Amp]| [Amp]| [Amp]#
-# IOTA |  I_T |  I_H |  I_V #
-# 1/3  |  486 |  900 |   00 #
-# 1/4  |  486 |  790 |   00 #
-# 1/5  |  486 |  710 |   00 #
-# 1/7  |  581 |  581 |   00 #
-# MAX. | 3500 | 7000 |   ?? #
-#############################
-# INPUT COIL CURRENTS:
-I_toro = 0000.   #[Amps]
-I_heli = 1000.   #[Amps]
-I_vert = 0000.   #[Amps]
-
-s_toro = 1.0
-s_heli = 1.0
-s_vert = 1.0
-
-I_toro *= s_toro
-I_heli *= s_heli
-I_vert *= s_vert
-
-########################
-## END OF USER INPUTS ##
-########################
 
 DEFAULT_INPUTS = {
-    "output_name": output_name,
-    "mesh_size": mesh_size,
-    "I_toro": I_toro,
-    "I_heli": I_heli,
-    "I_vert": I_vert,
-    "coilfile": "input_files/coils.wega_with_VFCoils",
+    "OUTPUT_NAME": "It0000_Ih1000_Iv000_1p000_1p000_64bit",
+    "MESH_SIZE": [191, 180, 360],
+
+    "I_TORO": 0.0,
+    "I_HELI": 1000.0,
+    "I_VERT": 0.0,
+
+    "COILFILE": "input_files/coils.wega_with_VFCoils",
     "RMAJOR": 0.72,
     "RMINOR": 0.19,
-    "mesh_periodicity": [0, 1, 5],
+    "MESH_PERIODICITY": [0, 1, 5],
 }
 
 _CLI_INPUTS = object()
@@ -94,8 +51,8 @@ def biotsavart_mesh(mesh, filament, current, Npoints):
     B = torch.zeros(mesh.shape, dtype=torch.float64, device=device)
 
     for i in range(Npoints):
-        P1 = filament[:,i-1] #[meters]
-        P2 = filament[:,i] #[meters]
+        P1 = filament[:,i-1] # [meters]
+        P2 = filament[:,i] # [meters]
 
         dl = P2 - P1
         dI = current * dl # [Amps*meters]
@@ -108,9 +65,9 @@ def biotsavart_mesh(mesh, filament, current, Npoints):
 
         B += torch.linalg.cross( dI.expand_as(Rv), Rv, dim=3 ).T / Rm3[:None]
         
-    return 1.0e-7 * B #[Tesla]
+    return 1.0e-7 * B # [Tesla]
 
-def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
+def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns, params):
     """
     Computes and sums the magnetic field contributions from multiple coils over a mesh grid.
     For each coil in `mycoils`, determines the current based on its type and number of turns,
@@ -129,16 +86,15 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
     for n, coil in enumerate(mycoils):
 
         print('Coil({:02d}'.format(n+1)+'/{:02d}) '.format(len(mycoils))+coiltype[n])
-        if coiltype[n] == 'Helix':                 current = turns[n] * I_heli # * 0.955 # Otte's error field correction
-        elif coiltype[n] == 'toroidal_field':      current = turns[n] * I_toro
-        elif coiltype[n] == 'Vertical_Field_Coil': current = turns[n] * I_vert
+        if coiltype[n] == 'Helix':                 current = turns[n] * params["I_HELI"] # * 0.955 # Otte's error field correction
+        elif coiltype[n] == 'toroidal_field':      current = turns[n] * params["I_TORO"]
+        elif coiltype[n] == 'Vertical_Field_Coil': current = turns[n] * params["I_VERT"]
         else: 
             raise ValueError(f"COIL-TYPE ERROR! Unknown coil type: {coiltype[n]}")
 
         coilpts = np.asarray(coil, dtype=np.float64)
         thiscoil = torch.tensor(coilpts) #, dtype=torch.float64)
         filament = thiscoil.T[:3].to(device)
-        thiscoil = torch.tensor(coilpts, dtype=torch.float64, device=device)
         ## Mesh-ified
         N = filament.shape[1]
         Bxyz += biotsavart_mesh(xyz_mesh, filament, current, N)
@@ -149,18 +105,18 @@ def loop_through_coils(Bxyz, xyz_mesh, mycoils, coiltype, turns):
 
     #return Bxyz
 
-def main(input_params=_CLI_INPUTS):
+def main(input_overrides=_CLI_INPUTS):
     """Main function to set up the mesh, read coil data, and compute the magnetic field using Biot-Savart law.
     It initializes the mesh parameters, reads coil data from a file, and computes the magnetic field.
     The results are saved to a specified output file."""
-    if input_params is _CLI_INPUTS:
+    if input_overrides is _CLI_INPUTS:
         args = parse_args()
-        input_params = load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None
-    globals().update(merge_input_params(DEFAULT_INPUTS, input_params))
+        input_overrides = load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None
+    params = merge_input_params(DEFAULT_INPUTS, input_overrides)
 
     ## READ COIL INPUT FILE
     coildata = pd.read_csv(
-    coilfile,
+    params["COILFILE"],
     header=None,
     skiprows=3,
     index_col=None,
@@ -184,6 +140,8 @@ def main(input_params=_CLI_INPUTS):
     ## 0: NOT PERIODIC
     ## 1: 2PI PERIODIC
     ## >1: HIGHER PERIODICITY (i.e (2PI)/N  PERIODIC)
+    mesh_size = params["MESH_SIZE"]
+    mesh_periodicity = params["MESH_PERIODICITY"]
 
     nr     = int( mesh_size[0] / max(1, mesh_periodicity[0]) )
     ntheta = int( mesh_size[1] / max(1, mesh_periodicity[1]) )
@@ -194,11 +152,11 @@ def main(input_params=_CLI_INPUTS):
     ## IF THE DIMENSION IS NOT PERIODIC, START AT 0
     ## IF IT IS PERIODIC, START AT DX (WHERE X IS THE COORDINATE)
     if r_prd:
-        r_maximum = RMINOR*r_prd
+        r_maximum = params["RMINOR"]*r_prd
         dr = r_maximum/nr
         r_minimum = dr
     else:
-        r_maximum = RMINOR
+        r_maximum = params["RMINOR"]
         dr = r_maximum/(nr-1)
         r_minimum = 0.
 
@@ -232,15 +190,15 @@ def main(input_params=_CLI_INPUTS):
 
     # Create Cartesian Mesh
     rr, tt, pp = torch.meshgrid(i_R, i_THETA, i_PHI)
-    xx = (RMAJOR + rr*torch.cos(tt))*torch.cos(pp)
-    yy = -(RMAJOR + rr*torch.cos(tt))*torch.sin(pp)
+    xx = (params["RMAJOR"] + rr*torch.cos(tt))*torch.cos(pp)
+    yy = -(params["RMAJOR"] + rr*torch.cos(tt))*torch.sin(pp)
     zz = rr*torch.sin(tt)
     xyz_mesh = torch.stack([xx, yy, zz]).to(device)
 
     # Loop through coils, summing each one's contribution to get total field
     B_XYZ = torch.zeros(( 3, nr, ntheta, nphi ), dtype=torch.float64, device=device) #.to(device)
-    loop_through_coils(B_XYZ, xyz_mesh, mycoils, coiltype, turns)
-    np.save(output_name, B_XYZ.cpu())
+    loop_through_coils(B_XYZ, xyz_mesh, mycoils, coiltype, turns, params)
+    np.save(params["OUTPUT_NAME"], B_XYZ.cpu())
 
 if __name__ == '__main__':
     main()

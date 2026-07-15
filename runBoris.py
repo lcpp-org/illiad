@@ -11,109 +11,49 @@ This function performs the following steps:
   7. Processes and transforms output coordinates for plotting.
   8. Generates a series of plots for particle trajectories, wall hits, deposition angles, and energies.
   9. Logs the completion of the simulation.
-All configuration and physical parameters are expected to be defined in the global scope or imported modules.
 """
-
-## IMPORTS
-import argparse
-import json
-import numpy as np
 import torch
-from time import perf_counter
-from pathlib import Path
-from typing import Optional
-
-from classes.iohandler import IOHandler
-from classes.meshNew import Mesh
+import argparse
+import numpy as np
+import utility.physical_constants as const
 from classes.boris import Boris
-
-from plot_funcs import plotFuncs
-from utility.coordtrans import *
+from classes.meshNew import Mesh
+from classes.iohandler import IOHandler
 from utility.point_generators import ionInitializer
-from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
-
-
+from utility.run_config import load_inputs_json, merge_input_params
 ## SOME PHYSICAL CONSTANTS
-kg_per_amu = 1.660_539_068E-27
-kboltz = 1.602_176_634E-19 # Joules/eV
-Li_mass = 6.941 #amu
-He_mass = 4.002602 #amu
-electron_mass = 9.109_383_7015E-31 # kg
 alpha = 0.5 # ratio of ion to electron saturation currents
 
-# JSON-provided run inputs. These are assigned dynamically in boris_runner();
-# the annotations keep static analyzers from reporting them as undefined.
-CONFIG_TOR: str
-CONFIG_HEL: str
-ENABLE_ERRFIELD: bool
-TOROIDAL_CURRENT: float
-HELICAL_CURRENT: float
-
-FIELD_FILE_DENSITY: str
-FIELD_FILE_ELECTRIC: str
-ION_NEUTRAL_COLLISIONS: Optional[str]
-ION_ION_COLLISIONS: Optional[str]
-
-PLASMA_POTENTIAL: float
-ELECTRON_TEMP_EV: Optional[float]
-BACKGROUND_GAS_SPECIES: str
-NEUTRAL_GAS_TEMP_EV: float
-NEUTRAL_GAS_DENSITY: float
-BACKGROUND_ION_TEMP_EV: float
-PLASMA_DENSITY: float
-
-ION_MASS: float
-ION_TEMP: float
-CHARGE_NUM: int
-
-LCFS_INDEX: int
-DELTRS: list[float]
-NPHI: int
-NTHETA: int
-NPARTICLES_PER_EMITTER: int
-
-DT: float
-TMAX: float
-NSTEPS: int
-TRACK_NPHI: int
-TRACK_NTHETA: int
-TRACK_NPARTICLES_PER_EMITTER: int
-STRIDE: int
-TRACE_STRIDE: int
-
-OUTPUT_DIRECTORY_NAME: str
-TAG: str
-
-
-input_params = {
+DEFAULT_INPUTS = {
     "CONFIG_TOR": "default_toroidal",
     "CONFIG_HEL": "default_helical",
     "ENABLE_ERRFIELD": True,
     "TOROIDAL_CURRENT": 0.486,
     "HELICAL_CURRENT": 0.900,
 
-    "FIELD_FILE_DENSITY": "output/iota3_entire_pipeline_test/data/test1/nField_test1.npy",
-    "FIELD_FILE_ELECTRIC": "output/iota3_entire_pipeline_test/data/test1/Efield_test1.npy",
+    "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
+    "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
     "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
-    "PLASMA_POTENTIAL": 60.0,
+    "ELECTRIC_POTENTIAL": 60.0,
     "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He", 
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
     "BACKGROUND_ION_TEMP_EV": 2.0,
     "PLASMA_DENSITY": 5e18,
+    "ION_ELECTRON_SAT_CURRENT_RATIO": 0.5,
 
     "ION_MASS": 6.941,
     "ION_TEMP": 2.0,
     "CHARGE_NUM": 1,
 
-    "LCFS_INDEX": 1,
+    "LCFS_INDEX": 20,
     "DELTRS": [0.0],
-    "NPHI": 2,
-    "NTHETA": 2,
-    "NPARTICLES_PER_EMITTER": 1,
+    "NPHI": 180,
+    "NTHETA": 120,
+    "NPARTICLES_PER_EMITTER": 5,
 
     "DT": 1e-8,
     "TMAX": 0.001,
@@ -123,8 +63,8 @@ input_params = {
     "TRACK_NPARTICLES_PER_EMITTER": 1,
     "STRIDE": 13,
 
-    "OUTPUT_DIRECTORY_NAME": "iota3_entire_pipeline_test",
-    "TAG": "test1_boris"
+    "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306_LSODA",
+    "TAG": "pipelineTest"
     }
 
 
@@ -142,106 +82,79 @@ def parse_args():
 
 def resolve_plasma_potential(params):
     field_scale = params.get("PLASMA_POTENTIAL", None)
+    current_ratio = params["ION_ELECTRON_SAT_CURRENT_RATIO"]
 
     if field_scale is not None:
         return field_scale, "input"
     else:
         electron_temp_ev = params.get("ELECTRON_TEMP_EV", None)
         background_ion_mass_amu = params.get("M_GAS_AMU", None)
-        background_ion_mass_kg = background_ion_mass_amu * kg_per_amu
+        background_ion_mass_kg = background_ion_mass_amu * const.KG_PER_AMU
 
-        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / alpha) 
-                    * (background_ion_mass_kg / (2 * np.pi * electron_mass)))
+        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / current_ratio) 
+                    * (background_ion_mass_kg / (2 * np.pi * const.ELECTRON_MASS_KG)))
 
     return field_scale, "calculated"
-
-def get_species_mass_amu(species):
-    species_masses_amu = {
-        "H":  1.007825,
-        "D":  2.014101,
-        "T":  3.016049,
-        "He": 4.002603,
-        "Ar": 39.962383,
-    }
-
-    try:
-        return species_masses_amu[species]
-    except KeyError as exc:
-        valid_species = ", ".join(species_masses_amu)
-        raise ValueError(
-            f"Unknown background gas species '{species}'. "
-            f"Valid options are: {valid_species}"
-        ) from exc
         
-
+        
 ## RUN SIMULATION:
 def boris_runner(params):
-     ## LOAD INPUT PARAMETERS
-    if params is not None:
-        #print(f'{params.keys()=}')
-        for key, value in params.items():
-            #print(f'{key}: {value}')
-            globals()[str(key)] = value
 
-    STRIDE = int(params.get("STRIDE", params.get("TRACE_STRIDE", 1)))
-    if STRIDE < 1:
+    stride = int(params["STRIDE"])
+    if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
-    params["TRACE_STRIDE"] = STRIDE
-    params["STRIDE"] = STRIDE
 
-    m_gas_amu = get_species_mass_amu(BACKGROUND_GAS_SPECIES)
+    m_gas_amu = const.get_species_mass_amu(params["BACKGROUND_GAS_SPECIES"])
     params["M_GAS_AMU"] = m_gas_amu
-    globals()["M_GAS_AMU"] = m_gas_amu
 
     plasma_potential, resolve_method = resolve_plasma_potential(params)
     params["PLASMA_POTENTIAL"] = plasma_potential
-    globals()["PLASMA_POTENTIAL"] = plasma_potential
 
     if resolve_method == "input":
         print(f"Using user provided PLASMA_POTENTIAL: {plasma_potential:.6g} V (ELECTRON_TEMP_EV ignored!)")
     else:
         print(
             f"Using calculated PLASMA_POTENTIAL: {plasma_potential:.6g} V "
-            f"from ELECTRON_TEMP_EV = {params.get('ELECTRON_TEMP_EV')} eV, "
-            f"BACKGROUND_GAS_SPECIES = {BACKGROUND_GAS_SPECIES}, "
-            f"M_GAS_AMU = {m_gas_amu:.6g}")
+            f"from ELECTRON_TEMP_EV = {params['ELECTRON_TEMP_EV']} eV, "
+            f"BACKGROUND_GAS_SPECIES = {params['BACKGROUND_GAS_SPECIES']}, "
+            f"M_GAS_AMU = {params['M_GAS_AMU']:.6g}")
 
     ## DEFINE STRING (FOR FILE NAME)
     delimiter = '-'
-    dr_String = delimiter.join(str(int(dr*1000)) for dr in DELTRS)
-    cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(LCFS_INDEX), int(ION_TEMP),
-                                                               int(plasma_potential), int(CHARGE_NUM))
-    boris_subdir = cond_string + TAG
-    params["NSTEPS"] = int(TMAX / DT)
+    dr_String = delimiter.join(str(int(dr*1000)) for dr in params["DELTRS"])
+    cond_string = dr_String + 'mm_LCFS{}_{}eV_{}V_Z{}_'.format(int(params["LCFS_INDEX"]), int(params["ION_TEMP"]),
+                                                               int(plasma_potential), int(params["CHARGE_NUM"]))
+    boris_subdir = cond_string + params["TAG"]
+    params["NSTEPS"] = int(params["TMAX"] / params["DT"])
 
     ## SET UP RUN DIRECTORY AND LOGGING
-    simIO = IOHandler(OUTPUT_DIRECTORY_NAME)
+    simIO = IOHandler(params["OUTPUT_DIRECTORY_NAME"])
     simIO.setActiveSubDir(boris_subdir)
     simIO.startLog(log_name="boris.log", subdir=boris_subdir, logger_name="Boris")
     simIO.borisBoilerplate(params)
 
     ## CALCULATE SOME CONSTANTS
-    N_emitters = len(DELTRS) * NTHETA * NPHI
-    N_particles = NPARTICLES_PER_EMITTER * N_emitters
+    N_emitters = len(params["DELTRS"]) * params["NTHETA"] * params["NPHI"]
+    N_particles = params["NPARTICLES_PER_EMITTER"] * N_emitters
 
     ## DEFINE MESH AND LOAD MAGNETIC AND ELECTRIC FIELD
     b_hidra = Mesh(R0=0.72, a=0.19)
     b_hidra.setErrorField()
-    b_hidra.loadCartesianField(coilCurrent=TOROIDAL_CURRENT, errField=ENABLE_ERRFIELD, att_mult=CONFIG_TOR)
-    b_hidra.addFieldPerturbation(coilCurrent=HELICAL_CURRENT, att_mult=CONFIG_HEL)
+    b_hidra.loadCartesianField(coilCurrent=params["TOROIDAL_CURRENT"], errField=params["ENABLE_ERRFIELD"], att_mult=params["CONFIG_TOR"])
+    b_hidra.addFieldPerturbation(coilCurrent=params["HELICAL_CURRENT"], att_mult=params["CONFIG_HEL"])
     e_hidra = Mesh(R0=0.72, a=0.19)
-    e_hidra.loadCartesianField(FIELD_FILE_ELECTRIC, period_=np.array([0, 1, 1]),
-                                    att_mult=plasma_potential)
-    if ION_ION_COLLISIONS:
+    e_hidra.loadCartesianField(params["FIELD_FILE_ELECTRIC"], period_=np.array([0, 1, 1]),
+                                    att_mult=params["PLASMA_POTENTIAL"])
+    if params["ION_ION_COLLISIONS"]:
       n_hidra = Mesh(R0=0.72, a=0.19)
-      n_hidra.loadScalarField(FIELD_FILE_DENSITY, period_=np.array([0, 1, 1]),
-                  att_mult=PLASMA_DENSITY)
+      n_hidra.loadScalarField(params["FIELD_FILE_DENSITY"], period_=np.array([0, 1, 1]),
+                  att_mult=params["PLASMA_DENSITY"])
     else:
       n_hidra = None
 
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
-    init_conds = [LCFS_INDEX, NPHI, NTHETA, DELTRS, NPARTICLES_PER_EMITTER]
-    ion_properties = [ION_MASS, CHARGE_NUM, ION_TEMP]
+    init_conds = [params["LCFS_INDEX"], params["NPHI"], params["NTHETA"], params["DELTRS"], params["NPARTICLES_PER_EMITTER"]]
+    ion_properties = [params["ION_MASS"], params["CHARGE_NUM"], params["ION_TEMP"]]
     ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
@@ -256,24 +169,24 @@ def boris_runner(params):
     ## Selects all NPARTICLES_PER_EMITTER copies for each grid location.
     ## Particle layout: block p (0..NPARTICLES_PER_EMITTER-1) starts at p*N_emitters;
     ## within a block: phi_i * len(DELTRS) * NTHETA + dr_j * NTHETA + theta_k
-    _track_phi_idx   = np.round(np.linspace(0, NPHI                  - 1, TRACK_NPHI                  )).astype(int)
-    _track_theta_idx = np.round(np.linspace(0, NTHETA                - 1, TRACK_NTHETA                )).astype(int)
-    _track_p_idx     = np.round(np.linspace(0, NPARTICLES_PER_EMITTER- 1, TRACK_NPARTICLES_PER_EMITTER)).astype(int)
-    particle_tracker_list = [int(p) * N_emitters + int(pi * len(DELTRS) * NTHETA + theta_i)
+    _track_phi_idx   = np.round(np.linspace(0, params["NPHI"]                  - 1, params["TRACK_NPHI"]                  )).astype(int)
+    _track_theta_idx = np.round(np.linspace(0, params["NTHETA"]                - 1, params["TRACK_NTHETA"]                )).astype(int)
+    _track_p_idx     = np.round(np.linspace(0, params["NPARTICLES_PER_EMITTER"]- 1, params["TRACK_NPARTICLES_PER_EMITTER"])).astype(int)
+    particle_tracker_list = [int(p) * N_emitters + int(pi * len(params["DELTRS"]) * params["NTHETA"] + theta_i)
                                 for pi in _track_phi_idx
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
 
-    ion_tracer = Boris(simIO, OUTPUT_DIRECTORY_NAME, TAG)
-    ion_tracer.setConditions(ion_list, cond_string, DT, TMAX, NEUTRAL_GAS_TEMP_EV, BACKGROUND_ION_TEMP_EV,
-                             n_gas=NEUTRAL_GAS_DENSITY, n_e=PLASMA_DENSITY, m_gas_amu=m_gas_amu)
+    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
+    ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["BACKGROUND_ION_TEMP_EV"],
+                             n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
                                                                                     nfield=n_hidra,
-                                                                                    ion_neutral_collisions=ION_NEUTRAL_COLLISIONS,
-                                                                                    ion_ion_collisions=ION_ION_COLLISIONS,
+                                                                                    ion_neutral_collisions=params["ION_NEUTRAL_COLLISIONS"],
+                                                                                    ion_ion_collisions=params["ION_ION_COLLISIONS"],
                                                                                     trace_IDs=particle_tracker_list,
-                                                                                    trace_stride=STRIDE)
+                                                                                    trace_stride=stride)
     simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
 
     # COORDINATE FLIIPING & CONVERSION
@@ -286,7 +199,7 @@ def boris_runner(params):
     theta_plot_deg = theta_plot*(180/np.pi)
 
     ## PLOTTING
-    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, TMAX, DT, runString='RunningFraction', simIO=simIO)
+    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
     ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90], 
                                 colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
@@ -298,11 +211,7 @@ def boris_runner(params):
                                 colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
                                 runString='PHIAngleCombined', simIO=simIO, cond_string=cond_string)
 
-
-    #ion_tracer.plotWallPoints3D(phi_plot_deg, theta_plot_deg, b_hidra, runString='WallPoints3D', simIO=simIO)
     ion_tracer.plotTraces(traces, b_hidra, runString='Traces', simIO=simIO)
-    #ion_tracer.plotWallPoints(phi_plot_deg, theta_plot_deg, runString='WallPoints', simIO=simIO)
-    #ion_tracer.plotInitEnergies(IC_filename+'.npy', ION_MASS, runString='InitEnergies', simIO=simIO)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')
@@ -312,7 +221,7 @@ def main(input_params_override=_CLI_INPUTS):
     if input_params_override is _CLI_INPUTS:
             args = parse_args()
             input_params_override = load_inputs_json(args.inputs_json, "Boris inputs") if args.inputs_json else None
-    params = merge_input_params(input_params, input_params_override)
+    params = merge_input_params(DEFAULT_INPUTS, input_params_override)
     boris_runner(params)
 
 

@@ -20,5 +20,10 @@
   "DEBUG": true,
   "INV_SURF_INDICES": [],
   "GUESS_PHI_INDEX": -3,
-  "OUTPUT_FILE_NAME": "LCFS30alpha1p0"
+  "OUTPUT_FILE_NAME": "LCFS30alpha1p0",
+
+  "RBF_KERNEL": "multiquadric",
+  "RBF_NEIGHBORS": 45,
+  "RBF_SMOOTHING": 1.0,
+  "RBF_EPSILON": 1000.0
 }
