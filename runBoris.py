@@ -15,18 +15,13 @@ This function performs the following steps:
 import torch
 import argparse
 import numpy as np
+import utility.physical_constants as const
 from classes.boris import Boris
 from classes.meshNew import Mesh
 from classes.iohandler import IOHandler
 from utility.point_generators import ionInitializer
 from utility.run_config import load_inputs_json, merge_input_params
-
 ## SOME PHYSICAL CONSTANTS
-kg_per_amu = 1.660_539_068E-27
-kboltz = 1.602_176_634E-19 # Joules/eV
-Li_mass = 6.941 #amu
-He_mass = 4.002602 #amu
-electron_mass = 9.109_383_7015E-31 # kg
 alpha = 0.5 # ratio of ion to electron saturation currents
 
 DEFAULT_INPUTS = {
@@ -36,28 +31,29 @@ DEFAULT_INPUTS = {
     "TOROIDAL_CURRENT": 0.486,
     "HELICAL_CURRENT": 0.900,
 
-    "FIELD_FILE_DENSITY": "output/iota3_entire_pipeline_test/data/test1/nField_test1.npy",
-    "FIELD_FILE_ELECTRIC": "output/iota3_entire_pipeline_test/data/test1/Efield_test1.npy",
+    "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
+    "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
     "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
-    "PLASMA_POTENTIAL": 60.0,
+    "ELECTRIC_POTENTIAL": 60.0,
     "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He", 
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
     "BACKGROUND_ION_TEMP_EV": 2.0,
     "PLASMA_DENSITY": 5e18,
+    "ION_ELECTRON_SAT_CURRENT_RATIO": 0.5,
 
     "ION_MASS": 6.941,
     "ION_TEMP": 2.0,
     "CHARGE_NUM": 1,
 
-    "LCFS_INDEX": 1,
+    "LCFS_INDEX": 20,
     "DELTRS": [0.0],
-    "NPHI": 2,
-    "NTHETA": 2,
-    "NPARTICLES_PER_EMITTER": 1,
+    "NPHI": 180,
+    "NTHETA": 120,
+    "NPARTICLES_PER_EMITTER": 5,
 
     "DT": 1e-8,
     "TMAX": 0.001,
@@ -67,8 +63,8 @@ DEFAULT_INPUTS = {
     "TRACK_NPARTICLES_PER_EMITTER": 1,
     "STRIDE": 13,
 
-    "OUTPUT_DIRECTORY_NAME": "iota3_entire_pipeline_test",
-    "TAG": "test1_boris"
+    "OUTPUT_DIRECTORY_NAME": "AAAnewIO_iota3FWD_phi306_LSODA",
+    "TAG": "pipelineTest"
     }
 
 
@@ -86,36 +82,19 @@ def parse_args():
 
 def resolve_plasma_potential(params):
     field_scale = params.get("PLASMA_POTENTIAL", None)
+    current_ratio = params["ION_ELECTRON_SAT_CURRENT_RATIO"]
 
     if field_scale is not None:
         return field_scale, "input"
     else:
         electron_temp_ev = params.get("ELECTRON_TEMP_EV", None)
         background_ion_mass_amu = params.get("M_GAS_AMU", None)
-        background_ion_mass_kg = background_ion_mass_amu * kg_per_amu
+        background_ion_mass_kg = background_ion_mass_amu * const.KG_PER_AMU
 
-        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / alpha) 
-                    * (background_ion_mass_kg / (2 * np.pi * electron_mass)))
+        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / current_ratio) 
+                    * (background_ion_mass_kg / (2 * np.pi * const.ELECTRON_MASS_KG)))
 
     return field_scale, "calculated"
-
-def get_species_mass_amu(species):
-    species_masses_amu = {
-        "H":  1.007825,
-        "D":  2.014101,
-        "T":  3.016049,
-        "He": 4.002603,
-        "Ar": 39.962383,
-    }
-
-    try:
-        return species_masses_amu[species]
-    except KeyError as exc:
-        valid_species = ", ".join(species_masses_amu)
-        raise ValueError(
-            f"Unknown background gas species '{species}'. "
-            f"Valid options are: {valid_species}"
-        ) from exc
         
         
 ## RUN SIMULATION:
@@ -125,7 +104,7 @@ def boris_runner(params):
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
 
-    m_gas_amu = get_species_mass_amu(params["BACKGROUND_GAS_SPECIES"])
+    m_gas_amu = const.get_species_mass_amu(params["BACKGROUND_GAS_SPECIES"])
     params["M_GAS_AMU"] = m_gas_amu
 
     plasma_potential, resolve_method = resolve_plasma_potential(params)
