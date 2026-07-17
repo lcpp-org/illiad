@@ -233,7 +233,7 @@ class FluxCalculator:
         hist, bin_edges, wrap_flag = hist_output
         for surf_index in range(self.lcfs_index, self.nsurfaces):
             n_subsets = num_subsets[surf_index]
-            # loop to spline, calculate flux, and create regularly-spaced points
+            # loop to spline, calculate flux, and create regularly-spaced points``
             output = self.fit_and_integrate_surface_subsets(subset_data, subset_centers, surf_index, 
                                                             smallest_island_index, n_subsets, wrap_flag, 
                                                             mag_axis_rev, phi_deg)
@@ -747,6 +747,54 @@ class FluxCalculator:
             self.valid_surfs[surf_index][phi_index] = False # not a valid surface for interpolation
             self.simIO.log.info( '\t(A)Surface #{} NOT A VALID SURFACE!!!'.format(surf_index) )
 
+    
+    def append_exponential_tail(self):
+        tail_array = np.full([self.nsurfaces//4, len(self.phi_gens)], np.nan)
+        for phi_index, phi in enumerate(self.phi_gens):
+            flux_inside = self.total_flux_norm[self.lcfs_index+2][phi_index]
+            #print(flux_inside,"Flux inside")
+            flux_lcfs = self.total_flux_norm[self.lcfs_index+1][phi_index]
+            #print(flux_lcfs,"Flux LCFS")
+            flux_wall = 0.1*flux_lcfs
+            #print(flux_wall,"Flux Wall")
+            inside_points = self.flat_point_meshes[self.lcfs_index+2][phi_index]
+            r_inside = inside_points[:, 1]
+            theta_inside = inside_points[:, 0]
+            lcfs_points = self.flat_point_meshes[self.lcfs_index+1][phi_index]
+            r_lcfs = lcfs_points[:, 1]
+            theta_lcfs = lcfs_points[:, 0]
+
+            if (len(theta_lcfs) == len(theta_inside) and np.allclose(theta_lcfs, theta_inside)):
+                r_inside_aligned = r_inside
+            else:
+                r_inside_aligned = np.interp(theta_lcfs,theta_inside, r_inside, period=2 * np.pi,)
+            radial_mesh = np.linspace(r_lcfs, 0.19, self.nsurfaces//4)
+            surfaces = np.linspace(0,len(radial_mesh), len(radial_mesh))
+            print(surfaces, "<- Surfaces")
+            #print(radial_mesh,"Radial Mesh")
+            slope = (flux_lcfs - flux_inside) / (r_lcfs - r_inside_aligned)
+            #print(slope,"Slope")
+            constant1, constant2 = self.apply_boundary_conditions(slope, r_lcfs, flux_lcfs, flux_wall)
+            for tail_index, r_values in enumerate(radial_mesh):
+                tail_array[tail_index, phi_index] = constant1[tail_index] * np.exp(-constant2[tail_index]**2/(0.19**2-r_values[tail_index]**2)) + flux_wall
+                #print(tail_array[tail_index, phi_index], "<- Tail Array Value")
+
+            #print(len(radial_mesh), "<- Radial Mesh")
+            #print(tail_array[:, phi_index], "<- Tail Array Values")
+            #plt.plot(surfaces, tail_array[:, phi_index], label=f'Phi={phi}')
+            #plt.xlabel('Radial Distance')
+            #plt.ylabel('Flux')
+            #plt.show()
+
+        return tail_array
+
+
+    def apply_boundary_conditions(self, slope, r_value_lcfs,flux_lcfs, flux_wall):
+        constant2 = np.sqrt(slope*((0.19**2-r_value_lcfs**2)**2) / ((flux_lcfs-flux_wall)*-2*r_value_lcfs))
+        constant1 = (flux_lcfs - flux_wall) / np.exp(-constant2**2/(0.19**2-r_value_lcfs**2))
+
+        return constant1, constant2
+
 
     def run(self):
         """
@@ -758,6 +806,7 @@ class FluxCalculator:
         """
         self.process_all_phi_angles()
         self.normalize_fluxes()
-        self.save_output()    
+        self.append_exponential_tail()
+        #self.save_output()    
 
 
