@@ -57,7 +57,8 @@ workflow command merges supplied values over its built-in defaults. When
 `--inputs-json` is omitted, the command uses those built-in defaults.
 
 Use the installed commands rather than invoking `run*.py` files directly. The
-runner module names and their `main()` functions are not public Python API.
+`illiad.cli` modules, root launchers, and their `main()` functions are not
+public Python API.
 
 The commands require their upstream data products. In particular, the usual
 workflow uses prepared magnetic-field arrays under `input_files/`, Poincare
@@ -157,9 +158,9 @@ release.
 ## Python API
 
 The preferred import root is `illiad`. Shared utilities are organized under
-`illiad.utilities`. New code must not import public functionality through
-`plot_funcs.*`; that path remains internal to the repository's current
-scripts. The former `classes.*` and `utility.*` packages have been removed.
+`illiad.utilities`, and active plotting helpers live in `illiad.plotting`.
+The former `classes.*`, `utility.*`, and `plot_funcs.*` packages have been
+removed.
 
 ### Stable Python Interfaces
 
@@ -244,10 +245,8 @@ cross-version public API.
 
 The following are outside the public compatibility contract:
 
-- Direct imports from `plot_funcs.*`.
-- Source runner modules (`runFieldsolver.py`, `runPoincare.py`,
-  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`) and their globals.
-- `fastplotlib_tests/`, `misc_runFiles/`, notebooks, scratch scripts, and
+- Modules under `illiad.cli`, root `run*.py` launchers, and their globals.
+- `fastplotlib_tests/`, `misc_scripts/`, notebooks, scratch scripts, and
   unpublished analysis helpers.
 - Generated input/output arrays, local output directories, and files not
   documented in this file.

@@ -71,25 +71,24 @@ trajectory traces, residence-time estimates, and collisionality comparisons.
   standalone fastplotlib trace viewers.
 
 ## Repository Layout
-The runner scripts are JSON-configured, with built-in defaults that also allow each script to be run directly.
+The workflow commands are JSON-configured and have built-in defaults. Thin
+root launchers also allow direct execution from a source checkout.
 
-- `runFieldsolver.py`: optional magnetic-field generation from coil geometry.
-- `runPoincare.py`: field-line tracing and LCFS identification.
-- `runFluxCalc.py`: flux-surface integration from Poincare output.
-- `runFluxGrad.py`: flux interpolation plus electric-field generation.
-- `runBoris.py`: lithium ion transport runner.
-- `*_inputs.json`: example JSON configuration files for the corresponding runner scripts.
+- `illiad/cli/`: implementations behind the five installed workflow commands.
+- `run*.py`: direct-execution launchers for those command modules.
+- `*_inputs.json`: example JSON configuration files for the corresponding workflow commands.
 - `illiad/`: solver, particle, collision, IO, Poincare, and mesh implementations.
 - `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` implementations.
 - `illiad/flux/`: flux calculation, interpolation, and gradient implementations.
 - `illiad/utilities/`: coordinate transforms, point generation, workflow
   configuration, event functions, and physical constants.
 - `illiad/plotting.py`: plotting helpers used by the active workflows.
-- `plot_funcs/`: retained legacy plotting scripts; not installed as a runtime package.
 - `input_files/`: coil geometry, pre-generated fields, fitted profiles, and
   supporting CSV/NumPy inputs.
 - `output/`: generated analysis products, logs, figures, and simulation data.
 - `fastplotlib_tests/`: standalone interactive trace-viewer prototypes.
+- `misc_scripts/`: legacy plotting, fitting, validation, and exploratory scripts;
+  not included in package artifacts.
 
 Release artifact contents are summarized in
 [`docs/RELEASE_CONTENTS.md`](docs/RELEASE_CONTENTS.md). Large generated field
@@ -112,8 +111,7 @@ Campus Cluster. Other versions may work, but have not been validated.
 
 Optional tools used by development, plotting, or standalone viewer scripts:
 
-- scikit-learn, used by a few fitting/validation utilities in `misc_runFiles/`
-  and `plot_funcs/`.
+- scikit-learn, used by a few fitting/validation utilities in `misc_scripts/`.
 - fastplotlib, pygfx, wgpu, and rendercanvas, used by the interactive viewers in
   `fastplotlib_tests/`.
 - imageio or an ffmpeg-capable matplotlib backend, useful for animation export.
@@ -240,12 +238,11 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 7. Inspect outputs and make figures.
 
    Stage logs are written under `output/<run>/logs/`, NumPy arrays under
-   `output/<run>/data/`, and figures under `output/<run>/plots/`. The
-   `plot_funcs/` scripts provide additional plotting workflows for magnetic
-   fields, flux profiles, deposition maps, impact-energy distributions,
-   incidence-angle distributions, survival functions, and article figures.
-   The scripts in `fastplotlib_tests/` are standalone interactive viewers for
-   saved Boris trace arrays.
+   `output/<run>/data/`, and figures under `output/<run>/plots/`. Active
+   workflows use the helpers in `illiad.plotting`. Retained one-off plotting
+   and analysis scripts are under `misc_scripts/`, while the scripts in
+   `fastplotlib_tests/` are standalone interactive viewers for saved Boris
+   trace arrays.
 
 ## Analysis Workflow
 

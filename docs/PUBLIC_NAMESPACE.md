@@ -1,9 +1,8 @@
 # Public Python Namespace
 
 The preferred public import path is `illiad.*`, with shared utilities grouped
-under `illiad.utilities.*`. Direct `plot_funcs.*` imports remain internal
-implementation paths. The former `classes.*` and `utility.*` packages have
-been removed.
+under `illiad.utilities.*`. The former `classes.*`, `utility.*`, and
+`plot_funcs.*` packages have been removed.
 
 ## Meshes
 
@@ -55,5 +54,5 @@ from illiad.utilities.run_config import load_inputs_json, merge_input_params, no
 from illiad import plotting
 ```
 
-The retained scripts under `plot_funcs/` are legacy source utilities and are
-not installed as a runtime package.
+Legacy plotting and analysis scripts are retained under `misc_scripts/` and
+are not installed as a runtime package.

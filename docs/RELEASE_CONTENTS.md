@@ -6,9 +6,10 @@ research runs.
 
 ## Include
 
-- Source code in `illiad/`, `plot_funcs/`, and `fastplotlib_tests/`.
-- Public runner scripts: `runFieldsolver.py`, `runPoincare.py`,
-  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`.
+- Source code in `illiad/` and standalone viewers in `fastplotlib_tests/`.
+- Command implementations under `illiad/cli/` and direct-execution launchers:
+  `runFieldsolver.py`, `runPoincare.py`, `runFluxCalc.py`, `runFluxGrad.py`,
+  and `runBoris.py`.
 - Example configuration files: `fieldsolver_inputs.json`,
   `poincare_inputs.json`, `flux_calc_inputs.json`, `flux_grad_inputs.json`,
   `boris_inputs.json`, and `animation_inputs.json`.
@@ -26,7 +27,7 @@ research runs.
   field/profile files under `input_files/`.
 - Manuscript drafts and large diagnostic measurement folders under
   `input_files/`.
-- Development scratch scripts under `misc_runFiles/`.
+- Legacy and development scripts under `misc_scripts/`.
 
 ## Data Policy
 
