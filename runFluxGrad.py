@@ -1,6 +1,5 @@
 import argparse
-import classes.flux_gradientor as fg
-import classes.interpolate_flux as fi
+from illiad.flux import FluxGradientor, FluxInterpolator
 from illiad.mesh import Mesh
 from illiad.io import IOHandler
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
@@ -108,7 +107,7 @@ def main(input_overrides=_CLI_INPUTS):
             "RBF_SMOOTHING",
             "RBF_EPSILON",
         ],)
-    flux_interpolator = fi.FluxInterpolator(interpIO, b_hidra, params)
+    flux_interpolator = FluxInterpolator(interpIO, b_hidra, params)
     flux_interpolator.run()
 
     gradIO = setup_IO(params, log_name="fluxGradientor.log", logger_name="FluxGradientor")
@@ -125,7 +124,7 @@ def main(input_overrides=_CLI_INPUTS):
             "PHI_GENs",
             "OUTPUT_FILE_NAME",
         ],)
-    flux_gradientor = fg.FluxGradientor(gradIO, b_hidra, params)
+    flux_gradientor = FluxGradientor(gradIO, b_hidra, params)
     flux_gradientor.run()
 
 

@@ -16,7 +16,7 @@
 import argparse
 from illiad.mesh import Mesh
 from illiad.io import IOHandler
-from classes.calculate_flux import FluxCalculator
+from illiad.flux import FluxCalculator
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 
 DEFAULT_INPUTS = {
