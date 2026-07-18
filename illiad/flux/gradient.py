@@ -1,3 +1,5 @@
+"""Electric-field generation from the interpolated flux gradient."""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from illiad.utilities.coordtrans import RTP_XYZ_JAC
@@ -19,8 +21,8 @@ class FluxGradientor:
 
         Args:
             IO_handler: An object responsible for handling output operations, such as logging and directory creation.
-            b_hidra: Magnetic field mesh/object.  
-            input_params (dict): Dictionary of flux calculation input parameters. 
+            b_hidra: Magnetic field mesh/object.
+            input_params (dict): Dictionary of flux calculation input parameters.
         """
         self.simIO = IO_handler
         self.field = b_hidra
@@ -91,7 +93,7 @@ class FluxGradientor:
         """Load the interpolated normalized flux field."""
         return self.simIO.loadNumpyData(self.anlys_subdir + '/' + 'nField_' + self.output_file_name + '.npy') #'/big_grid_linear.npy')
 
-    
+
     def filter_gradients(self):
         """
         For each phi plane, this method loads the LCFS Poincare points,
@@ -132,14 +134,14 @@ class FluxGradientor:
         th_in, r_in = lcfs_points
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]
-        
+
         return th_in, r_in
-        
+
 
     def calculate_gradient_magnitude(self):
         """Calculate the magnitude of the flux gradient."""
-        self.flux_grad_magnitude = np.sqrt(self.flux_grad_radial**2 
-                                           + self.flux_grad_poloidal**2 
+        self.flux_grad_magnitude = np.sqrt(self.flux_grad_radial**2
+                                           + self.flux_grad_poloidal**2
                                            + self.flux_grad_toroidal**2)
 
 
@@ -163,7 +165,7 @@ class FluxGradientor:
                                                                             xform_theta.flatten(),
                                                                             xform_phi.flatten(),
                                                                             reshaped_flux_grad_radial.flatten(),
-                                                                            reshaped_flux_grad_poloidal.flatten(), 
+                                                                            reshaped_flux_grad_poloidal.flatten(),
                                                                             reshaped_flux_grad_toroidal.flatten())):
             ErtpLin = np.array([E_rad_lin, E_theta_lin, E_phi_lin])
             p_RTP = np.array([rad, theta, np.radians(phi)])
@@ -173,7 +175,7 @@ class FluxGradientor:
         self.efield_xyz_array_linear[0] = Ex_linear.reshape(self.efield_xyz_array_linear[0].shape)
         self.efield_xyz_array_linear[1] = Ey_linear.reshape(self.efield_xyz_array_linear[1].shape)
         self.efield_xyz_array_linear[2] = Ez_linear.reshape(self.efield_xyz_array_linear[2].shape)
-    
+
 
     def save_and_plot_data(self):
         """Save the XYZ field array gradient plots."""

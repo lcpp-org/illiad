@@ -1,3 +1,5 @@
+"""Normalized-flux interpolation onto the field mesh."""
+
 import gc
 import torch
 import numpy as np
@@ -25,8 +27,8 @@ class FluxInterpolator:
 
         Args:
             IO_handler: An object responsible for handling output operations, such as logging and directory creation.
-            b_hidra: Magnetic field mesh/object.  
-            input_params (dict): Dictionary of flux calculation input parameters. 
+            b_hidra: Magnetic field mesh/object.
+            input_params (dict): Dictionary of flux calculation input parameters.
         """
         self.simIO = IO_handler
         self.field = b_hidra
@@ -64,7 +66,7 @@ class FluxInterpolator:
         self.grid_theta = None
         self.grid_rad = None
         self.interpolated_surface_parm = None
-        
+
 
     def load_flux_data(self):
         """Load normalized flux values, surface validity, and magnetic axis data."""
@@ -84,7 +86,7 @@ class FluxInterpolator:
     def select_best_flux_profile(self):
         """
         Method chooses one toroidal angle profile from self.flux_norm_array.
-        The selected profile is adjusted using the ALPHA parameter, 
+        The selected profile is adjusted using the ALPHA parameter,
         filtered using valid surface flags, and stored as
         self.linear_flux_array.
 
@@ -115,7 +117,7 @@ class FluxInterpolator:
         self.simIO.log.info(self.profile_select_str)
 
         self.simIO.log.info(f'Valid Surfaces: {self.valid_surface}')
-        
+
 
     def save_best_flux_profile(self):
         """Saves plot of the "best" flux profile.
@@ -156,7 +158,7 @@ class FluxInterpolator:
     def perform_interpolation(self):
         """Interpolate the selected flux profile onto the mesh for every phi.
 
-        Method loops through all toroidal angles in self.phi_gens, interpolates 
+        Method loops through all toroidal angles in self.phi_gens, interpolates
         each angle independently, and stores the results in self.interpolated_surface_parm.
         """
 
@@ -171,8 +173,8 @@ class FluxInterpolator:
                 gc.collect()
 
 
-    def interpolate_one_phi(self, phi_deg, grid_shape, interpol_pts):      
-        """Interpolate the flux profile for a single toroidal angle."""  
+    def interpolate_one_phi(self, phi_deg, grid_shape, interpol_pts):
+        """Interpolate the flux profile for a single toroidal angle."""
 
         points, flux_norm = self.obtain_poincare_data(phi_deg)
         source_points_xy = _polar_interp_points_to_xy(points[:, 0], points[:, 1])
@@ -182,12 +184,12 @@ class FluxInterpolator:
 
         interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel=self.rbf_kernel,
                                             neighbors=self.rbf_neighbors, smoothing=self.rbf_smoothing, epsilon=self.rbf_epsilon)
-        
+
         # Work around torchrbf device placement: ensure internal tensors/buffers are on the same device.
         interpolation = interpolation.to(device)
         interpolation.smoothing = interpolation.smoothing.to(device)
         interpolated_angle = interpolation(interpol_pts).reshape(grid_shape)
-        
+
         ## HACKY SOLUTIONS HERE!!!
         # copying values out for r=0.0
         fred3 = interpolated_angle.T[1]
@@ -198,7 +200,7 @@ class FluxInterpolator:
 
         return interpolated_angle
 
-    
+
     def create_meshgrid(self):
         """Create the target mesh used by the RBF interpolator.
 
@@ -206,7 +208,7 @@ class FluxInterpolator:
         mesh points to Cartesian (x, y) points, and initializes
         self.interpolated_surface_parm to store the final interpolated output.
         """
-        
+
         # Create a meshgrid for the interpolation
         rads = np.linspace(self.field.r_min, self.field.r_max, self.field.nr)
         thetas = np.linspace(0, self.field.theta_max, self.field.ntheta+1) #add theta=0 for proper interpolation
@@ -216,9 +218,9 @@ class FluxInterpolator:
         interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float32)
 
         self.interpolated_surface_parm = torch.zeros([len(self.phi_gens), len(thetas)-1, len(rads)], device=device, dtype=torch.float32)
-    
+
         return grid_shape, grid_theta, grid_rad, interpol_pts
-    
+
 
     def obtain_poincare_data(self, phi_deg):
         """Load Poincare points and matching flux values for one phi angle."""

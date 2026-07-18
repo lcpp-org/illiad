@@ -1,3 +1,5 @@
+"""Toroidal-flux calculation over reconstructed magnetic surfaces."""
+
 import gc
 import numpy as np
 from scipy.interpolate import splev, splrep
@@ -28,8 +30,8 @@ class FluxCalculator:
 
         Args:
             IO_handler: An object responsible for handling output operations, such as logging and directory creation.
-            b_hidra: Magnetic field mesh/object.  
-            input_params (dict): Dictionary of flux calculation input parameters. 
+            b_hidra: Magnetic field mesh/object.
+            input_params (dict): Dictionary of flux calculation input parameters.
         """
 
         self.simIO = IO_handler
@@ -62,7 +64,7 @@ class FluxCalculator:
         # Optional mesh output arrays
         self.lcfs_flat_point = None
         self.flat_point_meshes = None
-        
+
 
     def process_all_phi_angles(self):
         """Process every toroidal angle requested in 'self.phi_gens'.
@@ -97,21 +99,21 @@ class FluxCalculator:
             smallest_island_index, num_subsets, subset_data, subset_centers, hist_output = first_loop_output
             self.smallest_island_index = smallest_island_index
             # spline surfaces, calculate surface fluxes, validate fits, and store output data.
-            surface_fluxes = self.process_surfaces_for_phi(phi_index, phi_deg, flux_surfaces, mag_axis, 
-                                        mag_axis_rev, smallest_island_index, num_subsets, 
-                                        subset_data, subset_centers, hist_output, 
+            surface_fluxes = self.process_surfaces_for_phi(phi_index, phi_deg, flux_surfaces, mag_axis,
+                                        mag_axis_rev, smallest_island_index, num_subsets,
+                                        subset_data, subset_centers, hist_output,
                                         ax_rect=ax_rect, ax_hist=ax_hist, ax_polar=ax_polar)
 
             for flux_index, flux in enumerate(surface_fluxes, start=self.lcfs_index):
                 self.tot_flux_array[flux_index][phi_index] = np.sum(flux, axis=-1)
 
-            if self.plot_all: 
+            if self.plot_all:
                 self.finalize_plotting(fig, ax_rect, ax_hist, ax_polar, phi_deg)
 
             del flux_surfaces
             if phi_index % 5 == 0:
                 gc.collect()
-        
+
 
     def normalize_fluxes(self):
         """Normalize toroidal flux values relative to the LCFS flux.
@@ -121,7 +123,7 @@ class FluxCalculator:
             The normalized profile is clipped to the range [0, 1], and surfaces outside
             the LCFS are set to zero.
         """
-         
+
         self.tot_flux_array[:self.lcfs_index][:] = self.tot_flux_array[self.lcfs_index][:]
         self.tot_flux_array = np.clip(self.tot_flux_array, 0.0, self.tot_flux_array[self.lcfs_index])
         # Set range of data to be between 0 and 1, and set data outside of LCFS to be equal to the 0
@@ -138,7 +140,7 @@ class FluxCalculator:
         self.simIO.saveNumpyData(self.tot_flux_array, filename_fluxes)
         self.simIO.saveNumpyData(self.total_flux_norm, filename_fluxNorms)
         self.simIO.saveNumpyData(self.valid_surfs, filename_validSurfaces)
-    
+
         # plot a big array of fluxes
         self.simIO.log.info('Plotting Flux v Surface Index...')
         fig_post = plt.figure()
@@ -149,7 +151,7 @@ class FluxCalculator:
             ax_psi.plot(self.tot_flux_array[:,i]*10_000, label='{:d}'.format(int(self.phi_gens[i])), linewidth=1)
             ax_norm.plot(self.total_flux_norm.T[i], label='{:d}'.format(int(self.phi_gens[i])), linewidth=1)
         ax_psi.set_title('Toroidal Angles $\phi[\degree]$', loc='right', fontsize=8)
-        ax_psi.set_ylim(0, 1.1*10_000*np.max(self.tot_flux_array)) 
+        ax_psi.set_ylim(0, 1.1*10_000*np.max(self.tot_flux_array))
         ax_psi.grid(which='both', linestyle=':', linewidth=0.5)
         ax_psi.legend(loc='upper right', fontsize=5,ncols=3)
         ax_norm.set_ylim(0, 1.1)
@@ -169,14 +171,14 @@ class FluxCalculator:
             elif surf_index == self.lcfs_index:
                 filename_pt_mesh = self.anlys_subdir + '/fSurf_{:03d}_POINTmesh.npy'.format(surf_index)
                 self.simIO.saveNumpyData(self.lcfs_flat_point, filename_pt_mesh)
-    
-    
+
+
     def load_poincare_data(self, phi_deg):
         """Loads Poincare data for a specific toroidal angle."""
         filename = 'Poincare_{:03d}.npy'.format(int(phi_deg))
         flux_surfaces = self.simIO.loadNumpyData(filename, subdir="Poincare")
         return flux_surfaces
-    
+
 
     def init_output_arrays(self):
         """Initializes the output arrays."""
@@ -188,7 +190,7 @@ class FluxCalculator:
         else:
             self.lcfs_flat_point = np.full([len(self.phi_gens), self.ntheta*self.max_subsets, 2], np.nan)
 
-        self.valid_surfs = np.zeros([self.nsurfaces, len(self.phi_gens)], dtype=bool) 
+        self.valid_surfs = np.zeros([self.nsurfaces, len(self.phi_gens)], dtype=bool)
         self.valid_surfs[self.lcfs_index:][:] = True
 
 
@@ -199,12 +201,12 @@ class FluxCalculator:
         mag_axis_rev[0] += np.pi
 
         return mag_axis, mag_axis_rev
-    
-    
-    def process_surfaces_for_phi(self, phi_index, phi_deg, flux_surfaces, mag_axis, 
-                                        mag_axis_rev, smallest_island_index, num_subsets, 
-                                        subset_data, subset_centers, hist_output, 
-                                        ax_rect=None, ax_hist=None, ax_polar=None):        
+
+
+    def process_surfaces_for_phi(self, phi_index, phi_deg, flux_surfaces, mag_axis,
+                                        mag_axis_rev, smallest_island_index, num_subsets,
+                                        subset_data, subset_centers, hist_output,
+                                        ax_rect=None, ax_hist=None, ax_polar=None):
         """Process all flux surfaces for one toroidal angle.
 
         For each surface from the LCFS inward, this method fits splines, integrates the
@@ -234,8 +236,8 @@ class FluxCalculator:
         for surf_index in range(self.lcfs_index, self.nsurfaces):
             n_subsets = num_subsets[surf_index]
             # loop to spline, calculate flux, and create regularly-spaced points
-            output = self.fit_and_integrate_surface_subsets(subset_data, subset_centers, surf_index, 
-                                                            smallest_island_index, n_subsets, wrap_flag, 
+            output = self.fit_and_integrate_surface_subsets(subset_data, subset_centers, surf_index,
+                                                            smallest_island_index, n_subsets, wrap_flag,
                                                             mag_axis_rev, phi_deg)
             points_tr_geoAxis, spline_tr_magAxis, subCenters_geo, subset_flux_list, valid_surface = output
             # storing flux, center data, and validity
@@ -250,13 +252,13 @@ class FluxCalculator:
                                         spline_tr_magAxis,
                                         n_subsets,
                                         spline_lcfs_magaxis)
-                
+
             # flatten spline points for output storage and polar plotting
             total_npts = n_subsets * self.ntheta
             surface_tr_points = points_tr_geoAxis.reshape((total_npts, 2), order='C', copy=True)
             surface_thetas = surface_tr_points.T[0]
             surface_radii = surface_tr_points.T[1]
-            # store lcfs data 
+            # store lcfs data
             if surf_index == self.lcfs_index:
                 lcfs_points = surface_tr_points
                 if not self.big_mesh:
@@ -272,13 +274,13 @@ class FluxCalculator:
                                                 mag_axis, spline_tr_magAxis, num_subsets,
                                                 ax_rect, ax_hist, ax_polar, bin_edges,
                                                 hist, surface_thetas, surface_radii, surface_inside_lcfs)
-                        
-        return surface_fluxes
-    
 
-    def plot_flux_surfaces_for_phi(self, surf_index, phi_index, flux_surfaces, 
-                                  mag_axis, spline_tr_magAxis, num_subsets, 
-                                  ax_rect, ax_hist, ax_polar,bin_edges, 
+        return surface_fluxes
+
+
+    def plot_flux_surfaces_for_phi(self, surf_index, phi_index, flux_surfaces,
+                                  mag_axis, spline_tr_magAxis, num_subsets,
+                                  ax_rect, ax_hist, ax_polar,bin_edges,
                                   hist, surface_thetas, surface_radii, surface_inside_lcfs):
         """Plot rectangular, histogram, and polar diagnostics for one flux surface."""
         th_in, r_in = flux_surfaces[surf_index]
@@ -292,20 +294,20 @@ class FluxCalculator:
         points_tr_magAxis = points_tr_magAxis[np.argsort(points_tr_magAxis[:, 0])]
         # Plot thera-r Poincare points
         ax_rect.scatter(points_tr_magAxis.T[0]*180.0/np.pi, points_tr_magAxis.T[1], color='k', s=0.25, linewidths=0.0)
-        
-        # Overlay the spline fit used for integration.        
+
+        # Overlay the spline fit used for integration.
         if self.valid_surfs[surf_index][phi_index]:
             for i in range(0, num_subsets[surf_index]):
-                ax_rect.scatter(spline_tr_magAxis[i].T[0]*180.0/np.pi, spline_tr_magAxis[i].T[1], s=0.5, linewidths=0.05)  
+                ax_rect.scatter(spline_tr_magAxis[i].T[0]*180.0/np.pi, spline_tr_magAxis[i].T[1], s=0.5, linewidths=0.05)
 
-              
-            ax_hist.bar(bin_edges[surf_index][:-1]*180.0/np.pi, hist[surf_index], 
-                        width=np.diff(bin_edges[surf_index])*180.0/np.pi, align='edge', 
+
+            ax_hist.bar(bin_edges[surf_index][:-1]*180.0/np.pi, hist[surf_index],
+                        width=np.diff(bin_edges[surf_index])*180.0/np.pi, align='edge',
                         edgecolor='k', linewidth=0.1)
-        
+
         if not surface_inside_lcfs:
             return
-    
+
         if num_subsets[surf_index] == self.max_subsets:
             surface_centers_geoAxis = self.centers_array[surf_index][phi_index].T
         else:
@@ -314,8 +316,8 @@ class FluxCalculator:
         ax_polar.scatter(surface_thetas, surface_radii, s=0.3, linewidths=0.0)
         if surface_centers_geoAxis.shape[-1] > 1:
             ax_polar.scatter(surface_centers_geoAxis[0], surface_centers_geoAxis[1], s=15, color='k', marker='x',  linewidths=0.5)
-    
-        
+
+
     def finalize_plotting(self, fig, ax_rect, ax_hist, ax_polar, phi_deg):
         """Format, save, and close the plot for one toroidal angle."""
         fig.suptitle('Toroidal Angle $\phi={}\degree$'.format(int(phi_deg)), fontsize=12, x=0.18, y=0.98)
@@ -348,7 +350,7 @@ class FluxCalculator:
         self.simIO.log.info('Plotting Flux Surfaces @ phi={}'.format(phi_deg))
         self.simIO.saveFig(self.anlys_subdir +'/Splines_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
         plt.close()
-    
+
 
     def find_axis(self, theta_vals: np.ndarray, r_vals: np.ndarray, field: Mesh) -> np.ndarray:
         """Computes the geometric center (axis) of a set of points in (r, theta) coordinates.
@@ -385,8 +387,8 @@ class FluxCalculator:
         axis_thetar[1] = np.mean(r_vals[theta_indices])
 
         return axis_thetar
-    
-    
+
+
     def find_subsets(self, theta_r_pts, mag_axis):
         """Function to find contiguous subsets of points in theta-r space
         Args:
@@ -430,7 +432,7 @@ class FluxCalculator:
             subset_points = np.array(subset_points)
             subset_points = subset_points[np.argsort(subset_points[:, 0])] # sort by theta
 
-            # split if the # of sets is equal to input 'MAX_SUBSETS': 
+            # split if the # of sets is equal to input 'MAX_SUBSETS':
             if num_sets == self.max_subsets:
                 found_centers[i][:] = self.find_axis(subset_points.T[0], subset_points.T[1], self.field)
                 split_data_magAxis += [subset_points]
@@ -439,7 +441,7 @@ class FluxCalculator:
                 split_data_magAxis = [theta_r_pts]
 
         return split_data_magAxis, found_centers, hist, bin_edges, wrapped_flag
-        
+
 
     def identify_surface_subsets(self, flux_surfaces, mag_axis):
         """
@@ -485,7 +487,7 @@ class FluxCalculator:
             output_histogram_method = self.find_subsets(pts_tr_magAxis, mag_axis)
             hist[surf_index], bin_edges[surf_index] = output_histogram_method[2:4]
             wrap_flag[surf_index] = output_histogram_method[-1]
-            
+
             if self.island_algorithm == 'histogram':  output = output_histogram_method
             else: raise ValueError(f"Unknown ISLAND_ALGORITHM: {self.island_algorithm}")
 
@@ -518,7 +520,7 @@ class FluxCalculator:
             print(f'{surface_axes_magAxis[smallest_island_index]=}' )
         hist_data = (hist, bin_edges, wrap_flag)
         return smallest_island_index, num_subsets, split_data_magAxis, surface_axes_magAxis, hist_data
-    
+
 
     def init_plotting(self):
         """Initialize the plotting for the flux calculations."""
@@ -575,10 +577,10 @@ class FluxCalculator:
 
 
     def shift_the_subcenters(self, surf_index, smallest_island_index, subset_centers, num_subsets, wrap_flag):
-        """Function performs tests to see if there is a misalignment of subset centers 
-        between the smallest island set and the current island set. If so, it returns the 
+        """Function performs tests to see if there is a misalignment of subset centers
+        between the smallest island set and the current island set. If so, it returns the
         appropriate r and theta values to shift the data set to be relative to the smallest island subcenters """
-    
+
         smallest_centers = subset_centers[smallest_island_index]
         these_centers = subset_centers[surf_index]
 
@@ -597,7 +599,7 @@ class FluxCalculator:
                     shifted_data[subset_index] = axisShift(*smallest_centers[subset_index-1], *these_centers[subset_index])
 
         return shifted_data, shift_flag
-    
+
 
     def spline_data(self, theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
         """Create a smoothing spline fit of the data points.
@@ -622,7 +624,7 @@ class FluxCalculator:
 
         if len(theta_valid) <= 3:
             return None, None, True, "Not enough points for cubic spline (need > 3)"
-        # copy data to both ends for pseudo-periodicity (smooth spline endpoints) 
+        # copy data to both ends for pseudo-periodicity (smooth spline endpoints)
         append_length = int(len(theta_valid)/2)
 
         th_A = theta_valid[append_length:-1] - 2*np.pi
@@ -638,8 +640,8 @@ class FluxCalculator:
         return spline_rep
 
 
-    def fit_and_integrate_surface_subsets(self, subset_data, subset_centers, surf_index, 
-                      smallest_island_index, num_subsets, wrap_flag, 
+    def fit_and_integrate_surface_subsets(self, subset_data, subset_centers, surf_index,
+                      smallest_island_index, num_subsets, wrap_flag,
                       mag_axis_rev, phi_deg):
         """
     Loop through subsets of a flux surface, fit spline, calculate flux, and generate
@@ -669,9 +671,9 @@ class FluxCalculator:
         subCenters_geo       = np.zeros([num_subsets, 2])
         theta_gens = np.linspace(2*np.pi/self.ntheta, 2*np.pi, self.ntheta)
 
-        # align current island subsets with the smallest island reference set        
-        if num_subsets > 1: 
-            shifted_subcenters, shiftint = self.shift_the_subcenters(surf_index, smallest_island_index, 
+        # align current island subsets with the smallest island reference set
+        if num_subsets > 1:
+            shifted_subcenters, shiftint = self.shift_the_subcenters(surf_index, smallest_island_index,
                                                                      subset_centers, num_subsets, wrap_flag[surf_index] )
         else: shiftint = 0
         # loop through subsets to spline, calculate flux, create regularly-spaced points
@@ -704,7 +706,7 @@ class FluxCalculator:
                 valid_surface = True # valid surface for interpolation
             # integrate an amount of toroidal field bounded by the flux surface [Tesla*m^2]
             this_flux = self.integrate_flux(surface_spline_params, np.array(current_center, copy=True),
-                                            phi_deg*np.pi/180, self.field, err_abs=self.integrate_epsabs, 
+                                            phi_deg*np.pi/180, self.field, err_abs=self.integrate_epsabs,
                                             err_rel=self.integrate_epsrel)
             subset_flux_list += [this_flux]
 
@@ -730,14 +732,14 @@ class FluxCalculator:
             ).T
 
         return splined_tr_GeoAxis, splined_tr_MagAxis, subCenters_geo, subset_flux_list, valid_surface
-    
+
 
     def surface_validation(self, surf_index, phi_index, spline_tr_magAxis, n_subsets, spline_lcfs_magaxis):
-        """Mark a surface invalid if its spline geometry is unphysical (negative radii or extension beyond LCFS).""" 
+        """Mark a surface invalid if its spline geometry is unphysical (negative radii or extension beyond LCFS)."""
 
         if n_subsets == 1:
             has_negative_radius = np.any(spline_tr_magAxis[:,:,1] < 0.0)
-            delta_radius_to_lcfs = spline_lcfs_magaxis[0,:,1] - spline_tr_magAxis[0,:,1] 
+            delta_radius_to_lcfs = spline_lcfs_magaxis[0,:,1] - spline_tr_magAxis[0,:,1]
             extends_beyond_lcfs = np.any(delta_radius_to_lcfs <= 0.0)
             if has_negative_radius or extends_beyond_lcfs:
                 self.valid_surfs[surf_index][phi_index] = False # not a valid surface for interpolation
@@ -758,4 +760,4 @@ class FluxCalculator:
         """
         self.process_all_phi_angles()
         self.normalize_fluxes()
-        self.save_output()    
+        self.save_output()
