@@ -1,3 +1,5 @@
+"""Helpers for loading and normalizing workflow configuration."""
+
 import json
 from pathlib import Path
 

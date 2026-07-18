@@ -1,6 +1,6 @@
 import numpy as np
 #import numba as nb
-from utility.coordtrans import XYZ_to_RTP
+from .coordtrans import XYZ_to_RTP
 from classes.mesh import *
 
 

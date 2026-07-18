@@ -1,5 +1,5 @@
 """
-# utility/coordtrans.py
+# illiad/utilities/coordtrans.py
 # This module provides functions for coordinate transformations between
 # r-theta-phi (RTP) coordinates and Cartesian (XYZ) coordinates.
 # """
@@ -102,7 +102,7 @@ def XYZ_to_RTP2(p_XYZ, Rmajor=0.72):
         p_XYZ = p_XYZ.to(device=device, dtype=torch.float64)
     else:
         p_XYZ = torch.as_tensor(p_XYZ, dtype=torch.float64, device=device)
-    
+
     p_RTP = torch.empty_like(p_XYZ, dtype=torch.float64, device=device)
 
     x, y, z = p_XYZ.unbind(-1)
@@ -178,7 +178,7 @@ def rot_vecXYZ_byPHI(vec_XYZ, delta_phi):
     xFormMatrix = np.array([[ np.cos(delta_phi), -np.sin(delta_phi), 0.0],
                             [ np.sin(delta_phi),  np.cos(delta_phi), 0.0],
                             [               0.0,                0.0, 1.0]])
-    
+
     rotated_XYZ = np.dot(vec_XYZ, xFormMatrix)
 
     return rotated_XYZ
@@ -190,7 +190,7 @@ def RTP_XYZ_JAC(p_rtp, vec_in, form='xyz2rtp'):
     Args:
         p_rtp (array-like): The r-theta-phi coordinates [r, theta, phi] of the point.
         vec_in (array-like): The vector to be transformed.
-        c (str, optional): Transformation direction. 
+        c (str, optional): Transformation direction.
             'xyz2rtp' converts from Cartesian to RTP.
             'rtp2xyz' converts from RTP to Cartesian.
             Defaults to 'xyz2rtp'.
@@ -211,7 +211,7 @@ def RTP_XYZ_JAC(p_rtp, vec_in, form='xyz2rtp'):
                                   [-ctheta*sphi,  stheta*sphi, -cphi],
                                   [      stheta,       ctheta,     0]])
         return np.dot(XformTranspose, vec_in)
-    
+
     elif form == 'xyz2rtp':
         Xform = np.array([[ctheta*cphi, -ctheta*sphi, stheta],
                          [-stheta*cphi,  stheta*sphi, ctheta],
@@ -219,7 +219,7 @@ def RTP_XYZ_JAC(p_rtp, vec_in, form='xyz2rtp'):
         return np.dot(Xform, vec_in)
     else:
         raise ValueError("form must be 'rtp2xyz' or 'xyz2rtp'")
-    
+
 def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
     """
     Converts a vector between Cartesian (XYZ) and r-theta-phi (RTP) coordinates using torch
@@ -227,7 +227,7 @@ def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
     Args:
         p_rtp (torch tensor): The r-theta-phi coordinates [r, theta, phi] of the point. (N,3)
         vec_in (torch tensor): The vector to be transformed. (3,N)
-        form (str, optional): Transformation direction. 
+        form (str, optional): Transformation direction.
             'xyz2rtp' converts from Cartesian to RTP.
             'rtp2xyz' converts from RTP to Cartesian.
             Defaults to 'xyz2rtp'.
@@ -249,7 +249,7 @@ def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
         torch.stack([ctheta*cphi, -stheta*cphi, -sphi], dim=1),
         torch.stack([-ctheta*sphi,  stheta*sphi, -cphi], dim=1),
         torch.stack([      stheta,       ctheta,     torch.zeros_like(ctheta)], dim=1)
-    ], dim=1)  
+    ], dim=1)
 
     if form == 'rtp2xyz':
         result = torch.einsum('nij,jn->in', Xform, vec_in)  # (N,3)
@@ -262,7 +262,7 @@ def RTP_XYZ_JAC2(p_rtp, vec_in, form='xyz2rtp'):
 
 
 
-def axisShift(theta, radius, d_theta, d_radius): 
+def axisShift(theta, radius, d_theta, d_radius):
     """
     Transforms polar coordinates from a original axis to a shifted axis.
 

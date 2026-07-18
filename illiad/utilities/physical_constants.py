@@ -1,4 +1,4 @@
-"""Physical constants and atomic masses used by ILLIAD."""
+"""Physical constants and background-species data used by ILLIAD."""
 
 KG_PER_AMU       = 1.660_539_068e-27  # kg/amu
 JOULES_PER_EV    = 1.602_176_634e-19  # J/eV

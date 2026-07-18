@@ -7,7 +7,7 @@ plt.rcParams.update({'font.size': 10})
 #plt.rcParams.update({'figure.autolayout':True})
 
 from classes.particle import Ion
-from utility.coordtrans import RTP_to_XYZ, XYZ_to_RTP, RTP_XYZ_JAC, axisShift, align_z_to_vector
+from .coordtrans import RTP_to_XYZ, XYZ_to_RTP, RTP_XYZ_JAC, axisShift, align_z_to_vector
 
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -200,14 +200,14 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
             # Plot semicircles with normal as pole
             semicircle_radius = 0.009  # Adjust size as needed
             n_circle_points = 12       # Number of points for smooth semicircle
-            
+
             for i in range(len(output_ind_geo)):
                 center_theta, center_r = output_ind_geo[i][:2]
                 normal_theta_component, normal_r_component = plot_norm_rtp[i][:2]
 
                 # Calculate normal direction angle in polar coordinates
                 normal_direction = np.arctan2(normal_r_component, normal_theta_component)
-                
+
                 # Create semicircle oriented ±90° to the normal
                 perp_angle = normal_direction #+ np.pi/2
                 start_angle = perp_angle - np.pi/2
@@ -217,14 +217,14 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
                 # Calculate semicircle points in Cartesian coordinates, then convert back
                 x_circle = center_r * np.cos(center_theta) + semicircle_radius * np.cos(angle_range)
                 y_circle = center_r * np.sin(center_theta) + semicircle_radius * np.sin(angle_range)
-                
+
                 # Convert back to polar
                 r_circle = np.sqrt(x_circle**2 + y_circle**2)
                 theta_circle = np.arctan2(y_circle, x_circle)
                 theta_circle = theta_circle % (2 * np.pi) # Ensure positive theta values
 
                 lcfsfit = interp1d(geoCenterCoords[0], geoCenterCoords[1], fill_value="extrapolate")
-                r_lower = lcfsfit(theta_circle)        
+                r_lower = lcfsfit(theta_circle)
 
                 # Filter out points outside the domain
                 valid_points = (r_circle <= Bfield.a) & (r_circle >= 0)
@@ -255,7 +255,7 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         outputHandler.saveNumpyData(outArray, filename)
 
         if genNormals: outNormalsArray = np.asarray(outNormals)
-    
+
         seed_list.extend(outArray)
         normals_list.extend(outNormalsArray)
 
