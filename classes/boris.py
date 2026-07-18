@@ -14,7 +14,7 @@ plt.rcParams.update({'font.size': 10})
 import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from utility.coordtrans import XYZ_to_RTP, RTP_XYZ_JAC#, RTP_to_XYZ
+from illiad.utilities.coordtrans import XYZ_to_RTP, RTP_XYZ_JAC#, RTP_to_XYZ
 from classes.collisions import Collisions, kg_per_amu, kboltz, eps0, sqrt_pi, Li_mass, He_mass
 #from plot_funcs import plotFuncs
 

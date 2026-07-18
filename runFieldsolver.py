@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 import pandas as pd
 from time import perf_counter
-from utility.run_config import load_inputs_json, merge_input_params
+from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

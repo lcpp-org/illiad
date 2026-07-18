@@ -15,12 +15,12 @@ This function performs the following steps:
 import torch
 import argparse
 import numpy as np
-import utility.physical_constants as const
+import illiad.utilities.physical_constants as const
 from classes.boris import Boris
 from classes.meshNew import Mesh
 from classes.iohandler import IOHandler
-from utility.point_generators import ionInitializer
-from utility.run_config import load_inputs_json, merge_input_params
+from illiad.utilities.point_generators import ionInitializer
+from illiad.utilities.run_config import load_inputs_json, merge_input_params
 ## SOME PHYSICAL CONSTANTS
 alpha = 0.5 # ratio of ion to electron saturation currents
 

@@ -9,9 +9,9 @@ import concurrent.futures as cf
 from time import perf_counter
 import matplotlib.pyplot as plt
 
-#from utility.phi_events import *
-from utility.phi_events import inVV
-from utility.coordtrans import XYZ_to_RTP, XYZ_to_RTP_many, RTP_to_XYZ_many #RTP_to_XYZ
+# from illiad.utilities.phi_events import *
+from illiad.utilities.phi_events import inVV
+from illiad.utilities.coordtrans import XYZ_to_RTP, XYZ_to_RTP_many, RTP_to_XYZ_many #RTP_to_XYZ
 from classes.mesh import Mesh
 from classes.particle import FieldLine
 from plot_funcs import plotFuncs

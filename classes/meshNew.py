@@ -1,7 +1,7 @@
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
-from utility.coordtrans import XYZ_to_RTP2
+from illiad.utilities.coordtrans import XYZ_to_RTP2
 import logging
 
 import torch

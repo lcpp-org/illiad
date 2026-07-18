@@ -6,7 +6,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from classes.mesh import *
-from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
+from illiad.utilities.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 
 np.set_printoptions(threshold=np.inf)
 mpl.rcParams.update({
@@ -759,5 +759,4 @@ class FluxCalculator:
         self.process_all_phi_angles()
         self.normalize_fluxes()
         self.save_output()    
-
 

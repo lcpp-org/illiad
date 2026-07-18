@@ -3,7 +3,7 @@ import classes.flux_gradientor as fg
 import classes.interpolate_flux as fi
 from classes.mesh import Mesh
 from classes.iohandler import IOHandler
-from utility.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 
 DEFAULT_INPUTS = {
     "ANLYS_DIR": "It-0486_Ih-0790_PHI180_1500spins_105Lines_LSODA1e9_newEvents",

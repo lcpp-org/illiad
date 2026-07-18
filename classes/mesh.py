@@ -1,6 +1,6 @@
 import numpy as np
 import os as os
-from utility.coordtrans import XYZ_to_RTP
+from illiad.utilities.coordtrans import XYZ_to_RTP
 
 
 class Mesh:

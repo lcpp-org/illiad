@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utility.coordtrans import RTP_XYZ_JAC
+from illiad.utilities.coordtrans import RTP_XYZ_JAC
 
 
 class FluxGradientor:

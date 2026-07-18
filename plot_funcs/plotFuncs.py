@@ -9,7 +9,7 @@ import numpy as np
 import logging
 from PIL import Image
 from tqdm import tqdm
-from utility.coordtrans import XYZ_to_RTP2
+from illiad.utilities.coordtrans import XYZ_to_RTP2
 
 # UIUC branding color palette
 UIUC = {

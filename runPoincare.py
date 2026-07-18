@@ -25,7 +25,7 @@ import numpy as np
 from classes.mesh import Mesh
 from classes.poincare import Poincare
 from classes.iohandler import IOHandler
-from utility.run_config import load_inputs_json, merge_input_params
+from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
     "CURRENT_TOR": 0.486,  # [kA]
