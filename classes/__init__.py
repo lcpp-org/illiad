@@ -1,1 +1,1 @@
-"""Core ILLIAD classes."""
+"""Internal flux-workflow implementations pending consolidation."""

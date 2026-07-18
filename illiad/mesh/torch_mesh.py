@@ -1,3 +1,5 @@
+"""PyTorch-backed field mesh used by particle transport."""
+
 import numpy as np
 from math import degrees, sin, cos, floor
 import os as os
@@ -8,25 +10,25 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #device = torch.device('cpu')
 
-class Mesh:
+class TorchMesh:
     """
     Class to store the mesh data, properties, and interpolation methods
-    
+
     r, theta, and phi are the 1D arrays with the grid points
-    
+
     r: minor radius coordinate, measured from the geometrical center of the poloidal cross section
     theta: poloidal angle [0,2pi)
     phi: toroidal angle [0,2pi)
-    
+
     Rmaj: major radius of the tokamak
     Rmin: minor radius of the tokamak
-    
+
     dr: grid spacing in the r direction
     dtheta: grid spacing in the theta direction
     dphi: grid spacing in the phi direction
     """
     def __init__(self, R0=0.0, a=0.0):
-        """Initializes the Mesh object.
+        """Initialize a PyTorch-backed mesh.
 
         Args:
             R0 (float, optional): Major radius of the tokamak. Defaults to 0.0.
@@ -55,7 +57,7 @@ class Mesh:
         self.Bz: np.float64[:][:][:]
         self.value = None
         self.periodicity: np.int32[:]
-        
+
         self.errField: np.bool
         self.err_mag = 0.0 #1.5654e-4 # [Tesla]
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
@@ -65,7 +67,7 @@ class Mesh:
         self.yerr_adder = 0.0
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64).T
 
-        self.att_mult = 1.0 
+        self.att_mult = 1.0
 
     def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period_ = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
         """Loads a vector field from a file and sets mesh properties.
@@ -152,10 +154,10 @@ class Mesh:
         Array sizes must match the existing mesh dimensions, and periodicity is assumed to be the same.
 
         Args:
-            file_path (str, optional): Path to the .npy file containing the perturbation field arrays. 
+            file_path (str, optional): Path to the .npy file containing the perturbation field arrays.
                 Defaults to 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'.
             coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
-            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of 
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of
                 ['default_toroidal', 'default_helical', 'default_helical_rev']. Defaults to 'default_helical'.
 
         Raises:
@@ -419,7 +421,7 @@ class Mesh:
                 corner_vecs[7] = self.rot_vecXYZ_byPHI(corner_vecs[7], self.phi_max)
             vecOUT = (corner_vecs * weights[:, None]).sum(dim=0) / total_vol
 
-        # if the mesh is defined with periodic symmetry, we must 
+        # if the mesh is defined with periodic symmetry, we must
         # perform a rotational transform based on which 'period' of the mesh the point is located
         # -defined for phi, not sure if necessary for theta, (and almost surely not for r)
         if self.periodicity[2] > 1:
@@ -445,4 +447,4 @@ class Mesh:
     def interpScalarField(self, point_INPUT, Cart=True):
         weights, corner_indices, _ = self.get_weights(point_INPUT, Cart)
         return self.return_scalars(weights, corner_indices)
-    
+

@@ -1,3 +1,5 @@
+"""NumPy/SciPy-backed field mesh."""
+
 import numpy as np
 import os as os
 from illiad.utilities.coordtrans import XYZ_to_RTP
@@ -6,16 +8,16 @@ from illiad.utilities.coordtrans import XYZ_to_RTP
 class Mesh:
     """
     Class to store the mesh data, properties, and interpolation methods
-    
+
     r, theta, and phi are the 1D arrays with the grid points
-    
+
     r: minor radius coordinate, measured from the geometrical center of the poloidal cross section
     theta: poloidal angle [0,2pi)
     phi: toroidal angle [0,2pi)
-    
+
     Rmaj: major radius of the tokamak
     Rmin: minor radius of the tokamak
-    
+
     dr: grid spacing in the r direction
     dtheta: grid spacing in the theta direction
     dphi: grid spacing in the phi direction
@@ -54,16 +56,16 @@ class Mesh:
         # self.err_mag = 2.828427E-4 * 1.2
         # self.err_dir = 270.* np.pi/180
         # self.cos_err_dir = np.cos(self.err_dir)
-        # self.sin_err_dir = np.sin(self.err_dir)   
+        # self.sin_err_dir = np.sin(self.err_dir)
         self.err_mag = 0.0 #1.5654e-4 # [Tesla]
         self.err_dir = 0.0 #271.5 * np.pi/180 # [radians]
         self.cos_err_dir = 1.0 #np.cos(self.err_dir)
-        self.sin_err_dir = 0.0 #np.sin(self.err_dir)   
+        self.sin_err_dir = 0.0 #np.sin(self.err_dir)
         self.xerr_adder = 0.0
         self.yerr_adder = 0.0
         self.err_adder = np.array([self.xerr_adder, self.yerr_adder, 0.0], dtype=np.float64)
 
-        self.att_mult = 1.0 
+        self.att_mult = 1.0
 
     def loadCartesianField(self, file_path='input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy', period = np.array([0, 1, 5], dtype=np.int32), coilCurrent=1.0, errField=False, att_mult='default_toroidal'):
         """Loads a vector field from a file and sets mesh properties.
@@ -121,7 +123,7 @@ class Mesh:
                 self.r_max = self.a
                 self.dr = self.r_max / (self.nr-1)
                 self.r_min = 0.
-            
+
             # theta periodicity
             if self.periodicity[1]:
                 self.theta_max = (2*np.pi) / self.periodicity[1]
@@ -131,7 +133,7 @@ class Mesh:
                 self.theta_max = (2*np.pi)
                 self.dtheta = self.theta_max / (self.ntheta-1)
                 self.theta_min = 0.
-            
+
             # phi periodicity
             if self.periodicity[2]:
                 self.phi_max = (2*np.pi) / self.periodicity[2]
@@ -149,10 +151,10 @@ class Mesh:
         Array sizes must match the existing mesh dimensions, and periodicity is assumed to be the same.
 
         Args:
-            file_path (str, optional): Path to the .npy file containing the perturbation field arrays. 
+            file_path (str, optional): Path to the .npy file containing the perturbation field arrays.
                 Defaults to 'input_files/It000_Ih1000_Iv000_1p000_1p000_64bit.npy'.
             coilCurrent (float, optional): Scaling factor for the coil current. Defaults to 1.0.
-            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of 
+            att_mult (str or float, optional): Attenuation multiplier. Can be a float or one of
                 ['default_toroidal', 'default_helical', 'default_helical_rev']. Defaults to 'default_helical'.
 
         Raises:
@@ -279,7 +281,7 @@ class Mesh:
 
         if Cart: point_RTP = XYZ_to_RTP(point_XYZ, self.R0) #.to(device)
         else: point_RTP = point_XYZ #.to(device)
-        
+
         # periodic boundarys
         r_local  = point_RTP[0]
         if r_local < 0.0:
@@ -293,7 +295,7 @@ class Mesh:
 
 
 
-        vecXYZ = np.zeros([3,Npts], dtype=np.float64) 
+        vecXYZ = np.zeros([3,Npts], dtype=np.float64)
         rindex : np.int16
         thindex : np.int16
         phindex : np.int16
@@ -314,7 +316,7 @@ class Mesh:
 
         r_lowr_el = (r_low + r_el/2) * r_el
         r_localinvr_el = (r_local + invr_el/2) * invr_el
-        
+
         cos_th_low = np.cos(th_low)
         cos_th_local = np.cos(th_local)
 
@@ -332,7 +334,7 @@ class Mesh:
         A6 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* invph_el
         A7 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* invph_el
         A8 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* invph_el
-        
+
         Areas = np.array([A1, A2, A3, A4, A5, A6, A7, A8])
         Areas[:4] *= ph_el
         Areas[4:] *= invph_el
@@ -350,7 +352,7 @@ class Mesh:
                     [ir_hi, ith_lo, iph_hi], [ir_lo, ith_lo, iph_hi],
                     [ir_hi, ith_hi, iph_lo], [ir_lo, ith_hi, iph_lo],
                     [ir_hi, ith_lo, iph_lo], [ir_lo, ith_lo, iph_lo]], dtype=np.int16)
-        
+
         # B field vectors at the 8 corner nodes
         Bvecs = np.zeros((8, 3))
         Bvecs[:, 0] = self.Bx[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
@@ -368,7 +370,7 @@ class Mesh:
         # on which 'period' of the mesh the point is located
         phi_rotation = ph_localN * self.phi_max  # angle of transform
         vecXYZ = self.rot_vecXYZ_byPHI(vecXYZ, phi_rotation)
-    
+
         if self.errField: # non-periodic perturbative error field applied
             #vecXYZ *= self.att_mult
             # vecXYZ[0] += self.err_mag * self.cos_err_dir
@@ -378,7 +380,7 @@ class Mesh:
         return vecXYZ, ph_localN
 
     def loadScalarField(self, file_path, period = np.array([0, 1, 5], dtype=np.int32), errField=False, att_mult=1.0):
-        """ 
+        """
         This function loads a vector field as a 3-dimensional scalar array for each cartesian vector.
         The grid properties are assumed from the dimensions of the input arrays
         """
@@ -406,7 +408,7 @@ class Mesh:
             self.r_max = self.a
             self.dr = self.r_max / (self.nr-1)
             self.r_min = 0.
-        
+
         # theta periodicity
         if self.periodicity[1]:
             self.theta_max = (2*np.pi) / self.periodicity[1]
@@ -416,7 +418,7 @@ class Mesh:
             self.theta_max = (2*np.pi)
             self.dtheta = self.theta_max / (self.ntheta-1)
             self.theta_min = 0.
-        
+
         # phi periodicity
         if self.periodicity[2]:
             self.phi_max = (2*np.pi) / self.periodicity[2]
@@ -443,13 +445,13 @@ class Mesh:
 
         if Cart: point_RTP = XYZ_to_RTP(point_XYZ, self.R0) #.to(device)
         else: point_RTP = point_XYZ #.to(device)
-        
+
         # periodic boundarys
         r_local  = point_RTP[0]
         th_local = np.remainder(point_RTP[1], self.theta_max) # keep theta within 0 and theta_max!
         ph_localN, ph_local = np.divmod(point_RTP[2], self.phi_max) # keep phi within 0 and phi_max!
 
-        scalarVal = np.zeros([1,Npts], dtype=np.float64) 
+        scalarVal = np.zeros([1,Npts], dtype=np.float64)
         rindex : np.int16
         thindex : np.int16
         phindex : np.int16
@@ -470,7 +472,7 @@ class Mesh:
 
         r_lowr_el = (r_low + r_el/2) * r_el
         r_localinvr_el = (r_local + invr_el/2) * invr_el
-        
+
         cos_th_low = np.cos(th_low)
         cos_th_local = np.cos(th_local)
 
@@ -488,7 +490,7 @@ class Mesh:
         A6 = (self.R0 + cos_th_low_r_local)   * r_localinvr_el * th_el    #* invph_el
         A7 = (self.R0 + cos_th_local_r_low)   * r_lowr_el      * invth_el #* invph_el
         A8 = (self.R0 + cos_th_local_r_local) * r_localinvr_el * invth_el #* invph_el
-        
+
         Areas = np.array([A1, A2, A3, A4, A5, A6, A7, A8])
         Areas[:4] *= ph_el
         Areas[4:] *= invph_el
@@ -506,7 +508,7 @@ class Mesh:
                     [ir_hi, ith_lo, iph_hi], [ir_lo, ith_lo, iph_hi],
                     [ir_hi, ith_hi, iph_lo], [ir_lo, ith_hi, iph_lo],
                     [ir_hi, ith_lo, iph_lo], [ir_lo, ith_lo, iph_lo]], dtype=np.int16)
-        
+
         # B field vectors at the 8 corner nodes
         nodeVals = np.zeros((8, 1))
         nodeVals[:, 0] = self.value[index_array[:, 0], index_array[:, 1], index_array[:, 2]]
