@@ -84,7 +84,8 @@ The runner scripts are JSON-configured, with built-in defaults that also allow e
 - `illiad/flux/`: flux calculation, interpolation, and gradient implementations.
 - `illiad/utilities/`: coordinate transforms, point generation, workflow
   configuration, event functions, and physical constants.
-- `plot_funcs/`: plotting scripts and reusable plotting helpers.
+- `illiad/plotting.py`: plotting helpers used by the active workflows.
+- `plot_funcs/`: retained legacy plotting scripts; not installed as a runtime package.
 - `input_files/`: coil geometry, pre-generated fields, fitted profiles, and
   supporting CSV/NumPy inputs.
 - `output/`: generated analysis products, logs, figures, and simulation data.

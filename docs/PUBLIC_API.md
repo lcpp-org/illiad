@@ -52,11 +52,9 @@ Every command accepts:
 ```
 
 `PATH` names a UTF-8 JSON file whose top-level value is an object. Paths in the
-JSON file are resolved relative to the process working directory. The field
-solver, Poincare, flux-calculation, and flux-gradient commands merge supplied
-values over their built-in defaults. `illiad-boris` loads its complete input
-object from the supplied file and defaults to `boris_inputs.json` when the
-option is omitted.
+JSON file are resolved relative to the process working directory. Every
+workflow command merges supplied values over its built-in defaults. When
+`--inputs-json` is omitted, the command uses those built-in defaults.
 
 Use the installed commands rather than invoking `run*.py` files directly. The
 runner module names and their `main()` functions are not public Python API.
@@ -79,12 +77,12 @@ JSON types; array-like values are JSON arrays.
 
 | Key | Meaning |
 | --- | --- |
-| `output_name` | Basename for the generated magnetic-field array. |
-| `mesh_size` | Three integer mesh dimensions. |
-| `I_toro`, `I_heli`, `I_vert` | Toroidal, helical, and vertical coil currents in amperes. |
-| `coilfile` | Coil-geometry input file. |
+| `OUTPUT_NAME` | Basename for the generated magnetic-field array. |
+| `MESH_SIZE` | Three integer mesh dimensions. |
+| `I_TORO`, `I_HELI`, `I_VERT` | Toroidal, helical, and vertical coil currents in amperes. |
+| `COILFILE` | Coil-geometry input file. |
 | `RMAJOR`, `RMINOR` | Major and minor radii in meters. |
-| `mesh_periodicity` | Three-element mesh periodicity descriptor. |
+| `MESH_PERIODICITY` | Three-element mesh periodicity descriptor. |
 
 ### `poincare_inputs.json`
 
@@ -127,6 +125,7 @@ surface-sampling keys from `flux_calc_inputs.json`, plus:
 | --- | --- |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX` |
 | Interpolation and electric field | `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME` |
+| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
 
 `INV_SURF_INDICES` is a JSON array of surface indices. `OUTPUT_FILE_NAME` is
 the electric-field output basename, without a required `.npy` suffix.
@@ -140,16 +139,15 @@ the electric-field output basename, without a required `.npy` suffix.
 | Magnetic configuration | `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `TOROIDAL_CURRENT`, `HELICAL_CURRENT` |
 | Upstream fields | `FIELD_FILE_DENSITY`, `FIELD_FILE_ELECTRIC` |
 | Collision controls | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS`, `NEUTRAL_GAS_DENSITY`, `PLASMA_DENSITY` |
+| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `BACKGROUND_ION_TEMP_EV`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
 | Ion properties | `ION_MASS`, `ION_TEMP`, `CHARGE_NUM` |
-| Electric-field scale | `FIELD_SCALE_ELECTRIC` |
+| Plasma potential | Optional `PLASMA_POTENTIAL`; when omitted, derived from the background-plasma inputs. |
 | Particle initialization | `LCFS_INDEX`, `DELTRS`, `NPHI`, `NTHETA`, `NPARTICLES_PER_EMITTER` |
 | Time integration | `DT`, `TMAX` |
 | Trace selection | `TRACK_NPHI`, `TRACK_NTHETA`, `TRACK_NPARTICLES_PER_EMITTER`, `STRIDE` |
 | Output | `OUTPUT_DIRECTORY_NAME`, `TAG` |
 
-`STRIDE` is a positive integer controlling trace sampling. `TRACE_STRIDE` is
-accepted by the runner as a legacy equivalent when `STRIDE` is not present,
-but new configurations should use `STRIDE`.
+`STRIDE` is a positive integer controlling trace sampling.
 
 Unknown configuration keys are not part of the API. Current runners do not
 provide schema validation for every key, so a misspelled key can be ignored or
@@ -197,7 +195,7 @@ from illiad.collisions import Collisions
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 from illiad.utilities.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
-from illiad.plotting import plotFuncs
+from illiad import plotting
 ```
 
 The current documented members of these objects are:
@@ -225,9 +223,9 @@ The coordinate module exports `RTP_to_XYZ`, `XYZ_to_RTP`, `XYZ_to_RTP2`,
 `RTP_XYZ_JAC2`, `axisShift`, and `align_z_to_vector`.
 
 `illiad.utilities.point_generators` exports `generateSeedShells`,
-`generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` exports the
-existing `plotFuncs` plotting module. Their detailed return shapes and plot
-formats are provisional.
+`generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` provides the
+plotting helpers used by the Boris and Poincare workflows. Their detailed
+return shapes and plot formats are provisional.
 
 ## Output and Data Compatibility
 

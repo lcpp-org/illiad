@@ -48,3 +48,12 @@ from illiad.boris import Boris
 ```python
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```
+
+## Plotting Helpers
+
+```python
+from illiad import plotting
+```
+
+The retained scripts under `plot_funcs/` are legacy source utilities and are
+not installed as a runtime package.
