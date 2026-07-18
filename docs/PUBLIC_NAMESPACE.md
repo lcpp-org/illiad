@@ -1,8 +1,9 @@
 # Public Python Namespace
 
-The preferred public import path is `illiad.*`. The older `classes.*`,
-`utility.*`, and `plot_funcs.*` imports remain available for current scripts,
-but new user-facing examples should use the `illiad` namespace.
+The preferred public import path is `illiad.*`, with shared utilities grouped
+under `illiad.utilities.*`. The remaining `classes.*` and `plot_funcs.*`
+imports are internal implementation paths. The former `utility.*` package has
+been removed.
 
 ## Meshes
 
@@ -40,7 +41,7 @@ breaking current research scripts while the public API settles.
 ## Coordinate Transforms
 
 ```python
-from illiad.coordtrans import RTP_to_XYZ, XYZ_to_RTP
+from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 ```
 
 ## Particles and Solvers
@@ -54,5 +55,5 @@ from illiad.boris import Boris
 ## Run Configs
 
 ```python
-from illiad.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```

@@ -104,9 +104,8 @@ version = { attr = "illiad.__version__" }
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
-    "illiad",
+    "illiad*",
     "classes",
-    "utility",
     "plot_funcs",
     "fastplotlib_tests",
 ]

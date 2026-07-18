@@ -11,7 +11,6 @@ include flux_grad_inputs.json
 
 recursive-include illiad *.py
 recursive-include classes *.py
-recursive-include utility *.py
 recursive-include plot_funcs *.py
 recursive-include fastplotlib_tests *.py *.args
 

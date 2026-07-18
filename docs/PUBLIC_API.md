@@ -158,9 +158,11 @@ release.
 
 ## Python API
 
-The preferred import root is `illiad`. New code must not import public
-functionality through `classes.*`, `utility.*`, or `plot_funcs.*`; those paths
-remain internal compatibility paths for the repository's current scripts.
+The preferred import root is `illiad`. Shared utilities are organized under
+`illiad.utilities`. New code must not import public functionality through
+`classes.*` or `plot_funcs.*`; those paths remain internal implementation
+paths for the repository's current scripts. The former `utility.*` package has
+been removed.
 
 ### Stable Python Interfaces
 
@@ -170,7 +172,7 @@ series:
 ```python
 from illiad import __version__
 from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
-from illiad.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```
 
 | Import | Contract |
@@ -201,8 +203,8 @@ from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.boris import Boris
 from illiad.collisions import Collisions
-from illiad.coordtrans import RTP_to_XYZ, XYZ_to_RTP
-from illiad.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
+from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
+from illiad.utilities.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
 from illiad.plotting import plotFuncs
 ```
 
@@ -227,7 +229,7 @@ The coordinate module exports `RTP_to_XYZ`, `XYZ_to_RTP`, `XYZ_to_RTP2`,
 `RTP_to_XYZ_many`, `XYZ_to_RTP_many`, `rot_vecXYZ_byPHI`, `RTP_XYZ_JAC`,
 `RTP_XYZ_JAC2`, `axisShift`, and `align_z_to_vector`.
 
-`illiad.point_generators` exports `generateSeedShells`,
+`illiad.utilities.point_generators` exports `generateSeedShells`,
 `generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` exports the
 existing `plotFuncs` plotting module. Their detailed return shapes and plot
 formats are provisional.
@@ -249,7 +251,7 @@ cross-version public API.
 
 The following are outside the public compatibility contract:
 
-- Direct imports from `classes.*`, `utility.*`, and `plot_funcs.*`.
+- Direct imports from `classes.*` and `plot_funcs.*`.
 - Source runner modules (`runFieldsolver.py`, `runPoincare.py`,
   `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`) and their globals.
 - `fastplotlib_tests/`, `misc_runFiles/`, notebooks, scratch scripts, and
