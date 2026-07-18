@@ -21,8 +21,6 @@ from illiad.mesh import TorchMesh
 from illiad.io import IOHandler
 from illiad.utilities.point_generators import ionInitializer
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
-## SOME PHYSICAL CONSTANTS
-alpha = 0.5 # ratio of ion to electron saturation currents
 
 DEFAULT_INPUTS = {
     "CONFIG_TOR": "default_toroidal",
@@ -36,9 +34,8 @@ DEFAULT_INPUTS = {
     "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
     "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
-    "ELECTRIC_POTENTIAL": 60.0,
     "ELECTRON_TEMP_EV": 2.0,
-    "BACKGROUND_GAS_SPECIES": "He", 
+    "BACKGROUND_GAS_SPECIES": "He",
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
     "BACKGROUND_ION_TEMP_EV": 2.0,
@@ -81,22 +78,24 @@ def parse_args():
 
 
 def resolve_plasma_potential(params):
-    field_scale = params.get("PLASMA_POTENTIAL", None)
+    plasma_potential = params.get("PLASMA_POTENTIAL", None)
     current_ratio = params["ION_ELECTRON_SAT_CURRENT_RATIO"]
 
-    if field_scale is not None:
-        return field_scale, "input"
+    if plasma_potential is not None:
+        return plasma_potential, "input"
     else:
         electron_temp_ev = params.get("ELECTRON_TEMP_EV", None)
         background_ion_mass_amu = params.get("M_GAS_AMU", None)
         background_ion_mass_kg = background_ion_mass_amu * const.KG_PER_AMU
 
-        field_scale = (electron_temp_ev) * 0.5 * np.log((1 / current_ratio) 
-                    * (background_ion_mass_kg / (2 * np.pi * const.ELECTRON_MASS_KG)))
+        plasma_potential = electron_temp_ev * 0.5 * np.log(
+            (1 / current_ratio)
+            * (background_ion_mass_kg / (2 * np.pi * const.ELECTRON_MASS_KG))
+        )
 
-    return field_scale, "calculated"
-        
-        
+    return plasma_potential, "calculated"
+
+
 ## RUN SIMULATION:
 def boris_runner(params):
 
@@ -201,13 +200,13 @@ def boris_runner(params):
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
     ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90], 
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90],
                                 colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
                                 runString='AngleCombined', simIO=simIO, cond_string=cond_string)
     ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_out,
                                 colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
                                 runString='EnergyCombined', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180], 
+    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180],
                                 colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
                                 runString='PHIAngleCombined', simIO=simIO, cond_string=cond_string)
 

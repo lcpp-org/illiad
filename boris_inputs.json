@@ -10,7 +10,6 @@
   "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
   "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
 
-  "ELECTRIC_POTENTIAL": 60.0,
   "ELECTRON_TEMP_EV": 2.0,
   "BACKGROUND_GAS_SPECIES": "He", 
   "NEUTRAL_GAS_TEMP_EV": 0.025,
