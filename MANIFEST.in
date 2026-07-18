@@ -15,7 +15,7 @@ recursive-include utility *.py
 recursive-include plot_funcs *.py
 recursive-include fastplotlib_tests *.py *.args
 
-include runBoris_new.py
+include runBoris.py
 include runFieldsolver.py
 include runFluxCalc.py
 include runFluxGrad.py

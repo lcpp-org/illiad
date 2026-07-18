@@ -9,7 +9,7 @@ research runs.
 - Source code in `illiad/`, `classes/`, `utility/`, `plot_funcs/`, and
   `fastplotlib_tests/`.
 - Public runner scripts: `runFieldsolver.py`, `runPoincare.py`,
-  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris_new.py`.
+  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`.
 - Example configuration files: `fieldsolver_inputs.json`,
   `poincare_inputs.json`, `flux_calc_inputs.json`, `flux_grad_inputs.json`,
   `boris_inputs.json`, and `animation_inputs.json`.

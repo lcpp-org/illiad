@@ -251,7 +251,7 @@ The following are outside the public compatibility contract:
 
 - Direct imports from `classes.*`, `utility.*`, and `plot_funcs.*`.
 - Source runner modules (`runFieldsolver.py`, `runPoincare.py`,
-  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris_new.py`) and their globals.
+  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`) and their globals.
 - `fastplotlib_tests/`, `misc_runFiles/`, notebooks, scratch scripts, and
   unpublished analysis helpers.
 - Generated input/output arrays, local output directories, and files not
