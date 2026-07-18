@@ -81,10 +81,9 @@ The runner scripts are JSON-configured, with built-in defaults that also allow e
 - `*_inputs.json`: example JSON configuration files for the corresponding runner scripts.
 - `illiad/`: solver, particle, collision, IO, Poincare, and mesh implementations.
 - `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` implementations.
+- `illiad/flux/`: flux calculation, interpolation, and gradient implementations.
 - `illiad/utilities/`: coordinate transforms, point generation, workflow
   configuration, event functions, and physical constants.
-- `classes/`: flux calculation, interpolation, and gradient implementations
-  pending their package consolidation.
 - `plot_funcs/`: plotting scripts and reusable plotting helpers.
 - `input_files/`: coil geometry, pre-generated fields, fitted profiles, and
   supporting CSV/NumPy inputs.
@@ -165,7 +164,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    ```python
    from illiad.mesh import Mesh, TorchMesh
    from illiad.io import IOHandler
-   from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
+   from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
    ```
 
    See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for the versioned public API
@@ -269,7 +268,7 @@ fields every time.
 
 ## Outputs
 
-ILLIAD uses `classes/iohandler.py` to organize analysis products. A typical run
+ILLIAD uses `illiad/io.py` to organize analysis products. A typical run
 creates:
 
 - `output/<run>/logs/`: input summaries and stage logs.

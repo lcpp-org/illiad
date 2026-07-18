@@ -160,9 +160,8 @@ release.
 
 The preferred import root is `illiad`. Shared utilities are organized under
 `illiad.utilities`. New code must not import public functionality through
-`classes.*` or `plot_funcs.*`; those paths remain internal implementation
-paths for the repository's current scripts. The former `utility.*` package has
-been removed.
+`plot_funcs.*`; that path remains internal to the repository's current
+scripts. The former `classes.*` and `utility.*` packages have been removed.
 
 ### Stable Python Interfaces
 
@@ -171,23 +170,15 @@ series:
 
 ```python
 from illiad import __version__
-from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```
 
 | Import | Contract |
 | --- | --- |
 | `__version__` | Installed ILLIAD version string. |
-| `calculate_flux(input_params=None)` | Run flux-surface integration using a mapping compatible with `flux_calc_inputs.json`; returns the selected island index. |
-| `interpolate_flux(input_params=None)` | Generate the flux/density interpolation from a mapping compatible with `flux_grad_inputs.json`. |
-| `build_electric_field(input_params=None)` | Generate the electric field from a mapping compatible with `flux_grad_inputs.json`. |
 | `load_inputs_json(path, label="Inputs")` | Load and return a top-level JSON object, exiting with a readable error for unreadable or invalid input. |
 | `merge_input_params(defaults, overrides=None)` | Return a shallow copy of `defaults`, updated by `overrides` when supplied. |
 | `normalize_phi_gens(input_params)` | Mutate and return the mapping, deriving or normalizing `PHI_GENs` from `NPHI`. |
-
-The historical `illiad.flux` names `fluxCalculator`, `fluxInterpolator`, and
-`fluxGradientor` remain supported compatibility aliases for the three
-snake-case functions above. New code should use the snake-case names.
 
 ### Provisional Research Interfaces
 
@@ -203,6 +194,7 @@ from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.boris import Boris
 from illiad.collisions import Collisions
+from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 from illiad.utilities.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
 from illiad.plotting import plotFuncs
@@ -221,6 +213,9 @@ The current documented members of these objects are:
 | `Poincare` | `Poincare(io_handler, solvr="LSODA", r_tol=1e-6, a_tol=1e-16, workers=-1, double_line=False, anlys_name="Poincare")`; `set_conditions`, `parallel_solver`, `single_solver`, `post_solver`, `identifyLCFS`, `save_output`, `run` |
 | `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; `setConditions`, `parallel_solver`, `post_solver`, `save_output`, `run` |
 | `Collisions` | `viscous_drag_hstep`, `langevin_in_hstep`, `linearFP_ii_hstep`, `chandrasekhar_psi`, `chandrasekhar_psi_prime`, `coulomb_fp_rates_li_he`, `fokker_planck_ii_hstep` |
+| `FluxCalculator` | `FluxCalculator(io_handler, field, input_params)`; `run` |
+| `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
+| `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
 
 `illiad.collisions` also exports the physical constants `kg_per_amu`,
 `kboltz`, `eps0`, `sqrt_pi`, `Li_mass`, and `He_mass`.
@@ -251,7 +246,7 @@ cross-version public API.
 
 The following are outside the public compatibility contract:
 
-- Direct imports from `classes.*` and `plot_funcs.*`.
+- Direct imports from `plot_funcs.*`.
 - Source runner modules (`runFieldsolver.py`, `runPoincare.py`,
   `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`) and their globals.
 - `fastplotlib_tests/`, `misc_runFiles/`, notebooks, scratch scripts, and

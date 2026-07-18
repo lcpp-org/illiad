@@ -1,8 +1,8 @@
 # Public Python Namespace
 
 The preferred public import path is `illiad.*`, with shared utilities grouped
-under `illiad.utilities.*`. The remaining `classes.*` and `plot_funcs.*`
-imports are internal implementation paths. The former `utility.*` package has
+under `illiad.utilities.*`. Direct `plot_funcs.*` imports remain internal
+implementation paths. The former `classes.*` and `utility.*` packages have
 been removed.
 
 ## Meshes
@@ -23,20 +23,11 @@ from illiad.io import IOHandler
 
 ## Flux Workflow
 
-Use the snake-case aliases for public code:
+The flux implementations are available as classes:
 
 ```python
-from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
+from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 ```
-
-Compatibility aliases remain available:
-
-```python
-from illiad.flux import fluxCalculator, fluxInterpolator, fluxGradientor
-```
-
-The compatibility aliases call the same implementation and are kept to avoid
-breaking current research scripts while the public API settles.
 
 ## Coordinate Transforms
 

@@ -105,7 +105,6 @@ version = { attr = "illiad.__version__" }
 where = ["."]
 include = [
     "illiad*",
-    "classes",
     "plot_funcs",
     "fastplotlib_tests",
 ]
