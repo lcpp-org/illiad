@@ -16,9 +16,9 @@ import torch
 import argparse
 import numpy as np
 import illiad.utilities.physical_constants as const
-from classes.boris import Boris
-from classes.meshNew import Mesh
-from classes.iohandler import IOHandler
+from illiad.boris import Boris
+from illiad.mesh import TorchMesh
+from illiad.io import IOHandler
 from illiad.utilities.point_generators import ionInitializer
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 ## SOME PHYSICAL CONSTANTS
@@ -138,15 +138,15 @@ def boris_runner(params):
     N_particles = params["NPARTICLES_PER_EMITTER"] * N_emitters
 
     ## DEFINE MESH AND LOAD MAGNETIC AND ELECTRIC FIELD
-    b_hidra = Mesh(R0=0.72, a=0.19)
+    b_hidra = TorchMesh(R0=0.72, a=0.19)
     b_hidra.setErrorField()
     b_hidra.loadCartesianField(coilCurrent=params["TOROIDAL_CURRENT"], errField=params["ENABLE_ERRFIELD"], att_mult=params["CONFIG_TOR"])
     b_hidra.addFieldPerturbation(coilCurrent=params["HELICAL_CURRENT"], att_mult=params["CONFIG_HEL"])
-    e_hidra = Mesh(R0=0.72, a=0.19)
+    e_hidra = TorchMesh(R0=0.72, a=0.19)
     e_hidra.loadCartesianField(params["FIELD_FILE_ELECTRIC"], period_=np.array([0, 1, 1]),
                                     att_mult=params["PLASMA_POTENTIAL"])
     if params["ION_ION_COLLISIONS"]:
-      n_hidra = Mesh(R0=0.72, a=0.19)
+      n_hidra = TorchMesh(R0=0.72, a=0.19)
       n_hidra.loadScalarField(params["FIELD_FILE_DENSITY"], period_=np.array([0, 1, 1]),
                   att_mult=params["PLASMA_DENSITY"])
     else:

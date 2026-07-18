@@ -22,9 +22,9 @@
 """
 import argparse
 import numpy as np
-from classes.mesh import Mesh
-from classes.poincare import Poincare
-from classes.iohandler import IOHandler
+from illiad.mesh import Mesh
+from illiad.poincare import Poincare
+from illiad.io import IOHandler
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {

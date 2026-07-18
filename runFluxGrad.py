@@ -1,8 +1,8 @@
 import argparse
 import classes.flux_gradientor as fg
 import classes.interpolate_flux as fi
-from classes.mesh import Mesh
-from classes.iohandler import IOHandler
+from illiad.mesh import Mesh
+from illiad.io import IOHandler
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 
 DEFAULT_INPUTS = {

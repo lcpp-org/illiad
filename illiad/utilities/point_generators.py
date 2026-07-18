@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 10})
 #plt.rcParams.update({'figure.autolayout':True})
 
-from classes.particle import Ion
+from illiad.particle import Ion
 from .coordtrans import RTP_to_XYZ, XYZ_to_RTP, RTP_XYZ_JAC, axisShift, align_z_to_vector
 
 import torch

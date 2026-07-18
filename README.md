@@ -79,10 +79,12 @@ The runner scripts are JSON-configured, with built-in defaults that also allow e
 - `runFluxGrad.py`: flux interpolation plus electric-field generation.
 - `runBoris.py`: lithium ion transport runner.
 - `*_inputs.json`: example JSON configuration files for the corresponding runner scripts.
+- `illiad/`: solver, particle, collision, IO, Poincare, and mesh implementations.
+- `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` implementations.
 - `illiad/utilities/`: coordinate transforms, point generation, workflow
   configuration, event functions, and physical constants.
-- `classes/`: mesh, field-line, particle, collision, Boris, IO helpers, 
-  flux calculation, interpolation, and gradient tools.
+- `classes/`: flux calculation, interpolation, and gradient implementations
+  pending their package consolidation.
 - `plot_funcs/`: plotting scripts and reusable plotting helpers.
 - `input_files/`: coil geometry, pre-generated fields, fitted profiles, and
   supporting CSV/NumPy inputs.

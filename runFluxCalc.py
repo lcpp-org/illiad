@@ -14,8 +14,8 @@
 #------------------------------------------------------#
 """
 import argparse
-from classes.mesh import Mesh
-from classes.iohandler import IOHandler
+from illiad.mesh import Mesh
+from illiad.io import IOHandler
 from classes.calculate_flux import FluxCalculator
 from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 

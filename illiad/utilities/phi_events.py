@@ -1,7 +1,6 @@
 import numpy as np
 #import numba as nb
 from .coordtrans import XYZ_to_RTP
-from classes.mesh import *
 
 
 def inVV(t, p_XYZ, Mesh):
