@@ -14,7 +14,7 @@ from illiad.utilities.phi_events import inVV
 from illiad.utilities.coordtrans import XYZ_to_RTP, XYZ_to_RTP_many, RTP_to_XYZ_many #RTP_to_XYZ
 from .mesh import Mesh
 from .particle import FieldLine
-from plot_funcs import plotFuncs
+from . import plotting as plotFuncs
 import gc
 
 def _phi_from_xyz(points_xyz):

@@ -7,7 +7,7 @@ from math import degrees
 
 import matplotlib.pyplot as plt
 
-from plot_funcs import plotFuncs
+from . import plotting as plotFuncs
 plt.rcParams.update({'font.size': 10})
 #plt.rcParams.update({'figure.autolayout':True})
 
@@ -16,7 +16,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from illiad.utilities.coordtrans import XYZ_to_RTP, RTP_XYZ_JAC#, RTP_to_XYZ
 from .collisions import Collisions, kg_per_amu, kboltz, eps0, sqrt_pi, Li_mass, He_mass
-#from plot_funcs import plotFuncs
 
 
 class Boris(Collisions):

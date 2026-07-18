@@ -265,87 +265,24 @@ class IOHandler:
         lines.append("|=======================================================================================|\n")
         self.log.info("\n".join(lines))
 
-    def borisBoilerplate(self, param_dict=None):
-        """
-        Logs the values of a predefined set of simulation input parameters, indicating whether each was set or is using a default value.
-        Useful for recording the configuration of a simulation run for reproducibility and debugging.
-
-        This method checks for parameter values first in the provided param_dict (e.g., globals() or locals() from the caller),
-        then as instance attributes of the IOHandler object, and if not found, attempts to retrieve them from global variables.
-        If none is found, '*DEFAULT*' is used.
-        """
-        # List of all possible input parameters to check if user has set them
-        possible_input_parameters = [
-            "FIELD_FILE_TOR",
-            "CONFIG_TOR",
-            "TOROIDAL_CURRENT",
-            "FIELD_SCALE_TOR",
-            "FIELD_FILE_HEL",
-            "CONFIG_HEL",
-            "HELICAL_CURRENT",
-            "FIELD_SCALE_HEL",
-            "ENABLE_ERRFIELD",
-            "ERRFIELD_MAG",
-            "ERRFIELD_DIR_DEG",
-            "FIELD_FILE_ELECTRIC",
-            "PLASMA_POTENTIAL",
-            "ELECTRON_TEMP_EV",
-            "BACKGROUND_GAS_SPECIES",
-            "M_GAS_AMU",
-            "FIELD_FILE_DENSITY",
-            "ION_NEUTRAL_COLLISIONS",
-            "ION_ION_COLLISIONS",
-            "NEUTRAL_GAS_DENSITY",
-            "PLASMA_DENSITY",
-            "LCFS_INDEX",
-            "ION_TEMP",
-            "ION_MASS",
-            "CHARGE_NUM",
-            "DELTRS",
-            "NPHI",
-            "NTHETA",
-            "NPARTICLES_PER_EMITTER",
-            "DT",
-            "TMAX",
-            "NSTEPS",
-            "TRACK_NPHI",
-            "TRACK_NTHETA",
-            "TRACK_NPARTICLES_PER_EMITTER",
-            "STRIDE",
-            "TRACE_STRIDE",
-            "OUTPUT_DIRECTORY_NAME",
-            "TAG"
-        ]
-
-        # Build a dictionary of parameter values or '*DEFAULT*'
-        param_values = {}
-        for param in possible_input_parameters:
-            if param_dict is not None and param in param_dict:
-                param_values[param] = param_dict[param]
-            elif hasattr(self, param):
-                param_values[param] = getattr(self, param)
-            elif param in globals():
-                param_values[param] = globals()[param]
-            else:
-                param_values[param] = '*DEFAULT*'
+    def borisBoilerplate(self, param_dict):
+        """Log the merged Boris configuration and its derived values."""
+        param_values = param_dict
 
         self.log.info('\n|=======================================================================================|'
-                      +'\n| LOADED TOROIDAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_TOR"])
                       +'\n| LOADED TOROIDAL FIELD CONFIG: {}'.format(param_values["CONFIG_TOR"])
                       +'\n| LOADED TOROIDAL COIL CURRENT: {}'.format(param_values["TOROIDAL_CURRENT"])
-                      +'\n| LOADED TOROIDAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_TOR"])
-                      +'\n| LOADED HELICAL FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_HEL"])
                       +'\n| LOADED HELICAL FIELD CONFIG: {}'.format(param_values["CONFIG_HEL"])
                       +'\n| LOADED HELICAL COIL CURRENT: {}'.format(param_values["HELICAL_CURRENT"])
-                      +'\n| LOADED HELICAL FIELD SCALING FACTOR: {}'.format(param_values["FIELD_SCALE_HEL"])
                       +'\n| ENABLE ERROR FIELD: {}'.format(param_values["ENABLE_ERRFIELD"])
-                      +'\n| LOADED ERRFIELD MAG: {}'.format(param_values["ERRFIELD_MAG"])
-                      +'\n| LOADED ERRFIELD DIR: {}'.format(param_values["ERRFIELD_DIR_DEG"])
                       +'\n| LOADED ELECTRIC FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_ELECTRIC"])
                       +'\n| LOADED ELECTRIC FIELD SCALING FACTOR: {:.6f}'.format(param_values["PLASMA_POTENTIAL"])
                       +'\n| LOADED ELECTRON TEMPERATURE: {:.6f} eV'.format(param_values["ELECTRON_TEMP_EV"])
                       +'\n| LOADED BACKGROUND GAS SPECIES: {}'.format(param_values["BACKGROUND_GAS_SPECIES"])
                       +'\n| LOADED BACKGROUND GAS MASS: {:.6f} amu'.format(param_values["M_GAS_AMU"])
+                      +'\n| LOADED NEUTRAL GAS TEMPERATURE: {} eV'.format(param_values["NEUTRAL_GAS_TEMP_EV"])
+                      +'\n| LOADED BACKGROUND ION TEMPERATURE: {} eV'.format(param_values["BACKGROUND_ION_TEMP_EV"])
+                      +'\n| ION/ELECTRON SATURATION CURRENT RATIO: {}'.format(param_values["ION_ELECTRON_SAT_CURRENT_RATIO"])
                       +'\n| LOADED DENSITY FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_DENSITY"])
                       +'\n| ION-NEUTRAL COLLISIONS: {}'.format(param_values["ION_NEUTRAL_COLLISIONS"])
                       +'\n| ION-ION COLLISIONS: {}'.format(param_values["ION_ION_COLLISIONS"])
@@ -371,9 +308,7 @@ class IOHandler:
                       +'\n| TRACE TRACK_NPHI: {}'.format(param_values["TRACK_NPHI"])
                       +'\n| TRACE TRACK_NTHETA: {}'.format(param_values["TRACK_NTHETA"])
                       +'\n| TRACE TRACK_NPARTICLES_PER_EMITTER: {}'.format(param_values["TRACK_NPARTICLES_PER_EMITTER"])
-                      +'\n| TRACE OUTPUT STRIDE: {}'.format(
-                            param_values["TRACE_STRIDE"] if param_values["TRACE_STRIDE"] != '*DEFAULT*'
-                            else param_values["STRIDE"])
+                      +'\n| TRACE OUTPUT STRIDE: {}'.format(param_values["STRIDE"])
                       +'\n| OUTPUT DIRECTORY NAME: {}'.format(param_values["OUTPUT_DIRECTORY_NAME"])
                       +'\n| TAG: {}'.format(param_values["TAG"])
                       +'\n|=======================================================================================|\n\n\n')
