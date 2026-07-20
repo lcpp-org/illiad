@@ -293,3 +293,8 @@ pushes lithium ions until they intersect the wall. The resulting deposition
 maps are intended for comparison with post-operational wall images and for
 estimating quantities relevant to plasma-facing component studies, including
 particle fluence, incidence direction, and deposition energy.
+
+## License
+
+ILLIAD is licensed under the GNU General Public License, version 3.0 only
+(`GPL-3.0-only`). See [LICENSE](LICENSE) for the full license terms.
