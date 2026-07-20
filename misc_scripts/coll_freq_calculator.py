@@ -5,10 +5,10 @@ from pathlib import Path
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
-import classes.class_outputHandler as out
-from classes.mesh import *
+import illiad.io as out
+from illiad.mesh import Mesh
 #import "UIUC" color definitions from \plot_funcs\plotFuncs.py
-from plot_funcs.plotFuncs import UIUC
+from illiad.plotting import UIUC
 
 plt.rcParams.update({
     # --- fonts & text (IOP-friendly, ~8–12 pt at final size) ---

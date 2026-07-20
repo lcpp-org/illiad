@@ -9,9 +9,9 @@ os.chdir(_PROJECT_ROOT)
 
 import numpy as np
 import matplotlib.pyplot as plt
-from classes.iohandler import IOHandler
-from classes.mesh import Mesh
-from classes.poincare import Poincare
+from illiad.io import IOHandler
+from illiad.mesh import Mesh
+from illiad.poincare import Poincare
 
 
 # DEFINE OUTPUT DIRECTORY #

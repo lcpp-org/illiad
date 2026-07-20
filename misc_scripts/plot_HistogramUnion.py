@@ -11,13 +11,12 @@ os.chdir(_PROJECT_ROOT)
 import numpy as np
 from time import perf_counter
 
-import classes.class_outputHandler as out
-from classes.meshNew import *
-from utility.coordtrans import *
-from utility.anlys_funcs import *
-from utility.point_generators import generateSeedShells
-from classes.particle import *
-import plot_funcs.plotFuncs as plotFuncs
+import illiad.io as out
+from illiad.mesh import TorchMesh as Mesh
+from illiad.utilities.coordtrans import *
+from illiad.utilities.point_generators import generateSeedShells
+from illiad.particle import *
+from illiad import plotting as plotFuncs
 
 import matplotlib.pyplot as plt
 from matplotlib import patches, colors, cm, colormaps

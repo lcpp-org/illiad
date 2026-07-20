@@ -10,15 +10,14 @@ os.chdir(_PROJECT_ROOT)
 import numpy as np
 from time import perf_counter
 
-from classes.iohandler import IOHandler
-from classes.meshNew import Mesh
-from classes.boris import Boris
+from illiad.io import IOHandler
+from illiad.mesh import TorchMesh as Mesh
+from illiad.boris import Boris
 
 #from plot_HistogramUnion import OUTPUT_DIRECTORY_NAME
-from plot_funcs import plotFuncs
-from runBorisEfield_i3Accepted import TAG
-from utility.coordtrans import *
-from utility.point_generators import ionInitializer, generateSeedShells
+from illiad import plotting as plotFuncs
+from illiad.utilities.coordtrans import *
+from illiad.utilities.point_generators import ionInitializer, generateSeedShells
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27

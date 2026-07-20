@@ -11,14 +11,12 @@ os.chdir(_PROJECT_ROOT)
 import numpy as np
 from time import perf_counter
 
-from classes.iohandler import IOHandler
-from classes.meshNew import *
-from plot_funcs.plot_InitEnergies import FIELD_SCALE_ELECTRIC, ION_TEMP
-from utility.coordtrans import *
-from utility.anlys_funcs import *
-from classes.particle import *
+from illiad.io import IOHandler
+from illiad.mesh import TorchMesh as Mesh
+from illiad.utilities.coordtrans import *
+from illiad.particle import *
 #import plot_funcs.plotFuncs as plotFuncs
-from plot_funcs.plotFuncs import *
+from illiad.plotting import *
 
 ## SOME PHYSICAL CONSTANTS
 kg_per_amu = 1.660_539_068E-27

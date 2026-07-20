@@ -14,8 +14,8 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from classes.iohandler import IOHandler
-from classes.mesh import Mesh
+from illiad.io import IOHandler
+from illiad.mesh import Mesh
 
 
 CURRENT_TOR = 0.581 # [kA]

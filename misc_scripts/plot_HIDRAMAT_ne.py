@@ -14,8 +14,8 @@ import numpy as np
 from numpy.polynomial import Polynomial
 import pandas as pd
 import matplotlib.pyplot as plt
-import classes.class_outputHandler as out
-from classes.mesh import *
+import illiad.io as out
+from illiad.mesh import Mesh
 
 
 def main():

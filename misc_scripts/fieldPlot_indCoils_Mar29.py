@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from functools import partial
 from scipy.optimize import curve_fit, least_squares
 
-import classes.class_outputHandler as out
-from classes.mesh import *
-from utility.coordtrans import RTP_XYZ_JAC
+import illiad.io as out
+from illiad.mesh import Mesh
+from illiad.utilities.coordtrans import RTP_XYZ_JAC
 
 
 def main():

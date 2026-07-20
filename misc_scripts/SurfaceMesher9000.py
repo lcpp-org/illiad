@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import classes.class_outputHandler as out
-from utility.coordtrans import RTP_to_XYZ
+import illiad.io as out
+from illiad.utilities.coordtrans import RTP_to_XYZ
 import gmsh
 
 ##################################################

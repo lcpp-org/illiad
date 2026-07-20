@@ -4,8 +4,8 @@ import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import classes.class_outputHandler as out
-from classes.mesh import *
+import illiad.io as out
+from illiad.mesh import Mesh
 
 '''
 Things to change include

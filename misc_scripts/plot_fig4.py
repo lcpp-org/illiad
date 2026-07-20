@@ -11,9 +11,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-from classes.iohandler import IOHandler
-from classes.mesh import Mesh
-from utility.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
+from illiad.io import IOHandler
+from illiad.mesh import Mesh
+from illiad.utilities.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
 
 mpl.rcParams.update({
     # --- fonts & text (IOP-friendly, ~8–12 pt at final size) ---

@@ -3,7 +3,7 @@ import torch
 import numpy as np
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-from classes.mesh import Mesh
+from illiad.mesh import Mesh
 
 df = pd.read_csv("input_files/large_box.csv")
 print(df.head(10))
