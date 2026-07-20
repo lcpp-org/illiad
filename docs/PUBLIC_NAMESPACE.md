@@ -1,8 +1,8 @@
 # Public Python Namespace
 
-The preferred public import path is `illiad.*`. The older `classes.*`,
-`utility.*`, and `plot_funcs.*` imports remain available for current scripts,
-but new user-facing examples should use the `illiad` namespace.
+The preferred public import path is `illiad.*`, with shared utilities grouped
+under `illiad.utilities.*`. The former `classes.*`, `utility.*`, and
+`plot_funcs.*` packages have been removed.
 
 ## Meshes
 
@@ -22,25 +22,16 @@ from illiad.io import IOHandler
 
 ## Flux Workflow
 
-Use the snake-case aliases for public code:
+The flux implementations are available as classes:
 
 ```python
-from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
+from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 ```
-
-Compatibility aliases remain available:
-
-```python
-from illiad.flux import fluxCalculator, fluxInterpolator, fluxGradientor
-```
-
-The compatibility aliases call the same implementation and are kept to avoid
-breaking current research scripts while the public API settles.
 
 ## Coordinate Transforms
 
 ```python
-from illiad.coordtrans import RTP_to_XYZ, XYZ_to_RTP
+from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
 ```
 
 ## Particles and Solvers
@@ -54,5 +45,14 @@ from illiad.boris import Boris
 ## Run Configs
 
 ```python
-from illiad.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```
+
+## Plotting Helpers
+
+```python
+from illiad import plotting
+```
+
+Legacy plotting and analysis scripts are retained under `misc_scripts/` and
+are not installed as a runtime package.

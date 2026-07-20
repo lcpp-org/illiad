@@ -52,14 +52,13 @@ Every command accepts:
 ```
 
 `PATH` names a UTF-8 JSON file whose top-level value is an object. Paths in the
-JSON file are resolved relative to the process working directory. The field
-solver, Poincare, flux-calculation, and flux-gradient commands merge supplied
-values over their built-in defaults. `illiad-boris` loads its complete input
-object from the supplied file and defaults to `boris_inputs.json` when the
-option is omitted.
+JSON file are resolved relative to the process working directory. Every
+workflow command merges supplied values over its built-in defaults. When
+`--inputs-json` is omitted, the command uses those built-in defaults.
 
 Use the installed commands rather than invoking `run*.py` files directly. The
-runner module names and their `main()` functions are not public Python API.
+`illiad.cli` modules, root launchers, and their `main()` functions are not
+public Python API.
 
 The commands require their upstream data products. In particular, the usual
 workflow uses prepared magnetic-field arrays under `input_files/`, Poincare
@@ -79,12 +78,12 @@ JSON types; array-like values are JSON arrays.
 
 | Key | Meaning |
 | --- | --- |
-| `output_name` | Basename for the generated magnetic-field array. |
-| `mesh_size` | Three integer mesh dimensions. |
-| `I_toro`, `I_heli`, `I_vert` | Toroidal, helical, and vertical coil currents in amperes. |
-| `coilfile` | Coil-geometry input file. |
+| `OUTPUT_NAME` | Basename for the generated magnetic-field array. |
+| `MESH_SIZE` | Three integer mesh dimensions. |
+| `I_TORO`, `I_HELI`, `I_VERT` | Toroidal, helical, and vertical coil currents in amperes. |
+| `COILFILE` | Coil-geometry input file. |
 | `RMAJOR`, `RMINOR` | Major and minor radii in meters. |
-| `mesh_periodicity` | Three-element mesh periodicity descriptor. |
+| `MESH_PERIODICITY` | Three-element mesh periodicity descriptor. |
 
 ### `poincare_inputs.json`
 
@@ -127,6 +126,7 @@ surface-sampling keys from `flux_calc_inputs.json`, plus:
 | --- | --- |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX` |
 | Interpolation and electric field | `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME` |
+| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
 
 `INV_SURF_INDICES` is a JSON array of surface indices. `OUTPUT_FILE_NAME` is
 the electric-field output basename, without a required `.npy` suffix.
@@ -140,16 +140,15 @@ the electric-field output basename, without a required `.npy` suffix.
 | Magnetic configuration | `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `TOROIDAL_CURRENT`, `HELICAL_CURRENT` |
 | Upstream fields | `FIELD_FILE_DENSITY`, `FIELD_FILE_ELECTRIC` |
 | Collision controls | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS`, `NEUTRAL_GAS_DENSITY`, `PLASMA_DENSITY` |
+| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `BACKGROUND_ION_TEMP_EV`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
 | Ion properties | `ION_MASS`, `ION_TEMP`, `CHARGE_NUM` |
-| Electric-field scale | `FIELD_SCALE_ELECTRIC` |
+| Plasma potential | Optional `PLASMA_POTENTIAL`; when omitted, derived from the background-plasma inputs. |
 | Particle initialization | `LCFS_INDEX`, `DELTRS`, `NPHI`, `NTHETA`, `NPARTICLES_PER_EMITTER` |
 | Time integration | `DT`, `TMAX` |
 | Trace selection | `TRACK_NPHI`, `TRACK_NTHETA`, `TRACK_NPARTICLES_PER_EMITTER`, `STRIDE` |
 | Output | `OUTPUT_DIRECTORY_NAME`, `TAG` |
 
-`STRIDE` is a positive integer controlling trace sampling. `TRACE_STRIDE` is
-accepted by the runner as a legacy equivalent when `STRIDE` is not present,
-but new configurations should use `STRIDE`.
+`STRIDE` is a positive integer controlling trace sampling.
 
 Unknown configuration keys are not part of the API. Current runners do not
 provide schema validation for every key, so a misspelled key can be ignored or
@@ -158,9 +157,10 @@ release.
 
 ## Python API
 
-The preferred import root is `illiad`. New code must not import public
-functionality through `classes.*`, `utility.*`, or `plot_funcs.*`; those paths
-remain internal compatibility paths for the repository's current scripts.
+The preferred import root is `illiad`. Shared utilities are organized under
+`illiad.utilities`, and active plotting helpers live in `illiad.plotting`.
+The former `classes.*`, `utility.*`, and `plot_funcs.*` packages have been
+removed.
 
 ### Stable Python Interfaces
 
@@ -169,23 +169,15 @@ series:
 
 ```python
 from illiad import __version__
-from illiad.flux import calculate_flux, interpolate_flux, build_electric_field
-from illiad.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
 ```
 
 | Import | Contract |
 | --- | --- |
 | `__version__` | Installed ILLIAD version string. |
-| `calculate_flux(input_params=None)` | Run flux-surface integration using a mapping compatible with `flux_calc_inputs.json`; returns the selected island index. |
-| `interpolate_flux(input_params=None)` | Generate the flux/density interpolation from a mapping compatible with `flux_grad_inputs.json`. |
-| `build_electric_field(input_params=None)` | Generate the electric field from a mapping compatible with `flux_grad_inputs.json`. |
 | `load_inputs_json(path, label="Inputs")` | Load and return a top-level JSON object, exiting with a readable error for unreadable or invalid input. |
 | `merge_input_params(defaults, overrides=None)` | Return a shallow copy of `defaults`, updated by `overrides` when supplied. |
 | `normalize_phi_gens(input_params)` | Mutate and return the mapping, deriving or normalizing `PHI_GENs` from `NPHI`. |
-
-The historical `illiad.flux` names `fluxCalculator`, `fluxInterpolator`, and
-`fluxGradientor` remain supported compatibility aliases for the three
-snake-case functions above. New code should use the snake-case names.
 
 ### Provisional Research Interfaces
 
@@ -201,9 +193,10 @@ from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.boris import Boris
 from illiad.collisions import Collisions
-from illiad.coordtrans import RTP_to_XYZ, XYZ_to_RTP
-from illiad.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
-from illiad.plotting import plotFuncs
+from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
+from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
+from illiad.utilities.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
+from illiad import plotting
 ```
 
 The current documented members of these objects are:
@@ -219,6 +212,9 @@ The current documented members of these objects are:
 | `Poincare` | `Poincare(io_handler, solvr="LSODA", r_tol=1e-6, a_tol=1e-16, workers=-1, double_line=False, anlys_name="Poincare")`; `set_conditions`, `parallel_solver`, `single_solver`, `post_solver`, `identifyLCFS`, `save_output`, `run` |
 | `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; `setConditions`, `parallel_solver`, `post_solver`, `save_output`, `run` |
 | `Collisions` | `viscous_drag_hstep`, `langevin_in_hstep`, `linearFP_ii_hstep`, `chandrasekhar_psi`, `chandrasekhar_psi_prime`, `coulomb_fp_rates_li_he`, `fokker_planck_ii_hstep` |
+| `FluxCalculator` | `FluxCalculator(io_handler, field, input_params)`; `run` |
+| `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
+| `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
 
 `illiad.collisions` also exports the physical constants `kg_per_amu`,
 `kboltz`, `eps0`, `sqrt_pi`, `Li_mass`, and `He_mass`.
@@ -227,10 +223,10 @@ The coordinate module exports `RTP_to_XYZ`, `XYZ_to_RTP`, `XYZ_to_RTP2`,
 `RTP_to_XYZ_many`, `XYZ_to_RTP_many`, `rot_vecXYZ_byPHI`, `RTP_XYZ_JAC`,
 `RTP_XYZ_JAC2`, `axisShift`, and `align_z_to_vector`.
 
-`illiad.point_generators` exports `generateSeedShells`,
-`generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` exports the
-existing `plotFuncs` plotting module. Their detailed return shapes and plot
-formats are provisional.
+`illiad.utilities.point_generators` exports `generateSeedShells`,
+`generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` provides the
+plotting helpers used by the Boris and Poincare workflows. Their detailed
+return shapes and plot formats are provisional.
 
 ## Output and Data Compatibility
 
@@ -249,10 +245,8 @@ cross-version public API.
 
 The following are outside the public compatibility contract:
 
-- Direct imports from `classes.*`, `utility.*`, and `plot_funcs.*`.
-- Source runner modules (`runFieldsolver.py`, `runPoincare.py`,
-  `runFluxCalc.py`, `runFluxGrad.py`, and `runBoris.py`) and their globals.
-- `fastplotlib_tests/`, `misc_runFiles/`, notebooks, scratch scripts, and
+- Modules under `illiad.cli`, root `run*.py` launchers, and their globals.
+- `fastplotlib_tests/`, `misc_scripts/`, notebooks, scratch scripts, and
   unpublished analysis helpers.
 - Generated input/output arrays, local output directories, and files not
   documented in this file.

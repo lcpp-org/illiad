@@ -22,7 +22,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Physics",
@@ -73,11 +73,11 @@ Homepage = "https://github.com/lcpp-org/illiad"
 Repository = "https://github.com/lcpp-org/illiad"
 
 [project.scripts]
-illiad-fieldsolver = "runFieldsolver:main"
-illiad-poincare = "runPoincare:main"
-illiad-flux-calc = "runFluxCalc:main"
-illiad-flux-grad = "runFluxGrad:main"
-illiad-boris = "runBoris:main"
+illiad-fieldsolver = "illiad.cli.fieldsolver:main"
+illiad-poincare = "illiad.cli.poincare:main"
+illiad-flux-calc = "illiad.cli.flux_calc:main"
+illiad-flux-grad = "illiad.cli.flux_grad:main"
+illiad-boris = "illiad.cli.boris:main"
 
 [dependency-groups]
 fitting = [
@@ -104,10 +104,7 @@ version = { attr = "illiad.__version__" }
 [tool.setuptools.packages.find]
 where = ["."]
 include = [
-    "illiad",
-    "classes",
-    "utility",
-    "plot_funcs",
+    "illiad*",
     "fastplotlib_tests",
 ]
 exclude = [
@@ -118,10 +115,3 @@ exclude = [
 
 [tool.setuptools]
 include-package-data = false
-py-modules = [
-    "runBoris",
-    "runFieldsolver",
-    "runFluxCalc",
-    "runFluxGrad",
-    "runPoincare",
-]
