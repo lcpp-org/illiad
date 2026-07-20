@@ -391,7 +391,7 @@ class Poincare():
             plt.yscale('log')
             plt.grid(True, which='both')
             plt.xlabel('Connection length [m]')
-            self.IO.saveFig('connectLengths')
+            self.IO.saveFig('connectLengths', subdir=self.anlys_name)
             plt.close()
 
         elif LCFStype == 'outer':
@@ -406,7 +406,7 @@ class Poincare():
             plt.yscale('log')
             plt.grid(True, which='both')
             plt.xlabel('Connection length [m]')
-            self.IO.saveFig('connectLengths')
+            self.IO.saveFig('connectLengths', subdir=self.anlys_name)
             plt.close()
 
         self.IO.log.info('LCFS_index = {}'.format(LCFS_index))

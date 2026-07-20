@@ -723,7 +723,7 @@ def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysi
     phy_comp_string = '$\phi_c$={:02.0f}$\degree$'.format(phi_deg)
     if title_on: ax.set_title(phi_phy_string + phy_comp_string, loc='left')
 
-    plot_name = analysis_name +'/'+ analysis_name + '_phi={:03.0f}.png'.format(phi_deg)
+    plot_name = analysis_name + '/poincare_{:03.0f}.png'.format(phi_deg)
     plt.tight_layout()
     simIO.saveFig(plot_name, dpi=dpi)
     plt.close(fig)
