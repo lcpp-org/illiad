@@ -1,6 +1,7 @@
 """Normalized-flux interpolation onto the field mesh."""
 
 import gc
+import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,6 +37,7 @@ class FluxInterpolator:
 
         # Input parameters
         self.anlys_subdir = input_params["ANLYS_SUBDIR"]
+        self.plot_subdir = os.path.join(self.anlys_subdir, "nfield")
         self.lcfs_index = input_params["LCFS_INDEX"]
         self.phi_gens = input_params["PHI_GENs"]
         self.alpha = input_params.get("ALPHA", 1.0)
@@ -71,7 +73,7 @@ class FluxInterpolator:
     def load_flux_data(self):
         """Load normalized flux values, surface validity, and magnetic axis data."""
 
-        filepath = self.anlys_subdir  + '/'
+        filepath = self.anlys_subdir + '/'
         flux_norm_name = filepath + 'CalculatedFLuxes-normalized.npy'
         self.flux_norm_array = self.simIO.loadNumpyData(flux_norm_name)
         self.n_surfaces = self.flux_norm_array.shape[0]
@@ -131,7 +133,7 @@ class FluxInterpolator:
         ax.set_ylabel('Flux')
         ax.grid(True)
         ax.set_title(self.profile_select_str)
-        self.simIO.saveFig(self.anlys_subdir + '/' + 'Best_Flux_Profile.png', dpi=300)
+        self.simIO.saveFig(self.plot_subdir + '/Best_Flux_Profile.png', dpi=300)
         if self.debug:
             plt.show()
         else:
@@ -146,12 +148,12 @@ class FluxInterpolator:
 
         interpolated_surface_parm_np = self.interpolated_surface_parm.detach().to("cpu").numpy()
         self.simIO.saveNumpyData(interpolated_surface_parm_np,
-                                 self.anlys_subdir + '/' + 'nField_' + self.output_file_name  + '.npy')
+                                 self.anlys_subdir + '/nField_' + self.output_file_name + '.npy')
 
         for phi_index, phi_deg in enumerate(self.phi_gens):
             self.output_phi_plots(phi_deg, interpolated_surface_parm_np[phi_index],
-                                  name='LinearFluxNorm',
-                                  subdir=self.anlys_subdir, output_handler=self.simIO,
+                                  name='psi_hat',
+                                  subdir=self.plot_subdir, output_handler=self.simIO,
                                   colormap='Blues', plotmin=0.0, plotmax=1.0)
 
 
@@ -261,7 +263,7 @@ class FluxInterpolator:
         ax.set_rticks([])
         plt.grid(False)
         fig.colorbar(c, ax=ax, label='Flux')
-        fig_path = subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg))
+        fig_path = subdir + '/' + name + '_{:03d}.png'.format(int(phi_deg))
         output_handler.saveFig(fig_path, dpi=300)
         output_handler.log.info('Saved figure: ' + fig_path)
         plt.close()

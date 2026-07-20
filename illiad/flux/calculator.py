@@ -1,6 +1,7 @@
 """Toroidal-flux calculation over reconstructed magnetic surfaces."""
 
 import gc
+import os
 import numpy as np
 from scipy.interpolate import splev, splrep
 from scipy.integrate import dblquad
@@ -39,6 +40,7 @@ class FluxCalculator:
 
         # Input parameters
         self.anlys_subdir = input_params['ANLYS_SUBDIR']
+        self.plot_subdir = os.path.join(self.anlys_subdir, 'flux_calculator')
         self.lcfs_index = input_params['LCFS_INDEX']
         self.ntheta = input_params['NTHETA']
         self.phi_gens = input_params['PHI_GENs']
@@ -157,7 +159,7 @@ class FluxCalculator:
         ax_norm.set_ylim(0, 1.1)
         ax_norm.grid(which='both', linestyle=':', linewidth=0.5)
 
-        self.simIO.saveFig(self.anlys_subdir+'/Flux_v_Surface.png', dpi=250)
+        self.simIO.saveFig(self.plot_subdir + '/Flux_v_Surface.png', dpi=250)
         self.simIO.log.info('Finished, LCFS=#{}, ISLAND AXIS=#{}'.format(self.lcfs_index, self.smallest_island_index))
 
         # save the numpy arrays to individual files using simIO method
@@ -348,7 +350,7 @@ class FluxCalculator:
                         labels=['', '5cm', '', '10cm', '', '15cm', ''], angle=0, fontsize=4)
 
         self.simIO.log.info('Plotting Flux Surfaces @ phi={}'.format(phi_deg))
-        self.simIO.saveFig(self.anlys_subdir +'/Splines_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
+        self.simIO.saveFig(self.plot_subdir + '/Splines_{:03d}deg.png'.format(int(phi_deg)), dpi=300)
         plt.close()
 
 

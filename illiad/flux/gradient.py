@@ -1,5 +1,6 @@
 """Electric-field generation from the interpolated flux gradient."""
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from illiad.utilities.coordtrans import RTP_XYZ_JAC
@@ -30,6 +31,7 @@ class FluxGradientor:
 
         # Input parameters
         self.anlys_subdir = input_params['ANLYS_SUBDIR']
+        self.plot_subdir = os.path.join(self.anlys_subdir, 'Efield')
         self.output_file_name = input_params['OUTPUT_FILE_NAME']
         self.phi_gens = input_params['PHI_GENs']
         self.lcfs_index = input_params['LCFS_INDEX']
@@ -91,7 +93,7 @@ class FluxGradientor:
 
     def load_density_data(self):
         """Load the interpolated normalized flux field."""
-        return self.simIO.loadNumpyData(self.anlys_subdir + '/' + 'nField_' + self.output_file_name + '.npy') #'/big_grid_linear.npy')
+        return self.simIO.loadNumpyData(self.anlys_subdir + '/nField_' + self.output_file_name + '.npy')
 
 
     def filter_gradients(self):
@@ -179,15 +181,15 @@ class FluxGradientor:
 
     def save_and_plot_data(self):
         """Save the XYZ field array gradient plots."""
-        self.simIO.saveNumpyData(self.efield_xyz_array_linear, self.anlys_subdir + '/' + 'Efield_' + self.output_file_name + '.npy')
+        self.simIO.saveNumpyData(self.efield_xyz_array_linear, self.anlys_subdir + '/Efield_' + self.output_file_name + '.npy')
 
         # loop through PHI ANGLES for plotting
         colortest = 'afmhot_r'
         for phi_index, phi_gen_deg in enumerate(self.phi_gens):
-            self.output_phi_plots(phi_gen_deg, self.flux_grad_magnitude[phi_index], 'FluxGradMagnitude', self.anlys_subdir, self.simIO, colortest, 0.0, 200.0)
-            self.output_phi_plots(phi_gen_deg, self.flux_grad_radial[phi_index], 'FluxGradRadial', self.anlys_subdir, self.simIO, colortest, -200., 200)
-            self.output_phi_plots(phi_gen_deg, self.flux_grad_poloidal[phi_index], 'FluxGradPoloidal', self.anlys_subdir, self.simIO, colortest, -100.0, 100.0)
-            self.output_phi_plots(phi_gen_deg, self.flux_grad_toroidal[phi_index], 'FluxGradToroidal', self.anlys_subdir, self.simIO, colortest, -0.3, 0.3)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_magnitude[phi_index], 'magnitude', self.plot_subdir, self.simIO, colortest, 0.0, 200.0)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_radial[phi_index], 'radial', self.plot_subdir, self.simIO, colortest, -200., 200)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_poloidal[phi_index], 'poloidal', self.plot_subdir, self.simIO, colortest, -100.0, 100.0)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_toroidal[phi_index], 'toroidal', self.plot_subdir, self.simIO, colortest, -0.3, 0.3)
 
         self.simIO.log.info("## Flux gradienting complete. ##")
 
@@ -209,8 +211,9 @@ class FluxGradientor:
         fig.colorbar(c, ax=ax, label='Flux')
         plt.grid(False)
 
-        output_handler.saveFig(subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)), dpi=250)
-        output_handler.log.info('Saved figure: ' + subdir + '/' + name +'_{:03d}deg.png'.format(int(phi_deg)))
+        fig_path = subdir + '/' + name + '_{:03d}.png'.format(int(phi_deg))
+        output_handler.saveFig(fig_path, dpi=250)
+        output_handler.log.info('Saved figure: ' + fig_path)
         plt.close("All")
 
 
