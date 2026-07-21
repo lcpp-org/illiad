@@ -48,6 +48,7 @@ class FluxCalculator:
         self.hist_bins = input_params['HIST_BINS']
         self.plot_all = input_params['PLOT_ALL']
         self.big_mesh = input_params['BIG_MESH']
+        #self.flux_lcfs = input_params['FLUX_LCFS']
 
         # Calculation state
         self.nsurfaces = None
@@ -58,6 +59,8 @@ class FluxCalculator:
         self.total_flux_norm = None
         self.centers_array = None
         self.valid_surfs = None
+        self.tail_points = None
+        self.tail_surfaces = None
 
         # Optional mesh output arrays
         self.lcfs_flat_point = None
@@ -130,16 +133,18 @@ class FluxCalculator:
         self.total_flux_norm[:self.lcfs_index][:] = 0.0
 
 
-    def save_output(self, tail_array, surfaces):
+    def save_output(self):
         # save the core flux arrays
         filename_fluxes = self.anlys_subdir + '/CalculatedFLuxes.npy'
         filename_fluxNorms = self.anlys_subdir + '/CalculatedFLuxes-normalized.npy'
         filename_validSurfaces = self.anlys_subdir + '/ValidSurfaces.npy'
+        filename_tailFluxes = self.anlys_subdir + '/TailFluxes.npy'
+        filename_tailSurfaces = self.anlys_subdir + '/TailSurfaces.npy'
         self.simIO.saveNumpyData(self.tot_flux_array, filename_fluxes)
         self.simIO.saveNumpyData(self.total_flux_norm, filename_fluxNorms)
         self.simIO.saveNumpyData(self.valid_surfs, filename_validSurfaces)
-        self.simIO.saveNumpyData(tail_array, self.anlys_subdir + '/TailFluxes.npy')
-        self.simIO.saveNumpyData(surfaces, self.anlys_subdir + '/Surfaces.npy')
+        self.simIO.saveNumpyData(self.tail_points, filename_tailFluxes)
+        self.simIO.saveNumpyData(self.tail_surfaces, filename_tailSurfaces)
 
         # plot a big array of fluxes
         self.simIO.log.info('Plotting Flux v Surface Index...')
@@ -185,6 +190,8 @@ class FluxCalculator:
         self.tot_flux_array = np.zeros([self.nsurfaces, len(self.phi_gens)])
         self.total_flux_norm = np.zeros([self.nsurfaces, len(self.phi_gens)])
         self.centers_array = np.zeros([self.nsurfaces, len(self.phi_gens), self.max_subsets, 2])
+        self.tail_points = np.full((self.lcfs_index, len(self.phi_gens)), np.nan)
+
         if self.big_mesh:
             self.flat_point_meshes = np.full([self.nsurfaces, len(self.phi_gens), self.ntheta*self.max_subsets, 2], np.nan)
         else:
@@ -751,63 +758,73 @@ class FluxCalculator:
 
     
     def append_exponential_tail(self):
-        tail_array = np.full((self.lcfs_index, len(self.phi_gens)), np.nan)
+        r_wall = 0.19
+        wall_index = 0
+        flux_wall_scale = 0.1
+        max_surface_skip = 3
+
+
         for phi_index, phi in enumerate(self.phi_gens):
-            flux_inside = self.total_flux_norm[self.lcfs_index+2][phi_index]
-            #print(flux_inside,"Flux inside")
-            flux_lcfs = self.total_flux_norm[self.lcfs_index+1][phi_index]
-            #print(flux_lcfs,"Flux LCFS")
-            flux_wall = 0.1*flux_lcfs
-            #print(flux_wall,"Flux Wall")
-            inside_points = self.flat_point_meshes[self.lcfs_index+2][phi_index]
-            r_inside = inside_points[:, 1]
-            theta_inside = inside_points[:, 0]
-            lcfs_points = self.flat_point_meshes[self.lcfs_index+1][phi_index]
-            r_lcfs = lcfs_points[:, 1]
-            #print(r_lcfs,"R LCFS")z
+
+            candidate_indices = np.arange(self.lcfs_index + 1, min(self.lcfs_index + 1 + max_surface_skip, self.nsurfaces))
+            valid_candidates = candidate_indices[self.valid_surfs[candidate_indices, phi_index]]
+
+            if len(valid_candidates) < 2:
+                self.simIO.log.info(f"Could not find two nearby valid boundary surfaces at phi={phi}")
+                continue
+
+            valid_inner_indices = np.flatnonzero(self.valid_surfs[self.lcfs_index + 1:, phi_index]) + self.lcfs_index + 1
+            lcfs_index = valid_inner_indices[0]
+            inside_index = valid_inner_indices[1]
+
+            flux_lcfs = self.total_flux_norm[lcfs_index, phi_index]
+            flux_inside = self.total_flux_norm[inside_index, phi_index]
+            flux_wall = flux_wall_scale*flux_lcfs
+
+            lcfs_points = self.flat_point_meshes[lcfs_index, phi_index]
             theta_lcfs = lcfs_points[:, 0]
+            r_lcfs = lcfs_points[:, 1]
+            x_lcfs = r_lcfs * np.cos(theta_lcfs)
+            z_lcfs = r_lcfs * np.sin(theta_lcfs)
+            
+            inside_points = self.flat_point_meshes[inside_index, phi_index]
+            theta_inside = inside_points[:, 0]
+            r_inside = inside_points[:, 1]
+            x_inside = r_inside * np.cos(theta_inside)
+            z_inside = r_inside * np.sin(theta_inside)
 
-            if (len(theta_lcfs) == len(theta_inside) and np.allclose(theta_lcfs, theta_inside)):
-                r_inside_aligned = r_inside
-            else:
-                r_inside_aligned = np.interp(theta_lcfs,theta_inside, r_inside, period=2 * np.pi,)
-            radial_mesh = np.linspace(r_lcfs, 0.19, self.lcfs_index, endpoint=False).T
-            surfaces = np.linspace(0, self.lcfs_index, self.lcfs_index)
-            #print(surfaces, "<- Surfaces")
-            #print(radial_mesh,"Radial Mesh")
-            slope = (flux_lcfs - flux_inside) / (r_lcfs - r_inside_aligned)
-            #print(slope,"Slope")
-            constant1, constant2 = self.apply_boundary_conditions(slope, r_lcfs, flux_lcfs, flux_wall)
-            theta_tail_values = np.full((len(r_lcfs), self.lcfs_index,), np.nan)
-            for theta_index, r_values in enumerate(radial_mesh):
-                print(r_values, "<- R Values")
-                for surface_index, r_value in enumerate(r_values):
-                    theta_tail_values[theta_index, surface_index] = constant1[theta_index] * np.exp(-constant2[theta_index]**2/(0.19**2-r_value**2)) + flux_wall
-            mean = np.nanmean(theta_tail_values, axis=0)
-            tail_array[:,phi_index] = mean
+            radial_separation = np.sqrt((x_lcfs-x_inside)**2 + (z_lcfs-z_inside)**2)
+            slope_lcfs = ((flux_lcfs - flux_inside) / (radial_separation))
 
+            radial_mesh = np.linspace(r_wall, r_lcfs, self.lcfs_index, endpoint=True).T
+            self.tail_surfaces = np.linspace(wall_index, self.lcfs_index, self.lcfs_index)
+
+            delta_squared = self.apply_boundary_conditions(slope_lcfs, r_lcfs, r_wall, flux_lcfs, flux_wall)
                 
-                    #print(tail_array[surface_index, phi_index], "<- Tail Array Value")
+            tail_values_one_theta = np.full((len(r_lcfs), self.lcfs_index,), np.nan)
+            for theta_index, r_values in enumerate(radial_mesh):
+                for surface_index, r_value in enumerate(r_values):
+                    
+                    if np.isclose(r_value, r_wall):
+                        tail_values_one_theta[theta_index, surface_index] = flux_wall
+                        continue
 
-            #print(len(radial_mesh), "<- Radial Mesh")
-            #print(tail_array[:, phi_index], "<- Tail Array Values")
-            #plt.plot(surfaces, tail_array[:, phi_index], label=f'Phi={phi}')
-            #plt.xlabel('Radial Distance')
-            #plt.ylabel('Flux')
-            #plt.show()
-            print(tail_array, "<- Tail Array")
-            print(surfaces, "<- Surfaces")
+                    radial_denominator = (r_wall**2 - r_value**2)
+                    lcfs_denominator = (r_wall**2 - r_lcfs[theta_index]**2)
 
-        return tail_array, surfaces
+                    exponent = (-delta_squared[theta_index]* (1.0 / radial_denominator- 1.0 / lcfs_denominator))
 
+                    tail_values_one_theta[theta_index, surface_index] = (flux_wall + (flux_lcfs - flux_wall) * np.exp(exponent))
+                    
+            self.tail_points[:, phi_index] = np.nanmean(tail_values_one_theta, axis=0)
+            
 
-    def apply_boundary_conditions(self, slope, r_value_lcfs,flux_lcfs, flux_wall):
-        constant2 = np.sqrt(slope*((0.19**2-r_value_lcfs**2)**2) / ((flux_lcfs-flux_wall)*-2*r_value_lcfs))
-        #print(constant2, "<- Constant2")
-        constant1 = (flux_lcfs - flux_wall) / np.exp(-constant2**2/(0.19**2-r_value_lcfs**2))
-        #print(constant1, "<- Constant1")
+    def apply_boundary_conditions(self, slope_lcfs, r_lcfs, r_wall, flux_lcfs, flux_wall):
+        lcfs_denominator = (r_wall**2 - r_lcfs**2)
 
-        return constant1, constant2
+        delta_squared = (-slope_lcfs * lcfs_denominator**2 / (2 * r_lcfs * (flux_lcfs - flux_wall)))
+
+        return delta_squared
 
 
     def run(self):
@@ -820,7 +837,7 @@ class FluxCalculator:
         """
         self.process_all_phi_angles()
         self.normalize_fluxes()
-        tail_array, surfaces = self.append_exponential_tail()
-        self.save_output(tail_array, surfaces)    
+        self.append_exponential_tail()
+        self.save_output()    
 
 

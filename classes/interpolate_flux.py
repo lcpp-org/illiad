@@ -52,11 +52,10 @@ class FluxInterpolator:
         # Loaded data
         self.flux_norm_array = None
         self.n_surfaces = None
-        self.tail_flux_array = None
-        self.tail_surfaces_array = None
+        self.tail_points = None
+        self.tail_surfaces = None
         self.valid_surface = None
         self.axis_array = None
-        self.reverse_surfaces_array = None
 
         # Selected profile
         self.best_phi_index = None
@@ -83,9 +82,8 @@ class FluxInterpolator:
         filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(self.n_surfaces-1)
         self.axis_array = self.simIO.loadNumpyData(filename_center)
 
-        self.tail_flux_array = self.simIO.loadNumpyData(self.anlys_subdir + '/TailFluxes.npy')
-        self.tail_surfaces_array = self.simIO.loadNumpyData(self.anlys_subdir + '/Surfaces.npy')
-        self.reverse_surfaces_array = self.tail_surfaces_array[::-1]
+        self.tail_points = self.simIO.loadNumpyData(self.anlys_subdir + '/TailFluxes.npy')
+        self.tail_surfaces = self.simIO.loadNumpyData(self.anlys_subdir + '/TailSurfaces.npy')
 
 
 
@@ -119,7 +117,7 @@ class FluxInterpolator:
         self.valid_surface[self.inv_surf_indices] = False # manually set picked surfaces outside LCFS to invalid
 
         self.linear_flux_array = linear_flux_array
-        self.tail_flux_array = self.tail_flux_array[:,self.best_phi_index]
+        self.tail_points = self.tail_points[:,self.best_phi_index]
         self.profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(int(self.phi_gens[self.best_phi_index]))
         self.simIO.log.info(self.profile_select_str)
 
@@ -134,7 +132,7 @@ class FluxInterpolator:
 
         fig, ax = plt.subplots()
         ax.bar(range(len(self.linear_flux_array)), self.linear_flux_array)
-        ax.bar(self.reverse_surfaces_array, self.tail_flux_array, color="red")
+        ax.bar(self.tail_surfaces, self.tail_points, color="red")
         ax.set_xlabel('Surface Index')
         ax.set_ylabel('Flux')
         ax.grid(True)
