@@ -31,9 +31,13 @@ DEFAULT_INPUTS = {
     "OUTPUT_FILE_NAME": "LCFS30alpha1p0",
 
     "RBF_KERNEL": "multiquadric",
-    "RBF_NEIGHBORS": 45,
+    "RBF_NEIGHBORS": 128,
     "RBF_SMOOTHING": 1.0,
     "RBF_EPSILON": 1000.0,
+    "FLUX_INTERPOLATION_MODE": "3d",
+    "RBF_PHI_HALF_WINDOW": 2,
+    "RBF_PHI_SCALE": 0.72,
+    "RBF_POINTS_PER_SURFACE_PER_PHI": 72,
 
     "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS": False,
     "GRADIENT_FILTER_BUFFER": 0.01,
@@ -111,6 +115,10 @@ def main(input_overrides=_CLI_INPUTS):
             "RBF_NEIGHBORS",
             "RBF_SMOOTHING",
             "RBF_EPSILON",
+            "FLUX_INTERPOLATION_MODE",
+            "RBF_PHI_HALF_WINDOW",
+            "RBF_PHI_SCALE",
+            "RBF_POINTS_PER_SURFACE_PER_PHI",
         ],)
     flux_interpolator = FluxInterpolator(interpIO, b_hidra, params)
     flux_interpolator.run()
