@@ -48,17 +48,20 @@ trajectory traces, residence-time estimates, and collisionality comparisons.
   closed flux surface (LCFS).
 
 - **Flux-surface background models:** Construct a normalized flux-surface
-  coordinate from the reconstructed magnetic topology and use it to prescribe
-  surrogate helium plasma density and plasma-potential profiles.
+  coordinate from the reconstructed magnetic topology using either independent
+  2D cross-section fits or periodically wrapped local 3D RBF fits, then use it
+  to prescribe surrogate helium plasma density and plasma-potential profiles.
 
 - **Electrostatic-field construction:** Derive SOL electric fields from the
-  flux-surface-dependent plasma-potential model while retaining the 3D structure
-  of the fitted HIDRA magnetic field.
+  flux-surface-dependent plasma-potential model with radian, periodic angular
+  derivatives while retaining the 3D structure of the fitted HIDRA magnetic
+  field.
 
 - **GPU-accelerated lithium ion tracing:** Advance large particle ensembles
   with a Boris-Buneman full-orbit pusher using interpolated 3D electric and
   magnetic fields. The runner supports Maxwellian initial energies, LCFS-based
-  launch distributions, wall-intersection termination, trace capture, and
+  emitter-major launch distributions with cosine-weighted directions about
+  each launch normal, wall-intersection termination, trace capture, and
   optional ion-neutral and ion-ion collision models.
 
 - **Deposition diagnostics:** Record particle impact location, incidence angle,
@@ -211,15 +214,27 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
 5. Interpolate the flux profile and build the electric field.
 
    Update `flux_grad_inputs.json` for the same analysis directory and LCFS
-   selection, then run:
+   selection. Choose `FLUX_INTERPOLATION_MODE` as `2d` for independent
+   cross-sections or `3d` for a periodically wrapped local toroidal RBF, then
+   run:
 
    ```bash
    illiad-flux-grad --inputs-json flux_grad_inputs.json
    ```
 
-   This calls the flux interpolator to generate `density_field.npy`, then takes
-   the gradient of that field to produce a Cartesian electric-field array such
-   as `Efield_LCFS15.npy`.
+   This generates `nField_<OUTPUT_FILE_NAME>.npy`, using source labels that run
+   from 1 at the magnetic axis to 0 at the LCFS and a poloidally averaged value
+   at `rho=0`. Exterior scalar values are currently unconstrained RBF
+   extrapolation; a separate exterior-profile model is not applied in this
+   branch. The workflow then calculates periodic centered angular derivatives
+   in radians and saves `Efield_<OUTPUT_FILE_NAME>.npy`. Exterior-gradient
+   truncation is disabled by default and can be restored with
+   `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`.
+
+   The optional
+   `misc_scripts/plot_flux_interpolation_comparison.py` utility creates a
+   minimal 2D-versus-3D cross-section, difference, and toroidal-lineout
+   diagnostic from two saved `nField` arrays.
 
 6. Run lithium ion transport.
 
@@ -231,9 +246,12 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    illiad-boris --inputs-json boris_inputs.json
    ```
 
-   The runner initializes lithium ions near the LCFS, advances them with the
-   Boris solver, records wall hits and selected traces, and writes plots/data to
-   `output/<OUTPUT_DIRECTORY_NAME>/`.
+   The runner initializes lithium ions near the LCFS in emitter-major order,
+   with Maxwellian energies and cosine-weighted directions about each launch
+   normal. It writes `E0_Dist.png` and `V0_Dist.png` to verify the initial
+   energy, local velocity components, and angle from the launch normal. It then
+   advances the ions with the Boris solver, records wall hits and selected
+   traces, and writes plots/data to `output/<OUTPUT_DIRECTORY_NAME>/`.
 
 7. Inspect outputs and make figures.
 
@@ -273,7 +291,8 @@ creates:
 - `output/<run>/data/`: NumPy arrays for Poincare surfaces, flux fields,
   electric fields, initial conditions, wall hits, energies, and traces.
 - `output/<run>/plots/`: Poincare plots, flux diagnostics, field slices,
-  deposition maps, trajectory plots, and statistical summaries.
+  initial energy/velocity diagnostics, deposition maps, trajectory plots, and
+  statistical summaries.
 
 Existing output directories may be overwritten by scripts that reuse the same
 `OUTPUT_DIR`, `ANLYS_DIR`, `ANLYS_SUBDIR`, or Boris `TAG`, so choose unique run

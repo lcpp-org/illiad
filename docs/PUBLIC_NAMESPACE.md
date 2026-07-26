@@ -42,6 +42,21 @@ from illiad.poincare import Poincare
 from illiad.boris import Boris
 ```
 
+## Particle Initialization
+
+```python
+from illiad.utilities.point_generators import (
+    generateSeedShells,
+    generate_MB_velocities,
+    ionInitializer,
+)
+```
+
+`ionInitializer` returns the ion list, combined initial velocity/position
+array, and launch-normal array in one shared emitter-major particle order.
+`generate_MB_velocities` uses Maxwellian speeds and cosine-weighted
+hemispherical directions about those launch normals.
+
 ## Run Configs
 
 ```python

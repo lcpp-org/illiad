@@ -113,9 +113,9 @@ are expressed in degrees. `OUTPUT_DIR` identifies the run directory below
 | Diagnostics | `PLOT_ALL`, `BIG_MESH` |
 
 `PHI_GENs` is optional. When it is absent or `null`, ILLIAD derives it from
-`NPHI` as `numpy.linspace(360 // NPHI, 360, NPHI)` in degrees. Use an `NPHI`
-that divides 360, or provide `PHI_GENs` explicitly for a different sampling
-scheme.
+positive `NPHI` as `numpy.linspace(360.0 / NPHI, 360.0, NPHI)` in degrees.
+`NPHI` therefore does not need to divide 360. Explicit `PHI_GENs` values are
+normalized to a floating-point NumPy array.
 
 ### `flux_grad_inputs.json`
 
@@ -125,11 +125,39 @@ surface-sampling keys from `flux_calc_inputs.json`, plus:
 | Group | Keys |
 | --- | --- |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX` |
-| Interpolation and electric field | `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME` |
+| Interpolation and electric field | `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
 | RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
+| Periodic 3-D interpolation | `RBF_PHI_HALF_WINDOW`, `RBF_PHI_SCALE`, `RBF_POINTS_PER_SURFACE_PER_PHI` |
+| Gradient construction | `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`, `GRADIENT_FILTER_BUFFER` |
 
-`INV_SURF_INDICES` is a JSON array of surface indices. `OUTPUT_FILE_NAME` is
-the electric-field output basename, without a required `.npy` suffix.
+`INV_SURF_INDICES` is a JSON array of surface indices. `OUTPUT_FILE_NAME`
+selects the shared suffix for `nField_<OUTPUT_FILE_NAME>.npy` and
+`Efield_<OUTPUT_FILE_NAME>.npy`.
+
+`FLUX_INTERPOLATION_MODE` accepts exactly `2d` or `3d`. Both modes use the
+shared `RBF_NEIGHBORS` setting and float64 source, query, interpolation, and
+saved-field arrays:
+
+- `2d` fits each output plane from that plane's Poincare samples.
+- `3d` fits each output plane from a periodically wrapped local toroidal
+  window. `RBF_PHI_HALF_WINDOW` selects the number of source planes on either
+  side, `RBF_PHI_SCALE` converts wrapped angular separation to the RBF's length
+  scale, and `RBF_POINTS_PER_SURFACE_PER_PHI` limits each surface's
+  approximately angle-balanced contribution from each plane.
+
+The interpolation source labels span 1 at the periodically interpolated
+magnetic axis and 0 at the LCFS. After fitting, the output value at `rho=0` is
+assigned from the poloidal average of the innermost repaired radial shell. No
+exterior scalar-profile prescription is currently applied; exterior values are
+unconstrained RBF extrapolation. Poincare source pairs are jointly filtered for
+nonfinite values and exact duplicates before interpolation.
+
+Flux gradients use radian angular coordinates and periodic centered
+differences in both toroidal and poloidal directions. By default,
+`LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS` is `false`, so the resulting gradient is
+not truncated outside the LCFS. Setting it to `true` restores the legacy mask;
+`GRADIENT_FILTER_BUFFER` is the nonnegative radial buffer in meters used by
+that mask.
 
 ### `boris_inputs.json`
 
@@ -149,6 +177,22 @@ the electric-field output basename, without a required `.npy` suffix.
 | Output | `OUTPUT_DIRECTORY_NAME`, `TAG` |
 
 `STRIDE` is a positive integer controlling trace sampling.
+
+Particle initialization uses an emitter-major layout: all
+`NPARTICLES_PER_EMITTER` particles for one emitter are contiguous in the saved
+initial-condition array and particle list. Toroidal emitter planes are
+generated with floating-point spacing, so any positive `NPHI` is supported.
+Initial energies follow the configured Maxwellian model, while launch
+directions use a cosine-weighted hemisphere about each emitter's launch
+normal. The launch normal is the normalized local electric-field direction
+where it is finite and nonzero, with the outward geometric LCFS normal used as
+the fallback. Seed generation jointly removes nonfinite and exact-duplicate
+Poincare `(theta, rho)` pairs and reports the counts in the run log.
+
+Every `illiad-boris` run writes the existing initial-energy diagnostic
+`E0_Dist.png` and the 2-by-2 initial-velocity diagnostic `V0_Dist.png`. The
+latter contains local `(v_rho, v_theta, v_phi)` histograms and the angle from
+the launch normal with the cosine-weighted expectation overlaid.
 
 Unknown configuration keys are not part of the API. Current runners do not
 provide schema validation for every key, so a misspelled key can be ignored or
@@ -210,7 +254,7 @@ The current documented members of these objects are:
 | `FieldLine` | `FieldLine(init_XYZ, maxlength, direction=1.0)`; `pushXYZ`, `storePath` |
 | `Ion` | `Ion(init_XYZ, mass_amu, charge_z, maxlife=0.0)`; `initVelocity`, `initOutput`, `setPosition`, `setVelocity` |
 | `Poincare` | `Poincare(io_handler, solvr="LSODA", r_tol=1e-6, a_tol=1e-16, workers=-1, double_line=False, anlys_name="Poincare")`; `set_conditions`, `parallel_solver`, `single_solver`, `post_solver`, `identifyLCFS`, `save_output`, `run` |
-| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; `setConditions`, `parallel_solver`, `post_solver`, `save_output`, `run` |
+| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; `setConditions`, `parallel_solver`, `post_solver`, `save_output`, `plotInitEnergies`, `plotInitVelocities`, `run` |
 | `Collisions` | `viscous_drag_hstep`, `langevin_in_hstep`, `linearFP_ii_hstep`, `chandrasekhar_psi`, `chandrasekhar_psi_prime`, `coulomb_fp_rates_li_he`, `fokker_planck_ii_hstep` |
 | `FluxCalculator` | `FluxCalculator(io_handler, field, input_params)`; `run` |
 | `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
@@ -224,9 +268,11 @@ The coordinate module exports `RTP_to_XYZ`, `XYZ_to_RTP`, `XYZ_to_RTP2`,
 `RTP_XYZ_JAC2`, `axisShift`, and `align_z_to_vector`.
 
 `illiad.utilities.point_generators` exports `generateSeedShells`,
-`generate_MB_velocities`, and `ionInitializer`. `illiad.plotting` provides the
-plotting helpers used by the Boris and Poincare workflows. Their detailed
-return shapes and plot formats are provisional.
+`generate_MB_velocities`, and `ionInitializer`. `ionInitializer` returns
+`(ion_list, initVelPos, initial_normals)`, with the latter two arrays using the
+same emitter-major particle order. `illiad.plotting` provides the plotting
+helpers used by the Boris and Poincare workflows. Their detailed return shapes
+and plot formats are provisional.
 
 ## Output and Data Compatibility
 
