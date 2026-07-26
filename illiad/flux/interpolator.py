@@ -192,13 +192,20 @@ class FluxInterpolator:
         interpolation.smoothing = interpolation.smoothing.to(device)
         interpolated_angle = interpolation(interpol_pts).reshape(grid_shape)
 
-        ## HACKY SOLUTIONS HERE!!!
-        # copying values out for r=0.0
-        fred3 = interpolated_angle.T[1]
-        fred4 = interpolated_angle.T[2]
-        fred3[fred3==0] = fred4[fred3==0]
-        interpolated_angle.T[1] = fred3
-        interpolated_angle.T[0] = interpolated_angle.T[1]
+        # Repair zero values on the innermost finite-radius shell from the next
+        # radial shell, then enforce a single poloidally averaged value at
+        # rho=0. This removes unphysical angular variation at the coordinate
+        # singularity while retaining the nearby interpolated radial profile.
+        inner_shell = interpolated_angle[:, 1].clone()
+        next_shell = interpolated_angle[:, 2]
+        invalid_inner = (~torch.isfinite(inner_shell)) | (inner_shell == 0)
+        inner_shell[invalid_inner] = next_shell[invalid_inner]
+        if not torch.all(torch.isfinite(inner_shell)):
+            raise ValueError(
+                f"Flux interpolation produced nonfinite values near rho=0 at phi={phi_deg}"
+            )
+        interpolated_angle[:, 1] = inner_shell
+        interpolated_angle[:, 0] = torch.mean(inner_shell)
 
         return interpolated_angle
 
