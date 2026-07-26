@@ -6,13 +6,52 @@ import matplotlib.pyplot as plt
 from illiad.utilities.coordtrans import RTP_XYZ_JAC
 
 
+def _periodic_centered_difference(values, coordinates, axis, period=2*np.pi):
+    """Return a second-order three-point derivative on a periodic coordinate."""
+    values = np.asarray(values)
+    coordinates = np.asarray(coordinates, dtype=np.float64)
+
+    if coordinates.ndim != 1:
+        raise ValueError("Periodic-difference coordinates must be one-dimensional")
+    if values.shape[axis] != coordinates.size:
+        raise ValueError(
+            f"Axis {axis} has length {values.shape[axis]}, but "
+            f"{coordinates.size} coordinates were provided"
+        )
+    if coordinates.size < 3:
+        raise ValueError("Periodic centered differences require at least three grid points")
+
+    coordinates = np.unwrap(coordinates, period=period)
+    coordinate_steps = np.diff(coordinates)
+    seam_step = coordinates[0] + period - coordinates[-1]
+    if np.any(coordinate_steps <= 0) or seam_step <= 0:
+        raise ValueError(
+            "Periodic coordinates must be ordered around one cycle without a duplicated endpoint"
+        )
+
+    h_previous = np.concatenate(([seam_step], coordinate_steps))
+    h_next = np.concatenate((coordinate_steps, [seam_step]))
+    coefficient_shape = [1] * values.ndim
+    coefficient_shape[axis] = coordinates.size
+    h_previous = h_previous.reshape(coefficient_shape)
+    h_next = h_next.reshape(coefficient_shape)
+
+    previous_values = np.roll(values, 1, axis=axis)
+    next_values = np.roll(values, -1, axis=axis)
+    return (
+        -h_next / (h_previous * (h_previous + h_next)) * previous_values
+        + (h_next - h_previous) / (h_previous * h_next) * values
+        + h_previous / (h_next * (h_previous + h_next)) * next_values
+    )
+
+
 class FluxGradientor:
     """Class to handle flux gradient calculations.
 
     This class loads the interpolated normalized flux field, computes
-    E = -grad[flux] on the RTP grid, filts values outside the LCFS,
-    converts the RTP vector components to XYZ coordinates, and saves the
-    resulting field array.
+    E = -grad[flux] on the RTP grid, optionally applies the legacy exterior
+    mask, converts the RTP vector components to XYZ coordinates, and saves
+    the resulting field array.
 
     """
 
@@ -35,6 +74,14 @@ class FluxGradientor:
         self.output_file_name = input_params['OUTPUT_FILE_NAME']
         self.phi_gens = input_params['PHI_GENs']
         self.lcfs_index = input_params['LCFS_INDEX']
+        self.legacy_filter_exterior = input_params.get(
+            'LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS', False
+        )
+        if not isinstance(self.legacy_filter_exterior, (bool, np.bool_)):
+            raise ValueError("LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS must be a boolean")
+        self.gradient_filter_buffer = float(input_params.get('GRADIENT_FILTER_BUFFER', 0.01))
+        if self.gradient_filter_buffer < 0:
+            raise ValueError("GRADIENT_FILTER_BUFFER must be nonnegative")
 
         # Coordinate arrays
         self.rads = None
@@ -71,20 +118,35 @@ class FluxGradientor:
             self.flux_grad_toroidal: Toroidal component of -grad(flux).
         """
 
-        # GRADIENT CALCULATION: remember to divide by Jacobian determinant:
-        # gradF = [dF/dr] * R_HAT + [(1/r) * df/dtheta] * THETA_HAT + [( 1/(R0+rcos(theta)) ) * df/dphi] * PHI_HAT
+        # GRADIENT CALCULATION: remember to divide by the coordinate scale factors:
+        # gradF = [dF/dr] * R_HAT + [(1/r) * dF/dtheta] * THETA_HAT
+        #       + [(1/(R0+r*cos(theta))) * dF/dphi] * PHI_HAT
         density_grid = self.load_density_data()
-        self.simIO.log.info("## Starting flux gradient calculation. ##")
-        flux_gradient = np.gradient(density_grid, self.phi_gens, self.thetas, self.rads, edge_order=2)#, [grid_rad, grid_theta])
+        phi_radians = np.radians(np.asarray(self.phi_gens, dtype=np.float64))
+        self.simIO.log.info(
+            "## Starting flux gradient calculation with radian angular coordinates "
+            "and periodic centered differences. ##"
+        )
+        flux_gradient_toroidal = _periodic_centered_difference(
+            density_grid, phi_radians, axis=0
+        )
+        flux_gradient_poloidal = _periodic_centered_difference(
+            density_grid, self.thetas, axis=1
+        )
+        flux_gradient_radial = np.gradient(
+            density_grid, self.rads, axis=2, edge_order=2
+        )
         self.simIO.log.info("## Flux gradient calculation complete. ##")
 
         # Calculate RTP basis vectors and apply the Jacobian factors to get the physical gradient in each direction
-        flux_grad_radial = -flux_gradient[2]  # E = -grad[V]
+        flux_grad_radial = -flux_gradient_radial  # E = -grad[V]
 
-        flux_grad_poloidal = np.zeros_like(flux_gradient[1])
-        flux_grad_poloidal[:,:,1:] = -flux_gradient[1][:,:,1:] / self.grid_rad[:,1:]
+        flux_grad_poloidal = np.zeros_like(flux_gradient_poloidal)
+        flux_grad_poloidal[:,:,1:] = -flux_gradient_poloidal[:,:,1:] / self.grid_rad[:,1:]
 
-        flux_grad_toroidal = -flux_gradient[0] / (self.field.R0 + self.grid_rad * np.cos(self.grid_theta))
+        flux_grad_toroidal = -flux_gradient_toroidal / (
+            self.field.R0 + self.grid_rad * np.cos(self.grid_theta)
+        )
         self.simIO.log.info(f'{flux_grad_radial.shape=}')
         self.flux_grad_radial = flux_grad_radial
         self.flux_grad_poloidal = flux_grad_poloidal
@@ -98,10 +160,11 @@ class FluxGradientor:
 
     def filter_gradients(self):
         """
-        For each phi plane, this method loads the LCFS Poincare points,
-        finds the LCFS radius closest to each theta grid location, and zeros the
-        radial, poloidal, and toroidal gradient components for radii outside the
-        LCFS plus a small buffer.
+        Apply the optional legacy exterior-gradient mask.
+
+        For each phi plane, this method loads the LCFS Poincare points, finds
+        the LCFS radius closest to each theta grid location, and zeros the
+        gradient components beyond the configured LCFS buffer.
 
         Modifies:
             self.flux_grad_radial: Values outside the LCFS are set to zero.
@@ -122,8 +185,7 @@ class FluxGradientor:
                 lcfs_theta_index = np.argmin(mintheta3)
                 lcfs_rad = r_in[lcfs_theta_index] #lcfs_points[1]
 
-                # Use boolean indexing to set all radii greater than (lcfs_rad - 0.01) to zero for this theta
-                mask = self.rads > (lcfs_rad + 0.01) # add buffer to avoid numerical issues
+                mask = self.rads > (lcfs_rad + self.gradient_filter_buffer)
                 self.flux_grad_radial[phi_index][theta_index][mask] = 0.0
                 self.flux_grad_poloidal[phi_index][theta_index][mask] = 0.0
                 self.flux_grad_toroidal[phi_index][theta_index][mask] = 0.0
@@ -221,7 +283,17 @@ class FluxGradientor:
         """Run the full flux gradient calculation workflow."""
         self.build_coordinate_grid()
         self.calculate_gradients()
-        self.filter_gradients()
+        if self.legacy_filter_exterior:
+            self.simIO.log.warning(
+                "Applying legacy exterior-gradient mask beyond the LCFS plus "
+                f"{self.gradient_filter_buffer:g} m"
+            )
+            self.filter_gradients()
+        else:
+            self.simIO.log.info(
+                "Exterior-gradient masking disabled; retaining the interpolated "
+                "field through the SOL and wall"
+            )
         self.calculate_gradient_magnitude()
         self.convert_gradient_to_xyz()
         self.save_and_plot_data()

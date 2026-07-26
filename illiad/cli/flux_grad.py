@@ -34,6 +34,9 @@ DEFAULT_INPUTS = {
     "RBF_NEIGHBORS": 45,
     "RBF_SMOOTHING": 1.0,
     "RBF_EPSILON": 1000.0,
+
+    "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS": False,
+    "GRADIENT_FILTER_BUFFER": 0.01,
 }
 _CLI_INPUTS = object()
 
@@ -125,6 +128,8 @@ def main(input_overrides=_CLI_INPUTS):
             "LCFS_INDEX",
             "PHI_GENs",
             "OUTPUT_FILE_NAME",
+            "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS",
+            "GRADIENT_FILTER_BUFFER",
         ],)
     flux_gradientor = FluxGradientor(gradIO, b_hidra, params)
     flux_gradientor.run()
