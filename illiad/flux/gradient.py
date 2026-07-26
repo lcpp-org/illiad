@@ -251,7 +251,7 @@ class FluxGradientor:
             self.output_phi_plots(phi_gen_deg, self.flux_grad_magnitude[phi_index], 'magnitude', self.plot_subdir, self.simIO, colortest, 0.0, 200.0)
             self.output_phi_plots(phi_gen_deg, self.flux_grad_radial[phi_index], 'radial', self.plot_subdir, self.simIO, colortest, -200., 200)
             self.output_phi_plots(phi_gen_deg, self.flux_grad_poloidal[phi_index], 'poloidal', self.plot_subdir, self.simIO, colortest, -100.0, 100.0)
-            self.output_phi_plots(phi_gen_deg, self.flux_grad_toroidal[phi_index], 'toroidal', self.plot_subdir, self.simIO, colortest, -0.3, 0.3)
+            self.output_phi_plots(phi_gen_deg, self.flux_grad_toroidal[phi_index], 'toroidal', self.plot_subdir, self.simIO, colortest, -30.0, 30.0)
 
         self.simIO.log.info("## Flux gradienting complete. ##")
 
