@@ -13,6 +13,32 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+def _filter_unique_poincare_pairs(thetas, radii):
+    """Jointly filter nonfinite values and remove exact duplicate pairs."""
+    thetas = np.asarray(thetas)
+    radii = np.asarray(radii)
+    if thetas.shape != radii.shape:
+        raise ValueError(
+            f"Poincare theta and radius arrays must have matching shapes; "
+            f"got {thetas.shape} and {radii.shape}"
+        )
+
+    finite = np.isfinite(thetas) & np.isfinite(radii)
+    finite_thetas = thetas[finite]
+    finite_radii = radii[finite]
+    pairs = np.column_stack((finite_thetas, finite_radii))
+
+    if pairs.size:
+        _, first_indices = np.unique(pairs, axis=0, return_index=True)
+        keep_indices = np.sort(first_indices)
+        finite_thetas = finite_thetas[keep_indices]
+        finite_radii = finite_radii[keep_indices]
+
+    nonfinite_count = int(thetas.size - np.count_nonzero(finite))
+    duplicate_count = int(np.count_nonzero(finite) - finite_thetas.size)
+    return finite_thetas, finite_radii, nonfinite_count, duplicate_count
+
+
 def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, genNormals=False, Efield=None, outputHandler='simIO'):
     """
     Generates seed points on the last closed flux surface (LCFS) for a given magnetic field configuration.
@@ -39,18 +65,19 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
     outputHandler.log.info('GENERATING SEED POINTS FOR LCFS INDEX: {}'.format(lcfs_index))
 
     for phi_gen_deg in phi_array:
-        input_filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
+        input_filename = 'Poincare_{:03.0f}.npy'.format(phi_gen_deg)
         th_in, r_in = outputHandler.loadNumpyData(input_filename, subdir="Poincare", mmap_mode='r')[lcfs_index]
-        r_in = r_in[~np.isnan(r_in)]
-        th_in = th_in[~np.isnan(th_in)]
+        th_in, r_in, nonfinite_count, duplicate_count = _filter_unique_poincare_pairs(
+            th_in, r_in
+        )
+        outputHandler.log.info(
+            f"{input_filename}, surface {lcfs_index}: removed "
+            f"{nonfinite_count} nonfinite samples and {duplicate_count} exact "
+            f"duplicate (theta, rho) pairs; retained {th_in.size}"
+        )
 
-        phi_deg = int(phi_gen_deg)
+        phi_deg = float(phi_gen_deg)
         phi_rad = phi_gen_deg * np.pi / 180.
-
-        # hack solution, need to determine why an extra 30 copies of 1 initial condition are being appended to this event
-        if phi_deg == 324:
-            r_in = r_in[30:]
-            th_in = th_in[30:]
         th_size = th_in.size
 
         # find the centroid(?) by average positions
@@ -336,7 +363,7 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
     dr_String = delimiter.join(str(int(dr*1000)) for dr in deltrs)
 
     ## GENERATE INITIAL POSITIONS
-    phiGen_arr = np.arange(360//nphi, 361, 360//nphi, dtype=int).tolist()
+    phiGen_arr = np.linspace(360.0 / nphi, 360.0, nphi)
     seed_list, normals_list =  generateSeedShells(deltrs, ntheta, phiGen_arr, lcfs_index, 'IonSeedPts_{}mm'.format(dr_String),
                                                     bfield, Efield=efield, genNormals=True, outputHandler=outputHandler)
     ## GENERATE INITIAL VELOCITIES

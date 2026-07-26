@@ -181,8 +181,8 @@ class FluxInterpolator:
         points, flux_norm = self.obtain_poincare_data(phi_deg)
         source_points_xy = _polar_interp_points_to_xy(points[:, 0], points[:, 1])
 
-        points_torch = torch.as_tensor(source_points_xy, device=device, dtype=torch.float32)
-        flux_norm_torch = torch.as_tensor(flux_norm, device=device, dtype=torch.float32)
+        points_torch = torch.as_tensor(source_points_xy, device=device, dtype=torch.float64)
+        flux_norm_torch = torch.as_tensor(flux_norm, device=device, dtype=torch.float64)
 
         interpolation = RBFInterpolator(points_torch, flux_norm_torch, kernel=self.rbf_kernel,
                                             neighbors=self.rbf_neighbors, smoothing=self.rbf_smoothing, epsilon=self.rbf_epsilon)
@@ -224,16 +224,20 @@ class FluxInterpolator:
         grid_theta, grid_rad = np.meshgrid(thetas, rads, indexing='ij')
         grid_shape = grid_theta.shape
         interpol_pts = _polar_interp_points_to_xy(grid_theta.ravel(), grid_rad.ravel())
-        interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float32)
+        interpol_pts = torch.as_tensor(interpol_pts, device=device, dtype=torch.float64)
 
-        self.interpolated_surface_parm = torch.zeros([len(self.phi_gens), len(thetas)-1, len(rads)], device=device, dtype=torch.float32)
+        self.interpolated_surface_parm = torch.zeros(
+            [len(self.phi_gens), len(thetas)-1, len(rads)],
+            device=device,
+            dtype=torch.float64,
+        )
 
         return grid_shape, grid_theta, grid_rad, interpol_pts
 
 
     def obtain_poincare_data(self, phi_deg):
         """Load Poincare points and matching flux values for one phi angle."""
-        filename = 'Poincare_{:03d}.npy'.format(int(phi_deg))
+        filename = 'Poincare_{:03.0f}.npy'.format(phi_deg)
         flux_surfaces = self.simIO.loadNumpyData(filename, subdir="Poincare")
         points = np.zeros([1,2])
         flux_norm = np.ones(1)
