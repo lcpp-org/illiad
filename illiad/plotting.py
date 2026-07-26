@@ -231,10 +231,10 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     kg_per_amu = 1.66054E-27
     kboltz = 1.602E-19 # Joules/eV
 
-    # if simIO:
-    #     init_conds = simIO.loadNumpyData(init_file)
-    # else:
-    init_conds = simIO.loadNumpyData(init_file)
+    if isinstance(init_file, (str, os.PathLike)):
+        init_conds = simIO.loadNumpyData(init_file)
+    else:
+        init_conds = np.asarray(init_file)
 
     # extract initial velocities, calculate initial energies in eV
     v0s = init_conds[:,0:3].T
@@ -272,6 +272,85 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
+
+def boris_plotInitVelocities(init_conds, initial_normals, Rmajor=0.72, runString='default', simIO=None):
+    """Plot local initial-velocity components and emission angle from the launch normal."""
+    init_conds = np.asarray(init_conds)
+    initial_normals = np.asarray(initial_normals)
+    velocities = init_conds[:, 0:3]
+    positions = init_conds[:, 3:6]
+
+    if velocities.shape != initial_normals.shape:
+        raise ValueError(
+            "Initial velocities and normals must have matching (N_particles, 3) shapes; "
+            f"got {velocities.shape} and {initial_normals.shape}"
+        )
+
+    speeds = np.linalg.norm(velocities, axis=1)
+    normal_magnitudes = np.linalg.norm(initial_normals, axis=1)
+    valid = (
+        np.all(np.isfinite(velocities), axis=1)
+        & np.all(np.isfinite(positions), axis=1)
+        & np.all(np.isfinite(initial_normals), axis=1)
+        & (speeds > 0)
+        & (normal_magnitudes > 0)
+    )
+    if not np.any(valid):
+        raise ValueError("No finite, nonzero initial velocities and normals are available to plot")
+
+    velocities = velocities[valid]
+    positions = positions[valid]
+    normals = initial_normals[valid] / normal_magnitudes[valid, None]
+    unit_velocities = velocities / speeds[valid, None]
+
+    # Resolve each Cartesian velocity into the local toroidal (rho, theta, phi) basis.
+    x_pos, y_pos, z_pos = positions.T
+    major_radius = np.sqrt(x_pos**2 + y_pos**2)
+    theta = np.arctan2(z_pos, major_radius - Rmajor)
+    phi = -np.arctan2(y_pos, x_pos)
+    cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+    cos_phi, sin_phi = np.cos(phi), np.sin(phi)
+    vx, vy, vz = velocities.T
+    velocity_rtp = np.column_stack((
+        cos_theta*cos_phi*vx - cos_theta*sin_phi*vy + sin_theta*vz,
+        -sin_theta*cos_phi*vx + sin_theta*sin_phi*vy + cos_theta*vz,
+        -sin_phi*vx - cos_phi*vy,
+    ))
+
+    cos_emission_angle = np.einsum('ij,ij->i', unit_velocities, normals)
+    emission_angles_deg = np.degrees(np.arccos(np.clip(cos_emission_angle, -1.0, 1.0)))
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+    component_names = (r'$v_\rho$', r'$v_\theta$', r'$v_\phi$')
+    for ax, values, component_name in zip(axes.flat[:3], velocity_rtp.T / 1000, component_names):
+        ax.hist(values, bins=100, color=UIUC['il_orange'], edgecolor=UIUC['il_blue'])
+        ax.set_xlabel(f'{component_name} (km/s)')
+        ax.set_ylabel('# of Particles')
+        ax.grid(which='both', zorder=0, alpha=0.4)
+
+    angle_ax = axes.flat[3]
+    angle_ax.hist(
+        emission_angles_deg, bins=90, range=(0, 90), density=True,
+        color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], label='Sampled',
+    )
+    angle_grid_deg = np.linspace(0, 90, 361)
+    angle_grid_rad = np.radians(angle_grid_deg)
+    cosine_pdf_per_degree = np.sin(2*angle_grid_rad) * np.pi / 180
+    angle_ax.plot(angle_grid_deg, cosine_pdf_per_degree, color=UIUC['il_blue'],
+                  linewidth=2, label='Cosine-weighted expectation')
+    angle_ax.set_xlim(0, 90)
+    angle_ax.set_xlabel('Angle from Launch Normal (degrees)')
+    angle_ax.set_ylabel('Probability Density (1/degree)')
+    angle_ax.grid(which='both', zorder=0, alpha=0.4)
+    angle_ax.legend()
+
+    fig.suptitle('Initial Velocity Distribution')
+    fig.tight_layout()
+
+    plotname = 'V0_Dist.png'
+    simIO.saveFig(plotname, dpi=300)
+    simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
+    plt.close(fig)
 
 def boris_plotFinalEnergies(energy_array, mass, runString='default', simIO=None):
     """Plots the final energy distribution of particles."""

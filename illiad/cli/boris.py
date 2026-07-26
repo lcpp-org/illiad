@@ -154,29 +154,38 @@ def boris_runner(params):
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
     init_conds = [params["LCFS_INDEX"], params["NPHI"], params["NTHETA"], params["DELTRS"], params["NPARTICLES_PER_EMITTER"]]
     ion_properties = [params["ION_MASS"], params["CHARGE_NUM"], params["ION_TEMP"]]
-    ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
+    ion_list, initVelPos, initial_normals = ionInitializer(
+        init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO
+    )
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
     IC_filename = 'initVelPos'
     simIO.saveNumpyData(initVelPos, IC_filename)
     simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 
+    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
+    ion_tracer.plotInitEnergies(initVelPos, params["ION_MASS"], runString=cond_string+params["TAG"], simIO=simIO)
+    ion_tracer.plotInitVelocities(
+        initVelPos, initial_normals, Rmajor=b_hidra.R0,
+        runString=cond_string+params["TAG"], simIO=simIO,
+    )
+
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## RUN BORIS SOLVER FOR PARTICLES ##
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## Regularly-spaced tracker grid: adjust TRACK_NPHI and TRACK_NTHETA as needed.
     ## Selects all NPARTICLES_PER_EMITTER copies for each grid location.
-    ## Particle layout: block p (0..NPARTICLES_PER_EMITTER-1) starts at p*N_emitters;
-    ## within a block: phi_i * len(DELTRS) * NTHETA + dr_j * NTHETA + theta_k
+    ## Particle layout is emitter-major: each emitter has a contiguous block of
+    ## NPARTICLES_PER_EMITTER particles. Tracking samples the first DELTRS shell.
     _track_phi_idx   = np.round(np.linspace(0, params["NPHI"]                  - 1, params["TRACK_NPHI"]                  )).astype(int)
     _track_theta_idx = np.round(np.linspace(0, params["NTHETA"]                - 1, params["TRACK_NTHETA"]                )).astype(int)
     _track_p_idx     = np.round(np.linspace(0, params["NPARTICLES_PER_EMITTER"]- 1, params["TRACK_NPARTICLES_PER_EMITTER"])).astype(int)
-    particle_tracker_list = [int(p) * N_emitters + int(pi * len(params["DELTRS"]) * params["NTHETA"] + theta_i)
+    particle_tracker_list = [(int(pi) * len(params["DELTRS"]) * params["NTHETA"] + int(theta_i))
+                             * params["NPARTICLES_PER_EMITTER"] + int(p)
                                 for pi in _track_phi_idx
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
 
-    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
     ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["BACKGROUND_ION_TEMP_EV"],
                              n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
