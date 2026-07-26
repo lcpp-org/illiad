@@ -177,7 +177,7 @@ class FluxCalculator:
 
     def load_poincare_data(self, phi_deg):
         """Loads Poincare data for a specific toroidal angle."""
-        filename = 'Poincare_{:03d}.npy'.format(int(phi_deg))
+        filename = 'Poincare_{:03.0f}.npy'.format(phi_deg)
         flux_surfaces = self.simIO.loadNumpyData(filename, subdir="Poincare")
         return flux_surfaces
 
