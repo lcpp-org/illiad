@@ -167,8 +167,8 @@ output/
 *.mov
 *.gif
 *.xlsx
-*.o4*
-*.e4*
+*.out*
+*.err*
 *.sbatch
 
 # Large/generated scientific data products. Keep small reference CSV/coil files

@@ -130,13 +130,24 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    ```bash
    git clone https://github.com/lcpp-org/illiad.git
    cd illiad
-   python -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
-   pip install numpy scipy matplotlib pandas tqdm pillow torch torchrbf
+   pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cu126
+   pip install \
+     numpy==2.3.1 \
+     scipy==1.16.0 \
+     matplotlib==3.10.3 \
+     pandas==2.3.1 \
+     tqdm==4.67.1 \
+     Pillow \
+     torchrbf
    ```
 
-   Install the optional packages above only if you need the fitting utilities,
-   interactive trace viewers, or animation export.
+   Requires **Python 3.11**. On a cluster with environment modules, run
+   `module load python/3.11.11` before creating the venv. The PyTorch wheel
+   above targets CUDA 12.6; replace `cu126` with your local CUDA version if
+   needed (e.g. `cu118`, `cu121`). Install the optional packages above only if
+   you need the fitting utilities, interactive trace viewers, or animation export.
 
    For editable development installs, the repository also includes packaging
    metadata:
@@ -154,11 +165,11 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    Editable installs expose the canonical workflow commands:
 
    ```bash
-   illiad-fieldsolver --inputs-json fieldsolver_inputs.json
-   illiad-poincare --inputs-json poincare_inputs.json
-   illiad-flux-calc --inputs-json flux_calc_inputs.json
-   illiad-flux-grad --inputs-json flux_grad_inputs.json
-   illiad-boris --inputs-json boris_inputs.json
+   illiad-fieldsolver --inputs fieldsolver_inputs.json
+   illiad-poincare --inputs poincare_inputs.json
+   illiad-flux-calc --inputs flux_calc_inputs.json
+   illiad-flux-grad --inputs flux_grad_inputs.json
+   illiad-boris --inputs boris_inputs.json
    ```
 
    Public Python imports are available through the `illiad` namespace:
@@ -192,7 +203,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    `OUTPUT_DIR` in `poincare_inputs.json`, then run:
 
    ```bash
-   illiad-poincare --inputs-json poincare_inputs.json
+   illiad-poincare --inputs poincare_inputs.json
    ```
 
    This writes Poincare surfaces, wall-intersection data, plots, and logs under
@@ -204,7 +215,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    `flux_calc_inputs.json` so they match the Poincare output, then run:
 
    ```bash
-   illiad-flux-calc --inputs-json flux_calc_inputs.json
+   illiad-flux-calc --inputs flux_calc_inputs.json
    ```
 
    This integrates toroidal flux for each reconstructed surface and saves files
@@ -219,7 +230,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    run:
 
    ```bash
-   illiad-flux-grad --inputs-json flux_grad_inputs.json
+   illiad-flux-grad --inputs flux_grad_inputs.json
    ```
 
    This generates `nField_<OUTPUT_FILE_NAME>.npy`, using source labels that run
@@ -243,7 +254,7 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    properties, particle counts, timestep, and output tag. Then run:
 
    ```bash
-   illiad-boris --inputs-json boris_inputs.json
+   illiad-boris --inputs boris_inputs.json
    ```
 
    The runner initializes lithium ions near the LCFS in emitter-major order,
