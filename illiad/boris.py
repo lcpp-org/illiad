@@ -103,8 +103,8 @@ class Boris(Collisions):
             -nfield (object, optional): Neutral field object providing field interpolation methods. Defaults to None.
             -track_ID (list, optional): List of particle IDs to track. Defaults to [10, 20].
             -freq_corr (bool, optional): Flag to enable frequency correction. Defaults to False.
-            -ion_neutral_collisions (str or None): None, 'viscous_drag_hstep', or 'langevin_in_hstep'.
-            -ion_ion_collisions (str or None): None, 'linearFP_ii_hstep', or 'fokker_planck_ii_hstep'.
+            -ion_neutral_collisions (str or None): None, 'viscous_drag_hstep', or 'langevin'.
+            -ion_ion_collisions (str or None): None, 'linearFP_ii_hstep', or 'fokker_plank'.
             -trace_stride (int): Save one trace sample every trace_stride timesteps.
         Returns:
             -wallPts (torch.Tensor): XYZ Positions where particles terminate (e.g., hit the wall), shape (Nparticles, 3).

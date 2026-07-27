@@ -31,8 +31,8 @@ DEFAULT_INPUTS = {
 
     "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
     "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
-    "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
-    "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
+    "ION_NEUTRAL_COLLISIONS": "langevin",
+    "ION_ION_COLLISIONS": "fokker_plank",
 
     "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He",

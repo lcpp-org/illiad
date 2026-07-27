@@ -188,19 +188,17 @@ class Collisions():
             'off': None,
             'true': 'linearFP_ii_hstep',
             'viscous_drag_hstep': 'viscous_drag_hstep',
-            'langevin_in_hstep': 'langevin_in_hstep',
+            'langevin': 'langevin',
             'linearfp_ii_hstep': 'linearFP_ii_hstep',
-            'fokkerplanck_ii_hstep': 'fokker_planck_ii_hstep',
-            'fokker_planck_ii_hstep': 'fokker_planck_ii_hstep',
-            'fokker_planck_ii_hstepp': 'fokker_planck_ii_hstep',
+            'fokker_plank': 'fokker_plank',
         }
 
         if collision_key not in collision_models:
             valid = ', '.join([
                 'viscous_drag_hstep',
-                'langevin_in_hstep',
+                'langevin',
                 'linearFP_ii_hstep',
-                'fokker_planck_ii_hstep',
+                'fokker_plank',
                 'None',
             ])
             raise ValueError(f'Unknown collisions option {collisions!r}. Use one of: {valid}.')
@@ -209,23 +207,23 @@ class Collisions():
 
     def _resolve_ion_neutral_collision_model(self, collisions):
         collision_model = self._resolve_collision_model(collisions)
-        if collision_model in (None, 'viscous_drag_hstep', 'langevin_in_hstep'):
+        if collision_model in (None, 'viscous_drag_hstep', 'langevin'):
             return collision_model
         raise ValueError(f'Unknown ion-neutral collisions option {collisions!r}.')
 
     def _resolve_ion_ion_collision_model(self, collisions):
         collision_model = self._resolve_collision_model(collisions)
-        if collision_model in (None, 'linearFP_ii_hstep', 'fokker_planck_ii_hstep'):
+        if collision_model in (None, 'linearFP_ii_hstep', 'fokker_plank'):
             return collision_model
         raise ValueError(f'Unknown ion-ion collisions option {collisions!r}.')
 
     def _collision_uses_density(self, collision_model):
-        return collision_model in ('linearFP_ii_hstep', 'fokker_planck_ii_hstep')
+        return collision_model in ('linearFP_ii_hstep', 'fokker_plank')
 
     def _apply_collision_hstep(self, collision_model, x, v, n_e=None, n_gas=3e18, Ti_ev=2.0, kbTgasqMi=None):
         if collision_model == 'viscous_drag_hstep':
             return self.viscous_drag_hstep(x, v, n_gas=n_gas)
-        if collision_model == 'langevin_in_hstep':
+        if collision_model == 'langevin':
             if kbTgasqMi is None:
                 return self.langevin_in_hstep(x, v, n_gas=n_gas)
             return self.langevin_in_hstep(x, v, n_gas=n_gas, kbTgasqMi=kbTgasqMi)
@@ -235,7 +233,7 @@ class Collisions():
 
         if collision_model == 'linearFP_ii_hstep':
             return self.linearFP_ii_hstep(x, v, n_e, Ti_ev=Ti_ev)
-        if collision_model == 'fokker_planck_ii_hstep':
+        if collision_model == 'fokker_plank':
             return self.fokker_planck_ii_hstep(x, v, n_e, Ti_ev=Ti_ev)
 
         return v
