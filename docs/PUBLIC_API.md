@@ -168,7 +168,7 @@ that mask.
 | Magnetic configuration | `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `TOROIDAL_CURRENT`, `HELICAL_CURRENT` |
 | Upstream fields | `FIELD_FILE_DENSITY`, `FIELD_FILE_ELECTRIC` |
 | Collision controls | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS`, `NEUTRAL_GAS_DENSITY`, `PLASMA_DENSITY` |
-| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `BACKGROUND_ION_TEMP_EV`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
+| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
 | Ion properties | `ION_MASS`, `ION_TEMP`, `CHARGE_NUM` |
 | Plasma potential | Optional `PLASMA_POTENTIAL`; when omitted, derived from the background-plasma inputs. |
 | Particle initialization | `LCFS_INDEX`, `DELTRS`, `NPHI`, `NTHETA`, `NPARTICLES_PER_EMITTER` |

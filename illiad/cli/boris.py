@@ -38,7 +38,6 @@ DEFAULT_INPUTS = {
     "BACKGROUND_GAS_SPECIES": "He",
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
-    "BACKGROUND_ION_TEMP_EV": 2.0,
     "PLASMA_DENSITY": 5e18,
     "ION_ELECTRON_SAT_CURRENT_RATIO": 0.5,
 
@@ -186,7 +185,7 @@ def boris_runner(params):
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
 
-    ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["BACKGROUND_ION_TEMP_EV"],
+    ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["ION_TEMP"],
                              n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
