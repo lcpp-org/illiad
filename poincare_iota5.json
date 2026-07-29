@@ -1,11 +1,11 @@
 {
   "CURRENT_TOR": 0.486,
-  "CURRENT_HEL": 0.900,
+  "CURRENT_HEL": 0.710,
   "CONFIG_TOR": "default_toroidal",
   "CONFIG_HEL": "default_helical",
   "ENABLE_ERRFIELD": true,
 
-  "IC_PHI_DEG": 324.0,
+  "IC_PHI_DEG": 42.0,
   "IC_THETA_DEG": 180.0,
   "START_RADIUS": 0.150,
   "END_RADIUS": 0.020,
@@ -19,5 +19,5 @@
   "NTHREADS": -1,
   "DOUBLE_LINE": false,
 
-  "OUTPUT_DIR": "DEFAULT"
+  "OUTPUT_DIR": "IOTA5_1000sp_atol1e-9_2"
 }

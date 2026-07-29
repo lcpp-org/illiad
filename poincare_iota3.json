@@ -19,5 +19,5 @@
   "NTHREADS": -1,
   "DOUBLE_LINE": false,
 
-  "OUTPUT_DIR": "DEFAULT"
+  "OUTPUT_DIR": "IOTA3_1000sp_atol1e-9"
 }
