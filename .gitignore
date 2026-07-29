@@ -189,3 +189,6 @@ Miniforge3-Linux-x86_64.sh
 .codex/
 .agents/
 *.code-workspace
+
+# (Default) Input JSON files
+*.json
