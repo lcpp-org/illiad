@@ -70,11 +70,11 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
         th_in, r_in, nonfinite_count, duplicate_count = _filter_unique_poincare_pairs(
             th_in, r_in
         )
-        outputHandler.log.info(
-            f"{input_filename}, surface {lcfs_index}: removed "
-            f"{nonfinite_count} nonfinite samples and {duplicate_count} exact "
-            f"duplicate (theta, rho) pairs; retained {th_in.size}"
-        )
+        # outputHandler.log.info(
+        #     f"{input_filename}, surface {lcfs_index}: removed "
+        #     f"{nonfinite_count} nonfinite samples and {duplicate_count} exact "
+        #     f"duplicate (theta, rho) pairs; retained {th_in.size}"
+        # )
 
         phi_deg = float(phi_gen_deg)
         phi_rad = phi_gen_deg * np.pi / 180.

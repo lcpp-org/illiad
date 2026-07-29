@@ -533,6 +533,7 @@ def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='
         tau_res_corr = -frac_running[-1] / slope
     else:
         tau_res_corr = 0.0
+        slope = 0.0
 
     tau_res_est = tau_res + tau_res_corr
     frac_at_tau_res = frac_running[np.argmin(np.abs(time_steps - tau_res_est))]
