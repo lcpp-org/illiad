@@ -26,13 +26,13 @@ from illiad.poincare import Poincare
 from illiad.utilities.phi_events import inVV
 
 
-ANALYSIS_SUBDIR = "ConnectionLengths_double"
+ANALYSIS_SUBDIR = "ConnectionLengths_double_50spins_5mm"
 
 # Analysis settings
-MAX_SPINS = 300  # Set an integer here; None uses the Poincare log value
+MAX_SPINS = 50  # Set an integer here; None uses the Poincare log value
 LCFS_CLEARANCE = 0.005  # [m]
 N_RHO = 120
-N_THETA = 180
+N_THETA = 270
 RHO_MIN = 0.002  # [m]
 RHO_MAX = 0.189  # [m], kept just inside the r=0.19 m vessel boundary
 LCFS_SPLINE_SMOOTHING = 1e-5
@@ -40,36 +40,21 @@ LCFS_BOUNDARY_POINTS = 1000
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Plot field-line connection lengths outside an existing LCFS."
-    )
+    parser = argparse.ArgumentParser(description="Plot field-line connection lengths outside an existing LCFS.")
+
     parser.add_argument("analysis_dir", help="Existing directory under output/.")
-    parser.add_argument(
-        "--phi-deg",
-        type=float,
-        default=None,
+    parser.add_argument("--phi-deg", type=float, default=None,
         help="Toroidal plane in degrees (default: the Poincare initial plane).",
     )
-    parser.add_argument(
-        "--lcfs-index",
-        type=int,
-        default=None,
+    parser.add_argument("--lcfs-index", type=int, default=None,
         help="LCFS surface index (default: read from the Poincare log).",
     )
-    parser.add_argument(
-        "--spins",
-        type=int,
-        default=None,
+    parser.add_argument("--spins", type=int, default=None,
         help="Maximum number of toroidal spins (default: read from the Poincare log).",
     )
-    parser.add_argument(
-        "--double-line",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=(
-            "Trace in both +B and -B directions and sum the two lengths "
-            "(default: read from the Poincare log)."
-        ),
+    parser.add_argument("--double-line", action=argparse.BooleanOptionalAction, default=None,
+        help=( "Trace in both +B and -B directions and sum the two lengths "
+            "(default: read from the Poincare log)."),
     )
     return parser.parse_args()
 
@@ -345,11 +330,8 @@ def main():
 
     mode_suffix = "_double_line" if settings["DOUBLE_LINE"] else ""
 
-    boundary, poincare_path = load_lcfs_boundary(
-        args.analysis_dir,
-        phi_deg,
-        lcfs_index,
-    )
+    boundary, poincare_path = load_lcfs_boundary(args.analysis_dir, phi_deg, lcfs_index)
+
     initial_conditions, trace_mask, theta_grid, rho_grid = make_initial_conditions(
         phi_deg,
         boundary,

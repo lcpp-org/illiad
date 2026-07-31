@@ -11,8 +11,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # DATA AND OUTPUT SETTINGS
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-ANALYSIS_SUBDIR = "ConnectionLengths_double"
-PHI_DEG = 324
+ANALYSIS_SUBDIR = "ConnectionLengths_double_50spins_5mm"
+PHI_DEG = 18
 
 INPUT_FILENAME = f"connection_lengths_phi_{PHI_DEG:03.0f}_double_line.npz"
 OUTPUT_FILENAME = f"connection_lengths_phi_{PHI_DEG:03.0f}_replot.png"
@@ -22,11 +22,11 @@ FIGSIZE = (9, 7)
 DPI = 300
 
 COLOR_SCALE = "log"       # "log" or "linear"
-COLORMAP = "bone"      # Any Matplotlib colormap
-N_LEVELS = 50
-VMIN = None              # None uses the minimum finite connection length
-VMAX = None             # None uses the maximum finite connection length
-CONTOUR_EXTEND = "neither"  # "neither", "both", "min", or "max"
+COLORMAP = "afmhot"      # Any Matplotlib colormap
+N_LEVELS = 100
+VMIN = 2e-1              # None uses the minimum finite connection length
+VMAX = 2e3             # None uses the maximum finite connection length
+CONTOUR_EXTEND = "both"  # "neither", "both", "min", or "max"
 MASK_COLOR = "white"
 
 TITLE = None              # None creates a title from the saved phi value
@@ -37,6 +37,15 @@ SHOW_LCFS = False
 LCFS_COLOR = "black"
 LCFS_LINEWIDTH = 1.2
 LCFS_LABEL = "LCFS"
+
+SHOW_POINCARE = True
+POINCARE_SUBDIR = "Poincare"
+POINCARE_FILENAME = f"Poincare_{PHI_DEG:03.0f}.npy"
+POINCARE_COLOR = "black"
+POINCARE_MARKER_SIZE = 0.5
+POINCARE_LABEL = "Poincare surfaces"
+POINCARE_ZORDER = 5
+
 SHOW_LEGEND = False
 LEGEND_LOCATION = "upper right"
 
@@ -87,6 +96,23 @@ def make_color_scale(connection_length):
     return levels, norm, value_min, value_max
 
 
+def load_poincare_points(poincare_path):
+    if not poincare_path.is_file():
+        raise FileNotFoundError(f"Poincare data not found: {poincare_path}")
+
+    poincare_data = np.load(poincare_path, mmap_mode="r")
+    if poincare_data.ndim != 3 or poincare_data.shape[1] != 2:
+        raise ValueError(
+            "Poincare data must have shape (surface, coordinate, point); "
+            f"found {poincare_data.shape}."
+        )
+
+    poincare_theta = poincare_data[:, 0, :].ravel()
+    poincare_rho = poincare_data[:, 1, :].ravel()
+    finite = np.isfinite(poincare_theta) & np.isfinite(poincare_rho)
+    return poincare_theta[finite], poincare_rho[finite]
+
+
 def main():
     data_path = ( PROJECT_ROOT / "output" / ANALYSIS_DIR / "data" / ANALYSIS_SUBDIR / INPUT_FILENAME)
     output_path = ( PROJECT_ROOT / "output" / ANALYSIS_DIR / "plots" / ANALYSIS_SUBDIR / OUTPUT_FILENAME)
@@ -123,6 +149,26 @@ def main():
         antialiased=False,
     )
 
+    if SHOW_POINCARE:
+        poincare_path = (
+            PROJECT_ROOT
+            / "output"
+            / ANALYSIS_DIR
+            / "data"
+            / POINCARE_SUBDIR
+            / POINCARE_FILENAME
+        )
+        poincare_theta, poincare_rho = load_poincare_points(poincare_path)
+        ax.scatter(
+            poincare_theta,
+            poincare_rho,
+            color=POINCARE_COLOR,
+            s=POINCARE_MARKER_SIZE,
+            linewidths=0.0,
+            label=POINCARE_LABEL,
+            zorder=POINCARE_ZORDER,
+        )
+
     if SHOW_LCFS:
         closed_lcfs = np.vstack((lcfs_xz, lcfs_xz[0]))
         lcfs_theta = np.arctan2(closed_lcfs[:, 1], closed_lcfs[:, 0])
@@ -150,7 +196,7 @@ def main():
     else:
         ax.grid(SHOW_GRID)
 
-    if SHOW_LCFS and SHOW_LEGEND:
+    if SHOW_LEGEND and (SHOW_LCFS or SHOW_POINCARE):
         ax.legend(loc=LEGEND_LOCATION)
 
     colorbar_ticks = COLORBAR_TICKS
