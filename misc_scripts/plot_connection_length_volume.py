@@ -6,8 +6,9 @@ the Torch tracer's compact fieldline-ID representation. It does not construct
 a magnetic field or trace any field lines.
 """
 
-from pathlib import Path
+import argparse
 import gc
+from pathlib import Path
 import sys
 
 import matplotlib.pyplot as plt
@@ -48,7 +49,7 @@ COLOR_SCALE = "log"       # "log" or "linear"
 COLORMAP = "afmhot"      # Any Matplotlib colormap
 N_LEVELS = 50
 VMIN = None               # None uses the minimum positive saved value
-VMAX = 5e3               # None uses the maximum positive saved value
+VMAX = None               # None uses the maximum positive saved value
 CONTOUR_EXTEND = "both"   # "auto", "neither", "both", "min", or "max"
 MASK_COLOR = "white"
 ANTIALIASED = False
@@ -110,6 +111,25 @@ SHOW_PLOT = False
 COLOR_RANGE_CHUNK_SIZE = 1_000_000
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Replot an existing connection-length volume dataset."
+    )
+    parser.add_argument(
+        "analysis_dir",
+        nargs="?",
+        default=ANALYSIS_DIR,
+        help=f"Directory under output/ (default: {ANALYSIS_DIR}).",
+    )
+    parser.add_argument(
+        "data_subdir",
+        nargs="?",
+        default=DATA_SUBDIR,
+        help=f"Subdirectory under data/ (default: {DATA_SUBDIR}).",
+    )
+    return parser.parse_args()
+
+
 def load_raw_samples(data_dir):
     """Memory-map the raw sample arrays and validate their shared indexing."""
     required_paths = {
@@ -130,17 +150,17 @@ def load_raw_samples(data_dir):
     expanded_values_path = data_dir / "raw_connection_length_m.npy"
     fieldline_id_path = data_dir / "raw_fieldline_id.npy"
     fieldline_values_path = data_dir / "fieldline_connection_length_m.npy"
-    if expanded_values_path.is_file():
-        value_source = {
-            "expanded": np.load(expanded_values_path, mmap_mode="r"),
-            "fieldline_id": None,
-            "fieldline": None,
-        }
-    elif fieldline_id_path.is_file() and fieldline_values_path.is_file():
+    if fieldline_id_path.is_file() and fieldline_values_path.is_file():
         value_source = {
             "expanded": None,
             "fieldline_id": np.load(fieldline_id_path, mmap_mode="r"),
             "fieldline": np.load(fieldline_values_path, mmap_mode="r"),
+        }
+    elif expanded_values_path.is_file():
+        value_source = {
+            "expanded": np.load(expanded_values_path, mmap_mode="r"),
+            "fieldline_id": None,
+            "fieldline": None,
         }
     else:
         raise FileNotFoundError(
@@ -497,13 +517,19 @@ def plot_plane(
 
 
 def main():
-    data_dir = PROJECT_ROOT / "output" / ANALYSIS_DIR / "data" / DATA_SUBDIR
-    output_dir = PROJECT_ROOT / "output" / ANALYSIS_DIR / "plots" / OUTPUT_SUBDIR
+    args = parse_args()
+    analysis_dir = args.analysis_dir
+    data_subdir = args.data_subdir
+    output_subdir = (
+        data_subdir if OUTPUT_SUBDIR == DATA_SUBDIR else OUTPUT_SUBDIR
+    )
+    data_dir = PROJECT_ROOT / "output" / analysis_dir / "data" / data_subdir
+    output_dir = PROJECT_ROOT / "output" / analysis_dir / "plots" / output_subdir
     points, value_source, offsets, saved_phi_deg = load_raw_samples(data_dir)
     plane_indices = resolve_plane_indices(saved_phi_deg)
     levels, norm, extend, value_min, value_max = make_color_scale(value_source)
 
-    settings = load_poincare_settings(ANALYSIS_DIR)
+    settings = load_poincare_settings(analysis_dir)
     lcfs_index = settings.get("LCFS_INDEX") if LCFS_INDEX is None else LCFS_INDEX
     if lcfs_index is None:
         raise ValueError("No LCFS index was found; set LCFS_INDEX in this script.")
@@ -524,7 +550,7 @@ def main():
         else:
             values = value_source["expanded"][start:stop]
         boundary, _ = load_lcfs_boundary(
-            ANALYSIS_DIR,
+            analysis_dir,
             phi_deg,
             lcfs_index,
         )
