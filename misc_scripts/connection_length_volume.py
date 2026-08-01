@@ -11,6 +11,7 @@ samples onto a regular three-dimensional mesh.
 """
 
 import argparse
+import gc
 import os
 from pathlib import Path
 import sys
@@ -60,6 +61,9 @@ N_LEVELS = 50
 VMIN = None
 VMAX = None
 DPI = 300
+PLOT_MAX_SAMPLES = 150_000  # None disables deterministic plot-only thinning
+PLOT_SAMPLE_SEED = 0
+COLOR_RANGE_CHUNK_SIZE = 1_000_000
 
 
 def parse_args():
@@ -487,12 +491,17 @@ def save_raw_outputs(sim_io, seed_data, trace_data):
 
 
 def make_color_scale(values):
-    positive = values[np.isfinite(values) & (values > 0.0)]
-    if positive.size == 0:
+    data_min = np.inf
+    data_max = -np.inf
+    for start in range(0, values.size, COLOR_RANGE_CHUNK_SIZE):
+        chunk = np.asarray(values[start : start + COLOR_RANGE_CHUNK_SIZE])
+        positive = chunk[np.isfinite(chunk) & (chunk > 0.0)]
+        if positive.size:
+            data_min = min(data_min, float(positive.min()))
+            data_max = max(data_max, float(positive.max()))
+    if not np.isfinite(data_min):
         raise ValueError("No positive finite connection lengths are available.")
 
-    data_min = positive.min()
-    data_max = positive.max()
     value_min = data_min if VMIN is None else VMIN
     value_max = data_max if VMAX is None else VMAX
     if np.isclose(value_min, value_max):
@@ -535,6 +544,17 @@ def _unique_plane_samples(points_rtp, values):
     if not points_rtp.size:
         return points_rtp, values
 
+    if PLOT_MAX_SAMPLES is not None and points_rtp.shape[0] > PLOT_MAX_SAMPLES:
+        sample_indices = np.sort(
+            np.random.default_rng(PLOT_SAMPLE_SEED).choice(
+                points_rtp.shape[0],
+                PLOT_MAX_SAMPLES,
+                replace=False,
+            )
+        )
+        points_rtp = points_rtp[sample_indices]
+        values = values[sample_indices]
+
     x = points_rtp[:, 0] * np.cos(points_rtp[:, 1])
     z = points_rtp[:, 0] * np.sin(points_rtp[:, 1])
     _, unique_indices = np.unique(
@@ -555,6 +575,7 @@ def plot_plane_samples(
     norm,
     extend,
     sim_io,
+    analysis_subdir=ANALYSIS_SUBDIR,
 ):
     """Plot one unstructured toroidal slice with LCFS-interior triangles masked."""
     points_rtp, values = _unique_plane_samples(points_rtp, values)
@@ -674,27 +695,47 @@ def plot_plane_samples(
         colorbar.set_label("Connection length [m]")
 
     plot_name = f"connection_length_{phi_deg:03.0f}.png"
-    sim_io.saveFig(plot_name, dpi=DPI, subdir=ANALYSIS_SUBDIR)
+    sim_io.saveFig(plot_name, dpi=DPI, subdir=analysis_subdir)
     sim_io.log.info(
         "Saved figure with %d samples: %s/%s",
         points_rtp.shape[0],
-        ANALYSIS_SUBDIR,
+        analysis_subdir,
         plot_name,
     )
     plt.close(fig)
+    gc.collect()
 
 
-def plot_all_planes(analysis_dir, lcfs_index, trace_data, sim_io):
+def plot_all_planes(
+    analysis_dir,
+    lcfs_index,
+    trace_data,
+    sim_io,
+    analysis_subdir=ANALYSIS_SUBDIR,
+):
     """Produce one unstructured filled-contour plot for every toroidal plane."""
-    levels, norm, extend = make_color_scale(
-        trace_data["raw_connection_length"]
-    )
+    fieldline_values = trace_data.get("fieldline_connection_length")
+    raw_values = trace_data.get("raw_connection_length")
+    raw_fieldline_id = trace_data.get("raw_fieldline_id")
+    if raw_values is None and (
+        fieldline_values is None or raw_fieldline_id is None
+    ):
+        raise ValueError(
+            "Trace data must provide either expanded raw connection lengths or "
+            "fieldline lengths plus raw fieldline IDs."
+        )
+
+    color_values = raw_values if raw_values is not None else fieldline_values
+    levels, norm, extend = make_color_scale(color_values)
     raw_points_rtp = trace_data["raw_points_rtp"]
-    raw_values = trace_data["raw_connection_length"]
     plane_offsets = trace_data["plane_offsets"]
     for plane_index, phi_deg in enumerate(trace_data["plane_phi_deg"]):
-        start = plane_offsets[plane_index]
-        stop = plane_offsets[plane_index + 1]
+        start = int(plane_offsets[plane_index])
+        stop = int(plane_offsets[plane_index + 1])
+        if raw_values is None:
+            plane_values = fieldline_values[raw_fieldline_id[start:stop]]
+        else:
+            plane_values = raw_values[start:stop]
         boundary, _ = load_lcfs_boundary(
             analysis_dir,
             phi_deg,
@@ -702,13 +743,14 @@ def plot_all_planes(analysis_dir, lcfs_index, trace_data, sim_io):
         )
         plot_plane_samples(
             raw_points_rtp[start:stop],
-            raw_values[start:stop],
+            plane_values,
             boundary,
             phi_deg,
             levels,
             norm,
             extend,
             sim_io,
+            analysis_subdir=analysis_subdir,
         )
 
 

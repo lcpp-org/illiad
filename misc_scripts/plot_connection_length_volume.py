@@ -1,11 +1,13 @@
 """Replot connection-length volume slices from an already-completed analysis.
 
-This helper reads the raw, plane-sorted samples saved by
-``connection_length_volume.py``. It does not construct a magnetic field or
-trace any field lines.
+This helper reads the raw, plane-sorted samples saved by either connection-
+length volume tracer. It accepts both the original expanded value array and
+the Torch tracer's compact fieldline-ID representation. It does not construct
+a magnetic field or trace any field lines.
 """
 
 from pathlib import Path
+import gc
 import sys
 
 import matplotlib.pyplot as plt
@@ -27,7 +29,7 @@ from misc_scripts.connection_lengths_outside_lcfs import (
 
 # DATA AND OUTPUT SETTINGS
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-DATA_SUBDIR = "ConnectionLengthVolume"
+DATA_SUBDIR = "ConLenVolume_REDO_250spins_rk2mm"
 OUTPUT_SUBDIR = DATA_SUBDIR
 
 # None replots every saved plane. A single number or an iterable of numbers
@@ -50,6 +52,8 @@ VMAX = 5e3               # None uses the maximum positive saved value
 CONTOUR_EXTEND = "both"   # "auto", "neither", "both", "min", or "max"
 MASK_COLOR = "white"
 ANTIALIASED = False
+PLOT_MAX_SAMPLES = 150_000  # None disables deterministic plot-only thinning
+PLOT_SAMPLE_SEED = 0
 
 # Triangles whose centroid or any edge midpoint lies inside the LCFS are
 # removed from the filled contour. The raw samples themselves are unchanged.
@@ -110,7 +114,6 @@ def load_raw_samples(data_dir):
     """Memory-map the raw sample arrays and validate their shared indexing."""
     required_paths = {
         "points": data_dir / "raw_points_rtp.npy",
-        "values": data_dir / "raw_connection_length_m.npy",
         "offsets": data_dir / "plane_offsets.npy",
         "phi": data_dir / "plane_phi_deg.npy",
     }
@@ -121,19 +124,53 @@ def load_raw_samples(data_dir):
         )
 
     points = np.load(required_paths["points"], mmap_mode="r")
-    values = np.load(required_paths["values"], mmap_mode="r")
     offsets = np.load(required_paths["offsets"], mmap_mode="r")
     phi_deg = np.load(required_paths["phi"], mmap_mode="r")
+
+    expanded_values_path = data_dir / "raw_connection_length_m.npy"
+    fieldline_id_path = data_dir / "raw_fieldline_id.npy"
+    fieldline_values_path = data_dir / "fieldline_connection_length_m.npy"
+    if expanded_values_path.is_file():
+        value_source = {
+            "expanded": np.load(expanded_values_path, mmap_mode="r"),
+            "fieldline_id": None,
+            "fieldline": None,
+        }
+    elif fieldline_id_path.is_file() and fieldline_values_path.is_file():
+        value_source = {
+            "expanded": None,
+            "fieldline_id": np.load(fieldline_id_path, mmap_mode="r"),
+            "fieldline": np.load(fieldline_values_path, mmap_mode="r"),
+        }
+    else:
+        raise FileNotFoundError(
+            "Missing connection-length values. Expected either "
+            "raw_connection_length_m.npy or both raw_fieldline_id.npy and "
+            "fieldline_connection_length_m.npy."
+        )
 
     if points.ndim != 2 or points.shape[1] != 3:
         raise ValueError(
             "raw_points_rtp.npy must have shape (sample, 3); "
             f"found {points.shape}."
         )
-    if values.ndim != 1 or values.shape[0] != points.shape[0]:
-        raise ValueError(
-            "raw_connection_length_m.npy must contain one value per point."
-        )
+    if value_source["expanded"] is not None:
+        values = value_source["expanded"]
+        if values.ndim != 1 or values.shape[0] != points.shape[0]:
+            raise ValueError(
+                "raw_connection_length_m.npy must contain one value per point."
+            )
+    else:
+        fieldline_id = value_source["fieldline_id"]
+        fieldline_values = value_source["fieldline"]
+        if fieldline_id.ndim != 1 or fieldline_id.shape[0] != points.shape[0]:
+            raise ValueError(
+                "raw_fieldline_id.npy must contain one ID per raw point."
+            )
+        if fieldline_values.ndim != 1:
+            raise ValueError(
+                "fieldline_connection_length_m.npy must be one-dimensional."
+            )
     if phi_deg.ndim != 1:
         raise ValueError("plane_phi_deg.npy must be one-dimensional.")
     if offsets.ndim != 1 or offsets.size != phi_deg.size + 1:
@@ -147,11 +184,14 @@ def load_raw_samples(data_dir):
     if np.any(np.diff(offsets) < 0):
         raise ValueError("plane_offsets.npy must be monotonically increasing.")
 
-    return points, values, offsets, phi_deg
+    return points, value_source, offsets, phi_deg
 
 
-def data_range(values):
+def data_range(value_source):
     """Find the positive finite range without copying the full mapped array."""
+    values = value_source["expanded"]
+    if values is None:
+        values = value_source["fieldline"]
     data_min = np.inf
     data_max = -np.inf
     for start in range(0, values.size, COLOR_RANGE_CHUNK_SIZE):
@@ -166,8 +206,8 @@ def data_range(values):
     return data_min, data_max
 
 
-def make_color_scale(values):
-    data_min, data_max = data_range(values)
+def make_color_scale(value_source):
+    data_min, data_max = data_range(value_source)
     value_min = data_min if VMIN is None else VMIN
     value_max = data_max if VMAX is None else VMAX
 
@@ -251,6 +291,17 @@ def unique_plane_samples(points_rtp, values):
     values = np.asarray(values[finite])
     if not points_rtp.size:
         return points_rtp, values
+
+    if PLOT_MAX_SAMPLES is not None and points_rtp.shape[0] > PLOT_MAX_SAMPLES:
+        sample_indices = np.sort(
+            np.random.default_rng(PLOT_SAMPLE_SEED).choice(
+                points_rtp.shape[0],
+                PLOT_MAX_SAMPLES,
+                replace=False,
+            )
+        )
+        points_rtp = points_rtp[sample_indices]
+        values = values[sample_indices]
 
     x = points_rtp[:, 0] * np.cos(points_rtp[:, 1])
     z = points_rtp[:, 0] * np.sin(points_rtp[:, 1])
@@ -442,14 +493,15 @@ def plot_plane(
         plt.show()
     else:
         plt.close(fig)
+        gc.collect()
 
 
 def main():
     data_dir = PROJECT_ROOT / "output" / ANALYSIS_DIR / "data" / DATA_SUBDIR
     output_dir = PROJECT_ROOT / "output" / ANALYSIS_DIR / "plots" / OUTPUT_SUBDIR
-    points, values, offsets, saved_phi_deg = load_raw_samples(data_dir)
+    points, value_source, offsets, saved_phi_deg = load_raw_samples(data_dir)
     plane_indices = resolve_plane_indices(saved_phi_deg)
-    levels, norm, extend, value_min, value_max = make_color_scale(values)
+    levels, norm, extend, value_min, value_max = make_color_scale(value_source)
 
     settings = load_poincare_settings(ANALYSIS_DIR)
     lcfs_index = settings.get("LCFS_INDEX") if LCFS_INDEX is None else LCFS_INDEX
@@ -465,6 +517,12 @@ def main():
         phi_deg = float(saved_phi_deg[plane_index])
         start = int(offsets[plane_index])
         stop = int(offsets[plane_index + 1])
+        if value_source["expanded"] is None:
+            values = value_source["fieldline"][
+                value_source["fieldline_id"][start:stop]
+            ]
+        else:
+            values = value_source["expanded"][start:stop]
         boundary, _ = load_lcfs_boundary(
             ANALYSIS_DIR,
             phi_deg,
@@ -473,7 +531,7 @@ def main():
         output_name = OUTPUT_FILENAME.format(phi_deg=phi_deg)
         plot_plane(
             points[start:stop],
-            values[start:stop],
+            values,
             boundary,
             phi_deg,
             levels,
