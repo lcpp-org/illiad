@@ -188,6 +188,7 @@ NPR598/
 Miniforge3-Linux-x86_64.sh
 .codex/
 .agents/
+.vscode/settings.json
 *.code-workspace
 
 # (Default) Input JSON files
