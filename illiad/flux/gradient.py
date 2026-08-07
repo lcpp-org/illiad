@@ -72,6 +72,7 @@ class FluxGradientor:
         self.anlys_subdir = input_params['ANLYS_SUBDIR']
         self.plot_subdir = os.path.join(self.anlys_subdir, 'Efield')
         self.output_file_name = input_params['OUTPUT_FILE_NAME']
+        self.input_field_name = input_params.get('INPUT_FIELD_NAME')
         self.phi_gens = input_params['PHI_GENs']
         self.lcfs_index = input_params['LCFS_INDEX']
         self.legacy_filter_exterior = input_params.get(
@@ -154,8 +155,13 @@ class FluxGradientor:
 
 
     def load_density_data(self):
-        """Load the interpolated normalized flux field."""
-        return self.simIO.loadNumpyData(self.anlys_subdir + '/nField_' + self.output_file_name + '.npy')
+        """Load the configured scalar field used to generate ``-grad(field)``."""
+        input_field_name = self.input_field_name
+        if input_field_name is None:
+            input_field_name = (self.anlys_subdir
+                + '/nField_' + self.output_file_name + '.npy'
+            )
+        return self.simIO.loadNumpyData(input_field_name, mmap_mode='r')
 
 
     def filter_gradients(self):
@@ -276,7 +282,7 @@ class FluxGradientor:
         fig_path = subdir + '/' + name + '_{:03d}.png'.format(int(phi_deg))
         output_handler.saveFig(fig_path, dpi=250)
         output_handler.log.info('Saved figure: ' + fig_path)
-        plt.close("All")
+        plt.close("all")
 
 
     def run(self):
