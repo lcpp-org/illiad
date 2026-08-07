@@ -191,6 +191,7 @@ Miniforge3-Linux-x86_64.sh
 .vscode/settings.json
 *.code-workspace
 
-# (Default) Input JSON files
+# Local analysis JSON inputs. Keep checkout-specific defaults and variants under
+# input_files/ without tracking them.
 *.json
-!sol_trace_inputs.json
+!input_files/*.example.json

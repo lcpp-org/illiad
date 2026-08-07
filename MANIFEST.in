@@ -2,12 +2,6 @@ include README.md
 include LICENSE
 include pyproject.toml
 recursive-include docs *.md
-include boris_inputs.json
-include animation_inputs.json
-include fieldsolver_inputs.json
-include poincare_inputs.json
-include flux_calc_inputs.json
-include flux_grad_inputs.json
 
 recursive-include illiad *.py
 recursive-include fastplotlib_tests *.py *.args
@@ -16,9 +10,13 @@ include runBoris.py
 include runFieldsolver.py
 include runFluxCalc.py
 include runFluxGrad.py
+include runSOLTrace.py
+include runSOLDensity.py
+include runSOLPotential.py
 include runPoincare.py
 
 include input_files/*.csv
+include input_files/*.example.json
 include input_files/coils.wega_with_VFCoils
 
 prune output
