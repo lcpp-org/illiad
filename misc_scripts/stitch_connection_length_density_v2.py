@@ -36,11 +36,11 @@ if str(PROJECT_ROOT) not in sys.path:
 os.chdir(PROJECT_ROOT)
 
 from illiad.io import IOHandler
-from misc_scripts import stitch_connection_length_potential_v2 as common
-from misc_scripts.connection_lengths_outside_lcfs import (
+from illiad.sol import (
     load_lcfs_boundary,
     load_poincare_settings,
 )
+from misc_scripts import stitch_connection_length_potential_v2 as common
 
 
 # Analysis settings
@@ -728,7 +728,7 @@ def main():
 
     sim_io = IOHandler(args.analysis_dir)
     sim_io.startLog(
-        log_name="stitch_connection_length_density_v2.log",
+        log_name="solDensity.log",
         subdir=output_subdir,
         logger_name=output_subdir,
     )

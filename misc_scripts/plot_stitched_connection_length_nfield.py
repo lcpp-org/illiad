@@ -24,7 +24,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from illiad.io import IOHandler
-from misc_scripts.connection_lengths_outside_lcfs import (
+from illiad.sol import (
     load_lcfs_boundary,
     load_poincare_settings,
 )

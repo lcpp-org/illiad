@@ -1,9 +1,8 @@
 """Replot connection-length volume slices from an already-completed analysis.
 
-This helper reads the raw, plane-sorted samples saved by either connection-
-length volume tracer. It accepts both the original expanded value array and
-the Torch tracer's compact fieldline-ID representation. It does not construct
-a magnetic field or trace any field lines.
+This helper reads raw, plane-sorted connection-length samples. It accepts both
+expanded values from historical data and the current compact fieldline-ID
+representation. It does not construct a magnetic field or trace field lines.
 """
 
 import argparse
@@ -22,7 +21,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from misc_scripts.connection_lengths_outside_lcfs import (
+from illiad.sol import (
     load_lcfs_boundary,
     load_poincare_settings,
 )
