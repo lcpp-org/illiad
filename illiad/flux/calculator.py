@@ -95,15 +95,18 @@ class FluxCalculator:
                 ax_rect = None
                 ax_hist = None
                 ax_polar = None
-            mag_axis, mag_axis_rev = self.get_magnetic_axis(flux_surfaces)
+            mag_axis = self.find_axis(*flux_surfaces[-1], self.field)
+            mag_axis_rev = np.copy(mag_axis)
+            mag_axis_rev[0] += np.pi
+
             # process each flux surface to identify magnetic islands
             first_loop_output = self.identify_surface_subsets(flux_surfaces, mag_axis)
-            smallest_island_index, num_subsets, subset_data, subset_centers, hist_output = first_loop_output
+            smallest_island_index, num_subsets, subset_data, subset_centers, iota_output = first_loop_output
             self.smallest_island_index = smallest_island_index
             # spline surfaces, calculate surface fluxes, validate fits, and store output data.
             surface_fluxes = self.process_surfaces_for_phi(phi_index, phi_deg, flux_surfaces, mag_axis,
                                         mag_axis_rev, smallest_island_index, num_subsets,
-                                        subset_data, subset_centers, hist_output,
+                                        subset_data, subset_centers, iota_output,
                                         ax_rect=ax_rect, ax_hist=ax_hist, ax_polar=ax_polar)
 
             for flux_index, flux in enumerate(surface_fluxes, start=self.lcfs_index):
@@ -196,18 +199,9 @@ class FluxCalculator:
         self.valid_surfs[self.lcfs_index:][:] = True
 
 
-    def get_magnetic_axis(self, flux_surfaces):
-        """Finds the magnetic axis from the innermost (last) flux surface."""
-        mag_axis = self.find_axis(*flux_surfaces[-1], self.field)
-        mag_axis_rev = np.copy(mag_axis)
-        mag_axis_rev[0] += np.pi
-
-        return mag_axis, mag_axis_rev
-
-
     def process_surfaces_for_phi(self, phi_index, phi_deg, flux_surfaces, mag_axis,
                                         mag_axis_rev, smallest_island_index, num_subsets,
-                                        subset_data, subset_centers, hist_output,
+                                        subset_data, subset_centers, iota_output,
                                         ax_rect=None, ax_hist=None, ax_polar=None):
         """Process all flux surfaces for one toroidal angle.
 
@@ -225,16 +219,16 @@ class FluxCalculator:
             num_subsets (np.ndarray): Number of detected subsets for each surface.
             subset_data (list): Surface/subset point data relative to the magnetic axis.
             subset_centers (list): Center of each subset.
-            hist_output (tuple): Histogram data from the subset-identification pass.
+            iota_output (tuple): Measured/rational iota diagnostic data and wrap flags.
             ax_rect (optional): Rectangular plot axis.
-            ax_hist (optional): Histogram plot axis.
+            ax_hist (optional): Iota-profile plot axis.
             ax_polar (optional): Polar plot axis.
 
         Returns:
             surface_fluxes (list): Flux values for each processed surface, starting at 'self.lcfs_index'.
         """
         surface_fluxes = []
-        hist, bin_edges, wrap_flag = hist_output
+        iota_values, rational_iotas, wrap_flag = iota_output
         for surf_index in range(self.lcfs_index, self.nsurfaces):
             n_subsets = num_subsets[surf_index]
             # loop to spline, calculate flux, and create regularly-spaced points
@@ -244,7 +238,7 @@ class FluxCalculator:
             points_tr_geoAxis, spline_tr_magAxis, subCenters_geo, subset_flux_list, valid_surface = output
             # storing flux, center data, and validity
             surface_fluxes += [subset_flux_list]
-            self.centers_array[surf_index][phi_index] = subCenters_geo
+            self.centers_array[surf_index][phi_index][:n_subsets] = subCenters_geo
             self.valid_surfs[surf_index][phi_index] = valid_surface
             # use lcfs as reference for surface validation
             if surf_index == self.lcfs_index:
@@ -274,17 +268,17 @@ class FluxCalculator:
             if self.plot_all:
                 self.plot_flux_surfaces_for_phi(surf_index, phi_index, flux_surfaces,
                                                 mag_axis, spline_tr_magAxis, num_subsets,
-                                                ax_rect, ax_hist, ax_polar, bin_edges,
-                                                hist, surface_thetas, surface_radii, surface_inside_lcfs)
+                                                ax_rect, ax_hist, ax_polar, iota_values,
+                                                rational_iotas, surface_thetas, surface_radii, surface_inside_lcfs)
 
         return surface_fluxes
 
 
     def plot_flux_surfaces_for_phi(self, surf_index, phi_index, flux_surfaces,
                                   mag_axis, spline_tr_magAxis, num_subsets,
-                                  ax_rect, ax_hist, ax_polar,bin_edges,
-                                  hist, surface_thetas, surface_radii, surface_inside_lcfs):
-        """Plot rectangular, histogram, and polar diagnostics for one flux surface."""
+                                  ax_rect, ax_hist, ax_polar, iota_values,
+                                  rational_iotas, surface_thetas, surface_radii, surface_inside_lcfs):
+        """Plot rectangular, iota-profile, and polar diagnostics for one flux surface."""
         th_in, r_in = flux_surfaces[surf_index]
         r_in = r_in[~np.isnan(r_in)]
         th_in = th_in[~np.isnan(th_in)]
@@ -303,15 +297,30 @@ class FluxCalculator:
                 ax_rect.scatter(spline_tr_magAxis[i].T[0]*180.0/np.pi, spline_tr_magAxis[i].T[1], s=0.5, linewidths=0.05)
 
 
-            ax_hist.bar(bin_edges[surf_index][:-1]*180.0/np.pi, hist[surf_index],
-                        width=np.diff(bin_edges[surf_index])*180.0/np.pi, align='edge',
-                        edgecolor='k', linewidth=0.1)
+        if np.isfinite(iota_values[surf_index]):
+            if surf_index > self.lcfs_index and np.isfinite(iota_values[surf_index - 1]):
+                ax_hist.plot(
+                    [surf_index - 1, surf_index],
+                    iota_values[surf_index - 1:surf_index + 1],
+                    color='0.6',
+                    linewidth=0.5,
+                )
+            point_color = 'tab:orange' if num_subsets[surf_index] > 1 else 'k'
+            ax_hist.scatter(surf_index, iota_values[surf_index], color=point_color,
+                            s=7, linewidths=0.0, zorder=2)
+            if num_subsets[surf_index] > 1:
+                ax_hist.plot(
+                    [surf_index - 0.35, surf_index + 0.35],
+                    [rational_iotas[surf_index]] * 2,
+                    color='tab:orange',
+                    linewidth=1.0,
+                )
 
         if not surface_inside_lcfs:
             return
 
-        if num_subsets[surf_index] == self.max_subsets:
-            surface_centers_geoAxis = self.centers_array[surf_index][phi_index].T
+        if num_subsets[surf_index] > 1:
+            surface_centers_geoAxis = self.centers_array[surf_index][phi_index][:num_subsets[surf_index]].T
         else:
             surface_centers_geoAxis = self.centers_array[surf_index][phi_index][0].T
 
@@ -333,13 +342,13 @@ class FluxCalculator:
         ax_rect.set_yticklabels(['', '2.5', '5', '7.5', '10', '12.5', '15', '17.5'])
         ax_rect.grid(linewidth=0.5, linestyle=':', c='grey')
         ax_rect.set_ylabel('[cm]', fontsize=8)
-        # histogram plot
-        ax_hist.set_xlim(0, 360)
-        ax_hist.set_xticks(np.arange(0, 361, 90))
+        # iota profile
+        ax_hist.set_xlim(self.lcfs_index - 1, self.nsurfaces)
         ax_hist.tick_params(axis='both', which='major', labelsize=6)
         ax_hist.grid(linewidth=0.5, linestyle=':', c='grey')
-        ax_hist.set_xlabel('Poloidal Angle $\\theta[\degree]$', fontsize=8)
-        ax_hist.set_ylabel('[#]', fontsize=8)
+        ax_hist.set_xlabel('Surface index', fontsize=8)
+        ax_hist.set_ylabel('Rotational transform $\\iota$', fontsize=8)
+        ax_hist.set_title('Orange: matched low-order rational', color='tab:orange', fontsize=7)
         # polar plot
         ax_polar.set_rlim(0, 0.19)
         ax_polar.tick_params(axis='both', which='major', labelsize=8) #,pad=10)
@@ -392,57 +401,81 @@ class FluxCalculator:
 
 
     def find_subsets(self, theta_r_pts, mag_axis):
-        """Function to find contiguous subsets of points in theta-r space
+        """Split a low-order rational surface into its island subsets.
+
+        Iota is the average poloidal winding per toroidal transit. Consecutive
+        points in a saved Poincare plane are consecutive toroidal transits, so
+        a surface near p/q visits its q islands cyclically. Striding the ordered
+        data by q therefore separates the island subsets.
+
         Args:
-            theta_r_pts (np.ndarray): Array of points in (theta, r) coordinates, wrt to the magnetic Axis.
-            mag_axis (np.ndarray): Magnetic axis position in (theta, r) coordinates, wrt to the geometric Axis.
+            theta_r_pts (np.ndarray): Ordered points in (theta, r) coordinates,
+                relative to the magnetic axis.
+            mag_axis (np.ndarray): Magnetic axis position in (theta, r)
+                coordinates, relative to the geometric axis.
 
         Returns:
             split_data (list): List of arrays containing the split data points wrt to magnetic axis.
             found_centers (np.ndarray): Array of found centers wrt to magnetic axis for each subset.
-            hist (np.ndarray): Histogram of point density vs theta.
-            bin_edges (np.ndarray): Edges of the bins used for the histogram.
-            wrapped_flag (bool): Flag indicating if the data wraps around.
+            iota (float): Measured rotational transform.
+            rational_value (float): Matched low-order rational iota, or NaN.
+            wrapped_flag (bool): False; retained for plotting compatibility.
         """
-        # build theta histogram to identify separated angular regions.
-        hist, bin_edges = np.histogram(theta_r_pts.T[0], bins=self.hist_bins, range=(0.0, 2*np.pi))
-        dtheta_bin = bin_edges[1] - bin_edges[0]
+        from fractions import Fraction
 
-        # find contiguous sets of non-zero bins
-        non_empty_bins = np.where(hist > 0)[0]
-        contiguous_sets = np.split(non_empty_bins, np.where(np.diff(non_empty_bins) != 1)[0]+1)
-        # if first and last bins are non-empty, then the first and last sets of bins are contiguous
-        if hist[0] > 0 and hist[-1] > 0 and len(contiguous_sets) > 1:
-            contiguous_sets[0] = np.concatenate((contiguous_sets[-1], contiguous_sets[0]))
-            contiguous_sets.pop()
-            wrapped_flag = True
-        else:
-            wrapped_flag = False
-        num_sets = len(contiguous_sets)
+        if self.max_subsets < 1:
+            raise ValueError("MAX_SUBSETS must be a positive integer.")
 
-        # split the data points into subsets
-        split_data_magAxis = []
+        wrapped_flag = False
+
+        def unsplit_surface():
+            unique_indices = np.unique(theta_r_pts[:, 0], return_index=True)[1]
+            surface_points = theta_r_pts[unique_indices]
+            surface_points = surface_points[np.argsort(surface_points[:, 0])]
+            return [surface_points], np.atleast_2d(mag_axis[:2])
+
+        toroidal_transits = len(theta_r_pts) - 1
+        if toroidal_transits < 1:
+            split_data_magAxis, found_centers = unsplit_surface()
+            return split_data_magAxis, found_centers, np.nan, np.nan, wrapped_flag
+
+        theta = theta_r_pts[:, 0]
+        radius = theta_r_pts[:, 1]
+        x = radius*np.cos(theta)
+        z = radius*np.sin(theta)
+        surface_center_x = 0.5*(x.min() + x.max())
+        surface_center_z = 0.5*(z.min() + z.max())
+        surface_center_theta = np.arctan2(surface_center_z, surface_center_x)
+        surface_center_radius = np.hypot(surface_center_x, surface_center_z)
+
+
+        surface_theta = axisShift(theta, radius, surface_center_theta, surface_center_radius)[0]
+        unwrapped_theta = np.unwrap(surface_theta)
+        
+        iota = abs((unwrapped_theta[-1] - unwrapped_theta[0]) / (2*np.pi*toroidal_transits))
+        rational_iota = Fraction(float(iota)).limit_denominator(self.max_subsets)
+        num_sets = rational_iota.denominator
+        rational_value = rational_iota.numerator / num_sets
+        iota_tolerance = 0.5 / toroidal_transits
+
+        if num_sets == 1 or abs(iota - rational_value) > iota_tolerance:
+            split_data_magAxis, found_centers = unsplit_surface()
+            return split_data_magAxis, found_centers, iota, np.nan, wrapped_flag
+
+        split_data_magAxis = [
+            np.array(theta_r_pts[offset::num_sets], copy=True) for offset in range(num_sets)
+        ]
+
+        if any(len(subset_points) <= 3 for subset_points in split_data_magAxis):
+            split_data_magAxis, found_centers = unsplit_surface()
+            return split_data_magAxis, found_centers, iota, np.nan, wrapped_flag
+
         found_centers = np.zeros([num_sets, 2])
-        for i, contiguous_set in enumerate(contiguous_sets):
-            subset_points = []
-            lower_bound = contiguous_set*dtheta_bin
-            upper_bound = lower_bound + dtheta_bin
-            # append data within each bin belonging to the subset
-            for lo, hi in zip(lower_bound, upper_bound):
-                mask = (theta_r_pts[:, 0] >= lo) & (theta_r_pts[:, 0] < hi)
-                subset_points += list(theta_r_pts[mask])
-            subset_points = np.array(subset_points)
-            subset_points = subset_points[np.argsort(subset_points[:, 0])] # sort by theta
+        for subset_index, subset_points in enumerate(split_data_magAxis):
+            found_centers[subset_index] = self.find_axis(subset_points[:, 0], subset_points[:, 1], self.field)
+            split_data_magAxis[subset_index] = subset_points[np.argsort(subset_points[:, 0])]
 
-            # split if the # of sets is equal to input 'MAX_SUBSETS':
-            if num_sets == self.max_subsets:
-                found_centers[i][:] = self.find_axis(subset_points.T[0], subset_points.T[1], self.field)
-                split_data_magAxis += [subset_points]
-            else: # keep the original magnetic axis
-                found_centers[i][:] = mag_axis[:2]
-                split_data_magAxis = [theta_r_pts]
-
-        return split_data_magAxis, found_centers, hist, bin_edges, wrapped_flag
+        return split_data_magAxis, found_centers, iota, rational_value, wrapped_flag
 
 
     def identify_surface_subsets(self, flux_surfaces, mag_axis):
@@ -451,8 +484,8 @@ class FluxCalculator:
 
         For each flux surface in the specified range, this method:
         - Shifts the origin of (r, theta) coordinates to the magnetic axis.
-        - Sorts the data and removes duplicate theta values.
-        - Finds subsets (potential magnetic islands) and their local centers.
+        - Calculates iota from the ordered Poincare crossings.
+        - Splits low-order rational surfaces by striding the ordered crossings.
         - Computes mean radii for each subset.
         - Identifies the island (subset) with the smallest mean radius among surfaces with multiple subsets.
 
@@ -465,33 +498,28 @@ class FluxCalculator:
             num_subsets (np.ndarray): Array of the number of subsets found for each surface.
             split_data_magAxis (list): List of lists containing subset data wrt to magnetic axis for each surface.
             surface_axes_magAxis (list): List of local centers wrt to magnetic axis for each subset in each surface.
-            hist_data (tuple): Tuple containing (hist, bin_edges, wrap_flag) for each surface, useful for diagnostics or plotting.
+            iota_data (tuple): Measured iota, matched rational iota, and wrap
+                flags for each surface, used for diagnostics and plotting.
         """
         num_subsets = np.zeros(self.nsurfaces, dtype=int)
         set_mean_rads = np.zeros(self.nsurfaces)
         split_data_magAxis = [0]*self.nsurfaces
         surface_axes_magAxis = [0]*self.nsurfaces
-        hist = [0]*self.nsurfaces
-        bin_edges = [0]*self.nsurfaces
+        iota_values = np.full(self.nsurfaces, np.nan)
+        rational_iotas = np.full(self.nsurfaces, np.nan)
         wrap_flag = [0]*self.nsurfaces
         for surf_index in range(self.lcfs_index, self.nsurfaces):
             th_in, r_in = flux_surfaces[surf_index]
-            r_in = r_in[~np.isnan(r_in)]
-            th_in = th_in[~np.isnan(th_in)]
+            finite = np.isfinite(th_in) & np.isfinite(r_in)
+            th_in = th_in[finite]
+            r_in = r_in[finite]
             # shift origin of r, theta coords from geo center to mag axis
             pts_tr_magAxis = axisShift(th_in, r_in, *mag_axis).T
-            # remove duplicate theta values and sort data in increasing theta
-            unique_indices = np.unique(pts_tr_magAxis[:, 0], return_index=True, return_counts=False)[1:]
-            pts_tr_magAxis = pts_tr_magAxis[unique_indices]
-            pts_tr_magAxis = pts_tr_magAxis[np.argsort(pts_tr_magAxis[:, 0])]
 
             # Find subsets and local centers. Returned points are in the magnetic-axis frame.
-            output_histogram_method = self.find_subsets(pts_tr_magAxis, mag_axis)
-            hist[surf_index], bin_edges[surf_index] = output_histogram_method[2:4]
-            wrap_flag[surf_index] = output_histogram_method[-1]
-
-            if self.island_algorithm == 'histogram':  output = output_histogram_method
-            else: raise ValueError(f"Unknown ISLAND_ALGORITHM: {self.island_algorithm}")
+            output = self.find_subsets(pts_tr_magAxis, mag_axis)
+            iota_values[surf_index], rational_iotas[surf_index] = output[2:4]
+            wrap_flag[surf_index] = output[-1]
 
             # initialize split_data with data w.r.t. magnetic axis
             split_data_magAxis[surf_index], surface_axes_magAxis[surf_index] = output[:2]
@@ -514,14 +542,20 @@ class FluxCalculator:
 
         # find the index of the islands of smallest radius
         island_indices = np.where(num_subsets > 1)[0]
+        self.smallest_island_indices = {}
+        for subset_count in np.unique(num_subsets[island_indices]):
+            matching_indices = island_indices[num_subsets[island_indices] == subset_count]
+            self.smallest_island_indices[subset_count] = matching_indices[
+                np.argmin(set_mean_rads[matching_indices])
+            ]
         if island_indices.size > 0: smallest_island_index = island_indices[np.argmin(set_mean_rads[island_indices])]
         else: smallest_island_index = self.nsurfaces - 1  #If no islands found, return the last surface index
 
         if np.any(np.isnan(surface_axes_magAxis[smallest_island_index])):
             print('NaN detected in smallest island centers!!!!')
             print(f'{surface_axes_magAxis[smallest_island_index]=}' )
-        hist_data = (hist, bin_edges, wrap_flag)
-        return smallest_island_index, num_subsets, split_data_magAxis, surface_axes_magAxis, hist_data
+        iota_data = (iota_values, rational_iotas, wrap_flag)
+        return smallest_island_index, num_subsets, split_data_magAxis, surface_axes_magAxis, iota_data
 
 
     def init_plotting(self):
@@ -675,7 +709,8 @@ class FluxCalculator:
 
         # align current island subsets with the smallest island reference set
         if num_subsets > 1:
-            shifted_subcenters, shiftint = self.shift_the_subcenters(surf_index, smallest_island_index,
+            reference_island_index = self.smallest_island_indices[num_subsets]
+            shifted_subcenters, shiftint = self.shift_the_subcenters(surf_index, reference_island_index,
                                                                      subset_centers, num_subsets, wrap_flag[surf_index] )
         else: shiftint = 0
         # loop through subsets to spline, calculate flux, create regularly-spaced points
@@ -685,12 +720,12 @@ class FluxCalculator:
             current_data = np.array(subset_data[surf_index][subset_idx], copy=True)
 
             # shift data points from [rel. to magaxis] to [rel. to the centers of the smallest islands]
-            if num_subsets == self.max_subsets:
+            if num_subsets > 1:
                 current_data = axisShift(current_data[:, 0], current_data[:, 1], *current_center).T
                 current_data = axisShift(current_data[:, 0], current_data[:, 1], *shifted_subcenters[subset_idx]).T
 
                 current_data = current_data[np.argsort(current_data[:, 0])]
-                current_center = subset_centers[smallest_island_index][subset_idx-shiftint]
+                current_center = subset_centers[reference_island_index][subset_idx-shiftint]
                 subCenters_geo[subset_idx][:] = axisShift(*current_center, *mag_axis_rev)
             else:
                 subCenters_geo[subset_idx] = current_center
