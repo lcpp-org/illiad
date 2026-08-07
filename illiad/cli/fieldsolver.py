@@ -29,11 +29,28 @@ _CLI_INPUTS = object()
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ILLIAD Biot-Savart magnetic field generation.")
     parser.add_argument(
-        "--inputs-json",
+        "inputs_path",
+        nargs="?",
+        metavar="INPUTS",
+        help="Optional positional path to the workflow JSON input.",
+    )
+    inputs_group = parser.add_mutually_exclusive_group()
+    inputs_group.add_argument(
+        "--inputs",
+        dest="inputs",
         default=None,
         help="Optional path to a JSON object overriding built-in workflow defaults.",
     )
-    return parser.parse_args()
+    inputs_group.add_argument(
+        "--inputs-json",
+        dest="inputs",
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    if args.inputs_path is not None and args.inputs is not None:
+        parser.error("provide INPUTS or --inputs, not both")
+    args.inputs = args.inputs if args.inputs is not None else args.inputs_path
+    return args
 
 def biotsavart_mesh(mesh, filament, current, Npoints):
     """Calculates the magnetic field on a mesh of Cartesian points using the Biot-Savart Law for a single current filament.
@@ -113,7 +130,7 @@ def main(input_overrides=_CLI_INPUTS):
     The results are saved to a specified output file."""
     if input_overrides is _CLI_INPUTS:
         args = parse_args()
-        input_overrides = load_inputs_json(args.inputs_json, "Fieldsolver inputs") if args.inputs_json else None
+        input_overrides = load_inputs_json(args.inputs, "Fieldsolver inputs") if args.inputs else None
     params = merge_input_params(DEFAULT_INPUTS, input_overrides)
 
     ## READ COIL INPUT FILE
