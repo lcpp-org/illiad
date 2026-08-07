@@ -242,6 +242,12 @@ but production-size particle tracing is intended for a CUDA-capable GPU.
    truncation is disabled by default and can be restored with
    `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`.
 
+   To generate an electric field directly from an existing regular scalar
+   field, set `RUN_INTERPOLATOR` to `false` and set `INPUT_FIELD_NAME` to its
+   path relative to `output/<ANLYS_DIR>/data/`. The gradientor retains the
+   normal Efield output and diagnostic plots without rerunning flux
+   interpolation.
+
    The optional
    `misc_scripts/plot_flux_interpolation_comparison.py` utility creates a
    minimal 2D-versus-3D cross-section, difference, and toroidal-lineout

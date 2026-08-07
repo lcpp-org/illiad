@@ -30,7 +30,7 @@ from misc_scripts.connection_lengths_outside_lcfs import (
 
 # DATA AND OUTPUT SETTINGS
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-DATA_SUBDIR = "ConLenVolume_REDO_250spins_rk2mm"
+DATA_SUBDIR = "ConLenVolume_REDO_500spins_rk1mm"
 OUTPUT_SUBDIR = DATA_SUBDIR
 
 # None replots every saved plane. A single number or an iterable of numbers
@@ -43,17 +43,17 @@ OUTPUT_FILENAME = "connection_length_{phi_deg:03.0f}_replot.png"
 
 # PLOT SETTINGS
 FIGSIZE = (7, 6)
-DPI = 300
+DPI = 250
 
 COLOR_SCALE = "log"       # "log" or "linear"
 COLORMAP = "afmhot"      # Any Matplotlib colormap
-N_LEVELS = 50
+N_LEVELS = 100
 VMIN = None               # None uses the minimum positive saved value
 VMAX = None               # None uses the maximum positive saved value
 CONTOUR_EXTEND = "both"   # "auto", "neither", "both", "min", or "max"
 MASK_COLOR = "white"
 ANTIALIASED = False
-PLOT_MAX_SAMPLES = 150_000  # None disables deterministic plot-only thinning
+PLOT_MAX_SAMPLES = 150_000*9  # None disables deterministic plot-only thinning
 PLOT_SAMPLE_SEED = 0
 
 # Triangles whose centroid or any edge midpoint lies inside the LCFS are
@@ -63,7 +63,7 @@ MASK_LCFS_INTERIOR = True
 SHOW_RAW_POINTS = False
 RAW_POINT_COLOR = "black"
 RAW_POINT_SIZE = 0.1
-RAW_POINT_ALPHA = 0.4
+RAW_POINT_ALPHA = 0.7
 RAW_POINT_ZORDER = 5
 
 SHOW_LCFS = True
@@ -90,12 +90,12 @@ ASPECT = "equal"
 X_LABEL = r"$x=\rho\cos\theta$ [m]"
 Y_LABEL = r"$z=\rho\sin\theta$ [m]"
 
-SHOW_GRID = True
+SHOW_GRID = False
 GRID_COLOR = "0.75"
 GRID_LINEWIDTH = 0.4
 GRID_ALPHA = 1.0
 
-SHOW_LEGEND = True
+SHOW_LEGEND = False
 LEGEND_LOCATION = "upper right"
 
 COLORBAR_LABEL = "Connection length [m]"
