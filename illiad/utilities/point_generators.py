@@ -13,6 +13,32 @@ import torch
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
+def _filter_unique_poincare_pairs(thetas, radii):
+    """Jointly filter nonfinite values and remove exact duplicate pairs."""
+    thetas = np.asarray(thetas)
+    radii = np.asarray(radii)
+    if thetas.shape != radii.shape:
+        raise ValueError(
+            f"Poincare theta and radius arrays must have matching shapes; "
+            f"got {thetas.shape} and {radii.shape}"
+        )
+
+    finite = np.isfinite(thetas) & np.isfinite(radii)
+    finite_thetas = thetas[finite]
+    finite_radii = radii[finite]
+    pairs = np.column_stack((finite_thetas, finite_radii))
+
+    if pairs.size:
+        _, first_indices = np.unique(pairs, axis=0, return_index=True)
+        keep_indices = np.sort(first_indices)
+        finite_thetas = finite_thetas[keep_indices]
+        finite_radii = finite_radii[keep_indices]
+
+    nonfinite_count = int(thetas.size - np.count_nonzero(finite))
+    duplicate_count = int(np.count_nonzero(finite) - finite_thetas.size)
+    return finite_thetas, finite_radii, nonfinite_count, duplicate_count
+
+
 def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, genNormals=False, Efield=None, outputHandler='simIO'):
     """
     Generates seed points on the last closed flux surface (LCFS) for a given magnetic field configuration.
@@ -39,18 +65,19 @@ def generateSeedShells(drList, Ntheta, phi_array, lcfs_index, filename, Bfield, 
     outputHandler.log.info('GENERATING SEED POINTS FOR LCFS INDEX: {}'.format(lcfs_index))
 
     for phi_gen_deg in phi_array:
-        input_filename = 'Poincare_{:03d}.npy'.format(phi_gen_deg)
+        input_filename = 'Poincare_{:03.0f}.npy'.format(phi_gen_deg)
         th_in, r_in = outputHandler.loadNumpyData(input_filename, subdir="Poincare", mmap_mode='r')[lcfs_index]
-        r_in = r_in[~np.isnan(r_in)]
-        th_in = th_in[~np.isnan(th_in)]
+        th_in, r_in, nonfinite_count, duplicate_count = _filter_unique_poincare_pairs(
+            th_in, r_in
+        )
+        # outputHandler.log.info(
+        #     f"{input_filename}, surface {lcfs_index}: removed "
+        #     f"{nonfinite_count} nonfinite samples and {duplicate_count} exact "
+        #     f"duplicate (theta, rho) pairs; retained {th_in.size}"
+        # )
 
-        phi_deg = int(phi_gen_deg)
+        phi_deg = float(phi_gen_deg)
         phi_rad = phi_gen_deg * np.pi / 180.
-
-        # hack solution, need to determine why an extra 30 copies of 1 initial condition are being appended to this event
-        if phi_deg == 324:
-            r_in = r_in[30:]
-            th_in = th_in[30:]
         th_size = th_in.size
 
         # find the centroid(?) by average positions
@@ -267,9 +294,9 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     """
     Generates initial velocities for particles following a Maxwell-Boltzmann energy distribution.
 
-    The function samples random directions uniformly over a hemisphere and scales the velocities
-    according to the specified ion temperature. The resulting velocity vectors are rotated to align
-    with the provided surface normals.
+    The function samples cosine-weighted directions over the outward hemisphere and scales the
+    velocities according to the specified ion temperature. The resulting velocity vectors are
+    rotated to align with the provided surface normals.
 
     Args:
         N_particles (int): Number of particles to generate velocities for.
@@ -284,12 +311,15 @@ def generate_MB_velocities(N_particles, normals_list, ion_temp, ion_mass, nparti
     outputHandler.log.info(f'GENERATING INITIAL VELOCITIES (MAXWELLIAN DIST., T={ion_temp}eV):')
     kg_per_amu = 1.660_539_068E-27
     kboltz = 1.602_176_634E-19 # Joules/eV
-    r = np.random.uniform(0, 1, N_particles)
 
-    z = np.sqrt(1 - r**2)
-    phi = np.random.uniform(0, 2*np.pi, N_particles)
-    x = r * np.cos(phi)
-    y = r * np.sin(phi)
+    # Cosine-weighted hemispherical emission: p(mu) = 2*mu for
+    # mu = cos(angle from the outward normal), so mu = sqrt(U).
+    mu = np.sqrt(np.random.uniform(0, 1, N_particles))
+    sin_angle = np.sqrt(1 - mu**2)
+    azimuth = np.random.uniform(0, 2*np.pi, N_particles)
+    x = sin_angle * np.cos(azimuth)
+    y = sin_angle * np.sin(azimuth)
+    z = mu
     velocity_array = np.stack([x, y, z], axis=1) # shape (N, 3)
 
     # GENERATE NORMAL DISTRIBUTION OF SPEEDS
@@ -333,7 +363,7 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
     dr_String = delimiter.join(str(int(dr*1000)) for dr in deltrs)
 
     ## GENERATE INITIAL POSITIONS
-    phiGen_arr = np.arange(360//nphi, 361, 360//nphi, dtype=int).tolist()
+    phiGen_arr = np.linspace(360.0 / nphi, 360.0, nphi)
     seed_list, normals_list =  generateSeedShells(deltrs, ntheta, phiGen_arr, lcfs_index, 'IonSeedPts_{}mm'.format(dr_String),
                                                     bfield, Efield=efield, genNormals=True, outputHandler=outputHandler)
     ## GENERATE INITIAL VELOCITIES
@@ -341,20 +371,24 @@ def ionInitializer(initial_conditions, ion_properties, bfield, efield, outputHan
                                            ion_temp=temperature, ion_mass=mass,
                                            nparticles_per_emitter=nparticles_per_emitter, outputHandler=outputHandler)
 
-    initVelPos = np.zeros((nparticles_per_emitter*n_emitters, 6))
-    ion_list = []
-    for i in range(nparticles_per_emitter):
-        # instantiating ions in a list
-        ion_list += [Ion(seed_pt, mass, charge) for seed_pt in seed_list]
-        # parsing the initial velocities and positions into a single array for output
-        starti = i*n_emitters
-        stopi = starti + n_emitters
-        initVelPos[starti:stopi, 0:3] = initVel_array[starti:stopi]
-        initVelPos[starti:stopi, 3:6] = np.array(seed_list)
+    # Keep every particle-related array emitter-major:
+    # (emitter, particle copy, coordinate) -> flattened particle dimension.
+    seed_array = np.asarray(seed_list, dtype=np.float64)
+    normal_array = np.asarray(normals_list, dtype=np.float64)
+    position_by_emitter = np.repeat(seed_array[:, None, :], nparticles_per_emitter, axis=1)
+    normal_by_emitter = np.repeat(normal_array[:, None, :], nparticles_per_emitter, axis=1)
+    velocity_by_emitter = initVel_array.reshape(n_emitters, nparticles_per_emitter, 3)
+
+    initial_positions = position_by_emitter.reshape(n_particles, 3)
+    initial_normals = normal_by_emitter.reshape(n_particles, 3)
+    initial_velocities = velocity_by_emitter.reshape(n_particles, 3)
+
+    ion_list = [Ion(seed_pt, mass, charge) for seed_pt in initial_positions]
+    initVelPos = np.hstack((initial_velocities, initial_positions))
 
     ## SET INITIAL STATES AND OUTPUT(?necessary?)
-    for ion, v_0 in zip(ion_list, initVel_array):
+    for ion, v_0 in zip(ion_list, initial_velocities):
         ion.initVelocity(v_0)
         #ion.initOutput(DT, TMAX)
 
-    return ion_list, initVelPos
+    return ion_list, initVelPos, initial_normals

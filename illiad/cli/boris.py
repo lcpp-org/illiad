@@ -17,6 +17,7 @@ import argparse
 import numpy as np
 import illiad.utilities.physical_constants as const
 from illiad.boris import Boris
+from illiad.collisions import Collisions
 from illiad.mesh import TorchMesh
 from illiad.io import IOHandler
 from illiad.utilities.point_generators import ionInitializer
@@ -31,14 +32,13 @@ DEFAULT_INPUTS = {
 
     "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
     "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
-    "ION_NEUTRAL_COLLISIONS": "langevin_in_hstep",
-    "ION_ION_COLLISIONS": "fokker_planck_ii_hstep",
+    "ION_NEUTRAL_COLLISIONS": "langevin",
+    "ION_ION_COLLISIONS": "fokker_planck",
 
     "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He",
     "NEUTRAL_GAS_TEMP_EV": 0.025,
     "NEUTRAL_GAS_DENSITY": 3e18,
-    "BACKGROUND_ION_TEMP_EV": 2.0,
     "PLASMA_DENSITY": 5e18,
     "ION_ELECTRON_SAT_CURRENT_RATIO": 0.5,
 
@@ -70,11 +70,28 @@ _CLI_INPUTS = object()
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Boris ion tracking from a JSON input file.")
     parser.add_argument(
-        "--inputs-json",
+        "inputs_path",
+        nargs="?",
+        metavar="INPUTS",
+        help="Optional positional path to the workflow JSON input.",
+    )
+    inputs_group = parser.add_mutually_exclusive_group()
+    inputs_group.add_argument(
+        "--inputs",
+        dest="inputs",
         default=None,
         help="Optional path to a JSON object overriding built-in workflow defaults.",
     )
-    return parser.parse_args()
+    inputs_group.add_argument(
+        "--inputs-json",
+        dest="inputs",
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    if args.inputs_path is not None and args.inputs is not None:
+        parser.error("provide INPUTS or --inputs, not both")
+    args.inputs = args.inputs if args.inputs is not None else args.inputs_path
+    return args
 
 
 def resolve_plasma_potential(params):
@@ -102,6 +119,18 @@ def boris_runner(params):
     stride = int(params["STRIDE"])
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
+
+    collision_resolver = Collisions()
+    params["ION_NEUTRAL_COLLISIONS"] = (
+        collision_resolver._resolve_ion_neutral_collision_model(
+            params["ION_NEUTRAL_COLLISIONS"]
+        )
+    )
+    params["ION_ION_COLLISIONS"] = (
+        collision_resolver._resolve_ion_ion_collision_model(
+            params["ION_ION_COLLISIONS"]
+        )
+    )
 
     m_gas_amu = const.get_species_mass_amu(params["BACKGROUND_GAS_SPECIES"])
     params["M_GAS_AMU"] = m_gas_amu
@@ -154,30 +183,39 @@ def boris_runner(params):
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
     init_conds = [params["LCFS_INDEX"], params["NPHI"], params["NTHETA"], params["DELTRS"], params["NPARTICLES_PER_EMITTER"]]
     ion_properties = [params["ION_MASS"], params["CHARGE_NUM"], params["ION_TEMP"]]
-    ion_list, initVelPos = ionInitializer(init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO)
+    ion_list, initVelPos, initial_normals = ionInitializer(
+        init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO
+    )
 
     ## SAVE THE INITIAL VELOCITIES AND POSITIONS AS COMBINED ARRAY
     IC_filename = 'initVelPos'
     simIO.saveNumpyData(initVelPos, IC_filename)
     simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 
+    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
+    ion_tracer.plotInitEnergies(initVelPos, params["ION_MASS"], runString=cond_string+params["TAG"], simIO=simIO)
+    ion_tracer.plotInitVelocities(
+        initVelPos, initial_normals, Rmajor=b_hidra.R0,
+        runString=cond_string+params["TAG"], simIO=simIO,
+    )
+
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## RUN BORIS SOLVER FOR PARTICLES ##
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
     ## Regularly-spaced tracker grid: adjust TRACK_NPHI and TRACK_NTHETA as needed.
     ## Selects all NPARTICLES_PER_EMITTER copies for each grid location.
-    ## Particle layout: block p (0..NPARTICLES_PER_EMITTER-1) starts at p*N_emitters;
-    ## within a block: phi_i * len(DELTRS) * NTHETA + dr_j * NTHETA + theta_k
+    ## Particle layout is emitter-major: each emitter has a contiguous block of
+    ## NPARTICLES_PER_EMITTER particles. Tracking samples the first DELTRS shell.
     _track_phi_idx   = np.round(np.linspace(0, params["NPHI"]                  - 1, params["TRACK_NPHI"]                  )).astype(int)
     _track_theta_idx = np.round(np.linspace(0, params["NTHETA"]                - 1, params["TRACK_NTHETA"]                )).astype(int)
     _track_p_idx     = np.round(np.linspace(0, params["NPARTICLES_PER_EMITTER"]- 1, params["TRACK_NPARTICLES_PER_EMITTER"])).astype(int)
-    particle_tracker_list = [int(p) * N_emitters + int(pi * len(params["DELTRS"]) * params["NTHETA"] + theta_i)
+    particle_tracker_list = [(int(pi) * len(params["DELTRS"]) * params["NTHETA"] + int(theta_i))
+                             * params["NPARTICLES_PER_EMITTER"] + int(p)
                                 for pi in _track_phi_idx
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
 
-    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
-    ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["BACKGROUND_ION_TEMP_EV"],
+    ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["ION_TEMP"],
                              n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
                                                                                     Efield=e_hidra,
@@ -219,7 +257,7 @@ def boris_runner(params):
 def main(input_params_override=_CLI_INPUTS):
     if input_params_override is _CLI_INPUTS:
             args = parse_args()
-            input_params_override = load_inputs_json(args.inputs_json, "Boris inputs") if args.inputs_json else None
+            input_params_override = load_inputs_json(args.inputs, "Boris inputs") if args.inputs else None
     params = merge_input_params(DEFAULT_INPUTS, input_params_override)
     boris_runner(params)
 

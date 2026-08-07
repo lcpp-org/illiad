@@ -281,7 +281,7 @@ class IOHandler:
                       +'\n| LOADED BACKGROUND GAS SPECIES: {}'.format(param_values["BACKGROUND_GAS_SPECIES"])
                       +'\n| LOADED BACKGROUND GAS MASS: {:.6f} amu'.format(param_values["M_GAS_AMU"])
                       +'\n| LOADED NEUTRAL GAS TEMPERATURE: {} eV'.format(param_values["NEUTRAL_GAS_TEMP_EV"])
-                      +'\n| LOADED BACKGROUND ION TEMPERATURE: {} eV'.format(param_values["BACKGROUND_ION_TEMP_EV"])
+                      +'\n| LOADED BACKGROUND ION TEMPERATURE: {} eV'.format(param_values["ION_TEMP"])
                       +'\n| ION/ELECTRON SATURATION CURRENT RATIO: {}'.format(param_values["ION_ELECTRON_SAT_CURRENT_RATIO"])
                       +'\n| LOADED DENSITY FIELD DATA FROM: {}'.format(param_values["FIELD_FILE_DENSITY"])
                       +'\n| ION-NEUTRAL COLLISIONS: {}'.format(param_values["ION_NEUTRAL_COLLISIONS"])

@@ -9,13 +9,13 @@
   "IC_THETA_DEG": 180.0,
   "START_RADIUS": 0.150,
   "END_RADIUS": 0.020,
-  "NLINES": 53,
-  "SPINS": 600,
+  "NLINES": 105,
+  "SPINS": 1000,
   "NPLANES": 360,
 
   "SOLVER": "LSODA",
   "RTOL": 2.49e-12,
-  "ATOL": 1e-8,
+  "ATOL": 1e-9,
   "NTHREADS": -1,
   "DOUBLE_LINE": false,
 

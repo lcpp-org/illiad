@@ -36,8 +36,10 @@ def normalize_phi_gens(input_params):
         return input_params
 
     nphi = int(input_params["NPHI"])
+    if nphi < 1:
+        raise ValueError("NPHI must be a positive integer")
     if "PHI_GENs" not in input_params or input_params["PHI_GENs"] is None:
-        input_params["PHI_GENs"] = np.linspace(360 // nphi, 360, nphi)
+        input_params["PHI_GENs"] = np.linspace(360.0 / nphi, 360.0, nphi)
     else:
-        input_params["PHI_GENs"] = np.asarray(input_params["PHI_GENs"])
+        input_params["PHI_GENs"] = np.asarray(input_params["PHI_GENs"], dtype=float)
     return input_params

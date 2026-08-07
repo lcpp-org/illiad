@@ -1,40 +1,72 @@
 # Release Contents
 
-This file defines what belongs in public source releases and Python package
-artifacts. It is intentionally narrower than the full working tree used during
-research runs.
+This file describes the intended public source distribution and installed
+Python package. Release artifacts are narrower than the research working tree.
 
-## Include
+## Installed Distribution
 
-- Source code in `illiad/` and standalone viewers in `fastplotlib_tests/`.
-- Command implementations under `illiad/cli/` and direct-execution launchers:
+The wheel contains:
+
+- The `illiad` package, including `illiad.cli`, `illiad.flux`, `illiad.mesh`,
+  `illiad.sol`, and the Poincare, Boris, collision, IO, particle, utility, and
+  plotting modules.
+- `fastplotlib_tests` standalone viewer modules.
+- Distribution metadata, dependencies, the GPL-3.0-only license, and eight
+  command entry points:
+  `illiad-fieldsolver`, `illiad-poincare`, `illiad-flux-calc`,
+  `illiad-flux-grad`, `illiad-sol-trace`, `illiad-sol-density`,
+  `illiad-sol-potential`, and `illiad-boris`.
+
+`illiad-sol-density` and `illiad-sol-potential` are intentionally lightweight
+placeholder entry points. They contain no profile implementation and do not
+pull `misc_scripts` into the installed distribution.
+
+Root launchers, example JSON files, documentation sources, and reference input
+files are source-distribution resources; callers should not assume they are
+runtime files beside an installed wheel.
+
+## Source Distribution
+
+The source archive includes:
+
+- `README.md`, `CHANGELOG.md`, `LICENSE`, `pyproject.toml`, `MANIFEST.in`, and
+  Markdown files under `docs/`.
+- Root launchers:
   `runFieldsolver.py`, `runPoincare.py`, `runFluxCalc.py`, `runFluxGrad.py`,
-  and `runBoris.py`.
-- Example configuration files: `fieldsolver_inputs.json`,
-  `poincare_inputs.json`, `flux_calc_inputs.json`, `flux_grad_inputs.json`,
-  `boris_inputs.json`, and `animation_inputs.json`.
-- Project metadata: `pyproject.toml`, `README.md`, `LICENSE`, and
-  `MANIFEST.in`.
-- Small reference input files under `input_files/`, such as CSV geometry files,
-  profile tables, and `coils.wega_with_VFCoils`.
+  `runSOLTrace.py`, `runSOLDensity.py`, `runSOLPotential.py`, and
+  `runBoris.py`.
+- Complete tracked JSON templates under `input_files/`:
+  `fieldsolver_inputs.example.json`, `poincare_inputs.example.json`,
+  `flux_calc_inputs.example.json`, `flux_grad_inputs.example.json`,
+  `sol_trace_inputs.example.json`, `boris_inputs.example.json`, and
+  `animation_inputs.example.json`.
+- Python sources under `illiad/` and `fastplotlib_tests/`.
+- Small reference CSV files and `input_files/coils.wega_with_VFCoils`.
 
-## Exclude
+SOL tracing is implemented by `illiad.sol.SOLTracer` and
+`illiad-sol-trace`. Density and potential implementation modules are not
+included until their official analysis classes are ready.
 
+## Excluded Content
+
+- The complete `misc_scripts/` research-script directory.
+- Local working JSON files under `input_files/`; only `*.example.json`
+  templates are included.
 - Generated analysis products under `output/`.
-- Python caches, test caches, virtual environments, editor state, local
-  installers, and cluster job files.
-- Large generated scientific arrays such as `.npy`, `.npz`, `.h5`, and `.hdf5`
-  field/profile files under `input_files/`.
-- Manuscript drafts and large diagnostic measurement folders under
-  `input_files/`.
-- Legacy and development scripts under `misc_scripts/`.
+- Python/test caches, virtual environments, editor state, installers, object
+  files, and cluster job/output files.
+- Large generated scientific arrays such as `.npy`, `.npz`, `.h5`, and
+  `.hdf5` inputs.
+- Figures, videos, logs, spreadsheets, and PDF model/manuscript files.
+- Large diagnostic or measurement directories such as
+  `input_files/RLP_Results/`.
 
 ## Data Policy
 
-The source release should be installable and inspectable without bundled large
-simulation data. Public examples may refer to generated field files, but large
-arrays should be distributed separately through a DOI-backed archive, Git LFS,
-or a documented data-download step.
+The package is installable and inspectable without production-size fields or
+run results. Examples may refer to locally generated arrays, but those arrays
+should be distributed separately through an archival data record, Git LFS, or
+a documented download step.
 
-Small reference files that are required to understand geometry, ports, coil
-definitions, or default profiles may stay in git and in source distributions.
+A scientific result should retain the ILLIAD version, configuration inputs,
+dependency environment, and provenance for separately distributed data.

@@ -29,11 +29,20 @@ DEFAULT_INPUTS = {
     "INV_SURF_INDICES": [],
     "GUESS_PHI_INDEX": -3,
     "OUTPUT_FILE_NAME": "LCFS30alpha1p0",
+    "RUN_INTERPOLATOR": True,
+    "INPUT_FIELD_NAME": None,
 
     "RBF_KERNEL": "multiquadric",
-    "RBF_NEIGHBORS": 45,
+    "RBF_NEIGHBORS": 128,
     "RBF_SMOOTHING": 1.0,
     "RBF_EPSILON": 1000.0,
+    "FLUX_INTERPOLATION_MODE": "3d",
+    "RBF_PHI_HALF_WINDOW": 2,
+    "RBF_PHI_SCALE": 0.72,
+    "RBF_POINTS_PER_SURFACE_PER_PHI": 72,
+
+    "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS": False,
+    "GRADIENT_FILTER_BUFFER": 0.01,
 }
 _CLI_INPUTS = object()
 
@@ -41,11 +50,28 @@ _CLI_INPUTS = object()
 def parse_args():
     parser = argparse.ArgumentParser(description="Run ILLIAD flux interpolation and gradient generation.")
     parser.add_argument(
-        "--inputs-json",
+        "inputs_path",
+        nargs="?",
+        metavar="INPUTS",
+        help="Optional positional path to the workflow JSON input.",
+    )
+    inputs_group = parser.add_mutually_exclusive_group()
+    inputs_group.add_argument(
+        "--inputs",
+        dest="inputs",
         default=None,
         help="Optional path to a JSON object overriding built-in workflow defaults.",
     )
-    return parser.parse_args()
+    inputs_group.add_argument(
+        "--inputs-json",
+        dest="inputs",
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    if args.inputs_path is not None and args.inputs is not None:
+        parser.error("provide INPUTS or --inputs, not both")
+    args.inputs = args.inputs if args.inputs is not None else args.inputs_path
+    return args
 
 
 def setup_IO(params, log_name, logger_name):
@@ -78,7 +104,7 @@ def setup_field(params):
 def main(input_overrides=_CLI_INPUTS):
     if input_overrides is _CLI_INPUTS:
         args = parse_args()
-        input_overrides = load_inputs_json(args.inputs_json, "Flux gradient inputs") if args.inputs_json else None
+        input_overrides = load_inputs_json(args.inputs, "Flux gradient inputs") if args.inputs else None
     params = merge_input_params(DEFAULT_INPUTS, input_overrides)
 
     b_hidra = setup_field(params)
@@ -86,31 +112,43 @@ def main(input_overrides=_CLI_INPUTS):
     ## RUN ANALYSIS
     normalize_phi_gens(params)
 
-    interpIO = setup_IO(params, log_name="fluxInterpolator.log", logger_name="FluxInterpolator")
-    log_inputs(interpIO, "FLUX INTERPOLATOR INPUTS", params,
-        [
-            "ANLYS_DIR",
-            "ANLYS_SUBDIR",
-            "CURRENT_TOR",
-            "CURRENT_HEL",
-            "CONFIG_TOR",
-            "CONFIG_HEL",
-            "ENABLE_ERRFIELD",
-            "LCFS_INDEX",
-            "SMALLEST_ISLAND_INDEX",
-            "PHI_GENs",
-            "MAX_SUBSETS",
-            "ALPHA",
-            "INV_SURF_INDICES",
-            "GUESS_PHI_INDEX",
-            "OUTPUT_FILE_NAME",
-            "RBF_KERNEL",
-            "RBF_NEIGHBORS",
-            "RBF_SMOOTHING",
-            "RBF_EPSILON",
-        ],)
-    flux_interpolator = FluxInterpolator(interpIO, b_hidra, params)
-    flux_interpolator.run()
+    run_interpolator = params["RUN_INTERPOLATOR"]
+    if not isinstance(run_interpolator, bool):
+        raise ValueError("RUN_INTERPOLATOR must be a boolean")
+    if run_interpolator:
+        interpIO = setup_IO(
+            params,
+            log_name="fluxInterpolator.log",
+            logger_name="FluxInterpolator",
+        )
+        log_inputs(interpIO, "FLUX INTERPOLATOR INPUTS", params,
+            [
+                "ANLYS_DIR",
+                "ANLYS_SUBDIR",
+                "CURRENT_TOR",
+                "CURRENT_HEL",
+                "CONFIG_TOR",
+                "CONFIG_HEL",
+                "ENABLE_ERRFIELD",
+                "LCFS_INDEX",
+                "SMALLEST_ISLAND_INDEX",
+                "PHI_GENs",
+                "MAX_SUBSETS",
+                "ALPHA",
+                "INV_SURF_INDICES",
+                "GUESS_PHI_INDEX",
+                "OUTPUT_FILE_NAME",
+                "RBF_KERNEL",
+                "RBF_NEIGHBORS",
+                "RBF_SMOOTHING",
+                "RBF_EPSILON",
+                "FLUX_INTERPOLATION_MODE",
+                "RBF_PHI_HALF_WINDOW",
+                "RBF_PHI_SCALE",
+                "RBF_POINTS_PER_SURFACE_PER_PHI",
+            ],)
+        flux_interpolator = FluxInterpolator(interpIO, b_hidra, params)
+        flux_interpolator.run()
 
     gradIO = setup_IO(params, log_name="fluxGradientor.log", logger_name="FluxGradientor")
     log_inputs(gradIO, "FLUX GRADIENTOR INPUTS", params,
@@ -125,6 +163,10 @@ def main(input_overrides=_CLI_INPUTS):
             "LCFS_INDEX",
             "PHI_GENs",
             "OUTPUT_FILE_NAME",
+            "RUN_INTERPOLATOR",
+            "INPUT_FIELD_NAME",
+            "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS",
+            "GRADIENT_FILTER_BUFFER",
         ],)
     flux_gradientor = FluxGradientor(gradIO, b_hidra, params)
     flux_gradientor.run()
