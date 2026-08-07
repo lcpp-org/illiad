@@ -8,7 +8,7 @@
   "FIELD_FILE_DENSITY": "output/REPO_RUNTHROUGH_2/data/LCFS20_20x180_1/nField_LCFS20alpha1p0.npy",
   "FIELD_FILE_ELECTRIC": "output/REPO_RUNTHROUGH_2/data/LCFS20_20x180_1/Efield_LCFS20alpha1p0.npy",
   "ION_NEUTRAL_COLLISIONS": "langevin",
-  "ION_ION_COLLISIONS": "fokker_plank",
+  "ION_ION_COLLISIONS": "fokker_planck",
 
   "ELECTRON_TEMP_EV": 50.0,
   "BACKGROUND_GAS_SPECIES": "He",

@@ -17,6 +17,7 @@ import argparse
 import numpy as np
 import illiad.utilities.physical_constants as const
 from illiad.boris import Boris
+from illiad.collisions import Collisions
 from illiad.mesh import TorchMesh
 from illiad.io import IOHandler
 from illiad.utilities.point_generators import ionInitializer
@@ -32,7 +33,7 @@ DEFAULT_INPUTS = {
     "FIELD_FILE_DENSITY": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/big_grid_linear.npy",
     "FIELD_FILE_ELECTRIC": "output/AAAnewIO_iota3FWD_phi306_LSODA/data/LCFS20_360x180/Efield_testingOutput.npy",
     "ION_NEUTRAL_COLLISIONS": "langevin",
-    "ION_ION_COLLISIONS": "fokker_plank",
+    "ION_ION_COLLISIONS": "fokker_planck",
 
     "ELECTRON_TEMP_EV": 2.0,
     "BACKGROUND_GAS_SPECIES": "He",
@@ -69,11 +70,28 @@ _CLI_INPUTS = object()
 def parse_args():
     parser = argparse.ArgumentParser(description="Run Boris ion tracking from a JSON input file.")
     parser.add_argument(
-        "--inputs-json",
+        "inputs_path",
+        nargs="?",
+        metavar="INPUTS",
+        help="Optional positional path to the workflow JSON input.",
+    )
+    inputs_group = parser.add_mutually_exclusive_group()
+    inputs_group.add_argument(
+        "--inputs",
+        dest="inputs",
         default=None,
         help="Optional path to a JSON object overriding built-in workflow defaults.",
     )
-    return parser.parse_args()
+    inputs_group.add_argument(
+        "--inputs-json",
+        dest="inputs",
+        help=argparse.SUPPRESS,
+    )
+    args = parser.parse_args()
+    if args.inputs_path is not None and args.inputs is not None:
+        parser.error("provide INPUTS or --inputs, not both")
+    args.inputs = args.inputs if args.inputs is not None else args.inputs_path
+    return args
 
 
 def resolve_plasma_potential(params):
@@ -101,6 +119,18 @@ def boris_runner(params):
     stride = int(params["STRIDE"])
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
+
+    collision_resolver = Collisions()
+    params["ION_NEUTRAL_COLLISIONS"] = (
+        collision_resolver._resolve_ion_neutral_collision_model(
+            params["ION_NEUTRAL_COLLISIONS"]
+        )
+    )
+    params["ION_ION_COLLISIONS"] = (
+        collision_resolver._resolve_ion_ion_collision_model(
+            params["ION_ION_COLLISIONS"]
+        )
+    )
 
     m_gas_amu = const.get_species_mass_amu(params["BACKGROUND_GAS_SPECIES"])
     params["M_GAS_AMU"] = m_gas_amu
@@ -227,7 +257,7 @@ def boris_runner(params):
 def main(input_params_override=_CLI_INPUTS):
     if input_params_override is _CLI_INPUTS:
             args = parse_args()
-            input_params_override = load_inputs_json(args.inputs_json, "Boris inputs") if args.inputs_json else None
+            input_params_override = load_inputs_json(args.inputs, "Boris inputs") if args.inputs else None
     params = merge_input_params(DEFAULT_INPUTS, input_params_override)
     boris_runner(params)
 
