@@ -20,6 +20,8 @@
   "GUESS_PHI_INDEX": -7,
   "INV_SURF_INDICES": [],
   "OUTPUT_FILE_NAME": "LCFS19alpha1p0",
+  "RUN_INTERPOLATOR": true,
+  "INPUT_FIELD_NAME": null,
 
   "RBF_KERNEL": "multiquadric",
   "RBF_NEIGHBORS": 48,

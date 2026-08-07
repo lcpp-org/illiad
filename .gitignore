@@ -193,3 +193,4 @@ Miniforge3-Linux-x86_64.sh
 
 # (Default) Input JSON files
 *.json
+!sol_trace_inputs.json

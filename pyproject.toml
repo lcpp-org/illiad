@@ -77,6 +77,9 @@ illiad-fieldsolver = "illiad.cli.fieldsolver:main"
 illiad-poincare = "illiad.cli.poincare:main"
 illiad-flux-calc = "illiad.cli.flux_calc:main"
 illiad-flux-grad = "illiad.cli.flux_grad:main"
+illiad-sol-trace = "illiad.cli.sol_trace:main"
+illiad-sol-density = "illiad.cli.sol_density:main"
+illiad-sol-potential = "illiad.cli.sol_potential:main"
 illiad-boris = "illiad.cli.boris:main"
 
 [dependency-groups]
