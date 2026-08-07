@@ -13,7 +13,7 @@
 # ILLIAD
 
 **ILLIAD** (*Illinois Lagrangian Ion Advection and Deposition*) is a Python
-modeling framework for reconstructing three-dimensional HIDRA magnetic and
+modeling framework for reconstructing three-dimensional magnetic and
 electrostatic fields and simulating trace impurity-ion transport through the
 scrape-off layer (SOL).
 
@@ -22,6 +22,16 @@ stellarator at the University of Illinois Urbana-Champaign. ILLIAD connects
 reconstructed HIDRA fields to kinetic particle tracing so wall-deposition
 patterns can be compared with magnetic topology, background-plasma models,
 and lithium ion dynamics.
+
+## Release Status
+
+The current source tree identifies as version 1.0.0; this does not by itself
+indicate that a Git tag or package release has been published. Version 1.0.0
+establishes the supported active command names and JSON configuration interface
+documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). SOL density and
+potential analysis classes are planned for a later release; their reserved
+commands are not implementations and are not part of the v1.0.0 scientific
+workflow. See [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
 
 ## Features
 
@@ -48,11 +58,12 @@ and lithium ion dynamics.
 - `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` classes.
 - `illiad/`: Poincare, Boris, collision, particle, IO, and plotting code.
 - `run*.py`: thin source-checkout launchers for installed command modules.
-- `*_inputs.json`: complete examples for JSON-configured commands.
 - `misc_scripts/`: source-only research and plotting scripts. They are not
-  installed, are not public API, and are not called by the SOL placeholder
-  commands.
-- `input_files/`: small reference inputs and local generated scientific data.
+  installed and are not public API.
+
+- `input_files/*.example.json`: tracked configuration templates.
+- `input_files/`: tracked reference inputs plus ignored local JSON overrides
+  and generated scientific data.
 - `output/`: generated logs, arrays, and plots.
 - `fastplotlib_tests/`: standalone interactive trace viewers.
 
@@ -87,13 +98,33 @@ pip install -e ".[fitting,viewer,export]"
 Six active workflow commands use JSON inputs:
 
 ```bash
-illiad-fieldsolver --inputs-json fieldsolver_inputs.json
-illiad-poincare --inputs-json poincare_inputs.json
-illiad-flux-calc --inputs-json flux_calc_inputs.json
-illiad-flux-grad --inputs-json flux_grad_inputs.json
-illiad-sol-trace --inputs-json sol_trace_inputs.json
-illiad-boris --inputs-json boris_inputs.json
+illiad-fieldsolver --inputs input_files/fieldsolver_inputs.example.json
+illiad-poincare --inputs input_files/poincare_inputs.example.json
+illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
+illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
+illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
+illiad-boris --inputs input_files/boris_inputs.example.json
 ```
+
+The tracked templates may be passed directly to their commands, although
+analyses still require their documented upstream field or run data. Before
+customizing a template, copy it to the same directory without `.example`:
+
+```bash
+cp input_files/poincare_inputs.example.json input_files/poincare_inputs.json
+illiad-poincare --inputs input_files/poincare_inputs.json
+```
+
+Working `*.json` files are ignored by Git. This keeps run-specific settings
+out of commits without hiding the release templates.
+
+Each active command also accepts the JSON path positionally:
+
+```bash
+illiad-poincare input_files/poincare_inputs.json
+```
+
+Supply either the positional path or `--inputs`, but not both.
 
 Two additional command names are installed as placeholders for planned
 analysis classes:
@@ -125,11 +156,11 @@ public imports.
 
 ### 1. Trace Poincare surfaces
 
-Edit `poincare_inputs.json`, or start from `poincare_iota3.json`,
-`poincare_iota4.json`, or `poincare_iota5.json`:
+Start from `input_files/poincare_inputs.example.json` and copy it before
+changing run-specific values:
 
 ```bash
-illiad-poincare --inputs-json poincare_inputs.json
+illiad-poincare --inputs input_files/poincare_inputs.example.json
 ```
 
 The command saves Poincare planes, wall intersections, plots, and a log under
@@ -138,10 +169,10 @@ The command saves Poincare planes, wall intersections, plots, and a log under
 ### 2. Calculate toroidal flux
 
 Configure `ANLYS_DIR`, `ANLYS_SUBDIR`, `LCFS_INDEX`, and sampling in
-`flux_calc_inputs.json`:
+`input_files/flux_calc_inputs.example.json` or an ignored working copy:
 
 ```bash
-illiad-flux-calc --inputs-json flux_calc_inputs.json
+illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
 ```
 
 Island detection measures rotational transform from ordered Poincare
@@ -153,7 +184,7 @@ select the active detector.
 ### 3. Interpolate the interior scalar field and calculate its gradient
 
 ```bash
-illiad-flux-grad --inputs-json flux_grad_inputs.json
+illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
 ```
 
 With `RUN_INTERPOLATOR` set to `true`, `FLUX_INTERPOLATION_MODE` selects
@@ -169,10 +200,10 @@ To generate an electric field from an existing regular scalar field, set
 ### 4. Trace the SOL
 
 Configure the magnetic field, LCFS, seed grid, integration, device, and plots
-in `sol_trace_inputs.json`:
+in `input_files/sol_trace_inputs.example.json` or an ignored working copy:
 
 ```bash
-illiad-sol-trace --inputs-json sol_trace_inputs.json
+illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
 ```
 
 `SOLTracer` samples exterior seed points, traces both field directions until
@@ -191,16 +222,16 @@ source-only research scripts and are outside the installed workflow.
 
 ### 6. Run lithium ion transport
 
-Point `boris_inputs.json` at the prepared density and electric fields:
+Point `input_files/boris_inputs.example.json` or an ignored working copy at the
+prepared density and electric fields:
 
 ```bash
-illiad-boris --inputs-json boris_inputs.json
+illiad-boris --inputs input_files/boris_inputs.example.json
 ```
 
-Ion-neutral collisions accept `viscous_drag_hstep`, `langevin`, or an off
-value. Ion-ion collisions accept `linearFP_ii_hstep`, `fokker_plank`, or an
-off value; the selector spelling `fokker_plank` is intentional. Enabled
-operators are applied as half-steps around the Boris push.
+Ion-neutral collisions accept `viscous_drag`, `langevin`, or `null`. Ion-ion
+collisions accept `linear_fp`, `fokker_planck`, or `null`. Enabled operators
+are applied as half-steps around the Boris push.
 
 Particles are stored emitter-major. Initial speeds follow the configured
 Maxwellian model, and launch directions are cosine-weighted over a hemisphere

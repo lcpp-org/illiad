@@ -6,7 +6,7 @@ step/play controls.
 
 Example:
     conda run -n testenv python fastplotlib_tests/boris_trace_scatter_slider_extended.py \
-        --inputs-json animation_inputs.json
+        --inputs-json input_files/animation_inputs.example.json
 """
 
 from __future__ import annotations

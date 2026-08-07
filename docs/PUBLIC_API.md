@@ -1,80 +1,81 @@
 # ILLIAD Public API
 
-This document defines the public interface of ILLIAD version 0.1.0. It is the
-compatibility contract used for versioning and releases. Interfaces not listed
-here are implementation details, even when they are importable from a source
-checkout.
+This document defines the public interface of ILLIAD version 1.0.0. Interfaces
+not listed here are implementation details even when they are importable from
+a source checkout.
 
-ILLIAD is research software for a staged field-line, flux-surface, and
-impurity-ion transport workflow. Its primary public interface is therefore the
-command-line workflow and its JSON configuration files. The Python interfaces
-are provided for programmatic use of the same components.
+ILLIAD is research software for a staged field-line, flux-surface, SOL, and
+impurity-ion transport workflow. Its primary interface is the installed
+command set and JSON configuration files; selected analysis classes are also
+available for programmatic use.
 
 ## Versioning Policy
 
 ILLIAD follows [Semantic Versioning 2.0.0](https://semver.org/). The installed
-package version is available as:
+version is available as:
 
 ```python
 from illiad import __version__
 ```
 
-Until 1.0.0, ILLIAD is in an initial public-release phase:
+For the 1.x series, incompatible changes to active command names, documented
+JSON keys, or stable Python utilities require a major release. Minor releases
+may add backward-compatible commands, keys, and functionality; patch releases
+contain backward-compatible fixes and documentation changes. Interfaces
+explicitly labeled provisional are excluded from these stability guarantees.
 
-- Patch releases (`0.1.x`) will not intentionally break the supported command
-  interface, documented JSON keys, or stable Python interfaces below.
-- A minor pre-1.0 release may make a breaking change. It will be called out in
-  the release notes and this document before or with the release.
-- At 1.0.0 and later, removal or incompatible change to a public interface
-  requires a major-version increment, except where a documented deprecation
-  period says otherwise.
+Numerical results also depend on scientific inputs, dependency versions,
+stochastic sampling, and hardware; the version contract does not promise
+bitwise-identical output.
 
-Numerical results depend on model inputs, data files, platform, dependency
-versions, stochastic sampling, and hardware. Semantic versioning applies to
-the software interface, not to bitwise-identical scientific output.
+## Installed Commands
 
-## Supported Command Interface
+| Command | Status | Purpose | Configuration |
+| --- | --- | --- | --- |
+| `illiad-fieldsolver` | Active | Generate Cartesian magnetic-field arrays from coil geometry. | `input_files/fieldsolver_inputs.example.json` |
+| `illiad-poincare` | Active | Trace field lines and reconstruct Poincare surfaces. | `input_files/poincare_inputs.example.json` |
+| `illiad-flux-calc` | Active | Integrate toroidal flux and diagnose island chains. | `input_files/flux_calc_inputs.example.json` |
+| `illiad-flux-grad` | Active | Interpolate a scalar profile and/or generate its Cartesian electric field. | `input_files/flux_grad_inputs.example.json` |
+| `illiad-sol-trace` | Active | Trace open SOL field lines with the PyTorch solver. | `input_files/sol_trace_inputs.example.json` |
+| `illiad-sol-density` | Placeholder | Reserve the command name for a future density analysis class. | None |
+| `illiad-sol-potential` | Placeholder | Reserve the command name for a future potential analysis class. | None |
+| `illiad-boris` | Active | Run full-orbit lithium-ion transport. | `input_files/boris_inputs.example.json` |
 
-The following commands are installed by the `illiad-fieldlines` distribution:
-
-| Command | Purpose | Configuration file |
-| --- | --- | --- |
-| `illiad-fieldsolver` | Generate Cartesian magnetic-field arrays from coil geometry. | `fieldsolver_inputs.json` |
-| `illiad-poincare` | Trace field lines and reconstruct Poincare surfaces. | `poincare_inputs.json` |
-| `illiad-flux-calc` | Integrate toroidal flux across reconstructed surfaces. | `flux_calc_inputs.json` |
-| `illiad-flux-grad` | Interpolate the flux profile and generate a Cartesian electric field. | `flux_grad_inputs.json` |
-| `illiad-boris` | Run full-orbit lithium-ion transport with the Boris solver. | `boris_inputs.json` |
-
-Every command accepts:
+The six active commands accept:
 
 ```text
---inputs-json PATH
+--inputs PATH
 ```
 
-`PATH` names a UTF-8 JSON file whose top-level value is an object. Paths in the
-JSON file are resolved relative to the process working directory. Every
-workflow command merges supplied values over its built-in defaults. When
-`--inputs-json` is omitted, the command uses those built-in defaults.
+`PATH` is a UTF-8 JSON file whose top-level value is an object. Supplied values
+override built-in defaults. Omitting `--inputs` uses those defaults.
+The same path may instead be supplied as the optional positional `INPUTS`
+argument. Supplying both forms is an input error; neither form takes
+precedence.
+Relative input paths and `output/` are resolved from the process working
+directory.
 
-Use the installed commands rather than invoking `run*.py` files directly. The
-`illiad.cli` modules, root launchers, and their `main()` functions are not
-public Python API.
+The two placeholder commands accept only standard `-h`/`--help`. Invoking one
+without `--help` exits unsuccessfully with a not-implemented message. They do
+not import, install, or dispatch to `misc_scripts`, and they do not yet define
+JSON contracts.
 
-The commands require their upstream data products. In particular, the usual
-workflow uses prepared magnetic-field arrays under `input_files/`, Poincare
-outputs for the flux stages, and generated density/electric-field arrays for
-the Boris stage. ILLIAD does not bundle large scientific arrays in package
-artifacts. See [Release Contents](RELEASE_CONTENTS.md) for the data policy.
+Root `run*.py` launchers mirror the command modules for source-checkout use.
+Installed commands are canonical; `illiad.cli`, launcher modules, and their
+`main()` functions are not public Python API.
+
+Large generated scientific inputs and outputs are not bundled. See
+[Release Contents](RELEASE_CONTENTS.md).
 
 ## JSON Configuration Interface
 
-The repository-root JSON files are complete, supported examples. Keys listed
-below are the public configuration schema for their command. Values must use
-JSON types; array-like values are JSON arrays.
+Tracked `input_files/*.example.json` files are complete templates for their
+commands. Copy a template to a filename ending in `.json` before customizing
+it; ordinary JSON files are ignored so run-specific inputs are not committed
+accidentally. Values use JSON types, array-like values use arrays, and optional
+values use `null`.
 
-### `fieldsolver_inputs.json`
-
-`illiad-fieldsolver` accepts:
+### `fieldsolver_inputs.example.json`
 
 | Key | Meaning |
 | --- | --- |
@@ -85,9 +86,7 @@ JSON types; array-like values are JSON arrays.
 | `RMAJOR`, `RMINOR` | Major and minor radii in meters. |
 | `MESH_PERIODICITY` | Three-element mesh periodicity descriptor. |
 
-### `poincare_inputs.json`
-
-`illiad-poincare` accepts:
+### `poincare_inputs.example.json`
 
 | Group | Keys |
 | --- | --- |
@@ -96,206 +95,195 @@ JSON types; array-like values are JSON arrays.
 | Trace and solver controls | `SPINS`, `NPLANES`, `SOLVER`, `RTOL`, `ATOL`, `NTHREADS`, `DOUBLE_LINE` |
 | Output | `OUTPUT_DIR` |
 
-Currents are expressed in kiloamperes; radii are expressed in meters; angles
-are expressed in degrees. `OUTPUT_DIR` identifies the run directory below
-`output/`.
+Currents are in kiloamperes, radii in meters, and angles in degrees.
 
-### `flux_calc_inputs.json`
-
-`illiad-flux-calc` accepts:
+### `flux_calc_inputs.example.json`
 
 | Group | Keys |
 | --- | --- |
 | Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `FIELD_FILE_TOR`, `FIELD_FILE_HEL` |
 | Magnetic configuration | `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD` |
-| Surface sampling | `LCFS_INDEX`, `NPHI`, `NTHETA`, `PHI_GENs` |
-| Flux integration | `MAX_SUBSETS`, `SMOOTH_FCTR`, `INTEGRATE_EPSABS`, `INTEGRATE_EPSREL`, `ISLAND_ALGORITHM`, `HIST_BINS` |
+| Surface sampling | `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
+| Flux integration | `MAX_SUBSETS`, `SMOOTH_FCTR`, `INTEGRATE_EPSABS`, `INTEGRATE_EPSREL` |
+| Retained legacy inputs | `ISLAND_ALGORITHM`, `HIST_BINS` |
 | Diagnostics | `PLOT_ALL`, `BIG_MESH` |
 
-`PHI_GENs` is optional. When it is absent or `null`, ILLIAD derives it from
-positive `NPHI` as `numpy.linspace(360.0 / NPHI, 360.0, NPHI)` in degrees.
-`NPHI` therefore does not need to divide 360. Explicit `PHI_GENs` values are
+When `PHI_GENs` is absent or `null`, positive `NPHI` produces
+`numpy.linspace(360.0 / NPHI, 360.0, NPHI)` in degrees. Explicit values are
 normalized to a floating-point NumPy array.
 
-### `flux_grad_inputs.json`
+The active island detector measures rotational transform from each ordered
+Poincare surface, matches low-order rationals with denominators no greater
+than `MAX_SUBSETS`, and splits matched chains by striding the crossing array.
+This permits distinct island-chain subset counts in one run.
+`ISLAND_ALGORITHM` and `HIST_BINS` remain accepted and logged for existing
+inputs but do not control the active detector.
 
-`illiad-flux-grad` accepts the shared location, magnetic-configuration, and
-surface-sampling keys from `flux_calc_inputs.json`, plus:
+### `flux_grad_inputs.example.json`
 
 | Group | Keys |
 | --- | --- |
-| Prior flux selection | `SMALLEST_ISLAND_INDEX` |
-| Interpolation and electric field | `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
+| Shared analysis and magnetic inputs | `ANLYS_DIR`, `ANLYS_SUBDIR`, `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
+| Prior flux selection | `SMALLEST_ISLAND_INDEX`, `MAX_SUBSETS` |
+| Interpolation control | `RUN_INTERPOLATOR`, `INPUT_FIELD_NAME`, `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
 | RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
 | Periodic 3-D interpolation | `RBF_PHI_HALF_WINDOW`, `RBF_PHI_SCALE`, `RBF_POINTS_PER_SURFACE_PER_PHI` |
 | Gradient construction | `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`, `GRADIENT_FILTER_BUFFER` |
 
-`INV_SURF_INDICES` is a JSON array of surface indices. `OUTPUT_FILE_NAME`
-selects the shared suffix for `nField_<OUTPUT_FILE_NAME>.npy` and
-`Efield_<OUTPUT_FILE_NAME>.npy`.
-
-`FLUX_INTERPOLATION_MODE` accepts exactly `2d` or `3d`. Both modes use the
-shared `RBF_NEIGHBORS` setting and float64 source, query, interpolation, and
-saved-field arrays:
+With `RUN_INTERPOLATOR` set to `true`, `FLUX_INTERPOLATION_MODE` accepts
+exactly `2d` or `3d`:
 
 - `2d` fits each output plane from that plane's Poincare samples.
-- `3d` fits each output plane from a periodically wrapped local toroidal
-  window. `RBF_PHI_HALF_WINDOW` selects the number of source planes on either
-  side, `RBF_PHI_SCALE` converts wrapped angular separation to the RBF's length
-  scale, and `RBF_POINTS_PER_SURFACE_PER_PHI` limits each surface's
-  approximately angle-balanced contribution from each plane.
+- `3d` fits from a periodically wrapped local toroidal window.
+  `RBF_PHI_HALF_WINDOW` selects adjacent source planes,
+  `RBF_PHI_SCALE` supplies the angular length scale, and
+  `RBF_POINTS_PER_SURFACE_PER_PHI` limits each surface's contribution.
 
-The interpolation source labels span 1 at the periodically interpolated
-magnetic axis and 0 at the LCFS. After fitting, the output value at `rho=0` is
-assigned from the poloidal average of the innermost repaired radial shell. No
-exterior scalar-profile prescription is currently applied; exterior values are
-unconstrained RBF extrapolation. Poincare source pairs are jointly filtered for
-nonfinite values and exact duplicates before interpolation.
+Both modes retain float64 source, query, interpolated, and saved arrays. Source
+labels run from 1 at the magnetic axis to 0 at the LCFS, and `rho=0` is filled
+from the poloidal average of the innermost repaired radial shell.
 
-Flux gradients use radian angular coordinates and periodic centered
-differences in both toroidal and poloidal directions. By default,
-`LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS` is `false`, so the resulting gradient is
-not truncated outside the LCFS. Setting it to `true` restores the legacy mask;
-`GRADIENT_FILTER_BUFFER` is the nonnegative radial buffer in meters used by
-that mask.
+With `RUN_INTERPOLATOR` set to `false`, interpolation is skipped and
+`INPUT_FIELD_NAME` names an existing scalar array relative to
+`output/<ANLYS_DIR>/data/`. The gradient stage still writes
+`Efield_<OUTPUT_FILE_NAME>.npy` and its plots.
 
-### `boris_inputs.json`
+Gradients use radian angular coordinates and periodic centered differences in
+toroidal and poloidal directions. `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`
+enables the historical exterior mask; `GRADIENT_FILTER_BUFFER` is its
+nonnegative radial buffer in meters.
 
-`illiad-boris` accepts:
+### `sol_trace_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Output location | `ANLYS_DIR`, `ANLYS_SUBDIR` |
+| Magnetic configuration | `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `MAJOR_RADIUS_M`, `VESSEL_RADIUS_M` |
+| LCFS and seeds | `LCFS_INDEX`, `N_PLANES`, `N_SEED_PLANES`, `SEED_PHI_DEG`, `N_RHO`, `N_THETA`, `RHO_MIN`, `RHO_MAX`, `LCFS_CLEARANCE_M`, `LCFS_SPLINE_SMOOTHING`, `LCFS_BOUNDARY_POINTS` |
+| Trace length | `SPINS` |
+| Device and integration | `DEVICE`, `INTEGRATOR`, `STEP_SIZE_M`, `BATCH_SIZE`, `CROSSING_BUFFER_SIZE`, `STEP_CHUNK_SIZE`, `COMPILE_STEP_CHUNKS`, `WALL_BISECTION_STEPS`, `MIN_FIELD_MAGNITUDE` |
+| Progress | `PROGRESS_INTERVAL_STEPS`, `PROGRESS_REFRESH_STEPS`, `SHOW_PROGRESS` |
+| Plots | `GENERATE_PLOTS`, `COLOR_SCALE`, `COLORMAP`, `N_LEVELS`, `VMIN`, `VMAX`, `DPI`, `PLOT_MAX_SAMPLES`, `PLOT_SAMPLE_SEED`, `PHYSICAL_PHI_OFFSET_DEG` |
+
+`DEVICE` accepts `auto`, `cpu`, `cuda`, or an explicit CUDA device.
+`INTEGRATOR` accepts `euler`, `midpoint`, or `rk4`. Tracing uses float64
+values, integrates both directions from each valid exterior seed, and
+terminates each solve at the wall or numerical length limit
+`2*pi*MAJOR_RADIUS_M*SPINS`.
+
+Compact raw output is sorted by toroidal plane. `plane_offsets.npy` indexes
+each plane's slice in `raw_points_rtp.npy`; `raw_fieldline_id.npy` maps each
+crossing to `fieldline_connection_length_m.npy`; and
+`raw_source_direction.npy` distinguishes forward, reverse, and inserted seed
+samples. Directional lengths, wall intersections, masks, seed coordinates,
+and plane coordinates are saved alongside them.
+
+### `boris_inputs.example.json`
 
 | Group | Keys |
 | --- | --- |
 | Magnetic configuration | `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `TOROIDAL_CURRENT`, `HELICAL_CURRENT` |
 | Upstream fields | `FIELD_FILE_DENSITY`, `FIELD_FILE_ELECTRIC` |
-| Collision controls | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS`, `NEUTRAL_GAS_DENSITY`, `PLASMA_DENSITY` |
-| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
+| Collision selection | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS` |
+| Background plasma | `ELECTRON_TEMP_EV`, `BACKGROUND_GAS_SPECIES`, `NEUTRAL_GAS_TEMP_EV`, `NEUTRAL_GAS_DENSITY`, `PLASMA_DENSITY`, `ION_ELECTRON_SAT_CURRENT_RATIO` |
 | Ion properties | `ION_MASS`, `ION_TEMP`, `CHARGE_NUM` |
-| Plasma potential | Optional `PLASMA_POTENTIAL`; when omitted, derived from the background-plasma inputs. |
+| Plasma potential | Optional `PLASMA_POTENTIAL`; otherwise derived from background inputs. |
 | Particle initialization | `LCFS_INDEX`, `DELTRS`, `NPHI`, `NTHETA`, `NPARTICLES_PER_EMITTER` |
 | Time integration | `DT`, `TMAX` |
 | Trace selection | `TRACK_NPHI`, `TRACK_NTHETA`, `TRACK_NPARTICLES_PER_EMITTER`, `STRIDE` |
 | Output | `OUTPUT_DIRECTORY_NAME`, `TAG` |
 
-`STRIDE` is a positive integer controlling trace sampling.
+`ION_NEUTRAL_COLLISIONS` accepts `viscous_drag`, `langevin`, or `null`.
+`ION_ION_COLLISIONS` accepts `linear_fp`, `fokker_planck`, or `null`. Enabled
+models are applied as half-steps before and after each Boris push.
 
-Particle initialization uses an emitter-major layout: all
-`NPARTICLES_PER_EMITTER` particles for one emitter are contiguous in the saved
-initial-condition array and particle list. Toroidal emitter planes are
-generated with floating-point spacing, so any positive `NPHI` is supported.
-Initial energies follow the configured Maxwellian model, while launch
-directions use a cosine-weighted hemisphere about each emitter's launch
-normal. The launch normal is the normalized local electric-field direction
-where it is finite and nonzero, with the outward geometric LCFS normal used as
-the fallback. Seed generation jointly removes nonfinite and exact-duplicate
-Poincare `(theta, rho)` pairs and reports the counts in the run log.
-
-Every `illiad-boris` run writes the existing initial-energy diagnostic
-`E0_Dist.png` and the 2-by-2 initial-velocity diagnostic `V0_Dist.png`. The
-latter contains local `(v_rho, v_theta, v_phi)` histograms and the angle from
-the launch normal with the cosine-weighted expectation overlaid.
+Particle initialization uses an emitter-major layout. Initial speeds follow
+the configured Maxwellian, and launch directions are cosine-weighted over a
+hemisphere about the normalized local electric field, with the outward
+geometric LCFS normal as fallback. Every run writes `E0_Dist.png` and the
+four-panel `V0_Dist.png`. `STRIDE` must be a positive integer.
 
 Unknown configuration keys are not part of the API. Current runners do not
-provide schema validation for every key, so a misspelled key can be ignored or
-fail later in a workflow. Start from the supplied example files for each
-release.
+validate every key up front, so begin with the supplied example.
 
 ## Python API
 
-The preferred import root is `illiad`. Shared utilities are organized under
-`illiad.utilities`, and active plotting helpers live in `illiad.plotting`.
-The former `classes.*`, `utility.*`, and `plot_funcs.*` packages have been
-removed.
+The preferred import root is `illiad`. Former `classes.*`, `utility.*`, and
+`plot_funcs.*` packages have been removed.
 
-### Stable Python Interfaces
-
-The following interfaces are the stable programmatic surface for the 0.1
-series:
+### Stable Utilities
 
 ```python
 from illiad import __version__
-from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.run_config import (
+    load_inputs_json,
+    merge_input_params,
+    normalize_phi_gens,
+)
 ```
 
 | Import | Contract |
 | --- | --- |
-| `__version__` | Installed ILLIAD version string. |
-| `load_inputs_json(path, label="Inputs")` | Load and return a top-level JSON object, exiting with a readable error for unreadable or invalid input. |
-| `merge_input_params(defaults, overrides=None)` | Return a shallow copy of `defaults`, updated by `overrides` when supplied. |
-| `normalize_phi_gens(input_params)` | Mutate and return the mapping, deriving or normalizing `PHI_GENs` from `NPHI`. |
+| `__version__` | Installed version string. |
+| `load_inputs_json(path, label="Inputs")` | Load a top-level JSON object or exit with a readable input error. |
+| `merge_input_params(defaults, overrides=None)` | Return a shallow defaults copy updated by supplied overrides. |
+| `normalize_phi_gens(input_params)` | Mutate and return the mapping after deriving or normalizing `PHI_GENs`. |
 
 ### Provisional Research Interfaces
 
-The following imports are public in the sense that they are documented and
-supported for exploratory programmatic use. Their object models and method
-signatures are still being consolidated from research code. They may change in
-a minor pre-1.0 release; such changes will be documented in release notes.
+The following analysis objects and helper functions are documented for
+programmatic research use, but their constructors, methods, and detailed
+return formats are not part of the stable 1.x compatibility contract. The
+installed commands and JSON interfaces above are the stable workflow surface.
 
 ```python
 from illiad.io import IOHandler
 from illiad.mesh import Mesh, TorchMesh
 from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
+from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
+from illiad.sol import SOLTracer
 from illiad.boris import Boris
 from illiad.collisions import Collisions
-from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
-from illiad.utilities.point_generators import generateSeedShells, generate_MB_velocities, ionInitializer
+from illiad.utilities.point_generators import (
+    generateSeedShells,
+    generate_MB_velocities,
+    ionInitializer,
+)
 from illiad import plotting
 ```
 
-The current documented members of these objects are:
-
-| Object | Constructor and methods |
+| Object | Constructor and documented methods |
 | --- | --- |
-| `IOHandler` | `IOHandler(run_name)`; `startLog`, `createSubDir`, `setActiveSubDir`, `saveNumpyData`, `loadNumpyData`, `saveFig`, `loadPorts_fromCSV`, `loadCSV`, `saveCSV`, `inputsBoilerplate`, `borisBoilerplate` |
-| `Mesh` | `Mesh(R0=0.72, a=0.19)`; `loadCartesianField`, `addFieldPerturbation`, `setErrorField`, `set_nonPer_errField`, `rot_vecXYZ_byPHI`, `interpField`, `loadScalarField`, `interpScalarField` |
-| `TorchMesh` | `TorchMesh(R0=0.0, a=0.0)`; `loadCartesianField`, `addFieldPerturbation`, `loadScalarField`, `setErrorField`, `rot_vecXYZ_byPHI`, `get_weights`, `return_vecs`, `return_scalars`, `interpField`, `interpScalarField` |
-| `Particle` | `Particle(type)` |
-| `FieldLine` | `FieldLine(init_XYZ, maxlength, direction=1.0)`; `pushXYZ`, `storePath` |
-| `Ion` | `Ion(init_XYZ, mass_amu, charge_z, maxlife=0.0)`; `initVelocity`, `initOutput`, `setPosition`, `setVelocity` |
-| `Poincare` | `Poincare(io_handler, solvr="LSODA", r_tol=1e-6, a_tol=1e-16, workers=-1, double_line=False, anlys_name="Poincare")`; `set_conditions`, `parallel_solver`, `single_solver`, `post_solver`, `identifyLCFS`, `save_output`, `run` |
-| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; `setConditions`, `parallel_solver`, `post_solver`, `save_output`, `plotInitEnergies`, `plotInitVelocities`, `run` |
-| `Collisions` | `viscous_drag_hstep`, `langevin_in_hstep`, `linearFP_ii_hstep`, `chandrasekhar_psi`, `chandrasekhar_psi_prime`, `coulomb_fp_rates_li_he`, `fokker_planck_ii_hstep` |
+| `IOHandler` | `IOHandler(run_name)`; logging, subdirectory, NumPy, CSV, figure, and input-boilerplate methods |
+| `Mesh` | `Mesh(R0=0.72, a=0.19)`; field/scalar loading, perturbation, rotation, and interpolation methods |
+| `TorchMesh` | `TorchMesh(R0=0.0, a=0.0)`; torch field/scalar loading, interpolation, weight, and return methods |
+| `Poincare` | `Poincare(...)`; condition, solver, LCFS, output, and `run` methods |
 | `FluxCalculator` | `FluxCalculator(io_handler, field, input_params)`; `run` |
 | `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
 | `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
+| `SOLTracer` | `SOLTracer(io_handler, magnetic_field, input_params)`; `build_initial_conditions`, `log_inputs`, `trace`, `plot`, `run` |
+| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; condition, solver, output, diagnostic, and `run` methods |
+| `Collisions` | Collision-model resolution and ion-neutral and ion-ion numerical operators |
 
-`illiad.collisions` also exports the physical constants `kg_per_amu`,
-`kboltz`, `eps0`, `sqrt_pi`, `Li_mass`, and `He_mass`.
-
-The coordinate module exports `RTP_to_XYZ`, `XYZ_to_RTP`, `XYZ_to_RTP2`,
-`RTP_to_XYZ_many`, `XYZ_to_RTP_many`, `rot_vecXYZ_byPHI`, `RTP_XYZ_JAC`,
-`RTP_XYZ_JAC2`, `axisShift`, and `align_z_to_vector`.
-
-`illiad.utilities.point_generators` exports `generateSeedShells`,
-`generate_MB_velocities`, and `ionInitializer`. `ionInitializer` returns
-`(ion_list, initVelPos, initial_normals)`, with the latter two arrays using the
-same emitter-major particle order. `illiad.plotting` provides the plotting
-helpers used by the Boris and Poincare workflows. Their detailed return shapes
-and plot formats are provisional.
+`illiad.sol` also exports `build_torch_magnetic_field`,
+`load_lcfs_boundary`, `load_poincare_settings`,
+`minimum_boundary_distance`, and `resolve_device`. No density or potential
+analysis class is currently public.
 
 ## Output and Data Compatibility
 
 The directory convention `output/<run>/logs`, `output/<run>/data`, and
-`output/<run>/plots` is supported. Stage commands produce files consumed by
-later stages in the same ILLIAD release.
-
-Raw NumPy array layouts, output basenames beyond the workflow examples, log
-text, plot appearance, and files below `fastplotlib_tests/` are not stable
-public data formats yet. Pin the ILLIAD version and retain the source JSON
-configuration with a scientific result. A documented interchange format or
-data-schema version will be required before these files are treated as
-cross-version public API.
+`output/<run>/plots` is supported. Stage outputs are contracts between stages
+of the same ILLIAD release, not yet stable cross-version interchange formats.
 
 ## Explicitly Non-Public Interfaces
 
-The following are outside the public compatibility contract:
+- Modules under `illiad.cli`, root launchers, and their globals.
+- `misc_scripts`, including the current density and potential prototypes.
+- `fastplotlib_tests`, notebooks, scratch scripts, and unpublished helpers.
+- Generated arrays not explicitly documented above and local output trees.
 
-- Modules under `illiad.cli`, root `run*.py` launchers, and their globals.
-- `fastplotlib_tests/`, `misc_scripts/`, notebooks, scratch scripts, and
-  unpublished analysis helpers.
-- Generated input/output arrays, local output directories, and files not
-  documented in this file.
-
-When an internal interface is promoted, it will first be added here and exposed
-through the `illiad` namespace.
+An internal Python interface becomes public only when it is listed here and
+exported through an `illiad` namespace.

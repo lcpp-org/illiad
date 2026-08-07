@@ -1,46 +1,81 @@
 # Public Python Namespace
 
 The preferred public import path is `illiad.*`, with shared utilities grouped
-under `illiad.utilities.*`. The former `classes.*`, `utility.*`, and
+under `illiad.utilities.*`. Former `classes.*`, `utility.*`, and
 `plot_funcs.*` packages have been removed.
 
-## Meshes
+Detailed stability and method contracts are defined in
+[PUBLIC_API.md](PUBLIC_API.md). In version 1.0.0, the installed commands,
+documented JSON keys, version identifier, and run-configuration utilities are
+stable. Documented research-class object models remain provisional.
+
+## Version
 
 ```python
-from illiad.mesh import Mesh, TorchMesh
+from illiad import __version__
 ```
 
-- `Mesh` wraps the NumPy/scipy-oriented mesh implementation.
-- `TorchMesh` wraps the torch-backed mesh implementation used by the Boris
-  workflow.
-
-## IO
+## IO and Meshes
 
 ```python
 from illiad.io import IOHandler
+from illiad.mesh import Mesh, TorchMesh
 ```
 
-## Flux Workflow
+`Mesh` is the NumPy/SciPy-oriented structured mesh. `TorchMesh` is the
+torch-backed mesh used by Boris and `SOLTracer`.
 
-The flux implementations are available as classes:
+## Poincare and Flux Analyses
 
 ```python
+from illiad.poincare import Poincare
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
 ```
 
-## Coordinate Transforms
+`FluxCalculator` uses measured rotational transform and low-order rational
+matching for island-chain selection. `FluxGradientor` can consume a newly
+interpolated profile or an existing regular scalar field.
+
+## SOL Analysis
 
 ```python
-from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
+from illiad.sol import (
+    SOLTracer,
+    build_torch_magnetic_field,
+    load_lcfs_boundary,
+    load_poincare_settings,
+    minimum_boundary_distance,
+    resolve_device,
+)
 ```
 
-## Particles and Solvers
+`SOLTracer` is the official open-field-line analysis class. It builds
+LCFS-exterior seed grids, traces both directions with a `TorchMesh`, saves
+compact toroidal-plane crossings, and produces optional contour plots.
+
+There are no public density or potential analysis classes yet.
+`illiad-sol-density` and `illiad-sol-potential` are reserved dummy commands;
+they do not expose or call the prototype scripts under `misc_scripts`.
+
+## Particles, Boris, and Collisions
 
 ```python
 from illiad.particle import Particle, FieldLine, Ion
-from illiad.poincare import Poincare
 from illiad.boris import Boris
+from illiad.collisions import (
+    Collisions,
+    kg_per_amu,
+    kboltz,
+    eps0,
+    sqrt_pi,
+    Li_mass,
+    He_mass,
+)
 ```
+
+Ion-neutral collision selectors are `viscous_drag` and `langevin`. Ion-ion
+collision selectors are `linear_fp` and `fokker_planck`. Use `None` to disable
+either collision category programmatically.
 
 ## Particle Initialization
 
@@ -52,22 +87,42 @@ from illiad.utilities.point_generators import (
 )
 ```
 
-`ionInitializer` returns the ion list, combined initial velocity/position
-array, and launch-normal array in one shared emitter-major particle order.
-`generate_MB_velocities` uses Maxwellian speeds and cosine-weighted
-hemispherical directions about those launch normals.
+`ionInitializer` returns ions, combined initial velocity/position data, and
+launch normals in one emitter-major order. `generate_MB_velocities` uses
+Maxwellian speeds and cosine-weighted hemispherical directions.
 
-## Run Configs
+## Coordinate Transforms
 
 ```python
-from illiad.utilities.run_config import load_inputs_json, merge_input_params, normalize_phi_gens
+from illiad.utilities.coordtrans import (
+    RTP_to_XYZ,
+    XYZ_to_RTP,
+    XYZ_to_RTP2,
+    RTP_to_XYZ_many,
+    XYZ_to_RTP_many,
+    rot_vecXYZ_byPHI,
+    RTP_XYZ_JAC,
+    RTP_XYZ_JAC2,
+    axisShift,
+    align_z_to_vector,
+)
 ```
 
-## Plotting Helpers
+## Run Configuration
+
+```python
+from illiad.utilities.run_config import (
+    load_inputs_json,
+    merge_input_params,
+    normalize_phi_gens,
+)
+```
+
+## Plotting
 
 ```python
 from illiad import plotting
 ```
 
-Legacy plotting and analysis scripts are retained under `misc_scripts/` and
-are not installed as a runtime package.
+Python imports from `misc_scripts` and `fastplotlib_tests` remain outside the
+public namespace.
