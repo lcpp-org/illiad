@@ -99,6 +99,9 @@ class FluxInterpolator:
         self.rbf_neighbors = input_params.get("RBF_NEIGHBORS")
         self.rbf_smoothing = input_params.get("RBF_SMOOTHING")
         self.rbf_epsilon = input_params.get("RBF_EPSILON")
+        
+        # Future parameters for shifted flux
+        self.set_lcfs_value = 0.01
 
         self.interpolation_mode = str(
             input_params.get("FLUX_INTERPOLATION_MODE", "3d")
@@ -127,12 +130,16 @@ class FluxInterpolator:
         self.plane_sample_cache = {}
 
         # Loaded data
-        self.flux_norm_array = None
+        self.tot_flux_array = None
         self.n_surfaces = None
         self.valid_surface = None
         self.axis_array = None
         self.axis_phi_gens = None
         self.profile_phi_gens = None
+
+        # Processed flux data
+        self.total_flux_norm = None
+        self.shifted_flux_norm = None
 
         # Selected profile
         self.best_phi_index = None
@@ -149,9 +156,9 @@ class FluxInterpolator:
         """Load normalized flux values, surface validity, and magnetic axis data."""
 
         filepath = self.anlys_subdir + '/'
-        flux_norm_name = filepath + 'CalculatedFLuxes-normalized.npy'
-        self.flux_norm_array = self.simIO.loadNumpyData(flux_norm_name)
-        self.n_surfaces = self.flux_norm_array.shape[0]
+        tot_flux_array_name = filepath + 'CalculatedFLuxes.npy'
+        self.tot_flux_array = self.simIO.loadNumpyData(tot_flux_array_name)
+        self.n_surfaces = self.tot_flux_array.shape[0]
 
         valid_surf_name = filepath + 'ValidSurfaces.npy'
         self.valid_surface = self.simIO.loadNumpyData(valid_surf_name)
@@ -180,7 +187,7 @@ class FluxInterpolator:
 
     def select_best_flux_profile(self):
         """
-        Method chooses one toroidal angle profile from self.flux_norm_array.
+        Method chooses one toroidal angle profile from self.total_flux_norm.
         The selected profile is adjusted using the ALPHA parameter,
         filtered using valid surface flags, and stored as
         self.linear_flux_array.
@@ -191,14 +198,19 @@ class FluxInterpolator:
             manually marked valid.
         """
 
-        sum_flux = np.nansum(self.flux_norm_array, axis=0)
+        sum_flux = np.nansum(self.total_flux_norm, axis=0)
         if self.guess_phi_index is not None:
             self.best_phi_index = np.argsort(sum_flux)[self.guess_phi_index]
         else:
             self.best_phi_index = np.argsort(sum_flux)[-5]
-        linear_flux_array = self.flux_norm_array[:, self.best_phi_index]
-        # Adjust profile with ALPHA while retaining 1 at the axis and 0 at the LCFS.
+        linear_flux_array = self.total_flux_norm[:, self.best_phi_index]
+        # adjust profile with ALPHA parameter
         linear_flux_array = 1 - (1 - linear_flux_array)**self.alpha
+        # shift the profile to prescribe nonzero value at LCFS (Not currently used)
+        self.shifted_flux_norm = self.set_lcfs_value + self.total_flux_norm * (1.0 - self.set_lcfs_value)
+
+        # if valid_surface has shape (surface, phi), select the chosen phi profile
+        # if it already has shape (surface,), leave it alone
         if self.valid_surface.ndim == 2:
             self.valid_surface = self.valid_surface[:, self.best_phi_index]
         self.valid_surface = np.asarray(self.valid_surface, dtype=bool).copy()
@@ -470,10 +482,28 @@ class FluxInterpolator:
         plt.close()
 
 
+    def normalize_fluxes(self):
+        """Normalize toroidal flux values relative to the LCFS flux.
+
+        Notes:
+            Fluxes outside the LCFS are set equal to the LCFS flux before normalization.
+            The normalized profile is clipped to the range [0, 1], and surfaces outside
+            the LCFS are set to zero.
+        """
+
+        self.tot_flux_array[:self.lcfs_index][:] = self.tot_flux_array[self.lcfs_index][:]
+        self.tot_flux_array = np.clip(self.tot_flux_array, 0.0, self.tot_flux_array[self.lcfs_index])
+        # Set range of data to be between 0 and 1, and set data outside of LCFS to be equal to the 0
+        self.total_flux_norm = 1 - self.tot_flux_array / self.tot_flux_array[self.lcfs_index]
+        self.total_flux_norm = np.clip(self.total_flux_norm, 0.0, 1.0)
+        self.total_flux_norm[:self.lcfs_index][:] = 0.0
+        
+
     def run(self):
         """
         Run the full flux interpolation workflow."""
         self.load_flux_data()
+        self.normalize_fluxes()
         self.select_best_flux_profile()
         self.save_best_flux_profile()
         self.perform_interpolation()
