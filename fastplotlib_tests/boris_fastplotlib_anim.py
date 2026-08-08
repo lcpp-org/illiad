@@ -86,6 +86,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--compass-label-color", default="#F5F7FA", help="Compass north label color.")
     parser.add_argument("--compass-font-size", type=float, default=18.0, help="Compass north label font size.")
     parser.add_argument("--size", default="1280x720", help="Window size as WIDTHxHEIGHT.")
+    parser.add_argument(
+        "--present-method",
+        choices=("bitmap", "screen"),
+        default="bitmap",
+        help=(
+            "Canvas presentation method. 'screen' may improve FPS but is less "
+            "portable than the default bitmap path."
+        ),
+    )
     parser.add_argument("--synthetic-steps", type=int, default=4_000, help="Synthetic trace steps.")
     parser.add_argument("--synthetic-particles", type=int, default=512, help="Synthetic particle count.")
     parser.add_argument("--synthetic-turns", type=float, default=8.0, help="Synthetic trace toroidal turns.")
@@ -400,7 +409,12 @@ def main() -> int:
     print(f"selected particles: {n_particles}; animation frames: {n_frames}")
     print(f"mode: {args.mode}; stride={args.stride}; steps_per_frame={args.steps_per_frame}")
 
-    figure = fpl.Figure(cameras="3d", controller_types="orbit", size=size)
+    figure = fpl.Figure(
+        cameras="3d",
+        controller_types="orbit",
+        canvas_kwargs={"present_method": args.present_method},
+        size=size,
+    )
     subplot = figure[0, 0]
     try:
         subplot.set_title(f"Boris traces via fastplotlib ({args.mode})")

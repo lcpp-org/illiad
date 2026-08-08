@@ -218,6 +218,15 @@ def build_arg_parser() -> ArgFileParser:
     parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
     parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
     parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
+    parser.add_argument(
+        "--present-method",
+        choices=("bitmap", "screen"),
+        default="bitmap",
+        help=(
+            "Interactive Qt canvas presentation method. 'screen' may improve "
+            "FPS but is less portable; ignored for --export-mp4."
+        ),
+    )
     parser.add_argument("--hide-zero-rows", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--show-torus", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--show-ports", action=argparse.BooleanOptionalAction, default=True, help="Show HIDRA port outlines on the torus wall.")
@@ -1272,7 +1281,11 @@ def main() -> int:
     if app is None:
         app = QtWidgets.QApplication([])
 
-    canvas = QRenderWidget(size=size, title="Boris ion positions")
+    canvas = QRenderWidget(
+        size=size,
+        title="Boris ion positions",
+        present_method=args.present_method,
+    )
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas=canvas, size=size)
     subplot = figure[0, 0]
     set_subplot_background(subplot, args.plot_background)
