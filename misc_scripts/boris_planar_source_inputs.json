@@ -1,0 +1,44 @@
+{
+  "CONFIG_TOR": "default_toroidal",
+  "CONFIG_HEL": "default_helical",
+  "ENABLE_ERRFIELD": true,
+  "TOROIDAL_CURRENT": 0.486,
+  "HELICAL_CURRENT": 0.900,
+
+  "FIELD_FILE_DENSITY": "output/IOTA3_1000sp_atol1e-9/data/ConLenVolume_REDO_500spins_rk1mm_RegularGrid_Stitched_v2/stitched_nfield_connection_length.npy",
+  "FIELD_FILE_ELECTRIC": "output/IOTA3_1000sp_atol1e-9/data/ConLenVolume_REDO_500spins_rk1mm_RegularGrid_Stitched_v2/Efield_stitched_nfield_connection_length.npy",
+  "ION_NEUTRAL_COLLISIONS": "langevin",
+  "ION_ION_COLLISIONS": "fokker_planck",
+
+  "ELECTRON_TEMP_EV": 20.0,
+  "BACKGROUND_GAS_SPECIES": "He",
+  "NEUTRAL_GAS_TEMP_EV": 0.025,
+  "NEUTRAL_GAS_DENSITY": 3e18,
+  "BACKGROUND_ION_TEMP_EV": 1.0,
+  "PLASMA_DENSITY": 1e18,
+  "ION_ELECTRON_SAT_CURRENT_RATIO": 0.5,
+
+  "ION_MASS": 6.941,
+  "ION_TEMP": 1.0,
+  "CHARGE_NUM": 1,
+
+  "PLANE_WIDTH_M": 0.10,
+  "PLANE_HEIGHT_M": 0.08,
+  "PLANE_RESOLUTION": 20,
+  "PLANE_THETA_DEG": 270.0,
+  "PLANE_PHI_DEG": 0.0,
+  "PLANE_WALL_OFFSET_M": 0.02,
+  "PLANE_ROTATION_DEG": 0.0,
+  "NPARTICLES_PER_EMITTER": 100,
+
+  "DT": 1e-8,
+  "TMAX": 0.001,
+
+  "TRACK_NPHI": 20,
+  "TRACK_NTHETA": 20,
+  "TRACK_NPARTICLES_PER_EMITTER": 1,
+  "STRIDE": 15,
+
+  "OUTPUT_DIRECTORY_NAME": "IOTA3_1000sp_atol1e-9",
+  "TAG": "source_prototype"
+}

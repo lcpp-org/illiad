@@ -173,6 +173,7 @@ output/
 
 # Large/generated scientific data products. Keep small reference CSV/coil files
 # trackable under input_files/, but keep generated fields/profiles out of git.
+input_files/**/*.json
 input_files/**/*.npy
 input_files/**/*.npz
 input_files/**/*.h5
