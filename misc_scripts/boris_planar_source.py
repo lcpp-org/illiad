@@ -247,9 +247,8 @@ def make_planar_initializer(params):
             n_particles, inward, width_axis, float(temperature), float(mass)
         )
 
-        # Match the current runner's emitter-major ordering.
-        repeated_emitters = np.repeat(emitters, nparticles_per_emitter, axis=0)
-        initial_normals = np.repeat(inward[None, :], n_particles, axis=0)
+        # Match the current runner's particle-copy-major ordering.
+        repeated_emitters = np.tile(emitters, (nparticles_per_emitter, 1))
         ions = [Ion(position, mass, charge) for position in repeated_emitters]
         for ion, velocity in zip(ions, velocities):
             ion.initVelocity(velocity)
@@ -271,7 +270,7 @@ def make_planar_initializer(params):
         outputHandler.log.info(
             "PLANAR SOURCE RADIAL RANGE: %.6f to %.6f m", np.min(radii), np.max(radii)
         )
-        return ions, init_vel_pos, initial_normals
+        return ions, init_vel_pos
 
     return planar_initializer
 
