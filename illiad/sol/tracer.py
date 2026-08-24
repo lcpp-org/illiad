@@ -41,24 +41,16 @@ COLOR_RANGE_CHUNK_SIZE = 1_000_000
 
 
 def _parse_log_value(text):
-    try:
-        return ast.literal_eval(text)
-    except (SyntaxError, ValueError):
-        return text
+    try: return ast.literal_eval(text)
+    except (SyntaxError, ValueError): return text
 
 
 def load_poincare_settings(analysis_dir, project_root=PROJECT_ROOT):
     """Load saved Poincare inputs and the identified LCFS index."""
-    log_path = (
-        Path(project_root)
-        / "output"
-        / analysis_dir
-        / "logs"
-        / "Poincare"
-        / "poincare.log"
-    )
-    if not log_path.is_file():
-        raise FileNotFoundError(f"Poincare log not found: {log_path}")
+    log_path = (Path(project_root) / "output" / analysis_dir
+                 / "logs" / "Poincare" / "poincare.log")
+    
+    if not log_path.is_file(): raise FileNotFoundError(f"Poincare log not found: {log_path}")
 
     settings = {}
     input_pattern = re.compile(r"^\|\s*([A-Z][A-Z0-9_]+):\s*(.*?)\s*$")
@@ -78,14 +70,7 @@ def load_poincare_settings(analysis_dir, project_root=PROJECT_ROOT):
     return settings
 
 
-def load_lcfs_boundary(
-    analysis_dir,
-    phi_deg,
-    lcfs_index,
-    project_root=PROJECT_ROOT,
-    spline_smoothing=LCFS_SPLINE_SMOOTHING,
-    boundary_points=LCFS_BOUNDARY_POINTS,
-):
+def load_lcfs_boundary(analysis_dir, phi_deg, lcfs_index, project_root=PROJECT_ROOT, spline_smoothing=LCFS_SPLINE_SMOOTHING, boundary_points=LCFS_BOUNDARY_POINTS,):
     """Return an existing LCFS as an ordered closed poloidal curve."""
     poincare_path = (
         Path(project_root)
@@ -95,49 +80,30 @@ def load_lcfs_boundary(
         / "Poincare"
         / f"Poincare_{phi_deg:03.0f}.npy"
     )
+
     if not poincare_path.is_file():
-        raise FileNotFoundError(
-            f"Poincare plane data not found: {poincare_path}"
-        )
+        raise FileNotFoundError(f"Poincare plane data not found: {poincare_path}")
 
     poincare_data = np.load(poincare_path, mmap_mode="r")
     if not 0 <= lcfs_index < poincare_data.shape[0]:
-        raise IndexError(
-            f"LCFS index {lcfs_index} is outside the available surface range "
-            f"0-{poincare_data.shape[0] - 1}."
-        )
+        raise IndexError(f"LCFS index {lcfs_index} is outside the available surface range 0-{poincare_data.shape[0] - 1}.")
 
     theta, rho = poincare_data[lcfs_index]
     finite = np.isfinite(theta) & np.isfinite(rho)
     theta = np.asarray(theta[finite], dtype=np.float64)
     rho = np.asarray(rho[finite], dtype=np.float64)
-    boundary = np.unique(
-        np.column_stack((rho * np.cos(theta), rho * np.sin(theta))),
-        axis=0,
-    )
+    boundary = np.unique(np.column_stack((rho * np.cos(theta), rho * np.sin(theta))), axis=0)
+    
     if boundary.shape[0] < 4:
-        raise ValueError(
-            f"LCFS surface {lcfs_index} in {poincare_path} has fewer than "
-            "four unique finite points."
-        )
+        raise ValueError(f"LCFS surface {lcfs_index} in {poincare_path} has fewer than four unique finite points.")
 
     center = 0.5 * (boundary.min(axis=0) + boundary.max(axis=0))
-    poloidal_angle = np.arctan2(
-        boundary[:, 1] - center[1],
-        boundary[:, 0] - center[0],
-    )
+    poloidal_angle = np.arctan2(boundary[:, 1] - center[1], boundary[:, 0] - center[0])
+    
     boundary = boundary[np.argsort(poloidal_angle)]
-    spline, _ = splprep(
-        boundary.T,
-        s=float(spline_smoothing),
-        per=True,
-    )
-    boundary = np.column_stack(
-        splev(
-            np.linspace(0.0, 1.0, int(boundary_points), endpoint=False),
-            spline,
-        )
-    )
+    spline, _ = splprep(boundary.T, s=float(spline_smoothing), per=True)
+    boundary = np.column_stack(splev(np.linspace(0.0, 1.0, int(boundary_points), endpoint=False), spline))
+
     return boundary, poincare_path
 
 
@@ -151,10 +117,7 @@ def minimum_boundary_distance(points, boundary):
             continue
 
         projection = np.clip(
-            ((points - start) @ segment) / segment_length_squared,
-            0.0,
-            1.0,
-        )
+            ((points - start) @ segment) / segment_length_squared, 0.0, 1.0)
         closest = start + projection[:, None] * segment
         distance_squared = np.sum((points - closest) ** 2, axis=1)
         minimum_squared = np.minimum(minimum_squared, distance_squared)
@@ -163,16 +126,11 @@ def minimum_boundary_distance(points, boundary):
 
 def seed_plane_degrees(n_seed_planes, seed_phi_deg, n_planes):
     """Return equally spaced seed planes selected from the output planes."""
-    if (
-        isinstance(n_seed_planes, bool)
-        or not isinstance(n_seed_planes, int)
-        or n_seed_planes <= 0
-    ):
+    if (isinstance(n_seed_planes, bool) or not isinstance(n_seed_planes, int) or n_seed_planes <= 0):
         raise ValueError("N_SEED_PLANES must be a positive integer.")
+    
     if n_seed_planes > n_planes or n_planes % n_seed_planes:
-        raise ValueError(
-            f"N_SEED_PLANES must be a positive divisor of N_PLANES={n_planes}."
-        )
+        raise ValueError(f"N_SEED_PLANES must be a positive divisor of N_PLANES={n_planes}.")
 
     plane_step_deg = 360.0 / n_planes
     normalized_seed_phi = seed_phi_deg % 360.0
@@ -181,17 +139,11 @@ def seed_plane_degrees(n_seed_planes, seed_phi_deg, n_planes):
     first_plane_number = int(np.rint(normalized_seed_phi / plane_step_deg))
     first_plane_phi = first_plane_number * plane_step_deg
     if not np.isclose(normalized_seed_phi, first_plane_phi):
-        raise ValueError(
-            f"SEED_PHI_DEG must lie on the {plane_step_deg:g}-degree "
-            "output-plane grid."
-        )
+        raise ValueError(f"SEED_PHI_DEG must lie on the {plane_step_deg:g}-degree output-plane grid.")
 
     plane_spacing = n_planes // n_seed_planes
     first_plane_index = (first_plane_number - 1) % n_planes
-    plane_indices = (
-        first_plane_index
-        + np.arange(n_seed_planes, dtype=np.int32) * plane_spacing
-    ) % n_planes
+    plane_indices = (first_plane_index + np.arange(n_seed_planes, dtype=np.int32) * plane_spacing) % n_planes
     phi_degrees = (plane_indices + 1) * plane_step_deg
     return plane_indices, phi_degrees
 
@@ -216,26 +168,15 @@ def make_seed_initial_conditions(
     if n_rho < 2 or n_theta < 3:
         raise ValueError("The sparse grid requires N_RHO >= 2 and N_THETA >= 3.")
     if not 0.0 <= rho_min < rho_max <= vessel_radius:
-        raise ValueError(
-            "Require 0 <= RHO_MIN < RHO_MAX <= VESSEL_RADIUS_M."
-        )
+        raise ValueError("Require 0 <= RHO_MIN < RHO_MAX <= VESSEL_RADIUS_M.")
     if lcfs_clearance < 0.0:
         raise ValueError("LCFS_CLEARANCE_M must be non-negative.")
 
-    seed_plane_indices, seed_phi_degrees = seed_plane_degrees(
-        n_seed_planes,
-        seed_phi_deg,
-        n_planes,
-    )
+    seed_plane_indices, seed_phi_degrees = seed_plane_degrees(n_seed_planes, seed_phi_deg, n_planes)
     rho_values = np.linspace(rho_min, rho_max, n_rho)
     theta_values = np.linspace(0.0, 2.0 * np.pi, n_theta, endpoint=False)
     theta_grid, rho_grid = np.meshgrid(theta_values, rho_values)
-    grid_xz = np.column_stack(
-        (
-            rho_grid.ravel() * np.cos(theta_grid.ravel()),
-            rho_grid.ravel() * np.sin(theta_grid.ravel()),
-        )
-    )
+    grid_xz = np.column_stack((rho_grid.ravel() * np.cos(theta_grid.ravel()), rho_grid.ravel() * np.sin(theta_grid.ravel()),))
 
     condition_blocks = []
     seed_id_blocks = []
@@ -253,10 +194,7 @@ def make_seed_initial_conditions(
         closed_boundary = np.vstack((boundary, boundary[0]))
         inside_lcfs = MplPath(closed_boundary).contains_points(grid_xz)
         if lcfs_clearance > 0.0:
-            near_lcfs = (
-                minimum_boundary_distance(grid_xz, boundary)
-                <= lcfs_clearance
-            )
+            near_lcfs = (minimum_boundary_distance(grid_xz, boundary) <= lcfs_clearance)
         else:
             near_lcfs = np.zeros(grid_xz.shape[0], dtype=bool)
         trace_mask = ~(inside_lcfs | near_lcfs)
@@ -269,11 +207,7 @@ def make_seed_initial_conditions(
 
         condition_blocks.append(
             np.column_stack(
-                (
-                    rho_grid.ravel()[trace_mask],
-                    theta_grid.ravel()[trace_mask],
-                    np.full(count, np.deg2rad(phi_deg)),
-                )
+                (rho_grid.ravel()[trace_mask], theta_grid.ravel()[trace_mask], np.full(count, np.deg2rad(phi_deg)) )
             )
         )
         seed_id_blocks.append(np.full(count, seed_id, dtype=np.int16))
@@ -338,9 +272,7 @@ def build_torch_magnetic_field(settings, device):
 
 def minor_radius(points_xyz, major_radius):
     cylindrical_radius = torch.linalg.vector_norm(points_xyz[..., :2], dim=-1)
-    return torch.sqrt(
-        (cylindrical_radius - major_radius) ** 2 + points_xyz[..., 2] ** 2
-    )
+    return torch.sqrt((cylindrical_radius - major_radius) ** 2 + points_xyz[..., 2] ** 2)
 
 
 def wrapped_phi(points_xyz):
@@ -352,43 +284,18 @@ def compile_safe_weights(magnetic_field, positions):
     """Reproduce ``TorchMesh.get_weights`` with compile-safe tensor shapes."""
     x, y, z = positions.unbind(dim=1)
     cylindrical_radius = torch.sqrt(x * x + y * y)
-    radius = torch.sqrt(
-        x * x
-        + y * y
-        + z * z
-        + magnetic_field.R0 * magnetic_field.R0
-        - 2.0 * magnetic_field.R0 * cylindrical_radius
-    )
-    theta = torch.remainder(
-        torch.atan2(z, cylindrical_radius - magnetic_field.R0),
-        2.0 * torch.pi,
-    )
+    radius = torch.sqrt(x * x + y * y + z * z + magnetic_field.R0 * magnetic_field.R0 - 2.0 * magnetic_field.R0 * cylindrical_radius)
+    theta = torch.remainder(torch.atan2(z, cylindrical_radius - magnetic_field.R0), 2.0 * torch.pi)
     phi = torch.remainder(-torch.atan2(y, x), 2.0 * torch.pi)
 
     theta_local = torch.remainder(theta, magnetic_field.theta_max)
     phi_local = torch.remainder(phi, magnetic_field.phi_max)
-    phi_period = torch.div(
-        phi,
-        magnetic_field.phi_max,
-        rounding_mode="floor",
-    )
-    radius_index = torch.where(
-        radius >= magnetic_field.r_max,
-        magnetic_field.nr - 2,
-        torch.div(radius, magnetic_field.dr, rounding_mode="floor"),
-    )
+    phi_period = torch.div(phi, magnetic_field.phi_max, rounding_mode="floor")
+    radius_index = torch.where(radius >= magnetic_field.r_max, magnetic_field.nr - 2, torch.div(radius, magnetic_field.dr, rounding_mode="floor"))
     radius_element = torch.remainder(radius, magnetic_field.dr)
-    theta_index = torch.div(
-        theta_local,
-        magnetic_field.dtheta,
-        rounding_mode="floor",
-    )
+    theta_index = torch.div(theta_local, magnetic_field.dtheta, rounding_mode="floor")
     theta_element = torch.remainder(theta_local, magnetic_field.dtheta)
-    phi_index = torch.div(
-        phi_local,
-        magnetic_field.dphi,
-        rounding_mode="floor",
-    )
+    phi_index = torch.div(phi_local, magnetic_field.dphi, rounding_mode="floor")
     phi_element = torch.remainder(phi_local, magnetic_field.dphi)
 
     radius_low = radius_index * magnetic_field.dr
@@ -396,12 +303,8 @@ def compile_safe_weights(magnetic_field, positions):
     inverse_radius_element = magnetic_field.dr - radius_element
     inverse_theta_element = magnetic_field.dtheta - theta_element
     inverse_phi_element = magnetic_field.dphi - phi_element
-    radius_low_element = (
-        radius_low + 0.5 * radius_element
-    ) * radius_element
-    radius_inverse_element = (
-        radius + 0.5 * inverse_radius_element
-    ) * inverse_radius_element
+    radius_low_element = (radius_low + 0.5 * radius_element) * radius_element
+    radius_inverse_element = (radius + 0.5 * inverse_radius_element) * inverse_radius_element
 
     low_theta_factor = magnetic_field.R0 + radius_low * torch.cos(theta_low)
     high_theta_factor = magnetic_field.R0 + radius * torch.cos(theta_low)
@@ -471,20 +374,9 @@ def compile_safe_weights(magnetic_field, positions):
 
 def compile_safe_interp_field(magnetic_field, positions):
     """Evaluate ``TorchMesh`` without data-dependent Python branches."""
-    weights, corner_indices, phi_period = compile_safe_weights(
-        magnetic_field,
-        positions,
-    )
+    weights, corner_indices, phi_period = compile_safe_weights(magnetic_field, positions)
     phi_high = corner_indices[2, 0]
-    corner_vectors = torch.movedim(
-        magnetic_field.B[
-            corner_indices[0],
-            corner_indices[1],
-            corner_indices[2],
-        ],
-        -1,
-        1,
-    )
+    corner_vectors = torch.movedim(magnetic_field.B[corner_indices[0], corner_indices[1], corner_indices[2],], -1, 1)
 
     lower = corner_vectors[4:]
     cos_phi = torch.cos(magnetic_field.phi_max)
@@ -510,10 +402,8 @@ def compile_safe_interp_field(magnetic_field, positions):
     )
 
     total_volume = weights.sum(dim=0)
-    vectors = (
-        (corner_vectors * weights[:, None]).sum(dim=0)
-        / total_volume[None, :]
-    )
+    vectors = ((corner_vectors * weights[:, None]).sum(dim=0) / total_volume[None, :])
+
     phi_rotation = -phi_period * magnetic_field.phi_max
     cos_rotation = torch.cos(phi_rotation)
     sin_rotation = torch.sin(phi_rotation)
@@ -1803,24 +1693,15 @@ class SOLTracer:
         self.analysis_dir = self.input_params["ANLYS_DIR"]
         self.analysis_subdir = self.input_params["ANLYS_SUBDIR"]
         self.device = self.field.B.device
-        self.compile_chunks = (
-            self.input_params["COMPILE_STEP_CHUNKS"]
-            and self.device.type == "cuda"
-        )
+        self.compile_chunks = (self.input_params["COMPILE_STEP_CHUNKS"] and self.device.type == "cuda")
         if not hasattr(self.field, "_sol_error_enabled"):
-            self.field._sol_error_enabled = bool(
-                self.input_params["ENABLE_ERRFIELD"]
-            )
+            self.field._sol_error_enabled = bool(self.input_params["ENABLE_ERRFIELD"])
 
         self.seed_data = None
         self.trace_data = None
         self.data_dir = None
 
         validate_runtime_settings(self.input_params)
-        if not np.isclose(self.field.R0, self.input_params["MAJOR_RADIUS_M"]):
-            raise ValueError("Magnetic-field R0 does not match MAJOR_RADIUS_M.")
-        if not np.isclose(self.field.a, self.input_params["VESSEL_RADIUS_M"]):
-            raise ValueError("Magnetic-field a does not match VESSEL_RADIUS_M.")
 
     def build_initial_conditions(self):
         """Build and retain all LCFS-masked seed planes."""
@@ -1900,27 +1781,20 @@ class SOLTracer:
             params["MIN_FIELD_MAGNITUDE"],
             params["WALL_BISECTION_STEPS"],
             params["PROGRESS_REFRESH_STEPS"],
-            params["PROGRESS_INTERVAL_STEPS"],
-        )
+            params["PROGRESS_INTERVAL_STEPS"])
+        
         self.data_dir = save_torch_outputs(
             self.simIO,
             self.seed_data,
             self.trace_data,
             crossing_store,
             self.field.R0,
-            self.analysis_subdir,
-        )
+            self.analysis_subdir)
         return self.trace_data
 
     def plot(self):
         """Generate the configured per-plane contour diagnostics."""
-        plot_all_planes(
-            self.analysis_dir,
-            self.input_params["LCFS_INDEX"],
-            self.trace_data,
-            self.simIO,
-            self.input_params,
-        )
+        plot_all_planes(self.analysis_dir, self.input_params["LCFS_INDEX"], self.trace_data, self.simIO, self.input_params)
 
     def run(self):
         """Build seeds, trace the volume, save compact arrays, and plot."""
@@ -1934,30 +1808,15 @@ class SOLTracer:
 
         hit_count = np.count_nonzero(self.trace_data["hit_wall"])
         total_directions = self.trace_data["hit_wall"].size
-        self.simIO.log.info(
-            "Wall intersections: %d of %d directional traces.",
-            hit_count,
-            total_directions,
-        )
-        self.simIO.log.info(
-            "Saved raw connection-length data: %s",
-            self.data_dir,
-        )
+        self.simIO.log.info("Wall intersections: %d of %d directional traces.",
+            hit_count, total_directions)
+        self.simIO.log.info("Saved raw connection-length data: %s", self.data_dir)
         if self.input_params["GENERATE_PLOTS"]:
-            self.simIO.log.info(
-                "Saved %d contour plots: %s",
-                self.input_params["N_PLANES"],
-                Path(self.simIO.plot_dir) / self.analysis_subdir,
-            )
+            self.simIO.log.info("Saved %d contour plots: %s",
+                                self.input_params["N_PLANES"], Path(self.simIO.plot_dir) / self.analysis_subdir)
         if self.device.type == "cuda":
-            peak_gib = torch.cuda.max_memory_allocated(self.device) / (
-                1024.0 ** 3
-            )
-            self.simIO.log.info(
-                "PEAK CUDA MEMORY ALLOCATED: %.3f GiB",
-                peak_gib,
-            )
-        self.simIO.log.info(
-            "## SOL TRACE ANALYSIS FINISHED ##"
-        )
+            peak_gib = torch.cuda.max_memory_allocated(self.device) / (1024.0 ** 3)
+            self.simIO.log.info("PEAK CUDA MEMORY ALLOCATED: %.3f GiB", peak_gib)
+        self.simIO.log.info("## SOL TRACE ANALYSIS FINISHED ##")
+
         return self.trace_data

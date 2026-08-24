@@ -25,6 +25,7 @@ from time import perf_counter
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from matplotlib.path import Path as MplPath
 import numpy as np
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -100,7 +101,7 @@ MODEL_METADATA_FILENAME = "piecewise_density_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_density_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_density_trace.png"
 
-
+# unique function
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Construct the piecewise flux / connection-length density."
@@ -202,7 +203,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-
+# unique function
 def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
     if not all(np.isfinite(value) for value in (n_axis, n_lcfs, n_wall)):
         raise ValueError("N_AXIS, N_LCFS, and N_WALL must be finite.")
@@ -237,85 +238,42 @@ def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
     if CONTOUR_EXTEND not in {"neither", "both", "min", "max"}:
         raise ValueError("Invalid CONTOUR_EXTEND setting.")
 
+# unique function
+def construct_density_plane(sol_plane, linear_profile_plane,
+                            theta, rho, grid_points, boundary,
+                            vessel_radius, l_parallel_0,
+                            n_axis, n_lcfs, n_wall,
+                            alpha, sol_beta):
+    
+    boundary = common.resample_closed_curve(boundary, BOUNDARY_RESAMPLE_POINTS)
 
-def resolve_l_parallel_0(requested_value, poincare_settings):
-    if requested_value is not None:
-        value = float(requested_value)
-        source = "explicit setting"
-    else:
-        spins = poincare_settings.get("SPINS")
-        if not isinstance(spins, int) or spins <= 0:
-            raise ValueError(
-                "Cannot derive L_PARALLEL_0_M without positive logged SPINS."
-            )
-        value = 2.0 * np.pi * MAJOR_RADIUS_M * spins
-        source = f"2*pi*{MAJOR_RADIUS_M:g} m*{spins} logged spins"
-    if not np.isfinite(value) or value <= 0.0:
-        raise ValueError("L_PARALLEL_0_M must be positive and finite.")
-    return value, source
-
-
-def construct_density_plane(
-    sol_plane,
-    linear_profile_plane,
-    theta,
-    rho,
-    grid_points,
-    boundary,
-    vessel_radius,
-    l_parallel_0,
-    n_axis,
-    n_lcfs,
-    n_wall,
-    alpha,
-    sol_beta,
-):
-    boundary = common.resample_closed_curve(
-        boundary,
-        BOUNDARY_RESAMPLE_POINTS,
-    )
     normals = common.outward_normals(boundary)
-    inside = common.points_inside_boundary(
-        boundary,
-        grid_points,
-        (theta.size, rho.size),
-    )
+
+    closed = np.vstack((boundary, boundary[0]))
+    shape = (theta.size, rho.size)
+    inside = MplPath(closed).contains_points(grid_points).reshape(shape)
     if not np.any(inside) or not np.any(~inside):
         raise ValueError("LCFS mask does not divide the computational mesh.")
 
+
     delta_n_core = n_axis - n_lcfs
     delta_n_sol = n_lcfs - n_wall
-    density_profile = common.apply_profile_alpha(linear_profile_plane, alpha)
+    density_profile = 1.0 - (1.0 - linear_profile_plane) ** alpha
+
     output = np.empty((theta.size, rho.size), dtype=np.float64)
+
     output[inside] = n_lcfs + delta_n_core * density_profile[inside]
 
-    chi, diagnostics = common.construct_path_attenuation(
-        sol_plane,
-        density_profile,
-        theta,
-        rho,
-        boundary,
-        normals,
-        vessel_radius,
-        l_parallel_0,
-        delta_n_core,
-        delta_n_sol,
-        sol_beta,
-        path_samples=PATH_SAMPLES,
-        derivative_step=NORMAL_DERIVATIVE_STEP_M,
-        smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
-        lambda_min=LAMBDA_N_MIN_M,
-        lambda_max=LAMBDA_N_MAX_M,
-    )
-    output[~inside] = common.evaluate_exterior_profile(
-        grid_points[~inside.ravel()],
-        boundary,
-        normals,
-        chi,
-        vessel_radius,
-        n_wall,
-        delta_n_sol,
-    )
+    chi, diagnostics = common.construct_path_attenuation(sol_plane, density_profile, theta, rho,
+                                                         boundary, normals, vessel_radius, l_parallel_0,
+                                                         delta_n_core, delta_n_sol, sol_beta,
+                                                         path_samples=PATH_SAMPLES, derivative_step=NORMAL_DERIVATIVE_STEP_M,
+                                                         smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
+                                                         lambda_min=LAMBDA_N_MIN_M, lambda_max=LAMBDA_N_MAX_M)
+    
+    output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary,
+                                                       normals, chi, vessel_radius, n_wall, delta_n_sol)
+    
     if not np.all(np.isfinite(output)):
         raise ValueError("Constructed density contains non-finite values.")
 
@@ -327,34 +285,16 @@ def construct_density_plane(
     diagnostics["density_max"] = float(np.max(output))
     return output, diagnostics
 
-
-def build_density_field(
-    analysis_dir,
-    sol,
-    linear_profile,
-    rho,
-    theta,
-    phi_deg,
-    lcfs_index,
-    vessel_radius,
-    l_parallel_0,
-    n_axis,
-    n_lcfs,
-    n_wall,
-    alpha,
-    sol_beta,
-    output_path,
-    sim_io,
-    show_progress,
-):
+# unique function
+def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
+                        lcfs_index, vessel_radius, l_parallel_0,
+                        n_axis, n_lcfs, n_wall,
+                        alpha, sol_beta,
+                        output_path, sim_io, show_progress):
+    
     _, _, _, grid_points = common.make_grid(rho, theta)
     temporary_path = output_path.with_name(f".{output_path.stem}.building.npy")
-    output = np.lib.format.open_memmap(
-        temporary_path,
-        mode="w+",
-        dtype=np.float64,
-        shape=sol.shape,
-    )
+    output = np.lib.format.open_memmap(temporary_path, mode="w+", dtype=np.float64, shape=sol.shape)
 
     diagnostic_shape = (phi_deg.size, BOUNDARY_RESAMPLE_POINTS)
     boundaries = np.empty(diagnostic_shape + (2,), dtype=np.float64)
@@ -368,18 +308,8 @@ def build_density_field(
     chi_wall = np.empty(diagnostic_shape, dtype=np.float64)
 
     start_time = perf_counter()
-    progress = tqdm(
-        range(phi_deg.size),
-        desc="Constructing piecewise density",
-        unit="plane",
-        dynamic_ncols=True,
-        disable=not show_progress,
-    )
-    log_context = (
-        logging_redirect_tqdm(loggers=[sim_io.log])
-        if show_progress
-        else nullcontext()
-    )
+    progress = tqdm(range(phi_deg.size), desc="Constructing piecewise density", unit="plane", dynamic_ncols=True, disable=not show_progress)
+    log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
     try:
         with log_context:
             for plane_index in progress:
@@ -388,21 +318,10 @@ def build_density_field(
                     float(phi_deg[plane_index]),
                     lcfs_index,
                 )
-                plane, diagnostics = construct_density_plane(
-                    sol[plane_index],
-                    linear_profile[plane_index],
-                    theta,
-                    rho,
-                    grid_points,
-                    boundary,
-                    vessel_radius,
-                    l_parallel_0,
-                    n_axis,
-                    n_lcfs,
-                    n_wall,
-                    alpha,
-                    sol_beta,
-                )
+                plane, diagnostics = construct_density_plane(sol[plane_index], linear_profile[plane_index], theta, rho,
+                                                             grid_points, boundary, vessel_radius, l_parallel_0,
+                                                             n_axis, n_lcfs, n_wall, alpha, sol_beta)
+                
                 output[plane_index] = plane
                 boundaries[plane_index] = diagnostics["boundary"]
                 normals[plane_index] = diagnostics["normal"]
@@ -413,9 +332,7 @@ def build_density_field(
                 wall_distance[plane_index] = diagnostics["path_wall_distance"]
                 bridge_width[plane_index] = diagnostics["bridge_width"]
                 chi_wall[plane_index] = diagnostics["chi_wall"]
-                sim_io.log.info(
-                    "Constructed density phi=%03.0f: %d interior/%d exterior "
-                    "cells, lambda_n,0 %.6g/%.6g/%.6g m, bridge "
+                sim_io.log.info("Constructed density phi=%03.0f: %d interior/%d exterior cells, lambda_n,0 %.6g/%.6g/%.6g m, bridge "
                     "%.6g/%.6g/%.6g m, chi_n,w min %.6g, density %.6g to %.6g.",
                     phi_deg[plane_index],
                     diagnostics["inside_cells"],
@@ -443,12 +360,9 @@ def build_density_field(
         raise
 
     elapsed = perf_counter() - start_time
-    sim_io.log.info(
-        "Constructed %d density planes in %.3f s (%.3f s/plane).",
-        phi_deg.size,
-        elapsed,
-        elapsed / phi_deg.size,
-    )
+    sim_io.log.info("Constructed %d density planes in %.3f s (%.3f s/plane).",
+                    phi_deg.size, elapsed, elapsed / phi_deg.size)
+    
     metadata = {
         "phi_grid_deg": phi_deg,
         "lcfs_boundary_xz_m": boundaries,
@@ -473,21 +387,11 @@ def build_density_field(
     return np.load(output_path, mmap_mode="r"), metadata
 
 
-def plot_density_plane(
-    density_plane,
-    grid_x,
-    grid_z,
-    boundary,
-    vessel_radius,
-    phi_value,
-    n_axis,
-    color_scale,
-    plot_vmin,
-    plot_vmax,
-    show_lcfs,
-    sim_io,
-    output_subdir,
-):
+
+def plot_density_plane(density_plane, grid_x, grid_z, boundary, vessel_radius, phi_value,
+                       n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
+                       sim_io, output_subdir):
+    
     plot_x = np.vstack((grid_x[-1], grid_x))
     plot_z = np.vstack((grid_z[-1], grid_z))
     plot_density = np.vstack((density_plane[-1], density_plane)) / n_axis
@@ -500,38 +404,15 @@ def plot_density_plane(
         color_norm = None
 
     fig, ax = plt.subplots(figsize=FIGSIZE)
-    contour = ax.contourf(
-        plot_x,
-        plot_z,
-        plot_density,
-        levels=levels,
-        cmap=COLORMAP,
-        norm=color_norm,
-        extend=CONTOUR_EXTEND,
-    )
+    contour = ax.contourf(plot_x, plot_z, plot_density, levels=levels,
+                          cmap=COLORMAP, norm=color_norm, extend=CONTOUR_EXTEND)
     if show_lcfs:
         closed_boundary = np.vstack((boundary, boundary[0]))
-        ax.plot(
-            closed_boundary[:, 0],
-            closed_boundary[:, 1],
-            color="white",
-            linewidth=1.0,
-            label="LCFS",
-        )
+        ax.plot(closed_boundary[:, 0], closed_boundary[:, 1], color="white", linewidth=1.0, label="LCFS")
     wall_angle = np.linspace(0.0, 2.0 * np.pi, 720)
-    ax.plot(
-        vessel_radius * np.cos(wall_angle),
-        vessel_radius * np.sin(wall_angle),
-        color="0.35",
-        linewidth=1.0,
-        label="Vessel wall",
-    )
+    ax.plot(vessel_radius * np.cos(wall_angle), vessel_radius * np.sin(wall_angle), color="0.35", linewidth=1.0, label="Vessel wall")
     phi_phys = (phi_value + PHYSICAL_PHI_OFFSET_DEG) % 360.0
-    ax.set_title(
-        "Piecewise plasma density\n"
-        f"$\\phi_{{comp}}={phi_value:.0f}^\\circ$, "
-        f"$\\phi_{{phys}}={phi_phys:.0f}^\\circ$"
-    )
+    ax.set_title(f"Piecewise plasma density\n$\\phi_{{comp}}={phi_value:.0f}^\\circ$, $\\phi_{{phys}}={phi_phys:.0f}^\\circ$")
     ax.set_xlabel(r"$x=\rho\cos\theta$ [m]")
     ax.set_ylabel(r"$z=\rho\sin\theta$ [m]")
     ax.set_aspect("equal")
@@ -542,117 +423,41 @@ def plot_density_plane(
     colorbar = fig.colorbar(contour, ax=ax, pad=0.03)
     colorbar.set_label(r"Normalized density $n/n_0$")
     fig.tight_layout()
-    sim_io.saveFig(
-        OUTPUT_PLOT_FILENAME.format(phi_deg=phi_value),
-        subdir=output_subdir,
-        dpi=DPI,
-    )
+    sim_io.saveFig(OUTPUT_PLOT_FILENAME.format(phi_deg=phi_value), subdir=output_subdir, dpi=DPI)
     plt.close(fig)
 
 
-def generate_density_plots(
-    field,
-    rho,
-    theta,
-    phi_deg,
-    boundaries,
-    vessel_radius,
-    n_axis,
-    color_scale,
-    plot_vmin,
-    plot_vmax,
-    show_lcfs,
-    sim_io,
-    output_subdir,
-    show_progress,
-):
+def generate_density_plots(field, rho, theta, phi_deg, boundaries, vessel_radius,
+                           n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
+                           sim_io, output_subdir, show_progress):
+    
     _, grid_x, grid_z, _ = common.make_grid(rho, theta)
-    progress = tqdm(
-        range(phi_deg.size),
-        desc="Plotting piecewise density",
-        unit="plane",
-        dynamic_ncols=True,
-        disable=not show_progress,
-    )
-    log_context = (
-        logging_redirect_tqdm(loggers=[sim_io.log])
-        if show_progress
-        else nullcontext()
-    )
+    progress = tqdm(  range(phi_deg.size), desc="Plotting piecewise density", unit="plane", dynamic_ncols=True, disable=not show_progress)
+    log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
     with log_context:
         for plane_index in progress:
-            plot_density_plane(
-                np.asarray(field[plane_index]),
-                grid_x,
-                grid_z,
-                boundaries[plane_index],
-                vessel_radius,
-                float(phi_deg[plane_index]),
-                n_axis,
-                color_scale,
-                plot_vmin,
-                plot_vmax,
-                show_lcfs,
-                sim_io,
-                output_subdir,
-            )
+            plot_density_plane(np.asarray(field[plane_index]), grid_x, grid_z, boundaries[plane_index], vessel_radius, float(phi_deg[plane_index]),
+                               n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
+                               sim_io, output_subdir)
             if plane_index % 10 == 0:
                 gc.collect()
 
 
-def generate_midplane_density_plot(
-    field,
-    rho,
-    theta,
-    phi_deg,
-    vessel_radius,
-    n_axis,
-    n_lcfs,
-    sim_io,
-    output_subdir,
-):
-    theta_lfs_index = common.nearest_coordinate_index(
-        theta,
-        2.0 * np.pi,
-        "theta_LFS",
-    )
-    theta_hfs_index = common.nearest_coordinate_index(
-        theta,
-        np.pi,
-        "theta_HFS",
-    )
-    distance_from_lfs = np.concatenate(
-        (vessel_radius - rho[::-1], vessel_radius + rho[1:])
-    )
+def generate_midplane_density_plot(field, rho, theta, phi_deg,
+                                   vessel_radius, n_axis, n_lcfs, sim_io, output_subdir):
+    
+    theta_lfs_index = common.nearest_coordinate_index(theta, 2.0 * np.pi, "theta_LFS")
+    theta_hfs_index = common.nearest_coordinate_index(theta, np.pi, "theta_HFS")
+    distance_from_lfs = np.concatenate( (vessel_radius - rho[::-1], vessel_radius + rho[1:]) )
 
     fig, ax = plt.subplots(figsize=MIDPLANE_TRACE_FIGSIZE)
     for requested_phi in MIDPLANE_TRACE_PHI_DEG:
-        phi_index = common.nearest_coordinate_index(
-            phi_deg,
-            requested_phi,
-            "phi_comp",
-        )
-        density = np.concatenate(
-            (
-                np.asarray(field[phi_index, theta_lfs_index, ::-1]),
-                np.asarray(field[phi_index, theta_hfs_index, 1:]),
-            )
-        )
-        ax.plot(
-            distance_from_lfs,
-            density / n_axis,
-            linewidth=1.5,
-            label=rf"$\phi_{{comp}}={phi_deg[phi_index]:.0f}^\circ$",
-        )
+        phi_index = common.nearest_coordinate_index(phi_deg, requested_phi, "phi_comp")
+        density = np.concatenate( (np.asarray(field[phi_index, theta_lfs_index, ::-1]), np.asarray(field[phi_index, theta_hfs_index, 1:])) )
+        ax.plot(distance_from_lfs, density / n_axis, linewidth=1.5, label=rf"$\phi_{{comp}}={phi_deg[phi_index]:.0f}^\circ$")
 
     lcfs_fraction = n_lcfs / n_axis
-    ax.axhline(
-        lcfs_fraction,
-        color="black",
-        linestyle="--",
-        linewidth=1.2,
-        label=rf"$n_{{LCFS}}/n_0={lcfs_fraction:g}$",
-    )
+    ax.axhline(lcfs_fraction, color="black", linestyle="--", linewidth=1.2, label=rf"$n_{{LCFS}}/n_0={lcfs_fraction:g}$")
     ax.set_title("Horizontal-midplane plasma-density profile")
     ax.set_xlabel("Distance from low-field-side wall [m]")
     ax.set_ylabel(r"Normalized density $n/n_0$")
@@ -666,76 +471,48 @@ def generate_midplane_density_plot(
 
 
 def main():
+    ## INPUT PREAMBLE
     args = parse_args()
-    validate_settings(
-        args.n_axis,
-        args.n_lcfs,
-        args.n_wall,
-        args.alpha,
-        args.sol_beta,
-    )
-    output_subdir = (
-        args.output_subdir
-        if args.output_subdir is not None
-        else f"{args.sol_subdir}_Density_v2"
-    )
-    poincare_settings = load_poincare_settings(args.analysis_dir)
-    lcfs_index, lcfs_index_source = common.resolve_lcfs_index(
-        args.lcfs_index,
-        args.nfield_file,
-        poincare_settings,
-    )
-    l_parallel_0, l_parallel_0_source = resolve_l_parallel_0(
-        args.l_parallel_0_m,
-        poincare_settings,
-    )
-    (
-        sol,
-        linear_profile,
-        rho,
-        theta,
-        phi_deg,
-        sol_path,
-        profile_path,
-    ) = common.load_inputs(
-        args.analysis_dir,
-        args.sol_subdir,
-        args.nfield_subdir,
-        args.nfield_file,
-    )
-    vessel_radius = (
-        float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M)
-    )
-    if not np.isclose(vessel_radius, rho[-1], rtol=0.0, atol=1e-12):
-        raise ValueError(
-            "The exact wall boundary requires VESSEL_RADIUS_M to equal the "
-            "outermost rho grid node."
-        )
 
+    validate_settings(args.n_axis, args.n_lcfs, args.n_wall, args.alpha, args.sol_beta)
+
+
+    output_subdir = (args.output_subdir if args.output_subdir is not None else f"{args.sol_subdir}_Density_v2")
+
+    poincare_settings = load_poincare_settings(args.analysis_dir)
+    lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
+
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings)
+    print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and L_parallel,0={l_parallel_0:.6g} m")
+
+    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file)
+    sol, linear_profile, rho, theta, phi_deg, sol_path, profile_path = input_data
+
+    # double-check: why are we re-saving input rho,theta,phi grids?
+    for coordinate, filename in ( (rho, RHO_FILENAME), (theta, THETA_FILENAME), (phi_deg, PHI_FILENAME)):
+        sim_io.saveNumpyData(coordinate, filename.removesuffix(".npy"), subdir=output_subdir)
+
+    vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
     if PLOT_VMIN is None:
-        plot_vmin = (
-            LOG_PLOT_VMIN
-            if args.color_scale == "log"
-            else args.n_wall / args.n_axis
-        )
+        plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else args.n_wall / args.n_axis)
     else:
         plot_vmin = float(PLOT_VMIN)
     plot_vmax = 1.0 if PLOT_VMAX is None else float(PLOT_VMAX)
+
     if plot_vmin >= plot_vmax:
         raise ValueError("Resolved plot limits require PLOT_VMIN < PLOT_VMAX.")
     if args.color_scale == "log" and plot_vmin <= 0.0:
         raise ValueError("Logarithmic plot limits require PLOT_VMIN > 0.")
-
+    if not np.isclose(vessel_radius, rho[-1], rtol=0.0, atol=1e-12):
+        raise ValueError("The exact wall boundary requires VESSEL_RADIUS_M to equal the outermost rho grid node.")
+    
     sim_io = IOHandler(args.analysis_dir)
-    sim_io.startLog(
-        log_name="solDensity.log",
-        subdir=output_subdir,
-        logger_name=output_subdir,
-    )
+    sim_io.startLog(log_name="solDensity.log", subdir=output_subdir, logger_name=output_subdir)
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_data_dir / OUTPUT_FIELD_FILENAME
 
+    ## CALCULATIONS
     finite_sol = np.asarray(sol[np.isfinite(sol) & (sol > 0.0)])
     run_settings = {
         "ANALYSIS_DIR": args.analysis_dir,
@@ -776,104 +553,37 @@ def main():
         "GENERATE_PLOTS": args.plots,
         "SHOW_PROGRESS": args.progress,
     }
-    sim_io.inputsBoilerplate(
-        "PIECEWISE FLUX / CONNECTION-LENGTH DENSITY INPUTS",
-        run_settings,
-        list(run_settings),
-    )
+    sim_io.inputsBoilerplate("PIECEWISE FLUX / CONNECTION-LENGTH DENSITY INPUTS", run_settings, list(run_settings))
     if run_settings["SOL_CONNECTION_LENGTH_MAX_M"] >= l_parallel_0:
-        sim_io.log.warning(
-            "The exterior field reaches %.6g m, at or above L_parallel_0 "
-            "%.6g m; values will be capped at the LCFS reference.",
-            run_settings["SOL_CONNECTION_LENGTH_MAX_M"],
-            l_parallel_0,
-        )
+        sim_io.log.warning("The exterior field reaches %.6g m, at or above L_parallel_0 %.6g m; values will be capped at the LCFS reference.",
+            run_settings["SOL_CONNECTION_LENGTH_MAX_M"], l_parallel_0)
 
-    for coordinate, filename in (
-        (rho, RHO_FILENAME),
-        (theta, THETA_FILENAME),
-        (phi_deg, PHI_FILENAME),
-    ):
-        sim_io.saveNumpyData(
-            coordinate,
-            filename.removesuffix(".npy"),
-            subdir=output_subdir,
-        )
+    field, metadata = build_density_field(args.analysis_dir, sol, linear_profile,
+                                          rho, theta, phi_deg, lcfs_index,
+                                          vessel_radius, l_parallel_0,
+                                          args.n_axis, args.n_lcfs, args.n_wall,
+                                          args.alpha, args.sol_beta,
+                                          output_path, sim_io, args.progress)
 
-    print(f"Reading regular SOL field: {sol_path}")
-    print(f"Reading linear flux profile: {profile_path}")
-    print(
-        f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "
-        f"L_parallel,0={l_parallel_0:.6g} m"
-    )
-    print(f"Output density shape (phi, theta, rho): {sol.shape}")
-    field, metadata = build_density_field(
-        args.analysis_dir,
-        sol,
-        linear_profile,
-        rho,
-        theta,
-        phi_deg,
-        lcfs_index,
-        vessel_radius,
-        l_parallel_0,
-        args.n_axis,
-        args.n_lcfs,
-        args.n_wall,
-        args.alpha,
-        args.sol_beta,
-        output_path,
-        sim_io,
-        args.progress,
-    )
+    ## SAVE OUTPUT
     metadata_path = output_data_dir / MODEL_METADATA_FILENAME
     np.savez_compressed(metadata_path, **metadata)
     sim_io.log.info("Saved piecewise density: %s", output_path)
     sim_io.log.info("Saved density model metadata: %s", metadata_path)
-    sim_io.log.info(
-        "Finite-wall LCFS density-slope factor "
-        "1/(1-exp(-chi_n,w)): %.6g to %.6g.",
+    sim_io.log.info("Finite-wall LCFS density-slope factor 1/(1-exp(-chi_n,w)): %.6g to %.6g.",
         np.min(1.0 / (-np.expm1(-metadata["chi_n_wall"]))),
-        np.max(1.0 / (-np.expm1(-metadata["chi_n_wall"]))),
-    )
+        np.max(1.0 / (-np.expm1(-metadata["chi_n_wall"]))))
 
+    ## PLOTTING
     if args.plots:
-        generate_midplane_density_plot(
-            field,
-            rho,
-            theta,
-            phi_deg,
-            vessel_radius,
-            args.n_axis,
-            args.n_lcfs,
-            sim_io,
-            output_subdir,
-        )
-        generate_density_plots(
-            field,
-            rho,
-            theta,
-            phi_deg,
-            metadata["lcfs_boundary_xz_m"],
-            vessel_radius,
-            args.n_axis,
-            args.color_scale,
-            plot_vmin,
-            plot_vmax,
-            args.show_lcfs,
-            sim_io,
-            output_subdir,
-            args.progress,
-        )
-        sim_io.log.info(
-            "Saved density midplane trace and %d contour plots under %s.",
-            phi_deg.size,
-            Path(sim_io.plot_dir) / output_subdir,
-        )
+        generate_midplane_density_plot(field, rho, theta, phi_deg,
+                                       vessel_radius, args.n_axis, args.n_lcfs, sim_io, output_subdir)
+        generate_density_plots(field, rho, theta, phi_deg, metadata["lcfs_boundary_xz_m"], vessel_radius,
+                               args.n_axis, args.color_scale, plot_vmin, plot_vmax, args.show_lcfs,
+                               sim_io, output_subdir, args.progress)
+        sim_io.log.info( "Saved density midplane trace and %d contour plots under %s.", phi_deg.size, Path(sim_io.plot_dir) / output_subdir)
 
     sim_io.log.info("## PIECEWISE PLASMA-DENSITY MODEL FINISHED ##")
-    print(f"Saved piecewise density: {output_path}")
-    print(f"Saved density metadata: {metadata_path}")
 
 
 if __name__ == "__main__":
