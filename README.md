@@ -29,9 +29,9 @@ The current source tree identifies as version 1.0.0; this does not by itself
 indicate that a Git tag or package release has been published. Version 1.0.0
 establishes the supported active command names and JSON configuration interface
 documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). SOL density and
-potential analysis classes are planned for a later release; their reserved
-commands are not implementations and are not part of the v1.0.0 scientific
-workflow. See [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
+potential construction is implemented by the package-native `SOLDensity` and
+`SOLPotential` classes and their installed commands. See
+[CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
 
 ## Features
 
@@ -95,7 +95,7 @@ pip install -e ".[fitting,viewer,export]"
 
 ## Commands
 
-Six active workflow commands use JSON inputs:
+Eight active workflow commands use JSON inputs:
 
 ```bash
 illiad-fieldsolver --inputs input_files/fieldsolver_inputs.example.json
@@ -103,6 +103,8 @@ illiad-poincare --inputs input_files/poincare_inputs.example.json
 illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
 illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
 illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
+illiad-sol-density --inputs input_files/sol_density_inputs.example.json
+illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
 illiad-boris --inputs input_files/boris_inputs.example.json
 ```
 
@@ -126,18 +128,6 @@ illiad-poincare input_files/poincare_inputs.json
 
 Supply either the positional path or `--inputs`, but not both.
 
-Two additional command names are installed as placeholders for planned
-analysis classes:
-
-```text
-illiad-sol-density
-illiad-sol-potential
-```
-
-These placeholders do not run analyses and do not import or dispatch to
-`misc_scripts`. `--help` describes their reserved purpose; invoking either
-without `--help` exits with a clear not-implemented message.
-
 All relative inputs and the `output/` tree are resolved from the process
 working directory. The preferred Python imports include:
 
@@ -145,7 +135,7 @@ working directory. The preferred Python imports include:
 from illiad.io import IOHandler
 from illiad.mesh import Mesh, TorchMesh
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLTracer
+from illiad.sol import SOLDensity, SOLPotential, SOLTracer
 ```
 
 See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for command and configuration
@@ -215,10 +205,20 @@ directional, and wall-hit metadata.
 
 ### 5. SOL density and potential
 
-`illiad-sol-density` and `illiad-sol-potential` reserve the final installed
-names for future official analysis classes. They intentionally have no current
-analysis implementation. Existing density and potential prototypes remain
-source-only research scripts and are outside the installed workflow.
+Build the density and normalized electrostatic-potential fields from the
+linear interior profile, the regular SOL connection-length field, and saved
+Poincare surfaces:
+
+```bash
+illiad-sol-density --inputs input_files/sol_density_inputs.example.json
+illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
+```
+
+`SOLDensity` and `SOLPotential` preserve the float64
+`(phi, theta, rho)` scalar-field and coordinate-file contract used by
+`FluxGradientor`. Both models anchor at the LCFS, bridge the unsampled
+LCFS-to-SOL interval, integrate the connection-length-dependent attenuation
+to the wall, and can produce contour and midplane diagnostics.
 
 ### 6. Run lithium ion transport
 

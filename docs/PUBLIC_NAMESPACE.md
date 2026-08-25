@@ -40,6 +40,8 @@ interpolated profile or an existing regular scalar field.
 
 ```python
 from illiad.sol import (
+    SOLDensity,
+    SOLPotential,
     SOLTracer,
     build_torch_magnetic_field,
     load_lcfs_boundary,
@@ -53,9 +55,10 @@ from illiad.sol import (
 LCFS-exterior seed grids, traces both directions with a `TorchMesh`, saves
 compact toroidal-plane crossings, and produces optional contour plots.
 
-There are no public density or potential analysis classes yet.
-`illiad-sol-density` and `illiad-sol-potential` are reserved dummy commands;
-they do not expose or call the prototype scripts under `misc_scripts`.
+`SOLDensity` and `SOLPotential` are the package-native profile stitchers.
+They consume saved interior, connection-length, and Poincare artifacts and
+share their LCFS geometry and attenuation implementation through
+`illiad.sol.stitching`.
 
 ## Particles, Boris, and Collisions
 

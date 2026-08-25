@@ -37,11 +37,11 @@ bitwise-identical output.
 | `illiad-flux-calc` | Active | Integrate toroidal flux and diagnose island chains. | `input_files/flux_calc_inputs.example.json` |
 | `illiad-flux-grad` | Active | Interpolate a scalar profile and/or generate its Cartesian electric field. | `input_files/flux_grad_inputs.example.json` |
 | `illiad-sol-trace` | Active | Trace open SOL field lines with the PyTorch solver. | `input_files/sol_trace_inputs.example.json` |
-| `illiad-sol-density` | Placeholder | Reserve the command name for a future density analysis class. | None |
-| `illiad-sol-potential` | Placeholder | Reserve the command name for a future potential analysis class. | None |
+| `illiad-sol-density` | Active | Construct a piecewise core/SOL plasma-density field. | `input_files/sol_density_inputs.example.json` |
+| `illiad-sol-potential` | Active | Construct a piecewise core/SOL electrostatic-potential field. | `input_files/sol_potential_inputs.example.json` |
 | `illiad-boris` | Active | Run full-orbit lithium-ion transport. | `input_files/boris_inputs.example.json` |
 
-The six active commands accept:
+The eight active commands accept:
 
 ```text
 --inputs PATH
@@ -54,11 +54,6 @@ argument. Supplying both forms is an input error; neither form takes
 precedence.
 Relative input paths and `output/` are resolved from the process working
 directory.
-
-The two placeholder commands accept only standard `-h`/`--help`. Invoking one
-without `--help` exits unsuccessfully with a not-implemented message. They do
-not import, install, or dispatch to `misc_scripts`, and they do not yet define
-JSON contracts.
 
 Root `run*.py` launchers mirror the command modules for source-checkout use.
 Installed commands are canonical; `illiad.cli`, launcher modules, and their
@@ -178,6 +173,34 @@ crossing to `fieldline_connection_length_m.npy`; and
 samples. Directional lengths, wall intersections, masks, seed coordinates,
 and plane coordinates are saved alongside them.
 
+### `sol_density_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `SOL_SUBDIR`, `SOL_FIELD_FILENAME`, `NFIELD_SUBDIR`, `NFIELD_FILENAME` |
+| Surface selection | Optional `LCFS_INDEX`; `null` infers `LCFS<number>` from `NFIELD_FILENAME`, then falls back to the Poincare log |
+| Density model | `N_AXIS`, `N_LCFS`, `N_WALL`, `ALPHA`, `SOL_BETA`, optional `L_PARALLEL_0_M` |
+| Diagnostics | `GENERATE_PLOTS`, `SHOW_LCFS`, `COLOR_SCALE`, `SHOW_PROGRESS` |
+
+The density model requires `N_AXIS > N_LCFS > N_WALL >= 0`. The output is a
+float64 `(phi, theta, rho)` field normalized by `N_AXIS` when the default
+`N_AXIS=1` is retained. `L_PARALLEL_0_M=null` derives the numerical LCFS
+reference from the positive `SPINS` value recorded by the Poincare workflow.
+
+### `sol_potential_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `SOL_SUBDIR`, `SOL_FIELD_FILENAME`, `NFIELD_SUBDIR`, `NFIELD_FILENAME` |
+| Surface selection | Optional `LCFS_INDEX`, with the same inference rule as the density command |
+| Potential model | `PHI_WALL`, `DELTA_PHI_0W`, `DELTA_PHI_SOL`, `ALPHA`, `SOL_BETA`, optional `L_PARALLEL_0_M` |
+| Diagnostics | `GENERATE_PLOTS`, `SHOW_LCFS`, `COLOR_SCALE`, `SHOW_PROGRESS` |
+
+The potential model requires
+`0 < DELTA_PHI_SOL < DELTA_PHI_0W`. It preserves the gradient-compatible
+float64 `(phi, theta, rho)` layout, enforces `PHI_WALL` at the vessel wall,
+and writes coordinate arrays and compressed model metadata beside the field.
+
 ### `boris_inputs.example.json`
 
 | Group | Keys |
@@ -242,7 +265,7 @@ from illiad.mesh import Mesh, TorchMesh
 from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLTracer
+from illiad.sol import SOLDensity, SOLPotential, SOLTracer
 from illiad.boris import Boris
 from illiad.collisions import Collisions
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
@@ -264,13 +287,14 @@ from illiad import plotting
 | `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
 | `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
 | `SOLTracer` | `SOLTracer(io_handler, magnetic_field, input_params)`; `build_initial_conditions`, `log_inputs`, `trace`, `plot`, `run` |
+| `SOLDensity` | `SOLDensity(io_handler, input_params)`; `run` |
+| `SOLPotential` | `SOLPotential(io_handler, input_params)`; `run` |
 | `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; condition, solver, output, diagnostic, and `run` methods |
 | `Collisions` | Collision-model resolution and ion-neutral and ion-ion numerical operators |
 
 `illiad.sol` also exports `build_torch_magnetic_field`,
 `load_lcfs_boundary`, `load_poincare_settings`,
-`minimum_boundary_distance`, and `resolve_device`. No density or potential
-analysis class is currently public.
+`minimum_boundary_distance`, and `resolve_device`.
 
 ## Output and Data Compatibility
 

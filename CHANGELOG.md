@@ -9,8 +9,9 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
 
 - The official PyTorch-backed `illiad.sol.SOLTracer` analysis and
   `illiad-sol-trace` command for open-field-line connection-length tracing.
-- Reserved `illiad-sol-density` and `illiad-sol-potential` command names. These
-  commands are placeholders and do not yet implement profile analyses.
+- Package-native `illiad.sol.SOLDensity` and `illiad.sol.SOLPotential`
+  analyses, their installed commands, shared SOL stitching helpers, and JSON
+  input templates.
 - Periodically wrapped local 3-D flux interpolation and support for generating
   gradients from an existing regular scalar field.
 - Rotational-transform-based island-chain identification and strided subset
@@ -38,9 +39,3 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
   `SOLTracer`.
 - Root-level JSON configuration files and iota-specific Poincare examples;
   tracked templates now live under `input_files/`.
-
-### Not Included
-
-- Official SOL density and potential analysis classes. The current prototype
-  scripts remain outside the installed package and public compatibility
-  contract.
