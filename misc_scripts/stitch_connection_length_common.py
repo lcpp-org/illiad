@@ -1,128 +1,25 @@
-"""Build the piecewise LCFS / connection-length electrostatic potential.
+"""Shared geometry and attenuation helpers for LCFS/SOL stitchers.
 
-This post-processing script implements
-``input_files/piecewise_electrostatic_potential_model.pdf``.  It consumes an
-existing interior nField, an existing regular SOL connection-length field,
-and saved Poincare surfaces; it performs no field-line tracing.
-
-The input nField is the linear interior profile
-
-    q = 1 - Psi_tor.
-
-The selected profile exponent is applied here using the same transformation
-as ``FluxInterpolator``:
-
-    psi_in = 1 - (1 - q)**alpha = 1 - Psi_tor**alpha.
-
-At every toroidal plane the script derives the local LCFS potential scale
-length from the transformed profile's inward slope, traces outward-normal
-mapping paths from the LCFS to the wall, bridges any unsampled gap between
-the LCFS and the first valid SOL sample, and integrates
-``chi = integral(ds / lambda_phi)`` along those paths.
-
-The saved scalar field retains the original stitcher's gradientor-compatible
-``(phi, theta, rho)`` float64 layout and filename.  With the default potential
-settings it is normalized to one at the magnetic axis and zero at the wall;
-the Boris workflow may therefore continue to apply ``PLASMA_POTENTIAL`` when
-loading the resulting electric field.
+The density and potential scripts own their run-specific input paths, model
+parameters, numerical settings, output names, and plotting configuration.
 """
 
-import argparse
-from contextlib import nullcontext
-import gc
-
-import os
 from pathlib import Path
 import re
-import sys
-from time import perf_counter
-
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from matplotlib.path import Path as MplPath
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial import cKDTree
 
-from tqdm import tqdm
-from tqdm.contrib.logging import logging_redirect_tqdm
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-os.chdir(PROJECT_ROOT)
 
-
-# Analysis settings
-ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-SOL_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid"
-NFIELD_SUBDIR = "LCFS41"
-#NFIELD_FILENAME = "nField_LCFS40alpha1p0.npy"
-NFIELD_FILENAME = "nField_LCFS41_linear.npy"
-SOL_FIELD_FILENAME = "connection_length_field_m.npy"
-
-# None first infers the surface from NFIELD_FILENAME (LCFS<number>), then
-# falls back to LCFS_INDEX in the Poincare log.  This prevents an appended
-# Poincare run from silently changing the boundary paired with the nField.
-LCFS_INDEX = 41
-
-# Piecewise-potential inputs.  These defaults preserve the normalized scalar
-# convention used by the original stitcher and by PLASMA_POTENTIAL scaling.
-PHI_WALL = 0.0
-DELTA_PHI_0W = 1.0
-DELTA_PHI_SOL = 0.2
-ALPHA = 0.85
-SOL_BETA = 0.5
-
-# Numerical LCFS connection-length reference.  None derives the single-line
-# trace limit 2*pi*R0*SPINS from the Poincare log.  It is an intentional model
-# reference, not a claim that the physical LCFS connection length is finite.
-L_PARALLEL_0_M = None
-MAJOR_RADIUS_M = 0.72
-VESSEL_RADIUS_M = None  # None uses the outermost rho grid node
-
-# Surface mapping and numerical differentiation.  The nField is sampled one
-# and two steps inward from the LCFS for a second-order one-sided derivative.
-BOUNDARY_RESAMPLE_POINTS = 720
-PATH_SAMPLES = 256
-NORMAL_DERIVATIVE_STEP_M = 0.002
-SURFACE_SLOPE_SMOOTHING_SIGMA = 2.0
-TREE_WORKERS = -1
-
-# Optional bounds from the model PDF.  None leaves that side unbounded.
-LAMBDA_PHI_MIN_M = None
-LAMBDA_PHI_MAX_M = None
-
-# Output and plot settings
-GENERATE_PLOTS = True
-SHOW_PROGRESS = True
-FIGSIZE = (7, 6)
-DPI = 250
-COLORMAP = "afmhot"
-COLOR_SCALE = "log"  # "linear" or "log"
-N_LEVELS = 12
-PLOT_VMIN = None  # None uses PHI_WALL
-PLOT_VMAX = None  # None uses PHI_WALL + the selected DELTA_PHI_0W
-LOG_PLOT_VMIN = 1e-5  # Positive floor when log scale uses default limits
-CONTOUR_EXTEND = "neither"
-SHOW_LCFS = True
-PHYSICAL_PHI_OFFSET_DEG = 198.0
-MIDPLANE_TRACE_PHI_DEG = (324.0, 360.0)
-MIDPLANE_TRACE_FIGSIZE = (8, 5)
-
-# Output file names
-OUTPUT_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Stitched_v2-3"  # None uses f"{SOL_SUBDIR}_Stitched_v2"
-OUTPUT_FIELD_FILENAME = "stitched_nfield_connection_length.npy"
+# Shared coordinate-file contract for the regular (phi, theta, rho) grid.
 RHO_FILENAME = "rho_grid_m.npy"
 THETA_FILENAME = "theta_grid_rad.npy"
 PHI_FILENAME = "phi_grid_deg.npy"
-MODEL_METADATA_FILENAME = "piecewise_potential_metadata.npz"
-OUTPUT_PLOT_FILENAME = "stitched_potential_{phi_deg:03.0f}.png"
-MIDPLANE_TRACE_FILENAME = "midplane_potential_trace.png"
 
-# common function
+
 def resolve_lcfs_index(requested_index, nfield_filename, poincare_settings):
     if requested_index is not None:
         if requested_index < 0:
@@ -135,11 +32,13 @@ def resolve_lcfs_index(requested_index, nfield_filename, poincare_settings):
 
     logged_index = poincare_settings.get("LCFS_INDEX")
     if logged_index is None:
-        raise ValueError("Could not infer an LCFS index from the nField filename or ""Poincare log; provide --lcfs-index.")
+        raise ValueError(
+            "Could not infer an LCFS index from the nField filename or "
+            "Poincare log; provide --lcfs-index."
+        )
     return int(logged_index), "Poincare log"
 
-# common function
-def resolve_l_parallel_0(requested_value, poincare_settings):
+def resolve_l_parallel_0(requested_value, poincare_settings, *, major_radius_m):
     if requested_value is not None:
         value = float(requested_value)
         source = "explicit setting"
@@ -148,35 +47,35 @@ def resolve_l_parallel_0(requested_value, poincare_settings):
         if not isinstance(spins, int) or spins <= 0:
             raise ValueError("Cannot derive L_PARALLEL_0_M without a positive integer SPINS value in the Poincare log; provide --l-parallel-0-m.")
         
-        value = 2.0 * np.pi * MAJOR_RADIUS_M * spins
-        source = f"2*pi*{MAJOR_RADIUS_M:g} m*{spins} logged spins"
+        value = 2.0 * np.pi * major_radius_m * spins
+        source = f"2*pi*{major_radius_m:g} m*{spins} logged spins"
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError("L_PARALLEL_0_M must be positive and finite.")
     return value, source
 
-# "load_inputs" method
 def require_file(path, description):
     if not path.is_file():
         raise FileNotFoundError(f"Missing {description}: {path}")
     return path
 
-# common function
-def load_inputs(analysis_dir, sol_subdir, coreField_subdir, coreField_filename):
+def load_inputs(analysis_dir, sol_subdir, core_field_subdir, core_field_filename, *,
+                sol_field_filename, rho_filename=RHO_FILENAME, theta_filename=THETA_FILENAME, phi_filename=PHI_FILENAME):
+    
     base_data_dir = PROJECT_ROOT / "output" / analysis_dir / "data"
     sol_data_dir = base_data_dir / sol_subdir
-    coreField_path = base_data_dir / coreField_subdir / coreField_filename
+    core_field_path = base_data_dir / core_field_subdir / core_field_filename
 
-    sol_path = require_file(sol_data_dir / SOL_FIELD_FILENAME, "SOL-solved field")
-    rho_path = require_file(sol_data_dir / RHO_FILENAME, "rho grid")
-    theta_path = require_file(sol_data_dir / THETA_FILENAME, "theta grid")
-    phi_path = require_file(sol_data_dir / PHI_FILENAME, "phi grid")
-    require_file(coreField_path, "Core-solved Field")
+    sol_path = require_file(sol_data_dir / sol_field_filename, "SOL connection-length field")
+    rho_path = require_file(sol_data_dir / rho_filename, "rho grid")
+    theta_path = require_file(sol_data_dir / theta_filename, "theta grid")
+    phi_path = require_file(sol_data_dir / phi_filename, "phi grid")
+    require_file(core_field_path, "core field")
 
     print(f"Reading regular SOL field: {sol_path}")
     sol_data = np.load(sol_path, mmap_mode="r")
     print(f"Output field shape (phi, theta, rho): {sol_data.shape}")
-    print(f"Reading interior field: {coreField_path}")
-    core_data = np.load(coreField_path, mmap_mode="r")
+    print(f"Reading interior field: {core_field_path}")
+    core_data = np.load(core_field_path, mmap_mode="r")
     rho = np.load(rho_path)
     theta = np.load(theta_path)
     phi_deg = np.load(phi_path)
@@ -201,9 +100,8 @@ def load_inputs(analysis_dir, sol_subdir, coreField_subdir, coreField_filename):
     if not np.any(finite_sol):
         raise ValueError("Connection-length field has no positive finite samples.")
     
-    return sol_data, core_data, rho, theta, phi_deg, sol_path, coreField_path
+    return sol_data, core_data, rho, theta, phi_deg, sol_path, core_field_path
 
-# common function
 def make_grid(rho, theta):
     grid_theta, grid_rho = np.meshgrid(theta, rho, indexing="ij")
     grid_x = grid_rho * np.cos(grid_theta)
@@ -211,7 +109,6 @@ def make_grid(rho, theta):
     grid_points = np.column_stack((grid_x.ravel(), grid_z.ravel()))
     return grid_rho, grid_x, grid_z, grid_points
 
-# common function
 def resample_closed_curve(vertices, point_count):
     vertices = np.asarray(vertices, dtype=np.float64)
     if vertices.ndim != 2 or vertices.shape[1] != 2 or len(vertices) < 3:
@@ -232,7 +129,6 @@ def resample_closed_curve(vertices, point_count):
     target = np.linspace(0.0, cumulative[-1], point_count, endpoint=False)
     return np.column_stack( (np.interp(target, cumulative, closed[:, 0]), np.interp(target, cumulative, closed[:, 1])) )
 
-# common function
 def outward_normals(boundary):
     tangent = np.roll(boundary, -1, axis=0) - np.roll(boundary, 1, axis=0)
     tangent_norm = np.linalg.norm(tangent, axis=1)
@@ -247,11 +143,9 @@ def outward_normals(boundary):
         normals = np.column_stack((-tangent[:, 1], tangent[:, 0]))
     return normals
 
-# common function (via "construct_path_attenuation" and "surface_profile_slope")
 def xz_to_theta_rho(points):
     return np.column_stack(( np.mod(np.arctan2(points[:, 1], points[:, 0]), 2.0 * np.pi), np.linalg.norm(points, axis=1)) )
 
-# common function (via "construct_path_attenuation" and many more...)
 def wall_distance(origins, directions, vessel_radius):
     origin_dot_direction = np.sum(origins * directions, axis=1)
     discriminant = ( origin_dot_direction**2 + vessel_radius**2 - np.sum(origins**2, axis=1))
@@ -264,15 +158,14 @@ def wall_distance(origins, directions, vessel_radius):
     
     return distance
 
-# common function (via "construct_path_attenuation")
-def surface_profile_slope(nfield_interpolator, boundary, normals, derivative_step=NORMAL_DERIVATIVE_STEP_M, smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA):
+def surface_profile_slope(profile_interpolator, boundary, normals, *, derivative_step, smoothing_sigma):
 
     step = derivative_step
     inward_one = boundary - step * normals
     #inward_two = boundary - 2.0 * step * normals
     inward_two = inward_one - step * normals
-    profile_one = nfield_interpolator(xz_to_theta_rho(inward_one))
-    profile_two = nfield_interpolator(xz_to_theta_rho(inward_two))
+    profile_one = profile_interpolator(xz_to_theta_rho(inward_one))
+    profile_two = profile_interpolator(xz_to_theta_rho(inward_two))
     if not np.all(np.isfinite(profile_one)) or not np.all(np.isfinite(profile_two)):
         raise ValueError("Could not evaluate the nField on both inward derivative shells.")
 
@@ -288,12 +181,10 @@ def surface_profile_slope(nfield_interpolator, boundary, normals, derivative_ste
     
     return slope, profile_one, profile_two
 
-# "bridge_connection_length_paths" method
 def smoothstep(values):
     values = np.clip(values, 0.0, 1.0)
     return values * values * (3.0 - 2.0 * values)
 
-# common function (via "construct_path_attenuation")
 def bridge_connection_length_paths(raw_paths, path_distance, l_parallel_0):
     """Join L_parallel_0 to the first valid exterior sample on every path."""
     # sanitize the inputs, and set points on LCFS to False
@@ -329,21 +220,19 @@ def bridge_connection_length_paths(raw_paths, path_distance, l_parallel_0):
 
     return bridged, first_distance
 
-# common function
-def construct_path_attenuation(sol_plane, profile_plane,
-                               theta, rho, boundary, normals,
+def construct_path_attenuation(sol_plane, profile_plane, theta, rho, boundary, normals,
                                vessel_radius, l_parallel_0,
-                               delta_phi_core, delta_phi_sol, sol_beta,
-                               path_samples=PATH_SAMPLES,
-                               derivative_step=NORMAL_DERIVATIVE_STEP_M, smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
-                               lambda_min=LAMBDA_PHI_MIN_M, lambda_max=LAMBDA_PHI_MAX_M,):
+                               core_difference, exterior_difference, sol_beta, *,
+                               path_samples, derivative_step, smoothing_sigma,
+                               lambda_min, lambda_max):
 
     ## GET INTERIOR SLOPE, CALCULATE LAMBDA AT LCFS
     theta_extended = np.concatenate( ([theta[-1] - 2.0 * np.pi], theta, [theta[0] + 2.0 * np.pi]) )
     profile_extended = np.concatenate( (profile_plane[-1:, :], profile_plane, profile_plane[:1, :]), axis=0 )
-    nfield_interpolator = RegularGridInterpolator( (theta_extended, rho), profile_extended, bounds_error=False, fill_value=np.nan, )
-    slope, profile_one, profile_two = surface_profile_slope(nfield_interpolator, boundary, normals, derivative_step, smoothing_sigma)
-    lambda_phi_0 = delta_phi_sol / (delta_phi_core * slope)
+    profile_interpolator = RegularGridInterpolator( (theta_extended, rho), profile_extended, bounds_error=False, fill_value=np.nan, )
+    slope, profile_one, profile_two = surface_profile_slope( profile_interpolator, boundary, normals,
+                                                            derivative_step=derivative_step, smoothing_sigma=smoothing_sigma)
+    lambda_0 = exterior_difference / (core_difference * slope)
 
     ## CREATE GRID OF L_PARALLEL AT EVERY SAMPLE POINT FOR EVERY LCFS RAY
     path_wall_distance = wall_distance(boundary, normals, vessel_radius)
@@ -357,19 +246,19 @@ def construct_path_attenuation(sol_plane, profile_plane,
 
 
     connection, bridge_width = bridge_connection_length_paths(raw_connection, path_distance, l_parallel_0)
-    lambda_phi = lambda_phi_0[:, None] * (connection / l_parallel_0) ** sol_beta
+    scale_length = lambda_0[:, None] * (connection / l_parallel_0) ** sol_beta
 
     if lambda_min is not None:
-        lambda_phi = np.maximum(lambda_phi, lambda_min)
+        scale_length = np.maximum(scale_length, lambda_min)
     if lambda_max is not None:
-        lambda_phi = np.minimum(lambda_phi, lambda_max)
-    if not np.all(np.isfinite(lambda_phi)) or np.any(lambda_phi <= 0.0):
-        raise ValueError("Potential scale lengths are not positive and finite.")
+        scale_length = np.minimum(scale_length, lambda_max)
+    if not np.all(np.isfinite(scale_length)) or np.any(scale_length <= 0.0):
+        raise ValueError("Profile scale lengths are not positive and finite.")
 
-    inverse_lambda = 1.0 / lambda_phi
+    inverse_lambda = 1.0 / scale_length
     increments = 0.5 * (inverse_lambda[:, 1:] + inverse_lambda[:, :-1]) * np.diff(path_distance, axis=1)
 
-    chi = np.zeros_like(lambda_phi)
+    chi = np.zeros_like(scale_length)
     chi[:, 1:] = np.cumsum(increments, axis=1)
     if not np.all(np.isfinite(chi)) or np.any(chi[:, -1] <= 0.0):
         raise ValueError("Attenuation integrals are not positive and finite.")
@@ -378,23 +267,22 @@ def construct_path_attenuation(sol_plane, profile_plane,
         "slope": slope,
         "profile_one": profile_one,
         "profile_two": profile_two,
-        "lambda_phi_0": lambda_phi_0,
-        "lambda_phi_min": np.min(lambda_phi, axis=1),
-        "lambda_phi_max": np.max(lambda_phi, axis=1),
+        "lambda_0": lambda_0,
+        "lambda_min": np.min(scale_length, axis=1),
+        "lambda_max": np.max(scale_length, axis=1),
         "path_wall_distance": path_wall_distance,
         "bridge_width": bridge_width,
         "chi_wall": chi[:, -1],
     }
     return chi, diagnostics
 
-# common function
 def evaluate_exterior_profile(exterior_points, lcfs_points, normals,
                               chi, vessel_radius,
-                              outer_value, profile_difference):
+                              outer_value, profile_difference, *, tree_workers):
     
     # find nearest lcfs point to each exterior point and calc distance
     tree = cKDTree(lcfs_points)
-    _, surface_index = tree.query(exterior_points, workers=TREE_WORKERS)
+    _, surface_index = tree.query(exterior_points, workers=tree_workers)
     origins = lcfs_points[surface_index]
     displacement = exterior_points - origins
     distance = np.linalg.norm(displacement, axis=1)
@@ -435,9 +323,13 @@ def evaluate_exterior_profile(exterior_points, lcfs_points, normals,
     return profile
 
 
-# dummy
-def main():
-    print("This file contains common function definitions for stitching connection-length potentials.")
-
-if __name__ == "__main__":
-    main()
+def nearest_coordinate_index(coordinates, target, name):
+    coordinates = np.asarray(coordinates, dtype=np.float64)
+    index = int(np.argmin(np.abs(coordinates - target)))
+    if coordinates.size > 1:
+        tolerance = 0.5 * np.min(np.diff(coordinates)) + 1e-12
+    else:
+        tolerance = 1e-12
+    if abs(coordinates[index] - target) > tolerance:
+        raise ValueError(f"Requested {name}={target:g} is not represented by the grid.")
+    return index

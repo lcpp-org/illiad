@@ -68,6 +68,7 @@ BOUNDARY_RESAMPLE_POINTS = 720
 PATH_SAMPLES = 256
 NORMAL_DERIVATIVE_STEP_M = 0.002
 SURFACE_SLOPE_SMOOTHING_SIGMA = 2.0
+TREE_WORKERS = -1
 
 # Optional density-decay-length bounds
 LAMBDA_N_MIN_M = None
@@ -92,9 +93,6 @@ MIDPLANE_TRACE_FIGSIZE = (8, 5)
 
 SOL_FIELD_FILENAME = "connection_length_field_m.npy"
 OUTPUT_FIELD_FILENAME = "stitched_density_connection_length.npy"
-RHO_FILENAME = "rho_grid_m.npy"
-THETA_FILENAME = "theta_grid_rad.npy"
-PHI_FILENAME = "phi_grid_deg.npy"
 MODEL_METADATA_FILENAME = "piecewise_density_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_density_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_density_trace.png"
@@ -113,6 +111,14 @@ def parse_args():
         "--sol-subdir",
         default=SOL_SUBDIR,
         help=f"Regular SOL field data subdirectory (default: {SOL_SUBDIR}).",
+    )
+    parser.add_argument(
+        "--sol-field-file",
+        default=SOL_FIELD_FILENAME,
+        help=(
+            "Connection-length filename inside --sol-subdir "
+            f"(default: {SOL_FIELD_FILENAME})."
+        ),
     )
     parser.add_argument(
         "--nfield-subdir",
@@ -259,15 +265,15 @@ def construct_density_plane(sol_plane, linear_profile_plane,
 
     output[inside] = n_lcfs + delta_n_core * density_profile[inside]
 
-    chi, diagnostics = common.construct_path_attenuation(sol_plane, density_profile, theta, rho,
-                                                         boundary, normals, vessel_radius, l_parallel_0,
-                                                         delta_n_core, delta_n_sol, sol_beta,
+    chi, diagnostics = common.construct_path_attenuation(sol_plane, density_profile,
+                                                         theta, rho, boundary, normals,
+                                                         vessel_radius, l_parallel_0, delta_n_core, delta_n_sol, sol_beta,
                                                          path_samples=PATH_SAMPLES, derivative_step=NORMAL_DERIVATIVE_STEP_M,
                                                          smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
                                                          lambda_min=LAMBDA_N_MIN_M, lambda_max=LAMBDA_N_MAX_M)
     
-    output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary,
-                                                       normals, chi, vessel_radius, n_wall, delta_n_sol)
+    output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi,
+                                                       vessel_radius, n_wall, delta_n_sol, tree_workers=TREE_WORKERS)
     
     if not np.all(np.isfinite(output)):
         raise ValueError("Constructed density contains non-finite values.")
@@ -319,9 +325,9 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
                 output[plane_index] = plane
                 boundaries[plane_index] = diagnostics["boundary"]
                 normals[plane_index] = diagnostics["normal"]
-                lambda_n_0[plane_index] = diagnostics["lambda_phi_0"]
-                lambda_n_min[plane_index] = diagnostics["lambda_phi_min"]
-                lambda_n_max[plane_index] = diagnostics["lambda_phi_max"]
+                lambda_n_0[plane_index] = diagnostics["lambda_0"]
+                lambda_n_min[plane_index] = diagnostics["lambda_min"]
+                lambda_n_max[plane_index] = diagnostics["lambda_max"]
                 slopes[plane_index] = diagnostics["slope"]
                 wall_distance[plane_index] = diagnostics["path_wall_distance"]
                 bridge_width[plane_index] = diagnostics["bridge_width"]
@@ -331,9 +337,9 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
                     phi_deg[plane_index],
                     diagnostics["inside_cells"],
                     diagnostics["outside_cells"],
-                    np.min(diagnostics["lambda_phi_0"]),
-                    np.median(diagnostics["lambda_phi_0"]),
-                    np.max(diagnostics["lambda_phi_0"]),
+                    np.min(diagnostics["lambda_0"]),
+                    np.median(diagnostics["lambda_0"]),
+                    np.max(diagnostics["lambda_0"]),
                     np.min(diagnostics["bridge_width"]),
                     np.median(diagnostics["bridge_width"]),
                     np.max(diagnostics["bridge_width"]),
@@ -471,15 +477,11 @@ def main():
     poincare_settings = load_poincare_settings(args.analysis_dir)
     lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
 
-    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings)
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings, major_radius_m=MAJOR_RADIUS_M)
     print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and L_parallel,0={l_parallel_0:.6g} m")
 
-    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file)
+    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol, linear_profile, rho, theta, phi_deg, sol_path, profile_path = input_data
-
-    # double-check: why are we re-saving input rho,theta,phi grids?
-    for coordinate, filename in ( (rho, RHO_FILENAME), (theta, THETA_FILENAME), (phi_deg, PHI_FILENAME)):
-        sim_io.saveNumpyData(coordinate, filename.removesuffix(".npy"), subdir=output_subdir)
 
     vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
     if PLOT_VMIN is None:
@@ -500,6 +502,8 @@ def main():
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_data_dir / OUTPUT_FIELD_FILENAME
+    for coordinate, filename in ((rho, common.RHO_FILENAME), (theta, common.THETA_FILENAME), (phi_deg, common.PHI_FILENAME)):
+        sim_io.saveNumpyData(coordinate, filename.removesuffix(".npy"), subdir=output_subdir)
 
     ## CALCULATIONS
     finite_sol = np.asarray(sol[np.isfinite(sol) & (sol > 0.0)])
@@ -524,6 +528,7 @@ def main():
         "SOL_BETA": args.sol_beta,
         "L_PARALLEL_0_M": l_parallel_0,
         "L_PARALLEL_0_SOURCE": l_parallel_0_source,
+        "MAJOR_RADIUS_M": MAJOR_RADIUS_M,
         "SOL_CONNECTION_LENGTH_MIN_M": float(np.min(finite_sol)),
         "SOL_CONNECTION_LENGTH_MAX_M": float(np.max(finite_sol)),
         "VESSEL_RADIUS_M": vessel_radius,
@@ -531,6 +536,7 @@ def main():
         "PATH_SAMPLES": PATH_SAMPLES,
         "NORMAL_DERIVATIVE_STEP_M": NORMAL_DERIVATIVE_STEP_M,
         "SURFACE_SLOPE_SMOOTHING_SIGMA": SURFACE_SLOPE_SMOOTHING_SIGMA,
+        "TREE_WORKERS": TREE_WORKERS,
         "LAMBDA_N_MIN_M": LAMBDA_N_MIN_M,
         "LAMBDA_N_MAX_M": LAMBDA_N_MAX_M,
         "COLOR_SCALE": args.color_scale,

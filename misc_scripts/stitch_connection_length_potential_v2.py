@@ -119,9 +119,6 @@ MIDPLANE_TRACE_FIGSIZE = (8, 5)
 # Output file names
 OUTPUT_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Stitched_v2-3"  # None uses f"{SOL_SUBDIR}_Stitched_v2"
 OUTPUT_FIELD_FILENAME = "stitched_nfield_connection_length.npy"
-RHO_FILENAME = "rho_grid_m.npy"
-THETA_FILENAME = "theta_grid_rad.npy"
-PHI_FILENAME = "phi_grid_deg.npy"
 MODEL_METADATA_FILENAME = "piecewise_potential_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_potential_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_potential_trace.png"
@@ -142,6 +139,14 @@ def parse_args():
         "--sol-subdir",
         default=SOL_SUBDIR,
         help=f"Regular SOL field data subdirectory (default: {SOL_SUBDIR}).",
+    )
+    parser.add_argument(
+        "--sol-field-file",
+        default=SOL_FIELD_FILENAME,
+        help=(
+            "Connection-length filename inside --sol-subdir "
+            f"(default: {SOL_FIELD_FILENAME})."
+        ),
     )
     parser.add_argument(
         "--nfield-subdir",
@@ -282,12 +287,18 @@ def construct_plane(sol_plane, core_plane,
 
     output[inside] = (PHI_WALL + delta_phi_sol + delta_phi_core * interior_plane_data[inside])
 
-    chi, diagnostics = common.construct_path_attenuation(sol_plane, interior_plane_data,
-                                                  theta, rho, boundary, normals,
-                                                  vessel_radius, l_parallel_0,
-                                                  delta_phi_core, delta_phi_sol, sol_beta)
+    chi, diagnostics = common.construct_path_attenuation( sol_plane, interior_plane_data,
+                                                         theta, rho, boundary, normals,
+                                                         vessel_radius, l_parallel_0,
+                                                         delta_phi_core, delta_phi_sol, sol_beta,
+                                                         path_samples=PATH_SAMPLES,
+                                                         derivative_step=NORMAL_DERIVATIVE_STEP_M,
+                                                         smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
+                                                         lambda_min=LAMBDA_PHI_MIN_M,
+                                                         lambda_max=LAMBDA_PHI_MAX_M)
 
-    output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi, vessel_radius, PHI_WALL, delta_phi_sol)
+    output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi,
+                                                       vessel_radius, PHI_WALL, delta_phi_sol, tree_workers=TREE_WORKERS)
     if not np.all(np.isfinite(output)):
         raise ValueError("Constructed potential contains non-finite values.")
 
@@ -341,9 +352,9 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
                 output[phi_index] = plane
                 boundary_all[phi_index] = diagnostics["boundary"]
                 normal_all[phi_index] = diagnostics["normal"]
-                lambda_phi_0_all[phi_index] = diagnostics["lambda_phi_0"]
-                lambda_phi_min_all[phi_index] = diagnostics["lambda_phi_min"]
-                lambda_phi_max_all[phi_index] = diagnostics["lambda_phi_max"]
+                lambda_phi_0_all[phi_index] = diagnostics["lambda_0"]
+                lambda_phi_min_all[phi_index] = diagnostics["lambda_min"]
+                lambda_phi_max_all[phi_index] = diagnostics["lambda_max"]
                 slope_all[phi_index] = diagnostics["slope"]
                 wall_distance_all[phi_index] = diagnostics["path_wall_distance"]
                 bridge_width_all[phi_index] = diagnostics["bridge_width"]
@@ -351,7 +362,7 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
                 sim_io.log.info(f"Constructed phi=%03.0f: %d interior/%d exterior cells, lambda_phi_0 %.6g/%.6g/%.6g m, bridge "
                                 "%.6g/%.6g/%.6g m, chi_w min %.6g, potential %.6g to %.6g.",
                                 phi_deg[phi_index], diagnostics["inside_cells"], diagnostics["outside_cells"],
-                                np.min(diagnostics["lambda_phi_0"]), np.median(diagnostics["lambda_phi_0"]), np.max(diagnostics["lambda_phi_0"]),
+                                np.min(diagnostics["lambda_0"]), np.median(diagnostics["lambda_0"]), np.max(diagnostics["lambda_0"]),
                                 np.min(diagnostics["bridge_width"]), np.median(diagnostics["bridge_width"]), np.max(diagnostics["bridge_width"]),
                                 np.min(diagnostics["chi_wall"]),
                                 diagnostics["potential_min"], diagnostics["potential_max"])
@@ -442,27 +453,15 @@ def generate_plots(field, rho, theta, phi_deg, boundaries, vessel_radius, color_
             if phi_index % 10 == 0:
                 gc.collect()
 
-def nearest_coordinate_index(coordinates, target, name):
-    coordinates = np.asarray(coordinates, dtype=np.float64)
-    index = int(np.argmin(np.abs(coordinates - target)))
-    if coordinates.size > 1:
-        tolerance = 0.5 * np.min(np.diff(coordinates)) + 1e-12
-    else:
-        tolerance = 1e-12
-    if abs(coordinates[index] - target) > tolerance:
-        raise ValueError(f"Requested {name}={target:g} is not represented by the grid.")
-    
-    return index
-
 def generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius, delta_phi_0w, delta_phi_sol, sim_io, output_subdir,):
     """Plot LFS-to-HFS horizontal-midplane potential at selected phi."""
-    theta_lfs_index = nearest_coordinate_index(theta, 2.0 * np.pi, "theta_LFS")
-    theta_hfs_index = nearest_coordinate_index(theta, np.pi, "theta_HFS")
+    theta_lfs_index = common.nearest_coordinate_index(theta, 2.0 * np.pi, "theta_LFS")
+    theta_hfs_index = common.nearest_coordinate_index(theta, np.pi, "theta_HFS")
     distance_from_lfs = np.concatenate( (vessel_radius - rho[::-1], vessel_radius + rho[1:]) )
 
     fig, ax = plt.subplots(figsize=MIDPLANE_TRACE_FIGSIZE)
     for requested_phi in MIDPLANE_TRACE_PHI_DEG:
-        phi_index = nearest_coordinate_index(phi_deg, requested_phi, "phi_comp",)
+        phi_index = common.nearest_coordinate_index(phi_deg, requested_phi, "phi_comp")
         potential = np.concatenate( (np.asarray(field[phi_index, theta_lfs_index, ::-1]), np.asarray(field[phi_index, theta_hfs_index, 1:])) )
         normalized_potential = (potential - PHI_WALL) / delta_phi_0w
         ax.plot(distance_from_lfs, normalized_potential, linewidth=1.5, label=rf"$\phi_{{comp}}={phi_deg[phi_index]:.0f}^\circ$")
@@ -492,15 +491,11 @@ def main():
     poincare_settings = load_poincare_settings(args.analysis_dir)
     lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
 
-    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings)
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings, major_radius_m=MAJOR_RADIUS_M)
     print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "f"L_parallel,0={l_parallel_0:.6g} m")
 
-    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file)
+    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol_data, core_data, rho, theta, phi_deg, sol_path, core_path = input_data
-
-    # double-check: why are we re-saving input rho,theta,phi grids?
-    for coordinate, filename in ((rho, RHO_FILENAME), (theta, THETA_FILENAME), (phi_deg, PHI_FILENAME)):
-        sim_io.saveNumpyData(coordinate, filename.removesuffix(".npy"), subdir=output_subdir)
 
     vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M)) 
     if PLOT_VMIN is None:
@@ -521,6 +516,8 @@ def main():
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_data_dir / OUTPUT_FIELD_FILENAME
+    for coordinate, filename in ((rho, common.RHO_FILENAME), (theta, common.THETA_FILENAME), (phi_deg, common.PHI_FILENAME)):
+        sim_io.saveNumpyData(coordinate, filename.removesuffix(".npy"), subdir=output_subdir)
 
     ## CALCULATIONS
     delta_phi_core = args.delta_phi_0w - args.delta_phi_sol
@@ -545,6 +542,7 @@ def main():
         "SOL_BETA": args.sol_beta,
         "L_PARALLEL_0_M": l_parallel_0,
         "L_PARALLEL_0_SOURCE": l_parallel_0_source,
+        "MAJOR_RADIUS_M": MAJOR_RADIUS_M,
         "SOL_CONNECTION_LENGTH_MIN_M": float(np.min(finite_sol)),
         "SOL_CONNECTION_LENGTH_MAX_M": float(np.max(finite_sol)),
         "VESSEL_RADIUS_M": vessel_radius,
@@ -552,6 +550,7 @@ def main():
         "PATH_SAMPLES": PATH_SAMPLES,
         "NORMAL_DERIVATIVE_STEP_M": NORMAL_DERIVATIVE_STEP_M,
         "SURFACE_SLOPE_SMOOTHING_SIGMA": SURFACE_SLOPE_SMOOTHING_SIGMA,
+        "TREE_WORKERS": TREE_WORKERS,
         "LAMBDA_PHI_MIN_M": LAMBDA_PHI_MIN_M,
         "LAMBDA_PHI_MAX_M": LAMBDA_PHI_MAX_M,
         "NFIELD_DATA_MIN": float(np.min(core_data)),
