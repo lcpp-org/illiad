@@ -1,0 +1,21 @@
+{
+  "ANLYS_DIR": "IOTA3_1000sp_atol1e-9",
+  "ANLYS_SUBDIR": "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Density_v2",
+  "SOL_SUBDIR": "ConLenVolume_REDO_250spins_rk1mm_RegularGrid",
+  "SOL_FIELD_FILENAME": "connection_length_field_m.npy",
+  "NFIELD_SUBDIR": "LCFS40",
+  "NFIELD_FILENAME": "nField_LCFS40_linear.npy",
+  "LCFS_INDEX": null,
+
+  "N_AXIS": 1.0,
+  "N_LCFS": 0.3,
+  "N_WALL": 0.0001,
+  "ALPHA": 0.85,
+  "SOL_BETA": 0.5,
+  "L_PARALLEL_0_M": null,
+
+  "GENERATE_PLOTS": true,
+  "SHOW_LCFS": false,
+  "COLOR_SCALE": "log",
+  "SHOW_PROGRESS": true
+}
