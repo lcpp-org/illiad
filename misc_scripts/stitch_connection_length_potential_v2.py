@@ -48,16 +48,17 @@ from scipy.spatial import cKDTree
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+from illiad.io import IOHandler
+from illiad.sol import (load_lcfs_boundary, load_poincare_settings)
+
+from misc_scripts import stitch_connection_length_common as common
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 os.chdir(PROJECT_ROOT)
 
-from illiad.io import IOHandler
-from illiad.sol import (load_lcfs_boundary, load_poincare_settings)
-
-from misc_scripts import stitch_connection_length_common as common
 
 # Analysis settings
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
