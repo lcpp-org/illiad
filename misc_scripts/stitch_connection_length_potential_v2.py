@@ -289,13 +289,10 @@ def construct_plane(sol_plane, core_plane,
 
     chi, diagnostics = common.construct_path_attenuation( sol_plane, interior_plane_data,
                                                          theta, rho, boundary, normals,
-                                                         vessel_radius, l_parallel_0,
-                                                         delta_phi_core, delta_phi_sol, sol_beta,
-                                                         path_samples=PATH_SAMPLES,
-                                                         derivative_step=NORMAL_DERIVATIVE_STEP_M,
+                                                         vessel_radius, l_parallel_0, delta_phi_core, delta_phi_sol, sol_beta,
+                                                         path_samples=PATH_SAMPLES, derivative_step=NORMAL_DERIVATIVE_STEP_M,
                                                          smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
-                                                         lambda_min=LAMBDA_PHI_MIN_M,
-                                                         lambda_max=LAMBDA_PHI_MAX_M)
+                                                         lambda_min=LAMBDA_PHI_MIN_M, lambda_max=LAMBDA_PHI_MAX_M)
 
     output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi,
                                                        vessel_radius, PHI_WALL, delta_phi_sol, tree_workers=TREE_WORKERS)
@@ -343,12 +340,9 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
             for phi_index in progress:
 
                 lcfs_points, _ = load_lcfs_boundary(analysis_dir, float(phi_deg[phi_index]), lcfs_index, spline_smoothing=1e-5, boundary_points=1000)
-                plane, diagnostics = construct_plane(sol_data[phi_index], core_data[phi_index],
-                                                     theta, rho,
-                                                     grid_points, lcfs_points,
-                                                     vessel_radius, l_parallel_0,
-                                                     delta_phi_0w, delta_phi_sol,
-                                                     alpha, sol_beta)
+                plane, diagnostics = construct_plane(sol_data[phi_index], core_data[phi_index], theta, rho,
+                                                     grid_points, lcfs_points, vessel_radius, l_parallel_0,
+                                                     delta_phi_0w, delta_phi_sol, alpha, sol_beta)
                 output[phi_index] = plane
                 boundary_all[phi_index] = diagnostics["boundary"]
                 normal_all[phi_index] = diagnostics["normal"]

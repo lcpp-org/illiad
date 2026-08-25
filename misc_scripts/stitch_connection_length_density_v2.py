@@ -291,10 +291,6 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
                         n_axis, n_lcfs, n_wall,
                         alpha, sol_beta,
                         output_path, sim_io, show_progress):
-    
-    _, _, _, grid_points = common.make_grid(rho, theta)
-    temporary_path = output_path.with_name(f".{output_path.stem}.building.npy")
-    output = np.lib.format.open_memmap(temporary_path, mode="w+", dtype=np.float64, shape=sol.shape)
 
     diagnostic_shape = (phi_deg.size, BOUNDARY_RESAMPLE_POINTS)
     boundaries = np.empty(diagnostic_shape + (2,), dtype=np.float64)
@@ -307,17 +303,21 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
     bridge_width = np.empty(diagnostic_shape, dtype=np.float64)
     chi_wall = np.empty(diagnostic_shape, dtype=np.float64)
 
+
+    temporary_path = output_path.with_name(f".{output_path.stem}.building.npy")
+    output = np.lib.format.open_memmap(temporary_path, mode="w+", dtype=np.float64, shape=sol.shape)
+
+    _, _, _, grid_points = common.make_grid(rho, theta)
+
+    ## SET UP PHI LOOP
     start_time = perf_counter()
     progress = tqdm(range(phi_deg.size), desc="Constructing piecewise density", unit="plane", dynamic_ncols=True, disable=not show_progress)
     log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
     try:
         with log_context:
             for plane_index in progress:
-                boundary, _ = load_lcfs_boundary(
-                    analysis_dir,
-                    float(phi_deg[plane_index]),
-                    lcfs_index,
-                )
+
+                boundary, _ = load_lcfs_boundary(analysis_dir, float(phi_deg[plane_index]), lcfs_index)
                 plane, diagnostics = construct_density_plane(sol[plane_index], linear_profile[plane_index], theta, rho,
                                                              grid_points, boundary, vessel_radius, l_parallel_0,
                                                              n_axis, n_lcfs, n_wall, alpha, sol_beta)
