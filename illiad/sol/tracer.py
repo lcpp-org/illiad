@@ -70,7 +70,8 @@ def load_poincare_settings(analysis_dir, project_root=PROJECT_ROOT):
     return settings
 
 
-def load_lcfs_boundary(analysis_dir, phi_deg, lcfs_index, project_root=PROJECT_ROOT, spline_smoothing=LCFS_SPLINE_SMOOTHING, boundary_points=LCFS_BOUNDARY_POINTS,):
+def load_lcfs_boundary(analysis_dir, phi_deg, lcfs_index,
+                       project_root=PROJECT_ROOT, spline_smoothing=LCFS_SPLINE_SMOOTHING, boundary_points=LCFS_BOUNDARY_POINTS):
     """Return an existing LCFS as an ordered closed poloidal curve."""
     poincare_path = (
         Path(project_root)
@@ -605,11 +606,8 @@ class StepChunkRunner:
         except Exception as exc:
             if not self.compiled:
                 raise
-            self.sim_io.log.warning(
-                "Compiled step chunks are unavailable; falling back to eager "
-                "chunk execution: %s",
-                exc,
-            )
+            self.sim_io.log.warning("Compiled step chunks are unavailable; falling back to eager "
+                "chunk execution: %s", exc)
             self.function = self.eager
             self.compiled = False
             return self.function(positions, direction_sign, step_sizes)
@@ -1060,24 +1058,9 @@ def trace_connection_length_volume(
     """Trace every seed in both directions in batched Torch integrations."""
     initial_conditions_rtp = seed_data["initial_conditions_rtp"]
     n_fieldlines = initial_conditions_rtp.shape[0]
-    fieldline_id = np.concatenate(
-        (
-            np.arange(n_fieldlines, dtype=np.int64),
-            np.arange(n_fieldlines, dtype=np.int64),
-        )
-    )
-    direction_column = np.concatenate(
-        (
-            np.zeros(n_fieldlines, dtype=np.int64),
-            np.ones(n_fieldlines, dtype=np.int64),
-        )
-    )
-    direction_sign = np.concatenate(
-        (
-            np.ones(n_fieldlines, dtype=np.float64),
-            -np.ones(n_fieldlines, dtype=np.float64),
-        )
-    )
+    fieldline_id = np.concatenate( (np.arange(n_fieldlines, dtype=np.int64), np.arange(n_fieldlines, dtype=np.int64)) )
+    direction_column = np.concatenate( (np.zeros(n_fieldlines, dtype=np.int64), np.ones(n_fieldlines, dtype=np.int64)) )
+    direction_sign = np.concatenate( (np.ones(n_fieldlines, dtype=np.float64), -np.ones(n_fieldlines, dtype=np.float64)) )
     directional_rtp = initial_conditions_rtp[fieldline_id]
     directional_xyz = RTP_to_XYZ_many(directional_rtp, magnetic_field.R0)
     directional_phi = directional_rtp[:, 2]
@@ -1091,19 +1074,10 @@ def trace_connection_length_volume(
 
     directional_count = directional_xyz.shape[0]
     batch_count = int(np.ceil(directional_count / batch_size))
-    chunk_runner = StepChunkRunner(
-        magnetic_field,
-        chunk_size,
-        compile_chunks,
-        integrator,
-        minimum_field_magnitude,
-        sim_io,
-    )
+    chunk_runner = StepChunkRunner(magnetic_field, chunk_size, compile_chunks, integrator, minimum_field_magnitude, sim_io)
+
     trace_start = perf_counter()
-    for batch_index, start in enumerate(
-        range(0, directional_count, batch_size),
-        start=1,
-    ):
+    for batch_index, start in enumerate(range(0, directional_count, batch_size), start=1):
         stop = min(start + batch_size, directional_count)
         result = integrate_directional_batch(
             directional_xyz[start:stop],
@@ -1140,16 +1114,9 @@ def trace_connection_length_volume(
     connection_length[~np.all(valid_trace, axis=1)] = np.nan
     wall_rtp = np.full_like(wall_xyz, np.nan)
     finite_wall = np.all(np.isfinite(wall_xyz), axis=-1)
-    wall_rtp[finite_wall] = XYZ_to_RTP_many(
-        wall_xyz[finite_wall],
-        magnetic_field.R0,
-    )
+    wall_rtp[finite_wall] = XYZ_to_RTP_many(wall_xyz[finite_wall], magnetic_field.R0)
     trace_elapsed = perf_counter() - trace_start
-    sim_io.log.info(
-        "ALL TORCH SOLVERS FINISHED IN %.3f seconds; captured %d crossings.",
-        trace_elapsed,
-        crossing_store.counts.sum(),
-    )
+    sim_io.log.info("ALL TORCH SOLVERS FINISHED IN %.3f seconds; captured %d crossings.", trace_elapsed, crossing_store.counts.sum())
     return {
         "direction_length": direction_length,
         "connection_length": connection_length,
@@ -1158,11 +1125,7 @@ def trace_connection_length_volume(
         "hit_wall": hit_wall,
         "reached_limit": reached_limit,
         "valid_trace": valid_trace,
-        "plane_phi_deg": np.linspace(
-            360.0 / crossing_store.n_planes,
-            360.0,
-            crossing_store.n_planes,
-        ),
+        "plane_phi_deg": np.linspace(360.0 / crossing_store.n_planes, 360.0, crossing_store.n_planes),
     }
 
 
@@ -1726,9 +1689,7 @@ class SOLTracer:
     def log_inputs(self):
         """Log configured and derived settings for reproducibility."""
         params = self.input_params
-        directional_solves = 2 * self.seed_data[
-            "initial_conditions_rtp"
-        ].shape[0]
+        directional_solves = 2 * self.seed_data["initial_conditions_rtp"].shape[0]
         max_length = 2.0 * np.pi * self.field.R0 * params["SPINS"]
         cuda_device_name = None
         if self.device.type == "cuda":
@@ -1737,12 +1698,8 @@ class SOLTracer:
             **params,
             "SEED_PHI_DEG_RESOLVED": self.seed_data["seed_phi_deg"].tolist(),
             "SEED_COUNTS": self.seed_data["seed_counts"].tolist(),
-            "SEED_POINCARE_FILES": [
-                str(path) for path in self.seed_data["poincare_paths"]
-            ],
-            "TRACED_FIELD_LINES": self.seed_data[
-                "initial_conditions_rtp"
-            ].shape[0],
+            "SEED_POINCARE_FILES": [str(path) for path in self.seed_data["poincare_paths"]],
+            "TRACED_FIELD_LINES": self.seed_data["initial_conditions_rtp"].shape[0],
             "DIRECTIONAL_SOLVES": directional_solves,
             "DOUBLE_LINE": True,
             "TORCH_VERSION": torch.__version__,
@@ -1753,10 +1710,7 @@ class SOLTracer:
             "MAX_STEPS": int(np.ceil(max_length / params["STEP_SIZE_M"])),
             "COMPILE_STEP_CHUNKS_RESOLVED": self.compile_chunks,
         }
-        self.simIO.inputsBoilerplate(
-            "SOL TRACE INPUTS",
-            run_settings,
-        )
+        self.simIO.inputsBoilerplate("SOL TRACE INPUTS", run_settings)
 
     def trace(self):
         """Run both field-line directions for every seed."""

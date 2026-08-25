@@ -5,8 +5,7 @@ import argparse
 from illiad.sol import (
     SOLTracer,
     build_torch_magnetic_field,
-    resolve_device,
-)
+    resolve_device)
 from illiad.io import IOHandler
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 from illiad.sol.tracer import validate_runtime_settings
@@ -97,20 +96,12 @@ def parse_args():
 def main(input_overrides=_CLI_INPUTS):
     if input_overrides is _CLI_INPUTS:
         args = parse_args()
-        input_overrides = (
-            load_inputs_json(args.inputs, "SOL trace inputs")
-            if args.inputs
-            else None
-        )
+        input_overrides = (load_inputs_json(args.inputs, "SOL trace inputs") if args.inputs else None)
     params = merge_input_params(DEFAULT_INPUTS, input_overrides)
     validate_runtime_settings(params)
 
     simIO = IOHandler(params["ANLYS_DIR"])
-    simIO.startLog(
-        log_name="solTrace.log",
-        subdir=params["ANLYS_SUBDIR"],
-        logger_name="SOLTracer",
-    )
+    simIO.startLog(log_name="solTrace.log", subdir=params["ANLYS_SUBDIR"], logger_name="SOLTracer")
 
     device = resolve_device(params["DEVICE"])
     magnetic_field = build_torch_magnetic_field(params, device)
@@ -119,10 +110,7 @@ def main(input_overrides=_CLI_INPUTS):
 
     print(f"Saved raw data: {analysis.data_dir}")
     if params["GENERATE_PLOTS"]:
-        print(
-            "Saved contour plots: "
-            f"{simIO.plot_dir}/{params['ANLYS_SUBDIR']}"
-        )
+        print(f"Saved contour plots: {simIO.plot_dir}/{params['ANLYS_SUBDIR']}")
 
 
 if __name__ == "__main__":
