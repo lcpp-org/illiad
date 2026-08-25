@@ -1,4 +1,4 @@
-"""Direct-execution launcher for the reserved SOL potential command."""
+"""Direct-execution launcher for SOL potential construction."""
 
 from illiad.cli.sol_potential import main
 
