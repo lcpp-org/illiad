@@ -37,11 +37,9 @@ if str(PROJECT_ROOT) not in sys.path:
 os.chdir(PROJECT_ROOT)
 
 from illiad.io import IOHandler
-from illiad.sol import (
-    load_lcfs_boundary,
-    load_poincare_settings,
-)
-from misc_scripts import stitch_connection_length_potential_v2 as common
+from illiad.sol import (load_lcfs_boundary, load_poincare_settings)
+
+from misc_scripts import stitch_connection_length_common as common
 
 
 # Analysis settings
@@ -101,7 +99,6 @@ MODEL_METADATA_FILENAME = "piecewise_density_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_density_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_density_trace.png"
 
-# unique function
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Construct the piecewise flux / connection-length density."
@@ -203,7 +200,6 @@ def parse_args():
     )
     return parser.parse_args()
 
-# unique function
 def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
     if not all(np.isfinite(value) for value in (n_axis, n_lcfs, n_wall)):
         raise ValueError("N_AXIS, N_LCFS, and N_WALL must be finite.")
@@ -238,7 +234,6 @@ def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
     if CONTOUR_EXTEND not in {"neither", "both", "min", "max"}:
         raise ValueError("Invalid CONTOUR_EXTEND setting.")
 
-# unique function
 def construct_density_plane(sol_plane, linear_profile_plane,
                             theta, rho, grid_points, boundary,
                             vessel_radius, l_parallel_0,
@@ -285,7 +280,6 @@ def construct_density_plane(sol_plane, linear_profile_plane,
     diagnostics["density_max"] = float(np.max(output))
     return output, diagnostics
 
-# unique function
 def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
                         lcfs_index, vessel_radius, l_parallel_0,
                         n_axis, n_lcfs, n_wall,
@@ -386,8 +380,6 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
     }
     return np.load(output_path, mmap_mode="r"), metadata
 
-
-
 def plot_density_plane(density_plane, grid_x, grid_z, boundary, vessel_radius, phi_value,
                        n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
                        sim_io, output_subdir):
@@ -426,7 +418,6 @@ def plot_density_plane(density_plane, grid_x, grid_z, boundary, vessel_radius, p
     sim_io.saveFig(OUTPUT_PLOT_FILENAME.format(phi_deg=phi_value), subdir=output_subdir, dpi=DPI)
     plt.close(fig)
 
-
 def generate_density_plots(field, rho, theta, phi_deg, boundaries, vessel_radius,
                            n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
                            sim_io, output_subdir, show_progress):
@@ -441,7 +432,6 @@ def generate_density_plots(field, rho, theta, phi_deg, boundaries, vessel_radius
                                sim_io, output_subdir)
             if plane_index % 10 == 0:
                 gc.collect()
-
 
 def generate_midplane_density_plot(field, rho, theta, phi_deg,
                                    vessel_radius, n_axis, n_lcfs, sim_io, output_subdir):
@@ -468,7 +458,6 @@ def generate_midplane_density_plot(field, rho, theta, phi_deg,
     fig.tight_layout()
     sim_io.saveFig(MIDPLANE_TRACE_FILENAME, subdir=output_subdir, dpi=DPI)
     plt.close(fig)
-
 
 def main():
     ## INPUT PREAMBLE
@@ -584,7 +573,6 @@ def main():
         sim_io.log.info( "Saved density midplane trace and %d contour plots under %s.", phi_deg.size, Path(sim_io.plot_dir) / output_subdir)
 
     sim_io.log.info("## PIECEWISE PLASMA-DENSITY MODEL FINISHED ##")
-
 
 if __name__ == "__main__":
     main()
