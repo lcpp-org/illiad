@@ -3,8 +3,9 @@
 Sparse grids outside the last-closed flux surface are launched from one or
 more toroidal planes. Each field line is traced in both directions, and its
 wall-to-wall connection length is attached to every captured toroidal-plane
-crossing. The compact output stores canonical RTP crossings plus field-line
-IDs; expanded per-crossing values can be reconstructed from those arrays.
+crossing. The retained raw output stores canonical RTP crossings plus
+field-line IDs in append-only plane shards; per-crossing values are resolved
+from compact field-line metadata.
 
 CUDA is used when available, with a CPU fallback for validation. The analysis
 uses :class:`illiad.mesh.TorchMesh` field interpolation while owning its
@@ -32,6 +33,7 @@ from illiad.mesh import TorchMesh
 import illiad.mesh.torch_mesh as torch_mesh_module
 import illiad.utilities.coordtrans as coordtrans_module
 from illiad.utilities.coordtrans import RTP_to_XYZ_many, XYZ_to_RTP_many
+from .crossings import PlaneShardWriter, open_plane_crossing_source
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -635,14 +637,15 @@ def wall_intersections(
 
 
 class PlaneCrossingStore:
-    """Buffer GPU plane crossings and group flushed chunks by output plane."""
+    """Buffer GPU plane crossings and stream flushed blocks to a CPU sink."""
 
-    def __init__(self, n_planes, capacity, device, dtype=torch.float64):
+    def __init__(self, n_planes, capacity, device, sink, dtype=torch.float64):
         if capacity <= 0:
             raise ValueError("CROSSING_BUFFER_SIZE must be positive.")
         self.n_planes = n_planes
         self.capacity = capacity
         self.device = device
+        self.sink = sink
         self.xyz_buffer = torch.empty((capacity, 3), dtype=dtype, device=device)
         self.plane_buffer = torch.empty(capacity, dtype=torch.int16, device=device)
         self.fieldline_buffer = torch.empty(
@@ -656,7 +659,6 @@ class PlaneCrossingStore:
             device=device,
         )
         self.cursor = 0
-        self.blocks = [[] for _ in range(n_planes)]
         self.counts = np.zeros(n_planes, dtype=np.int64)
 
     @property
@@ -702,12 +704,11 @@ class PlaneCrossingStore:
         for plane_index, start, count in zip(unique_planes, starts, counts):
             stop = start + count
             plane_index = int(plane_index)
-            self.blocks[plane_index].append(
-                (
-                    xyz[start:stop],
-                    fieldline_id[start:stop],
-                    source_direction[start:stop],
-                )
+            self.sink.append_xyz(
+                plane_index,
+                xyz[start:stop],
+                fieldline_id[start:stop],
+                source_direction[start:stop],
             )
             self.counts[plane_index] += count
         self.cursor = 0
@@ -1058,6 +1059,8 @@ def trace_connection_length_volume(
     """Trace every seed in both directions in batched Torch integrations."""
     initial_conditions_rtp = seed_data["initial_conditions_rtp"]
     n_fieldlines = initial_conditions_rtp.shape[0]
+    if n_fieldlines > np.iinfo(np.int32).max:
+        raise ValueError("The fieldline count exceeds the int32 raw-ID range.")
     fieldline_id = np.concatenate( (np.arange(n_fieldlines, dtype=np.int64), np.arange(n_fieldlines, dtype=np.int64)) )
     direction_column = np.concatenate( (np.zeros(n_fieldlines, dtype=np.int64), np.ones(n_fieldlines, dtype=np.int64)) )
     direction_sign = np.concatenate( (np.ones(n_fieldlines, dtype=np.float64), -np.ones(n_fieldlines, dtype=np.float64)) )
@@ -1129,52 +1132,188 @@ def trace_connection_length_volume(
     }
 
 
-def _open_output_memmap(data_dir, name, dtype, shape):
-    return np.lib.format.open_memmap(
-        data_dir / f"{name}.npy",
-        mode="w+",
-        dtype=dtype,
-        shape=shape,
+def trace_connection_length_volume_paired(
+    seed_data,
+    settings,
+    magnetic_field,
+    step_size,
+    batch_size,
+    crossing_buffer_size,
+    sink_factory,
+    accumulator,
+    raw_chunk_size,
+    sim_io,
+    show_progress,
+    chunk_size,
+    compile_chunks,
+    integrator,
+    minimum_field_magnitude,
+    wall_bisection_steps,
+    progress_refresh_steps,
+    progress_interval_steps,
+):
+    """Trace paired directions and resolve each bounded crossing spool."""
+    initial_conditions_rtp = seed_data["initial_conditions_rtp"]
+    n_fieldlines = initial_conditions_rtp.shape[0]
+    if n_fieldlines > np.iinfo(np.int32).max:
+        raise ValueError("The fieldline count exceeds the int32 spool-ID range.")
+    max_length = 2.0 * np.pi * magnetic_field.R0 * settings["SPINS"]
+    fieldlines_per_batch = max(1, batch_size // 2)
+    batch_count = int(np.ceil(n_fieldlines / fieldlines_per_batch))
+    chunk_runner = StepChunkRunner(
+        magnetic_field,
+        chunk_size,
+        compile_chunks,
+        integrator,
+        minimum_field_magnitude,
+        sim_io,
     )
 
-
-def save_torch_outputs(
-    sim_io,
-    seed_data,
-    trace_data,
-    crossing_store,
-    major_radius,
-    analysis_subdir,
-):
-    """Save compact plane-sorted raw arrays without duplicating them in RAM."""
-    data_dir = Path(sim_io.data_dir) / analysis_subdir
-    data_dir.mkdir(parents=True, exist_ok=True)
-    for obsolete_name in (
-        "raw_points_xyz.npy",
-        "raw_connection_length_m.npy",
-        "raw_plane_index.npy",
-        "wall_intersection_xyz.npy",
-    ):
-        (data_dir / obsolete_name).unlink(missing_ok=True)
-    plane_phi_deg = trace_data["plane_phi_deg"]
+    direction_length = np.full((n_fieldlines, 2), np.nan)
+    connection_length = np.full(n_fieldlines, np.nan)
+    wall_xyz = np.full((n_fieldlines, 2, 3), np.nan)
+    hit_wall = np.zeros((n_fieldlines, 2), dtype=bool)
+    reached_limit = np.zeros((n_fieldlines, 2), dtype=bool)
+    valid_trace = np.zeros((n_fieldlines, 2), dtype=bool)
     seed_plane_for_fieldline = seed_data["seed_plane_index"][
         seed_data["seed_id"]
     ]
-    seed_counts_per_plane = np.bincount(
-        seed_plane_for_fieldline,
-        minlength=crossing_store.n_planes,
-    )
-    plane_counts = crossing_store.counts + seed_counts_per_plane
-    plane_offsets = np.concatenate(
-        (np.array([0], dtype=np.int64), np.cumsum(plane_counts))
-    )
-    total_samples = int(plane_offsets[-1])
-    if trace_data["connection_length"].size > np.iinfo(np.int32).max:
-        raise ValueError("The fieldline count exceeds the int32 raw-ID range.")
+    total_crossings = 0
+    trace_start = perf_counter()
 
+    for batch_number, start in enumerate(
+        range(0, n_fieldlines, fieldlines_per_batch),
+        start=1,
+    ):
+        stop = min(start + fieldlines_per_batch, n_fieldlines)
+        batch_fieldline = np.arange(start, stop, dtype=np.int64)
+        fieldline_id = np.concatenate((batch_fieldline, batch_fieldline))
+        direction_column = np.concatenate(
+            (
+                np.zeros(batch_fieldline.size, dtype=np.int64),
+                np.ones(batch_fieldline.size, dtype=np.int64),
+            )
+        )
+        direction_sign = np.concatenate(
+            (
+                np.ones(batch_fieldline.size, dtype=np.float64),
+                -np.ones(batch_fieldline.size, dtype=np.float64),
+            )
+        )
+        directional_rtp = initial_conditions_rtp[fieldline_id]
+        directional_xyz = RTP_to_XYZ_many(
+            directional_rtp,
+            magnetic_field.R0,
+        )
+        sink = sink_factory(batch_number)
+        crossing_store = PlaneCrossingStore(
+            settings["N_PLANES"],
+            crossing_buffer_size,
+            magnetic_field.B.device,
+            sink,
+        )
+        try:
+            result = integrate_directional_batch(
+                directional_xyz,
+                directional_rtp[:, 2],
+                fieldline_id,
+                direction_column,
+                direction_sign,
+                magnetic_field,
+                max_length,
+                step_size,
+                crossing_store,
+                sim_io,
+                batch_number,
+                batch_count,
+                show_progress,
+                chunk_size,
+                compile_chunks,
+                integrator,
+                minimum_field_magnitude,
+                wall_bisection_steps,
+                progress_refresh_steps,
+                progress_interval_steps,
+                chunk_runner,
+            )
+            crossing_store.finish()
+            result_index = (
+                result["fieldline_id"],
+                result["direction_column"],
+            )
+            direction_length[result_index] = result["path_length"]
+            wall_xyz[result_index] = result["wall_xyz"]
+            hit_wall[result_index] = result["hit_wall"]
+            reached_limit[result_index] = result["reached_limit"]
+            valid_trace[result_index] = result["valid_trace"]
+            batch_length = np.sum(direction_length[batch_fieldline], axis=1)
+            batch_valid = np.all(valid_trace[batch_fieldline], axis=1)
+            batch_length[~batch_valid] = np.nan
+            connection_length[batch_fieldline] = batch_length
+
+            for plane_index in np.unique(
+                seed_plane_for_fieldline[batch_fieldline]
+            ):
+                on_plane = (
+                    seed_plane_for_fieldline[batch_fieldline] == plane_index
+                )
+                seed_fieldline = batch_fieldline[on_plane]
+                sink.append_rtp(
+                    int(plane_index),
+                    initial_conditions_rtp[seed_fieldline],
+                    seed_fieldline,
+                    np.zeros(seed_fieldline.size, dtype=np.int8),
+                )
+            sink.consume(
+                accumulator,
+                connection_length,
+                raw_chunk_size,
+            )
+            total_crossings += int(crossing_store.counts.sum())
+        except Exception:
+            sink.abort()
+            raise
+
+    wall_rtp = np.full_like(wall_xyz, np.nan)
+    finite_wall = np.all(np.isfinite(wall_xyz), axis=-1)
+    wall_rtp[finite_wall] = XYZ_to_RTP_many(
+        wall_xyz[finite_wall],
+        magnetic_field.R0,
+    )
+    sim_io.log.info(
+        "ALL PAIRED TORCH SOLVERS FINISHED IN %.3f seconds; processed %d "
+        "crossings through bounded batch spools.",
+        perf_counter() - trace_start,
+        total_crossings,
+    )
+    return {
+        "direction_length": direction_length,
+        "connection_length": connection_length,
+        "wall_xyz": wall_xyz,
+        "wall_rtp": wall_rtp,
+        "hit_wall": hit_wall,
+        "reached_limit": reached_limit,
+        "valid_trace": valid_trace,
+        "plane_phi_deg": np.linspace(
+            360.0 / settings["N_PLANES"],
+            360.0,
+            settings["N_PLANES"],
+        ),
+    }
+
+
+def save_trace_metadata(
+    sim_io,
+    seed_data,
+    trace_data,
+    major_radius,
+    analysis_subdir,
+):
+    """Save seed and per-field-line trace metadata."""
+    data_dir = Path(sim_io.data_dir) / analysis_subdir
+    data_dir.mkdir(parents=True, exist_ok=True)
     small_outputs = {
-        "plane_offsets": plane_offsets,
-        "plane_phi_deg": plane_phi_deg,
+        "plane_phi_deg": trace_data["plane_phi_deg"],
         "seed_initial_conditions_rtp": seed_data["initial_conditions_rtp"],
         "seed_id": seed_data["seed_id"],
         "seed_plane_index": seed_data["seed_plane_index"],
@@ -1190,86 +1329,62 @@ def save_torch_outputs(
     }
     for name, values in small_outputs.items():
         sim_io.saveNumpyData(values, name, subdir=analysis_subdir)
+    return data_dir
 
-    raw_rtp = _open_output_memmap(
-        data_dir,
-        "raw_points_rtp",
-        np.float64,
-        (total_samples, 3),
-    )
-    raw_fieldline = _open_output_memmap(
-        data_dir,
-        "raw_fieldline_id",
-        np.int32,
-        (total_samples,),
-    )
-    raw_direction = _open_output_memmap(
-        data_dir,
-        "raw_source_direction",
-        np.int8,
-        (total_samples,),
-    )
 
-    for plane_index in range(crossing_store.n_planes):
-        cursor = int(plane_offsets[plane_index])
-        for xyz_block, fieldline_block, direction_block in crossing_store.blocks[
-            plane_index
-        ]:
-            stop = cursor + xyz_block.shape[0]
-            raw_rtp[cursor:stop] = XYZ_to_RTP_many(xyz_block, major_radius)
-            raw_rtp[cursor:stop, 2] = np.deg2rad(plane_phi_deg[plane_index])
-            raw_fieldline[cursor:stop] = fieldline_block
-            raw_direction[cursor:stop] = direction_block
-            cursor = stop
+def save_torch_outputs(
+    sim_io,
+    seed_data,
+    trace_data,
+    crossing_writer,
+    major_radius,
+    analysis_subdir,
+):
+    """Finish append-only raw shards and save compact trace metadata."""
+    data_dir = Path(sim_io.data_dir) / analysis_subdir
+    for obsolete_name in (
+        "raw_points_xyz.npy",
+        "raw_points_rtp.npy",
+        "raw_connection_length_m.npy",
+        "raw_plane_index.npy",
+        "raw_fieldline_id.npy",
+        "raw_source_direction.npy",
+        "plane_offsets.npy",
+        "wall_intersection_xyz.npy",
+    ):
+        (data_dir / obsolete_name).unlink(missing_ok=True)
+    seed_plane_for_fieldline = seed_data["seed_plane_index"][
+        seed_data["seed_id"]
+    ]
+    if trace_data["connection_length"].size > np.iinfo(np.int32).max:
+        raise ValueError("The fieldline count exceeds the int32 raw-ID range.")
 
+    for plane_index in range(crossing_writer.n_planes):
         seed_fieldlines = np.flatnonzero(seed_plane_for_fieldline == plane_index)
         if seed_fieldlines.size:
-            stop = cursor + seed_fieldlines.size
-            raw_rtp[cursor:stop] = seed_data["initial_conditions_rtp"][
-                seed_fieldlines
-            ]
-            raw_rtp[cursor:stop, 2] = np.deg2rad(plane_phi_deg[plane_index])
-            raw_fieldline[cursor:stop] = seed_fieldlines
-            raw_direction[cursor:stop] = 0
-            cursor = stop
-
-        expected_stop = int(plane_offsets[plane_index + 1])
-        if cursor != expected_stop:
-            raise RuntimeError(
-                f"Plane {plane_index} wrote {cursor} samples; "
-                f"expected offset {expected_stop}."
+            crossing_writer.append_rtp(
+                plane_index,
+                seed_data["initial_conditions_rtp"][seed_fieldlines],
+                seed_fieldlines.astype(np.int32, copy=False),
+                np.zeros(seed_fieldlines.size, dtype=np.int8),
             )
-        crossing_store.blocks[plane_index].clear()
 
-    for array in (
-        raw_rtp,
-        raw_fieldline,
-        raw_direction,
-    ):
-        array.flush()
-
-    trace_data.update(
-        {
-            "raw_points_rtp": np.load(
-                data_dir / "raw_points_rtp.npy",
-                mmap_mode="r",
-            ),
-            "raw_fieldline_id": np.load(
-                data_dir / "raw_fieldline_id.npy",
-                mmap_mode="r",
-            ),
-            "raw_source_direction": np.load(
-                data_dir / "raw_source_direction.npy",
-                mmap_mode="r",
-            ),
-            "fieldline_connection_length": trace_data["connection_length"],
-            "plane_offsets": plane_offsets,
-        }
+    save_trace_metadata(
+        sim_io,
+        seed_data,
+        trace_data,
+        major_radius,
+        analysis_subdir,
     )
+    crossing_writer.finish(trace_data["connection_length"])
+    trace_data["crossing_source"] = open_plane_crossing_source(data_dir)
+    trace_data["fieldline_connection_length"] = trace_data[
+        "connection_length"
+    ]
     sim_io.log.info(
         "Saved %d raw Torch samples across %d toroidal planes: %s",
-        total_samples,
-        crossing_store.n_planes,
+        crossing_writer.counts.sum(),
+        crossing_writer.n_planes,
         data_dir,
     )
     return data_dir
@@ -1504,7 +1619,7 @@ def plot_plane_samples(
 def plot_all_planes(analysis_dir, lcfs_index, trace_data, sim_io, params):
     """Produce one unstructured filled-contour plot per toroidal plane."""
     fieldline_values = trace_data["fieldline_connection_length"]
-    raw_fieldline_id = trace_data["raw_fieldline_id"]
+    source = trace_data["crossing_source"]
     levels, norm, extend = make_color_scale(
         fieldline_values,
         params["COLOR_SCALE"],
@@ -1512,12 +1627,21 @@ def plot_all_planes(analysis_dir, lcfs_index, trace_data, sim_io, params):
         params["VMIN"],
         params["VMAX"],
     )
-    raw_points_rtp = trace_data["raw_points_rtp"]
-    plane_offsets = trace_data["plane_offsets"]
     for plane_index, phi_deg in enumerate(trace_data["plane_phi_deg"]):
-        start = int(plane_offsets[plane_index])
-        stop = int(plane_offsets[plane_index + 1])
-        plane_values = fieldline_values[raw_fieldline_id[start:stop]]
+        point_blocks = []
+        value_blocks = []
+        for chunk in source.iter_plane_chunks(
+            plane_index,
+            COLOR_RANGE_CHUNK_SIZE,
+        ):
+            point_blocks.append(chunk.points_rtp)
+            value_blocks.append(chunk.connection_length_m)
+        if point_blocks:
+            plane_points = np.concatenate(point_blocks)
+            plane_values = np.concatenate(value_blocks)
+        else:
+            plane_points = np.empty((0, 3), dtype=np.float64)
+            plane_values = np.empty(0, dtype=np.float64)
         boundary, _ = load_lcfs_boundary(
             analysis_dir,
             phi_deg,
@@ -1526,7 +1650,7 @@ def plot_all_planes(analysis_dir, lcfs_index, trace_data, sim_io, params):
             boundary_points=params["LCFS_BOUNDARY_POINTS"],
         )
         plot_plane_samples(
-            raw_points_rtp[start:stop],
+            plane_points,
             plane_values,
             boundary,
             phi_deg,
@@ -1715,35 +1839,63 @@ class SOLTracer:
     def trace(self):
         """Run both field-line directions for every seed."""
         params = self.input_params
+        self.data_dir = Path(self.simIO.data_dir) / self.analysis_subdir
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        for obsolete_name in (
+            "raw_points_xyz.npy",
+            "raw_points_rtp.npy",
+            "raw_connection_length_m.npy",
+            "raw_plane_index.npy",
+            "raw_fieldline_id.npy",
+            "raw_source_direction.npy",
+            "plane_offsets.npy",
+            "wall_intersection_xyz.npy",
+        ):
+            (self.data_dir / obsolete_name).unlink(missing_ok=True)
+        plane_phi_deg = np.linspace(
+            360.0 / params["N_PLANES"],
+            360.0,
+            params["N_PLANES"],
+        )
+        crossing_writer = PlaneShardWriter(
+            self.data_dir,
+            plane_phi_deg,
+            self.field.R0,
+        )
         crossing_store = PlaneCrossingStore(
             params["N_PLANES"],
             params["CROSSING_BUFFER_SIZE"],
             self.device,
+            crossing_writer,
         )
-        self.trace_data = trace_connection_length_volume(
-            self.seed_data,
-            params,
-            self.field,
-            params["STEP_SIZE_M"],
-            params["BATCH_SIZE"],
-            crossing_store,
-            self.simIO,
-            params["SHOW_PROGRESS"],
-            params["STEP_CHUNK_SIZE"],
-            self.compile_chunks,
-            params["INTEGRATOR"],
-            params["MIN_FIELD_MAGNITUDE"],
-            params["WALL_BISECTION_STEPS"],
-            params["PROGRESS_REFRESH_STEPS"],
-            params["PROGRESS_INTERVAL_STEPS"])
-        
-        self.data_dir = save_torch_outputs(
-            self.simIO,
-            self.seed_data,
-            self.trace_data,
-            crossing_store,
-            self.field.R0,
-            self.analysis_subdir)
+        try:
+            self.trace_data = trace_connection_length_volume(
+                self.seed_data,
+                params,
+                self.field,
+                params["STEP_SIZE_M"],
+                params["BATCH_SIZE"],
+                crossing_store,
+                self.simIO,
+                params["SHOW_PROGRESS"],
+                params["STEP_CHUNK_SIZE"],
+                self.compile_chunks,
+                params["INTEGRATOR"],
+                params["MIN_FIELD_MAGNITUDE"],
+                params["WALL_BISECTION_STEPS"],
+                params["PROGRESS_REFRESH_STEPS"],
+                params["PROGRESS_INTERVAL_STEPS"])
+
+            self.data_dir = save_torch_outputs(
+                self.simIO,
+                self.seed_data,
+                self.trace_data,
+                crossing_writer,
+                self.field.R0,
+                self.analysis_subdir)
+        except Exception:
+            crossing_writer.abort()
+            raise
         return self.trace_data
 
     def plot(self):

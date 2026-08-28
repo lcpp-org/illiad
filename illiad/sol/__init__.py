@@ -4,12 +4,15 @@ from . import stitching
 from .crossings import (
     CrossingChunk,
     NpyPlaneCrossingSource,
+    PlaneShardWriter,
     PlaneCrossingSource,
+    ShardedPlaneCrossingSource,
     open_plane_crossing_source,
 )
 from .density import SOLDensity
 from .potential import SOLPotential
 from .regularizer import SOLRegularizer
+from .workflow import SOLTraceRegularizer
 from .tracer import (
     SOLTracer,
     build_torch_magnetic_field,
@@ -24,9 +27,12 @@ __all__ = [
     "SOLPotential",
     "SOLRegularizer",
     "SOLTracer",
+    "SOLTraceRegularizer",
     "CrossingChunk",
     "NpyPlaneCrossingSource",
+    "PlaneShardWriter",
     "PlaneCrossingSource",
+    "ShardedPlaneCrossingSource",
     "stitching",
     "build_torch_magnetic_field",
     "load_lcfs_boundary",

@@ -20,6 +20,7 @@ from scipy.spatial import cKDTree
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
+from illiad.utilities.coordtrans import XYZ_to_RTP_many
 from .crossings import open_plane_crossing_source
 from .tracer import load_lcfs_boundary, load_poincare_settings
 
@@ -27,6 +28,10 @@ from .tracer import load_lcfs_boundary, load_poincare_settings
 RHO_FILENAME = "rho_grid_m.npy"
 THETA_FILENAME = "theta_grid_rad.npy"
 PHI_FILENAME = "phi_grid_deg.npy"
+INDEX_SPOOL_DTYPE = np.dtype(
+    [("cell_index", "<i4"), ("fieldline_id", "<i4")],
+    align=False,
+)
 
 
 def validate_regularizer_settings(params):
@@ -175,6 +180,171 @@ def grid_indices(points_rtp, n_rho, n_theta, rho_min, rho_max):
         - 1
     ) % n_theta
     return rho_index, theta_index
+
+
+class RegularGridAccumulator:
+    """Fixed-size sufficient statistics for direct trace regularization."""
+
+    def __init__(self, plane_count, params):
+        self.plane_count = int(plane_count)
+        self.n_theta = params["N_THETA"]
+        self.n_rho = params["N_RHO"]
+        self.interpolation_space = params["INTERPOLATION_SPACE"]
+        shape = (self.plane_count, self.n_theta, self.n_rho)
+        self.value_sum = np.zeros(shape, dtype=np.float64)
+        self.sample_count = np.zeros(shape, dtype=np.int64)
+        self.used_samples = np.zeros(self.plane_count, dtype=np.int64)
+
+    @property
+    def cell_count(self):
+        return int(self.value_sum.size)
+
+    def add_indexed(self, cell_index, connection_length_m):
+        """Add resolved positive samples addressed by global cell index."""
+        cell_index = np.asarray(cell_index)
+        values = np.asarray(connection_length_m)
+        valid = (
+            (cell_index >= 0)
+            & (cell_index < self.cell_count)
+            & np.isfinite(values)
+            & (values > 0.0)
+        )
+        if not np.any(valid):
+            return 0
+        cell_index = cell_index[valid].astype(np.int64, copy=False)
+        values = values[valid]
+        if self.interpolation_space == "log":
+            values = np.log(values)
+        flat_sum = self.value_sum.ravel()
+        flat_count = self.sample_count.ravel()
+        np.add.at(flat_sum, cell_index, values)
+        np.add.at(flat_count, cell_index, 1)
+        plane_index = cell_index // (self.n_theta * self.n_rho)
+        self.used_samples += np.bincount(
+            plane_index,
+            minlength=self.plane_count,
+        )
+        return int(cell_index.size)
+
+    def plane_mean(self, plane_index):
+        """Return one plane's direct cell means and occupancy counts."""
+        counts = self.sample_count[plane_index]
+        occupied = counts > 0
+        gridded = np.full(counts.shape, np.nan, dtype=np.float64)
+        gridded[occupied] = (
+            self.value_sum[plane_index][occupied] / counts[occupied]
+        )
+        if self.interpolation_space == "log":
+            gridded[occupied] = np.exp(gridded[occupied])
+        return gridded, counts
+
+
+class GridIndexSpool:
+    """Temporarily spool one paired trace batch as cell/field-line IDs."""
+
+    def __init__(self, scratch_path, plane_count, major_radius, params):
+        self.path = Path(scratch_path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.unlink(missing_ok=True)
+        self._handle = self.path.open("wb", buffering=0)
+        self.n_planes = int(plane_count)
+        self.major_radius = float(major_radius)
+        self.params = params
+        self.counts = np.zeros(self.n_planes, dtype=np.int64)
+        self.record_count = 0
+
+    def _append_points(self, plane_index, points_rtp, fieldline_id):
+        points_rtp = np.asarray(points_rtp)
+        fieldline_id = np.asarray(fieldline_id)
+        finite = (
+            np.all(np.isfinite(points_rtp[:, :2]), axis=1)
+            & (points_rtp[:, 0] >= self.params["RHO_MIN"])
+            & (points_rtp[:, 0] <= self.params["RHO_MAX"])
+        )
+        if not np.any(finite):
+            return
+        points_rtp = points_rtp[finite]
+        fieldline_id = fieldline_id[finite]
+        rho_index, theta_index = grid_indices(
+            points_rtp,
+            self.params["N_RHO"],
+            self.params["N_THETA"],
+            self.params["RHO_MIN"],
+            self.params["RHO_MAX"],
+        )
+        valid = (rho_index >= 0) & (rho_index < self.params["N_RHO"])
+        if not np.any(valid):
+            return
+        local_index = (
+            theta_index[valid] * self.params["N_RHO"] + rho_index[valid]
+        )
+        global_index = (
+            int(plane_index) * self.params["N_THETA"] * self.params["N_RHO"]
+            + local_index
+        )
+        if global_index.max(initial=0) > np.iinfo(np.int32).max:
+            raise ValueError("Regular field exceeds the int32 cell-index range.")
+        records = np.empty(global_index.size, dtype=INDEX_SPOOL_DTYPE)
+        records["cell_index"] = global_index
+        records["fieldline_id"] = fieldline_id[valid]
+        records.tofile(self._handle)
+        count = int(records.size)
+        self.counts[int(plane_index)] += count
+        self.record_count += count
+
+    def append_xyz(
+        self,
+        plane_index,
+        xyz,
+        fieldline_id,
+        source_direction,
+    ):
+        del source_direction
+        points_rtp = XYZ_to_RTP_many(np.asarray(xyz), self.major_radius)
+        self._append_points(plane_index, points_rtp, fieldline_id)
+
+    def append_rtp(
+        self,
+        plane_index,
+        points_rtp,
+        fieldline_id,
+        source_direction,
+    ):
+        del source_direction
+        self._append_points(plane_index, points_rtp, fieldline_id)
+
+    def consume(self, accumulator, fieldline_connection_length_m, chunk_size):
+        """Accumulate the completed batch and remove its temporary spool."""
+        self._handle.flush()
+        self._handle.close()
+        self._handle = None
+        try:
+            if self.record_count:
+                records = np.memmap(
+                    self.path,
+                    mode="r",
+                    dtype=INDEX_SPOOL_DTYPE,
+                    shape=(self.record_count,),
+                )
+                try:
+                    for start in range(0, self.record_count, chunk_size):
+                        stop = min(start + chunk_size, self.record_count)
+                        chunk = records[start:stop]
+                        fieldline_id = np.asarray(chunk["fieldline_id"])
+                        accumulator.add_indexed(
+                            np.asarray(chunk["cell_index"]),
+                            np.asarray(fieldline_connection_length_m)[fieldline_id],
+                        )
+                finally:
+                    del records
+        finally:
+            self.path.unlink(missing_ok=True)
+
+    def abort(self):
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
+        self.path.unlink(missing_ok=True)
 
 
 def accumulate_plane(source, plane_index, params):
@@ -383,6 +553,67 @@ def regularize_field(
         "REGULAR CONNECTION-LENGTH FIELD FINISHED IN %.3f seconds.",
         perf_counter() - start_time,
     )
+    return np.load(output_path, mmap_mode="r")
+
+
+def regularize_accumulator(
+    analysis_dir,
+    accumulator,
+    plane_phi_deg,
+    lcfs_index,
+    rho,
+    theta,
+    grid_x,
+    grid_z,
+    output_path,
+    sim_io,
+    params,
+):
+    """Fill LCFS-exterior gaps and atomically save direct statistics."""
+    temporary_path = output_path.with_name(f".{output_path.stem}.building.npy")
+    temporary_path.unlink(missing_ok=True)
+    field = np.lib.format.open_memmap(
+        temporary_path,
+        mode="w+",
+        dtype=np.float64,
+        shape=(accumulator.plane_count, theta.size, rho.size),
+    )
+    try:
+        for plane_index, phi_deg in enumerate(plane_phi_deg):
+            boundary, _ = load_lcfs_boundary(
+                analysis_dir,
+                float(phi_deg),
+                lcfs_index,
+            )
+            exterior = exterior_mask(boundary, grid_x, grid_z)
+            binned, counts = accumulator.plane_mean(plane_index)
+            regular, occupied_count, filled_count = fill_missing_cells(
+                binned,
+                exterior,
+                grid_x,
+                grid_z,
+                params,
+            )
+            field[plane_index] = regular
+            sim_io.log.info(
+                "Regularized direct phi=%03.0f deg: %d samples, %d "
+                "directly occupied exterior cells, %d filled cells, %d "
+                "samples in the busiest cell.",
+                phi_deg,
+                accumulator.used_samples[plane_index],
+                occupied_count,
+                filled_count,
+                int(counts.max(initial=0)),
+            )
+        field.flush()
+        del field
+        field = None
+        os.replace(temporary_path, output_path)
+    except Exception:
+        if field is not None:
+            del field
+        temporary_path.unlink(missing_ok=True)
+        raise
     return np.load(output_path, mmap_mode="r")
 
 
