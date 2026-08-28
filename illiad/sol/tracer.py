@@ -33,7 +33,14 @@ from illiad.mesh import TorchMesh
 import illiad.mesh.torch_mesh as torch_mesh_module
 import illiad.utilities.coordtrans as coordtrans_module
 from illiad.utilities.coordtrans import RTP_to_XYZ_many, XYZ_to_RTP_many
-from .crossings import PlaneShardWriter, open_plane_crossing_source
+from .crossings import (
+    TRACE_LCFS_INDEX_FILENAME,
+    TRACE_LENGTH_LIMIT_FILENAME,
+    TRACE_SPINS_FILENAME,
+    TRACE_VESSEL_RADIUS_FILENAME,
+    PlaneShardWriter,
+    open_plane_crossing_source,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -1128,6 +1135,10 @@ def trace_connection_length_volume(
         "hit_wall": hit_wall,
         "reached_limit": reached_limit,
         "valid_trace": valid_trace,
+        "trace_length_limit_m": float(max_length),
+        "trace_spins": int(settings["SPINS"]),
+        "trace_lcfs_index": int(settings["LCFS_INDEX"]),
+        "trace_vessel_radius_m": float(settings["VESSEL_RADIUS_M"]),
         "plane_phi_deg": np.linspace(360.0 / crossing_store.n_planes, 360.0, crossing_store.n_planes),
     }
 
@@ -1294,6 +1305,10 @@ def trace_connection_length_volume_paired(
         "hit_wall": hit_wall,
         "reached_limit": reached_limit,
         "valid_trace": valid_trace,
+        "trace_length_limit_m": float(max_length),
+        "trace_spins": int(settings["SPINS"]),
+        "trace_lcfs_index": int(settings["LCFS_INDEX"]),
+        "trace_vessel_radius_m": float(settings["VESSEL_RADIUS_M"]),
         "plane_phi_deg": np.linspace(
             360.0 / settings["N_PLANES"],
             360.0,
@@ -1320,6 +1335,18 @@ def save_trace_metadata(
         "seed_phi_deg": seed_data["seed_phi_deg"],
         "seed_counts": seed_data["seed_counts"],
         "major_radius_m": np.asarray(major_radius),
+        TRACE_LENGTH_LIMIT_FILENAME.removesuffix(".npy"): np.asarray(
+            trace_data["trace_length_limit_m"]
+        ),
+        TRACE_SPINS_FILENAME.removesuffix(".npy"): np.asarray(
+            trace_data["trace_spins"], dtype=np.int64
+        ),
+        TRACE_LCFS_INDEX_FILENAME.removesuffix(".npy"): np.asarray(
+            trace_data["trace_lcfs_index"], dtype=np.int64
+        ),
+        TRACE_VESSEL_RADIUS_FILENAME.removesuffix(".npy"): np.asarray(
+            trace_data["trace_vessel_radius_m"]
+        ),
         "fieldline_connection_length_m": trace_data["connection_length"],
         "direction_connection_length_m": trace_data["direction_length"],
         "wall_intersection_rtp": trace_data["wall_rtp"],

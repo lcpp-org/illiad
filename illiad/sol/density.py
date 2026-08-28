@@ -332,13 +332,39 @@ def _run_analysis(args, sim_io):
     poincare_settings = load_poincare_settings(args.analysis_dir)
     lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
 
-    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings, major_radius_m=MAJOR_RADIUS_M)
-    print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and L_parallel,0={l_parallel_0:.6g} m")
-
     input_data = common.load_inputs(sim_io.data_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol, linear_profile, rho, theta, phi_deg, sol_path, profile_path = input_data
 
     vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
+    sol_data_dir = Path(sim_io.data_dir) / args.sol_subdir
+    common.validate_regular_grid_contract(
+        rho,
+        theta,
+        phi_deg,
+        vessel_radius,
+    )
+    trace_metadata = common.validate_trace_metadata(
+        sol_data_dir,
+        lcfs_index=lcfs_index,
+        vessel_radius_m=vessel_radius,
+        major_radius_m=MAJOR_RADIUS_M,
+    )
+    lcfs_preflight_planes = common.validate_lcfs_artifacts(
+        sim_io.data_dir,
+        phi_deg,
+        lcfs_index,
+        vessel_radius,
+    )
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(
+        args.l_parallel_0_m,
+        poincare_settings,
+        major_radius_m=MAJOR_RADIUS_M,
+        trace_data_dir=sol_data_dir,
+    )
+    print(
+        f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "
+        f"L_parallel,0={l_parallel_0:.6g} m"
+    )
     if PLOT_VMIN is None:
         plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else args.n_wall / args.n_axis)
     else:
@@ -381,6 +407,8 @@ def _run_analysis(args, sim_io):
         "SOL_BETA": args.sol_beta,
         "L_PARALLEL_0_M": l_parallel_0,
         "L_PARALLEL_0_SOURCE": l_parallel_0_source,
+        "TRACE_METADATA_PREFLIGHT": trace_metadata,
+        "LCFS_PREFLIGHT_PLANES": lcfs_preflight_planes,
         "MAJOR_RADIUS_M": MAJOR_RADIUS_M,
         "SOL_CONNECTION_LENGTH_MIN_M": float(np.min(finite_sol)),
         "SOL_CONNECTION_LENGTH_MAX_M": float(np.max(finite_sol)),

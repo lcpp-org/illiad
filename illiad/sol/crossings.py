@@ -14,6 +14,10 @@ from illiad.utilities.coordtrans import XYZ_to_RTP_many
 SHARD_DIRECTORY = "raw_crossings"
 SHARD_MANIFEST = "manifest.json"
 SHARD_FORMAT = "illiad-plane-crossings-v1"
+TRACE_LENGTH_LIMIT_FILENAME = "trace_length_limit_m.npy"
+TRACE_SPINS_FILENAME = "trace_spins.npy"
+TRACE_LCFS_INDEX_FILENAME = "trace_lcfs_index.npy"
+TRACE_VESSEL_RADIUS_FILENAME = "trace_vessel_radius_m.npy"
 SHARD_DTYPE = np.dtype(
     [
         ("rtp", "<f8", (3,)),

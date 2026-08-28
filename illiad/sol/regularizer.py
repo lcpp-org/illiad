@@ -21,7 +21,13 @@ from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
 from illiad.utilities.coordtrans import XYZ_to_RTP_many
-from .crossings import open_plane_crossing_source
+from .crossings import (
+    TRACE_LCFS_INDEX_FILENAME,
+    TRACE_LENGTH_LIMIT_FILENAME,
+    TRACE_SPINS_FILENAME,
+    TRACE_VESSEL_RADIUS_FILENAME,
+    open_plane_crossing_source,
+)
 from .tracer import load_lcfs_boundary, load_poincare_settings
 
 
@@ -806,6 +812,25 @@ class SOLRegularizer:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.output_path = self.data_dir / params["OUTPUT_FIELD_FILENAME"]
 
+        propagated_trace_metadata = []
+        if raw_data_dir is not None:
+            for filename in (
+                TRACE_LENGTH_LIMIT_FILENAME,
+                TRACE_SPINS_FILENAME,
+                TRACE_LCFS_INDEX_FILENAME,
+                TRACE_VESSEL_RADIUS_FILENAME,
+                "major_radius_m.npy",
+            ):
+                source_path = Path(raw_data_dir) / filename
+                if source_path.is_file():
+                    values = np.load(source_path)
+                    self.simIO.saveNumpyData(
+                        values,
+                        filename.removesuffix(".npy"),
+                        subdir=params["ANLYS_SUBDIR"],
+                    )
+                    propagated_trace_metadata.append(filename)
+
         run_settings = {
             **params,
             "RAW_DATA_DIR": None if raw_data_dir is None else str(raw_data_dir),
@@ -818,6 +843,7 @@ class SOLRegularizer:
                 theta.size,
                 rho.size,
             ),
+            "PROPAGATED_TRACE_METADATA": propagated_trace_metadata,
         }
         self.simIO.inputsBoilerplate(
             "CONNECTION-LENGTH REGULAR-FIELD INPUTS",
