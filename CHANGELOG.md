@@ -9,6 +9,8 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
 
 - The official PyTorch-backed `illiad.sol.SOLTracer` analysis and
   `illiad-sol-trace` command for open-field-line connection-length tracing.
+- The package-native `illiad.sol.SOLRegularizer`, chunk-oriented crossing
+  source interface, `illiad-sol-regularize` command, and JSON input template.
 - Package-native `illiad.sol.SOLDensity` and `illiad.sol.SOLPotential`
   analyses, their installed commands, shared SOL stitching helpers, and JSON
   input templates.

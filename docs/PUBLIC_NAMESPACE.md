@@ -40,13 +40,18 @@ interpolated profile or an existing regular scalar field.
 
 ```python
 from illiad.sol import (
+    CrossingChunk,
+    NpyPlaneCrossingSource,
+    PlaneCrossingSource,
     SOLDensity,
     SOLPotential,
+    SOLRegularizer,
     SOLTracer,
     build_torch_magnetic_field,
     load_lcfs_boundary,
     load_poincare_settings,
     minimum_boundary_distance,
+    open_plane_crossing_source,
     resolve_device,
 )
 ```
@@ -54,6 +59,11 @@ from illiad.sol import (
 `SOLTracer` is the official open-field-line analysis class. It builds
 LCFS-exterior seed grids, traces both directions with a `TorchMesh`, saves
 compact toroidal-plane crossings, and produces optional contour plots.
+
+`SOLRegularizer` consumes plane crossing chunks and writes the regular
+float64 `(phi, theta, rho)` connection-length field used by later SOL
+profile analyses. `PlaneCrossingSource` defines the chunk interface, and
+`NpyPlaneCrossingSource` adapts current compact and legacy expanded outputs.
 
 `SOLDensity` and `SOLPotential` are the package-native profile stitchers.
 They consume saved interior, connection-length, and Poincare artifacts and

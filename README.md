@@ -30,7 +30,8 @@ indicate that a Git tag or package release has been published. Version 1.0.0
 establishes the supported active command names and JSON configuration interface
 documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). SOL density and
 potential construction is implemented by the package-native `SOLDensity` and
-`SOLPotential` classes and their installed commands. See
+`SOLPotential` classes, while `SOLRegularizer` provides the official link
+from saved trace crossings to their regular-grid input. See
 [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
 
 ## Features
@@ -43,7 +44,8 @@ potential construction is implemented by the package-native `SOLDensity` and
 - Integrate toroidal flux and interpolate normalized interior profiles with
   independent 2-D or periodically wrapped local 3-D RBF fits.
 - Trace open SOL field lines on CPU or CUDA with the PyTorch-backed
-  `SOLTracer`, retaining compact plane-sorted crossing data.
+  `SOLTracer`, retaining compact plane-sorted crossing data, and regularize
+  saved crossings onto the package-standard scalar-field mesh.
 - Generate a Cartesian electric field from either a newly interpolated flux
   profile or an existing regular scalar field.
 - Advance lithium ions with a Boris-Buneman full-orbit pusher, optional
@@ -53,7 +55,8 @@ potential construction is implemented by the package-native `SOLDensity` and
 ## Repository Layout
 
 - `illiad/cli/`: adapters behind the installed commands.
-- `illiad/sol/`: the official `SOLTracer` analysis and shared LCFS helpers.
+- `illiad/sol/`: official SOL tracing, regularization, profile, and shared
+  LCFS analyses.
 - `illiad/flux/`: flux calculation, interpolation, and gradient analyses.
 - `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` classes.
 - `illiad/`: Poincare, Boris, collision, particle, IO, and plotting code.
@@ -95,7 +98,7 @@ pip install -e ".[fitting,viewer,export]"
 
 ## Commands
 
-Eight active workflow commands use JSON inputs:
+Nine active workflow commands use JSON inputs:
 
 ```bash
 illiad-fieldsolver --inputs input_files/fieldsolver_inputs.example.json
@@ -103,6 +106,7 @@ illiad-poincare --inputs input_files/poincare_inputs.example.json
 illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
 illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
 illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
+illiad-sol-regularize --inputs input_files/sol_regularize_inputs.example.json
 illiad-sol-density --inputs input_files/sol_density_inputs.example.json
 illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
 illiad-boris --inputs input_files/boris_inputs.example.json
@@ -135,7 +139,7 @@ working directory. The preferred Python imports include:
 from illiad.io import IOHandler
 from illiad.mesh import Mesh, TorchMesh
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLDensity, SOLPotential, SOLTracer
+from illiad.sol import SOLDensity, SOLPotential, SOLRegularizer, SOLTracer
 ```
 
 See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for command and configuration
@@ -202,6 +206,19 @@ toroidal planes. Compact outputs include `raw_points_rtp.npy`,
 `raw_fieldline_id.npy`, `raw_source_direction.npy`, `plane_offsets.npy`,
 `plane_phi_deg.npy`, and `fieldline_connection_length_m.npy`, plus seed,
 directional, and wall-hit metadata.
+
+Regularize those saved crossings onto the flux-compatible
+`(phi, theta, rho)` mesh with:
+
+```bash
+illiad-sol-regularize --inputs input_files/sol_regularize_inputs.example.json
+```
+
+`SOLRegularizer` reads each toroidal plane through a bounded chunk interface,
+averages finite positive samples at their nearest regular-grid nodes, and
+fills unsampled exterior cells in seam-free poloidal `(x, z)` coordinates.
+It writes `connection_length_field_m.npy` and its coordinate arrays for the
+density and potential stages.
 
 ### 5. SOL density and potential
 

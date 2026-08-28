@@ -37,11 +37,12 @@ bitwise-identical output.
 | `illiad-flux-calc` | Active | Integrate toroidal flux and diagnose island chains. | `input_files/flux_calc_inputs.example.json` |
 | `illiad-flux-grad` | Active | Interpolate a scalar profile and/or generate its Cartesian electric field. | `input_files/flux_grad_inputs.example.json` |
 | `illiad-sol-trace` | Active | Trace open SOL field lines with the PyTorch solver. | `input_files/sol_trace_inputs.example.json` |
+| `illiad-sol-regularize` | Active | Regularize saved SOL crossings onto a scalar-field mesh. | `input_files/sol_regularize_inputs.example.json` |
 | `illiad-sol-density` | Active | Construct a piecewise core/SOL plasma-density field. | `input_files/sol_density_inputs.example.json` |
 | `illiad-sol-potential` | Active | Construct a piecewise core/SOL electrostatic-potential field. | `input_files/sol_potential_inputs.example.json` |
 | `illiad-boris` | Active | Run full-orbit lithium-ion transport. | `input_files/boris_inputs.example.json` |
 
-The eight active commands accept:
+The nine active commands accept:
 
 ```text
 --inputs PATH
@@ -173,6 +174,22 @@ crossing to `fieldline_connection_length_m.npy`; and
 samples. Directional lengths, wall intersections, masks, seed coordinates,
 and plane coordinates are saved alongside them.
 
+### `sol_regularize_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `TRACE_SUBDIR`, `OUTPUT_FIELD_FILENAME` |
+| Surface and grid | `LCFS_INDEX`, `N_RHO`, `N_THETA`, `RHO_MIN`, `RHO_MAX`, `VESSEL_RADIUS_M` |
+| Accumulation and fill | `INTERPOLATION_SPACE`, `FILL_METHOD`, `IDW_NEIGHBORS`, `IDW_POWER`, `TREE_WORKERS`, `RAW_CHUNK_SIZE` |
+| Plots | `GENERATE_PLOTS`, `SHOW_PROGRESS`, `COLOR_SCALE`, `COLORMAP`, `N_LEVELS`, `VMIN`, `VMAX`, `CONTOUR_EXTEND`, `DPI`, `PHYSICAL_PHI_OFFSET_DEG` |
+
+The regularizer consumes either compact field-line-indexed trace output or
+the legacy expanded connection-length array through a plane/chunk source
+interface. It preserves the nearest-node accumulation, optional linear or
+logarithmic averaging, and seam-free exterior fill used by the research
+interpolator. Output is a float64 `(phi, theta, rho)` field plus matching
+coordinate arrays.
+
 ### `sol_density_inputs.example.json`
 
 | Group | Keys |
@@ -265,7 +282,16 @@ from illiad.mesh import Mesh, TorchMesh
 from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLDensity, SOLPotential, SOLTracer
+from illiad.sol import (
+    CrossingChunk,
+    NpyPlaneCrossingSource,
+    PlaneCrossingSource,
+    SOLDensity,
+    SOLPotential,
+    SOLRegularizer,
+    SOLTracer,
+    open_plane_crossing_source,
+)
 from illiad.boris import Boris
 from illiad.collisions import Collisions
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
@@ -287,6 +313,7 @@ from illiad import plotting
 | `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
 | `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
 | `SOLTracer` | `SOLTracer(io_handler, magnetic_field, input_params)`; `build_initial_conditions`, `log_inputs`, `trace`, `plot`, `run` |
+| `SOLRegularizer` | `SOLRegularizer(io_handler, input_params, crossing_source=None)`; `run` |
 | `SOLDensity` | `SOLDensity(io_handler, input_params)`; `run` |
 | `SOLPotential` | `SOLPotential(io_handler, input_params)`; `run` |
 | `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; condition, solver, output, diagnostic, and `run` methods |
@@ -294,7 +321,9 @@ from illiad import plotting
 
 `illiad.sol` also exports `build_torch_magnetic_field`,
 `load_lcfs_boundary`, `load_poincare_settings`,
-`minimum_boundary_distance`, and `resolve_device`.
+`minimum_boundary_distance`, `resolve_device`, `CrossingChunk`,
+`PlaneCrossingSource`, `NpyPlaneCrossingSource`, and
+`open_plane_crossing_source`.
 
 ## Output and Data Compatibility
 
