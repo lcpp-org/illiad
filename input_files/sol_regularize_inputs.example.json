@@ -1,0 +1,31 @@
+{
+  "ANLYS_DIR": "DEFAULT",
+  "ANLYS_SUBDIR": "SOLTrace_RegularGrid",
+  "TRACE_SUBDIR": "SOLTrace",
+  "LCFS_INDEX": 19,
+
+  "N_RHO": 191,
+  "N_THETA": 180,
+  "RHO_MIN": 0.0,
+  "RHO_MAX": 0.19,
+
+  "INTERPOLATION_SPACE": "log",
+  "FILL_METHOD": "idw",
+  "IDW_NEIGHBORS": 8,
+  "IDW_POWER": 2.0,
+  "TREE_WORKERS": -1,
+  "RAW_CHUNK_SIZE": 250000,
+  "OUTPUT_FIELD_FILENAME": "connection_length_field_m.npy",
+
+  "GENERATE_PLOTS": true,
+  "SHOW_PROGRESS": true,
+  "COLOR_SCALE": "log",
+  "COLORMAP": "afmhot",
+  "N_LEVELS": 50,
+  "VMIN": null,
+  "VMAX": null,
+  "CONTOUR_EXTEND": "both",
+  "DPI": 250,
+  "VESSEL_RADIUS_M": 0.19,
+  "PHYSICAL_PHI_OFFSET_DEG": 198.0
+}
