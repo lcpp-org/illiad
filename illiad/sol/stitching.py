@@ -8,6 +8,13 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import gaussian_filter1d
 from scipy.spatial import cKDTree
 
+from .crossings import (
+    TRACE_LCFS_INDEX_FILENAME,
+    TRACE_LENGTH_LIMIT_FILENAME,
+    TRACE_SPINS_FILENAME,
+    TRACE_VESSEL_RADIUS_FILENAME,
+)
+
 # Shared coordinate-file contract for the regular (phi, theta, rho) grid.
 RHO_FILENAME = "rho_grid_m.npy"
 THETA_FILENAME = "theta_grid_rad.npy"
@@ -30,6 +37,9 @@ __all__ = [
     "resolve_lcfs_index",
     "smoothstep",
     "surface_profile_slope",
+    "validate_lcfs_artifacts",
+    "validate_regular_grid_contract",
+    "validate_trace_metadata",
     "wall_distance",
     "xz_to_theta_rho",
 ]
@@ -53,20 +63,179 @@ def resolve_lcfs_index(requested_index, nfield_filename, poincare_settings):
         )
     return int(logged_index), "Poincare log"
 
-def resolve_l_parallel_0(requested_value, poincare_settings, *, major_radius_m):
+def _load_scalar(path, description):
+    values = np.asarray(np.load(path))
+    if values.size != 1:
+        raise ValueError(f"{description} must contain exactly one value: {path}")
+    return values.reshape(()).item()
+
+
+def resolve_l_parallel_0(
+    requested_value,
+    poincare_settings,
+    *,
+    major_radius_m,
+    trace_data_dir=None,
+):
     if requested_value is not None:
         value = float(requested_value)
         source = "explicit setting"
+    elif trace_data_dir is not None and (
+        Path(trace_data_dir) / TRACE_LENGTH_LIMIT_FILENAME
+    ).is_file():
+        metadata_path = Path(trace_data_dir) / TRACE_LENGTH_LIMIT_FILENAME
+        value = float(_load_scalar(metadata_path, "trace length limit"))
+        source = f"trace metadata {metadata_path}"
     else:
         spins = poincare_settings.get("SPINS")
         if not isinstance(spins, int) or spins <= 0:
-            raise ValueError("Cannot derive L_PARALLEL_0_M without a positive integer SPINS value in the Poincare log; provide --l-parallel-0-m.")
+            raise ValueError(
+                "Cannot derive L_PARALLEL_0_M without a positive integer "
+                "SPINS value in the Poincare log; provide L_PARALLEL_0_M."
+            )
 
         value = 2.0 * np.pi * major_radius_m * spins
         source = f"2*pi*{major_radius_m:g} m*{spins} logged spins"
     if not np.isfinite(value) or value <= 0.0:
         raise ValueError("L_PARALLEL_0_M must be positive and finite.")
     return value, source
+
+
+def validate_regular_grid_contract(rho, theta, phi_deg, vessel_radius):
+    """Validate the flux-compatible regular coordinate convention."""
+    for values, name in (
+        (rho, RHO_FILENAME),
+        (theta, THETA_FILENAME),
+        (phi_deg, PHI_FILENAME),
+    ):
+        if (
+            values.ndim != 1
+            or not values.size
+            or not np.all(np.isfinite(values))
+        ):
+            raise ValueError(f"{name} must be a nonempty finite vector.")
+    if not np.isclose(rho[0], 0.0, rtol=0.0, atol=1.0e-12):
+        raise ValueError("The stitched field requires rho_grid_m.npy to start at 0.")
+    if not np.isclose(rho[-1], vessel_radius, rtol=0.0, atol=1.0e-12):
+        raise ValueError(
+            "The vessel radius must equal the outermost rho grid node."
+        )
+    expected_rho = np.linspace(rho[0], rho[-1], rho.size)
+    expected_theta = np.linspace(
+        2.0 * np.pi / theta.size,
+        2.0 * np.pi,
+        theta.size,
+    )
+    expected_phi = np.linspace(
+        360.0 / phi_deg.size,
+        360.0,
+        phi_deg.size,
+    )
+    if not np.allclose(rho, expected_rho, rtol=0.0, atol=1.0e-12):
+        raise ValueError("rho_grid_m.npy must be uniformly spaced.")
+    if not np.allclose(theta, expected_theta, rtol=0.0, atol=1.0e-12):
+        raise ValueError(
+            "theta_grid_rad.npy does not follow the periodic ILLIAD node grid."
+        )
+    if not np.allclose(phi_deg, expected_phi, rtol=0.0, atol=1.0e-10):
+        raise ValueError(
+            "phi_grid_deg.npy does not follow the periodic ILLIAD plane grid."
+        )
+
+
+def validate_trace_metadata(
+    sol_data_dir,
+    *,
+    lcfs_index,
+    vessel_radius_m,
+    major_radius_m,
+):
+    """Compare optional trace provenance with the selected stitcher inputs."""
+    sol_data_dir = Path(sol_data_dir)
+    checked = {}
+    checks = (
+        (
+            TRACE_LCFS_INDEX_FILENAME,
+            "LCFS index",
+            int(lcfs_index),
+            lambda actual, expected: (
+                not isinstance(actual, bool)
+                and np.isfinite(actual)
+                and int(actual) == actual
+                and int(actual) == expected
+            ),
+        ),
+        (
+            TRACE_VESSEL_RADIUS_FILENAME,
+            "vessel radius",
+            float(vessel_radius_m),
+            lambda actual, expected: np.isclose(
+                float(actual), expected, rtol=0.0, atol=1.0e-12
+            ),
+        ),
+        (
+            "major_radius_m.npy",
+            "major radius",
+            float(major_radius_m),
+            lambda actual, expected: np.isclose(
+                float(actual), expected, rtol=0.0, atol=1.0e-12
+            ),
+        ),
+    )
+    for filename, description, expected, matches in checks:
+        path = sol_data_dir / filename
+        if not path.is_file():
+            continue
+        actual = _load_scalar(path, description)
+        if not matches(actual, expected):
+            raise ValueError(
+                f"Trace {description} {actual!r} does not match the selected "
+                f"stitcher value {expected!r}: {path}"
+            )
+        checked[description] = actual
+
+    spins_path = sol_data_dir / TRACE_SPINS_FILENAME
+    if spins_path.is_file():
+        spins = _load_scalar(spins_path, "trace spin count")
+        if isinstance(spins, bool) or int(spins) != spins or int(spins) <= 0:
+            raise ValueError(f"Invalid trace spin count in {spins_path}.")
+        checked["trace spin count"] = int(spins)
+    return checked
+
+
+def validate_lcfs_artifacts(
+    data_dir,
+    phi_deg,
+    lcfs_index,
+    vessel_radius_m,
+):
+    """Preflight every selected Poincare LCFS plane without fitting splines."""
+    poincare_dir = Path(data_dir) / "Poincare"
+    for phi_value in phi_deg:
+        path = poincare_dir / f"Poincare_{float(phi_value):03.0f}.npy"
+        require_file(path, "Poincare plane data")
+        plane = np.load(path, mmap_mode="r")
+        if plane.ndim < 3 or plane.shape[1] < 2:
+            raise ValueError(f"Invalid Poincare plane layout {plane.shape}: {path}")
+        if not 0 <= lcfs_index < plane.shape[0]:
+            raise IndexError(
+                f"LCFS index {lcfs_index} is outside [0, {plane.shape[0]}) "
+                f"for {path}."
+            )
+        theta_values, rho_values = plane[lcfs_index, :2]
+        finite = np.isfinite(theta_values) & np.isfinite(rho_values)
+        finite_rho = np.asarray(rho_values[finite])
+        if finite_rho.size < 4:
+            raise ValueError(
+                f"LCFS surface {lcfs_index} has fewer than four finite points: "
+                f"{path}"
+            )
+        if np.any(finite_rho < 0.0) or np.any(finite_rho >= vessel_radius_m):
+            raise ValueError(
+                f"LCFS surface {lcfs_index} is not strictly inside the vessel: "
+                f"{path}"
+            )
+    return int(phi_deg.size)
 
 def require_file(path, description):
     if not path.is_file():
