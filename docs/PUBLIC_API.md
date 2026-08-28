@@ -38,21 +38,24 @@ bitwise-identical output.
 | `illiad-flux-grad` | Active | Interpolate a scalar profile and/or generate its Cartesian electric field. | `input_files/flux_grad_inputs.example.json` |
 | `illiad-sol-trace` | Active | Trace open SOL field lines with the PyTorch solver. | `input_files/sol_trace_inputs.example.json` |
 | `illiad-sol-regularize` | Active | Regularize saved SOL crossings onto a scalar-field mesh. | `input_files/sol_regularize_inputs.example.json` |
+| `illiad-sol-connection-length` | Active | Select retained tracing, existing-raw regularization, or direct bounded-memory trace regularization. | `input_files/sol_connection_length_inputs.example.json` |
 | `illiad-sol-density` | Active | Construct a piecewise core/SOL plasma-density field. | `input_files/sol_density_inputs.example.json` |
 | `illiad-sol-potential` | Active | Construct a piecewise core/SOL electrostatic-potential field. | `input_files/sol_potential_inputs.example.json` |
 | `illiad-boris` | Active | Run full-orbit lithium-ion transport. | `input_files/boris_inputs.example.json` |
 
-The nine active commands accept:
+The ten active commands accept:
 
 ```text
 --inputs PATH
 ```
 
 `PATH` is a UTF-8 JSON file whose top-level value is an object. Supplied values
-override built-in defaults. Omitting `--inputs` uses those defaults.
-The same path may instead be supplied as the optional positional `INPUTS`
-argument. Supplying both forms is an input error; neither form takes
-precedence.
+override built-in defaults. Omitting `--inputs` uses those defaults. The
+unified connection-length command first requires one of `trace`, `regularize`,
+or `trace_regularize`; its input object contains separate `TRACE` and
+`REGULARIZE` sections. For the other active commands, the same path may instead
+be supplied as the optional positional `INPUTS` argument. Supplying both forms
+is an input error; neither form takes precedence.
 Relative input paths and `output/` are resolved from the process working
 directory.
 
@@ -167,12 +170,14 @@ values, integrates both directions from each valid exterior seed, and
 terminates each solve at the wall or numerical length limit
 `2*pi*MAJOR_RADIUS_M*SPINS`.
 
-Compact raw output is sorted by toroidal plane. `plane_offsets.npy` indexes
-each plane's slice in `raw_points_rtp.npy`; `raw_fieldline_id.npy` maps each
-crossing to `fieldline_connection_length_m.npy`; and
-`raw_source_direction.npy` distinguishes forward, reverse, and inserted seed
-samples. Directional lengths, wall intersections, masks, seed coordinates,
-and plane coordinates are saved alongside them.
+Compact raw output is appended directly to packed per-plane files under
+`raw_crossings/`. Its `manifest.json` records the plane coordinates and sample
+counts, while each crossing record stores RTP, field-line ID, and source
+direction. `fieldline_connection_length_m.npy` resolves the value for each
+field-line ID. Directional lengths, wall intersections, masks, seed
+coordinates, and plane coordinates are saved alongside the shards. The
+crossing reader continues to accept the earlier plane-sorted monolithic NumPy
+files for existing runs.
 
 ### `sol_regularize_inputs.example.json`
 
@@ -189,6 +194,22 @@ interface. It preserves the nearest-node accumulation, optional linear or
 logarithmic averaging, and seam-free exterior fill used by the research
 interpolator. Output is a float64 `(phi, theta, rho)` field plus matching
 coordinate arrays.
+
+### `sol_connection_length_inputs.example.json`
+
+The unified input contains independent `TRACE` and `REGULARIZE` objects so the
+sparse seed grid and final regular grid retain separate `N_RHO`, `N_THETA`,
+`RHO_MIN`, and `RHO_MAX` settings. The required CLI mode defines the products:
+
+- `trace` retains raw plane shards and compact trace metadata.
+- `regularize` reads existing raw crossings and does not remove them.
+- `trace_regularize` retains the regular field and compact trace metadata but
+  does not create a complete raw crossing dataset.
+
+Direct mode pairs both directions for each field-line batch. Its temporary
+records contain only regular-cell and field-line IDs and are consumed after
+the batch connection lengths resolve. The accumulator size is fixed by the
+configured regular field shape.
 
 ### `sol_density_inputs.example.json`
 

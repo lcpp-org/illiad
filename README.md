@@ -98,7 +98,7 @@ pip install -e ".[fitting,viewer,export]"
 
 ## Commands
 
-Nine active workflow commands use JSON inputs:
+Ten active workflow commands use JSON inputs:
 
 ```bash
 illiad-fieldsolver --inputs input_files/fieldsolver_inputs.example.json
@@ -107,6 +107,7 @@ illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
 illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
 illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
 illiad-sol-regularize --inputs input_files/sol_regularize_inputs.example.json
+illiad-sol-connection-length trace_regularize --inputs input_files/sol_connection_length_inputs.example.json
 illiad-sol-density --inputs input_files/sol_density_inputs.example.json
 illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
 illiad-boris --inputs input_files/boris_inputs.example.json
@@ -202,10 +203,11 @@ illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
 
 `SOLTracer` samples exterior seed points, traces both field directions until
 the wall or configured length limit, and captures crossings at regular
-toroidal planes. Compact outputs include `raw_points_rtp.npy`,
-`raw_fieldline_id.npy`, `raw_source_direction.npy`, `plane_offsets.npy`,
-`plane_phi_deg.npy`, and `fieldline_connection_length_m.npy`, plus seed,
-directional, and wall-hit metadata.
+toroidal planes. The `trace` path continuously appends packed records under
+`raw_crossings/`, publishes its manifest only after a successful trace, and
+retains `plane_phi_deg.npy`, `fieldline_connection_length_m.npy`, seed,
+directional, and wall-hit metadata. The reader also remains compatible with
+the earlier monolithic NumPy representation.
 
 Regularize those saved crossings onto the flux-compatible
 `(phi, theta, rho)` mesh with:
@@ -219,6 +221,22 @@ averages finite positive samples at their nearest regular-grid nodes, and
 fills unsampled exterior cells in seam-free poloidal `(x, z)` coordinates.
 It writes `connection_length_field_m.npy` and its coordinate arrays for the
 density and potential stages.
+
+The unified command exposes retention through its mode rather than through
+separate output-product flags:
+
+```bash
+illiad-sol-connection-length trace --inputs input_files/sol_connection_length_inputs.example.json
+illiad-sol-connection-length regularize --inputs input_files/sol_connection_length_inputs.example.json
+illiad-sol-connection-length trace_regularize --inputs input_files/sol_connection_length_inputs.example.json
+```
+
+`trace_regularize` traces both directions for each bounded field-line batch,
+temporarily spools only regular-cell and field-line IDs, and folds that batch
+into fixed-size sufficient statistics as soon as its connection lengths are
+known. It retains the regular field and compact trace metadata, but no raw
+crossing dataset. `regularize` never removes its externally supplied raw
+trace input.
 
 ### 5. SOL density and potential
 

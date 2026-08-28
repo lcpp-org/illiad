@@ -11,6 +11,10 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
   `illiad-sol-trace` command for open-field-line connection-length tracing.
 - The package-native `illiad.sol.SOLRegularizer`, chunk-oriented crossing
   source interface, `illiad-sol-regularize` command, and JSON input template.
+- Append-only plane-sharded trace output and the unified
+  `illiad-sol-connection-length` modes. Direct `trace_regularize` runs pair
+  both directions per field-line batch and accumulate fixed-size regular-grid
+  statistics without retaining a raw crossing dataset.
 - Package-native `illiad.sol.SOLDensity` and `illiad.sol.SOLPotential`
   analyses, their installed commands, shared SOL stitching helpers, and JSON
   input templates.
