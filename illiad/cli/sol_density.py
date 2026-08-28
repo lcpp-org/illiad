@@ -8,14 +8,12 @@ from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 
 DEFAULT_INPUTS = {
-    "ANLYS_DIR": "IOTA3_1000sp_atol1e-9",
-    "ANLYS_SUBDIR": (
-        "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Density_v2"
-    ),
-    "SOL_SUBDIR": "ConLenVolume_REDO_250spins_rk1mm_RegularGrid",
+    "ANLYS_DIR": "DEFAULT",
+    "ANLYS_SUBDIR": "SOLTrace_RegularGrid_Density",
+    "SOL_SUBDIR": "SOLTrace_RegularGrid",
     "SOL_FIELD_FILENAME": "connection_length_field_m.npy",
-    "NFIELD_SUBDIR": "LCFS40",
-    "NFIELD_FILENAME": "nField_LCFS40_linear.npy",
+    "NFIELD_SUBDIR": "LCFS19",
+    "NFIELD_FILENAME": "nField_LCFS19alpha1p0.npy",
     "LCFS_INDEX": None,
 
     "N_AXIS": 1.0,
