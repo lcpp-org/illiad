@@ -27,6 +27,10 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
 
 ### Changed
 
+- Aligned SOL density and potential defaults with the generic
+  `DEFAULT/LCFS19/SOLTrace_RegularGrid` chain, propagated trace geometry and
+  length metadata through regularization, and added stitcher preflight checks
+  for grids, LCFS planes, vessel geometry, and trace provenance.
 - Consolidated supported imports under the `illiad` namespace and documented
   the installed commands as the canonical workflow interface.
 - Standardized `--inputs PATH` as the active commands' configuration option.

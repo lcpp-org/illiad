@@ -255,6 +255,14 @@ illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
 LCFS-to-SOL interval, integrate the connection-length-dependent attenuation
 to the wall, and can produce contour and midplane diagnostics.
 
+Their official defaults consume `DEFAULT/data/SOLTrace_RegularGrid` together
+with `DEFAULT/data/LCFS19/nField_LCFS19alpha1p0.npy`. Before constructing any
+planes, both analyses verify the complete regular-grid convention, every
+selected Poincare LCFS plane, the vessel boundary, and any propagated trace
+geometry metadata. Unless explicitly configured, `L_PARALLEL_0_M` comes from
+the SOL trace-length metadata when available and otherwise falls back to the
+Poincare spin count for legacy artifacts.
+
 ### 6. Run lithium ion transport
 
 Point `input_files/boris_inputs.example.json` or an ignored working copy at the

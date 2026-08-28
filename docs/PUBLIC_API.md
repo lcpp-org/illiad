@@ -222,8 +222,12 @@ configured regular field shape.
 
 The density model requires `N_AXIS > N_LCFS > N_WALL >= 0`. The output is a
 float64 `(phi, theta, rho)` field normalized by `N_AXIS` when the default
-`N_AXIS=1` is retained. `L_PARALLEL_0_M=null` derives the numerical LCFS
-reference from the positive `SPINS` value recorded by the Poincare workflow.
+`N_AXIS=1` is retained. The official defaults select the generic
+`DEFAULT/LCFS19` workflow. Before calculation, the command validates the
+regular grid, all selected LCFS planes, the vessel radius, and propagated
+trace geometry metadata. With `L_PARALLEL_0_M=null`, trace-length metadata is
+preferred; legacy artifacts fall back to the positive `SPINS` value recorded
+by the Poincare workflow.
 
 ### `sol_potential_inputs.example.json`
 
@@ -238,6 +242,8 @@ The potential model requires
 `0 < DELTA_PHI_SOL < DELTA_PHI_0W`. It preserves the gradient-compatible
 float64 `(phi, theta, rho)` layout, enforces `PHI_WALL` at the vessel wall,
 and writes coordinate arrays and compressed model metadata beside the field.
+It uses the same generic defaults, artifact preflight, and
+`L_PARALLEL_0_M` provenance order as the density command.
 
 ### `boris_inputs.example.json`
 
