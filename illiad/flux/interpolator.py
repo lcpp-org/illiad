@@ -166,8 +166,8 @@ class FluxInterpolator:
         filename_center = filepath + 'fSurf_{:03d}_center.npy'.format(self.n_surfaces-1)
         self.axis_array = self.simIO.loadNumpyData(filename_center)
         profile_nphi = (
-            self.flux_norm_array.shape[1]
-            if self.flux_norm_array.ndim == 2 else 1
+            self.tot_flux_array.shape[1]
+            if self.tot_flux_array.ndim == 2 else 1
         )
         if profile_nphi == len(self.phi_gens):
             self.profile_phi_gens = np.asarray(self.phi_gens, dtype=np.float64)
