@@ -117,7 +117,10 @@ def construct_density_plane(sol_plane, linear_profile_plane,
 
     delta_n_core = n_axis - n_lcfs
     delta_n_sol = n_lcfs - n_wall
-    density_profile = 1.0 - (1.0 - linear_profile_plane) ** alpha
+    linear_profile = np.clip(
+        np.asarray(linear_profile_plane, dtype=np.float64), 0.0, 1.0
+    )
+    density_profile = 1.0 - (1.0 - linear_profile) ** alpha
 
     output = np.empty((theta.size, rho.size), dtype=np.float64)
 
