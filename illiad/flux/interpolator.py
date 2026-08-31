@@ -114,6 +114,9 @@ class FluxInterpolator:
         self.rbf_points_per_surface_per_phi = int(
             input_params.get("RBF_POINTS_PER_SURFACE_PER_PHI", 72)
         )
+        self.rbf_query_batch_size = input_params.get(
+            "RBF_QUERY_BATCH_SIZE", 512
+        )
         if self.rbf_phi_half_window < 0:
             raise ValueError("RBF_PHI_HALF_WINDOW must be nonnegative")
         if self.interpolation_mode == "3d" and self.rbf_phi_half_window < 1:
@@ -122,6 +125,13 @@ class FluxInterpolator:
             raise ValueError("RBF_PHI_SCALE must be positive")
         if self.rbf_points_per_surface_per_phi < 1:
             raise ValueError("RBF_POINTS_PER_SURFACE_PER_PHI must be positive")
+        if (
+            isinstance(self.rbf_query_batch_size, (bool, np.bool_))
+            or not isinstance(self.rbf_query_batch_size, (int, np.integer))
+            or self.rbf_query_batch_size < 1
+        ):
+            raise ValueError("RBF_QUERY_BATCH_SIZE must be a positive integer")
+        self.rbf_query_batch_size = int(self.rbf_query_batch_size)
         if self.rbf_neighbors is not None:
             self.rbf_neighbors = int(self.rbf_neighbors)
             if self.rbf_neighbors < 1:
@@ -290,7 +300,7 @@ class FluxInterpolator:
 
 
     def _fit_rbf(self, source_points, source_values, query_points, grid_shape):
-        """Fit and evaluate one local RBF using the shared RBF settings."""
+        """Fit one local RBF and evaluate its queries in bounded batches."""
         points_torch = torch.as_tensor(source_points, device=device, dtype=torch.float64)
         values_torch = torch.as_tensor(source_values, device=device, dtype=torch.float64)
         query_torch = torch.as_tensor(query_points, device=device, dtype=torch.float64)
@@ -309,7 +319,20 @@ class FluxInterpolator:
         # Work around torchrbf device placement: ensure internal tensors/buffers are on the same device.
         interpolation = interpolation.to(device)
         interpolation.smoothing = interpolation.smoothing.to(device)
-        return interpolation(query_torch).reshape(grid_shape)
+
+        output_shape = (query_torch.shape[0], *values_torch.shape[1:])
+        interpolated = torch.empty(
+            output_shape,
+            device=query_torch.device,
+            dtype=query_torch.dtype,
+        )
+        with torch.inference_mode():
+            batch_size = self.rbf_query_batch_size
+            for start in range(0, query_torch.shape[0], batch_size):
+                stop = min(start + batch_size, query_torch.shape[0])
+                interpolated[start:stop] = interpolation(query_torch[start:stop])
+
+        return interpolated.reshape((*grid_shape, *values_torch.shape[1:]))
 
     def _regularize_axis(self, interpolated_angle, phi_deg):
         """Apply the existing near-axis repair and poloidal axis average."""
@@ -477,7 +500,7 @@ class FluxInterpolator:
         plt.grid(False)
         fig.colorbar(c, ax=ax, label='Flux')
         fig_path = subdir + '/' + name + '_{:03.0f}.png'.format(phi_deg)
-        output_handler.saveFig(fig_path, dpi=300)
+        output_handler.saveFig(fig_path, dpi=250)
         output_handler.log.info('Saved figure: ' + fig_path)
         plt.close()
 

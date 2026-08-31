@@ -125,7 +125,7 @@ inputs but do not control the active detector.
 | Shared analysis and magnetic inputs | `ANLYS_DIR`, `ANLYS_SUBDIR`, `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX`, `MAX_SUBSETS` |
 | Interpolation control | `RUN_INTERPOLATOR`, `INPUT_FIELD_NAME`, `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
-| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
+| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON`, `RBF_QUERY_BATCH_SIZE` |
 | Periodic 3-D interpolation | `RBF_PHI_HALF_WINDOW`, `RBF_PHI_SCALE`, `RBF_POINTS_PER_SURFACE_PER_PHI` |
 | Gradient construction | `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`, `GRADIENT_FILTER_BUFFER` |
 
@@ -137,6 +137,8 @@ exactly `2d` or `3d`:
   `RBF_PHI_HALF_WINDOW` selects adjacent source planes,
   `RBF_PHI_SCALE` supplies the angular length scale, and
   `RBF_POINTS_PER_SURFACE_PER_PHI` limits each surface's contribution.
+  `RBF_QUERY_BATCH_SIZE` bounds how many target mesh points are evaluated in
+  one local-RBF solve batch without changing the fitted sources or query order.
 
 Both modes retain float64 source, query, interpolated, and saved arrays. Source
 labels run from 1 at the magnetic axis to 0 at the LCFS, and `rho=0` is filled

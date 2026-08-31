@@ -40,6 +40,7 @@ DEFAULT_INPUTS = {
     "RBF_PHI_HALF_WINDOW": 2,
     "RBF_PHI_SCALE": 0.72,
     "RBF_POINTS_PER_SURFACE_PER_PHI": 72,
+    "RBF_QUERY_BATCH_SIZE": 512,
 
     "LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS": False,
     "GRADIENT_FILTER_BUFFER": 0.01,
@@ -146,6 +147,7 @@ def main(input_overrides=_CLI_INPUTS):
                 "RBF_PHI_HALF_WINDOW",
                 "RBF_PHI_SCALE",
                 "RBF_POINTS_PER_SURFACE_PER_PHI",
+                "RBF_QUERY_BATCH_SIZE",
             ],)
         flux_interpolator = FluxInterpolator(interpIO, b_hidra, params)
         flux_interpolator.run()
