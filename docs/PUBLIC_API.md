@@ -1,6 +1,6 @@
 # ILLIAD Public API
 
-This document defines the public interface of ILLIAD version 1.0.0. Interfaces
+This document defines the public interface of ILLIAD version 1.1.0. Interfaces
 not listed here are implementation details even when they are importable from
 a source checkout.
 

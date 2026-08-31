@@ -11,7 +11,7 @@ The wheel contains:
   `illiad.sol`, and the Poincare, Boris, collision, IO, particle, utility, and
   plotting modules.
 - `fastplotlib_tests` standalone viewer modules.
-- Distribution metadata, dependencies, the GPL-3.0-only license, and nine
+- Distribution metadata, dependencies, the GPL-3.0-only license, and ten
   command entry points:
   `illiad-fieldsolver`, `illiad-poincare`, `illiad-flux-calc`,
   `illiad-flux-grad`, `illiad-sol-trace`, `illiad-sol-regularize`,
@@ -34,12 +34,13 @@ The source archive includes:
   Markdown files under `docs/`.
 - Root launchers:
   `runFieldsolver.py`, `runPoincare.py`, `runFluxCalc.py`, `runFluxGrad.py`,
-  `runSOLTrace.py`, `runSOLRegularize.py`, `runSOLDensity.py`,
-  `runSOLPotential.py`, and `runBoris.py`.
+  `runSOLTrace.py`, `runSOLRegularize.py`, `runSOLConnectionLength.py`,
+  `runSOLDensity.py`, `runSOLPotential.py`, and `runBoris.py`.
 - Complete tracked JSON templates under `input_files/`:
   `fieldsolver_inputs.example.json`, `poincare_inputs.example.json`,
   `flux_calc_inputs.example.json`, `flux_grad_inputs.example.json`,
   `sol_trace_inputs.example.json`, `sol_regularize_inputs.example.json`,
+  `sol_connection_length_inputs.example.json`,
   `sol_density_inputs.example.json`, `sol_potential_inputs.example.json`,
   `boris_inputs.example.json`, and `animation_inputs.example.json`.
 - Python sources under `illiad/` and `fastplotlib_tests/`.

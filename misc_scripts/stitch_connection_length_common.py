@@ -46,7 +46,7 @@ def resolve_l_parallel_0(requested_value, poincare_settings, *, major_radius_m):
         spins = poincare_settings.get("SPINS")
         if not isinstance(spins, int) or spins <= 0:
             raise ValueError("Cannot derive L_PARALLEL_0_M without a positive integer SPINS value in the Poincare log; provide --l-parallel-0-m.")
-        
+
         value = 2.0 * np.pi * major_radius_m * spins
         source = f"2*pi*{major_radius_m:g} m*{spins} logged spins"
     if not np.isfinite(value) or value <= 0.0:
@@ -60,7 +60,7 @@ def require_file(path, description):
 
 def load_inputs(analysis_dir, sol_subdir, core_field_subdir, core_field_filename, *,
                 sol_field_filename, rho_filename=RHO_FILENAME, theta_filename=THETA_FILENAME, phi_filename=PHI_FILENAME):
-    
+
     base_data_dir = PROJECT_ROOT / "output" / analysis_dir / "data"
     sol_data_dir = base_data_dir / sol_subdir
     core_field_path = base_data_dir / core_field_subdir / core_field_filename
@@ -99,7 +99,7 @@ def load_inputs(analysis_dir, sol_subdir, core_field_subdir, core_field_filename
     finite_sol = np.isfinite(sol_data) & (sol_data > 0.0)
     if not np.any(finite_sol):
         raise ValueError("Connection-length field has no positive finite samples.")
-    
+
     return sol_data, core_data, rho, theta, phi_deg, sol_path, core_field_path
 
 def make_grid(rho, theta):
@@ -121,7 +121,7 @@ def resample_closed_curve(vertices, point_count):
     keep_segment = segment_length > 0.0
     if np.count_nonzero(keep_segment) < 3:
         raise ValueError("LCFS boundary has fewer than three unique points.")
-    
+
     kept_vertices = closed[:-1][keep_segment]
     closed = np.vstack((kept_vertices, kept_vertices[0]))
     segment_length = np.linalg.norm(np.diff(closed, axis=0), axis=1)
@@ -151,11 +151,11 @@ def wall_distance(origins, directions, vessel_radius):
     discriminant = ( origin_dot_direction**2 + vessel_radius**2 - np.sum(origins**2, axis=1))
     if np.any(discriminant < -1e-12):
         raise ValueError("An LCFS mapping ray does not intersect the vessel.")
-    
+
     distance = -origin_dot_direction + np.sqrt(np.maximum(discriminant, 0.0))
     if np.any(distance <= 0.0):
         raise ValueError("An outward LCFS mapping ray misses the vessel wall.")
-    
+
     return distance
 
 def surface_profile_slope(profile_interpolator, boundary, normals, *, derivative_step, smoothing_sigma):
@@ -178,7 +178,7 @@ def surface_profile_slope(profile_interpolator, boundary, normals, *, derivative
     if not np.all(np.isfinite(slope)) or np.any(slope <= 0.0):
         bad_count = int(np.count_nonzero(~np.isfinite(slope) | (slope <= 0.0)))
         raise ValueError(f"Derived nonpositive LCFS nField slope at {bad_count} surface points. Verify that the selected LCFS matches the nField.")
-    
+
     return slope, profile_one, profile_two
 
 def smoothstep(values):
@@ -279,7 +279,7 @@ def construct_path_attenuation(sol_plane, profile_plane, theta, rho, boundary, n
 def evaluate_exterior_profile(exterior_points, lcfs_points, normals,
                               chi, vessel_radius,
                               outer_value, profile_difference, *, tree_workers):
-    
+
     # find nearest lcfs point to each exterior point and calc distance
     tree = cKDTree(lcfs_points)
     _, surface_index = tree.query(exterior_points, workers=tree_workers)
@@ -296,7 +296,7 @@ def evaluate_exterior_profile(exterior_points, lcfs_points, normals,
     # resampled vertex whose point-to-vertex vector has a tiny inward normal
     # projection.  Its physical mapping is the vertex normal; use that limit
     # instead of rejecting an otherwise valid plane.
-    outward_projection = np.sum(directions * normals[surface_index], axis=1)    
+    outward_projection = np.sum(directions * normals[surface_index], axis=1)
     nonoutward = outward_projection <= 0.0
     directions[nonoutward] = normals[surface_index[nonoutward]]
 

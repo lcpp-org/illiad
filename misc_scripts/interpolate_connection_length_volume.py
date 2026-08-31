@@ -323,7 +323,7 @@ def fill_missing_cells(field, exterior, grid_x, grid_z):
 def interpolate_field(analysis_dir, points, value_source, offsets,
                       phi_deg, lcfs_index, rho, theta, grid_x, grid_z,
                       output_path, sim_io, show_progress):
-    
+
     """Build and save the complete regular connection-length field."""
     field = np.lib.format.open_memmap(output_path, mode="w+", dtype=np.float64, shape=(phi_deg.size, theta.size, rho.size))
 
@@ -342,7 +342,7 @@ def interpolate_field(analysis_dir, points, value_source, offsets,
             field[plane_index] = regular
             sim_io.log.info("Regularized phi=%03.0f deg: %d/%d raw samples used, %d directly occupied exterior cells, %d filled cells, %d samples in the busiest cell.",
                             phi_deg[plane_index], used_samples, plane_stop - plane_start, occupied_count, filled_count, int(counts.max(initial=0)))
-            
+
             if (plane_index + 1) % 10 == 0:
                 field.flush()
                 gc.collect()
@@ -354,7 +354,7 @@ def interpolate_field(analysis_dir, points, value_source, offsets,
 def plot_plane(plane, rho, theta, phi_deg,
                boundary, levels, norm, extend,
                sim_io, output_subdir):
-    
+
     """Plot one regular field plane in the original Cartesian cross-section."""
     plot_theta = np.concatenate(([0.0], theta))
     plot_data = np.vstack((plane[-1], plane))
@@ -390,7 +390,7 @@ def plot_plane(plane, rho, theta, phi_deg,
 def plot_field(analysis_dir, field,
                rho, theta, phi_deg, lcfs_index, value_source,
                sim_io, output_subdir, show_progress):
-    
+
     levels, norm, extend, value_min, value_max = make_color_scale(source_value_array(value_source))
     sim_io.log.info("Regular-grid plot color range: %g to %g m (%s).", value_min, value_max, COLOR_SCALE)
     progress = tqdm( range(phi_deg.size), desc="Plotting regular field", unit="plane", dynamic_ncols=True, disable=not show_progress)
@@ -484,7 +484,7 @@ def main():
     field = interpolate_field(args.analysis_dir, points, value_source, offsets,
                               phi_deg, lcfs_index, rho, theta, grid_x, grid_z,
                               field_path, sim_io, args.progress)
-    
+
     sim_io.log.info("Saved regular connection-length field: %s", field_path)
 
     if args.plots:

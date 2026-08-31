@@ -25,14 +25,13 @@ and lithium ion dynamics.
 
 ## Release Status
 
-The current source tree identifies as version 1.0.0; this does not by itself
+The current source tree identifies as version 1.1.0; this does not by itself
 indicate that a Git tag or package release has been published. Version 1.0.0
-establishes the supported active command names and JSON configuration interface
-documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). SOL density and
-potential construction is implemented by the package-native `SOLDensity` and
-`SOLPotential` classes, while `SOLRegularizer` provides the official link
-from saved trace crossings to their regular-grid input. See
-[CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
+established the supported command names and JSON configuration interface
+documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). Version 1.1.0 adds
+package-native SOL density and potential construction, regularization, and a
+bounded-memory unified connection-length workflow. See
+[CHANGELOG.md](CHANGELOG.md) for the release summary.
 
 ## Features
 

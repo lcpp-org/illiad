@@ -245,7 +245,7 @@ def construct_density_plane(sol_plane, linear_profile_plane,
                             vessel_radius, l_parallel_0,
                             n_axis, n_lcfs, n_wall,
                             alpha, sol_beta):
-    
+
     boundary = common.resample_closed_curve(boundary, BOUNDARY_RESAMPLE_POINTS)
 
     normals = common.outward_normals(boundary)
@@ -271,10 +271,10 @@ def construct_density_plane(sol_plane, linear_profile_plane,
                                                          path_samples=PATH_SAMPLES, derivative_step=NORMAL_DERIVATIVE_STEP_M,
                                                          smoothing_sigma=SURFACE_SLOPE_SMOOTHING_SIGMA,
                                                          lambda_min=LAMBDA_N_MIN_M, lambda_max=LAMBDA_N_MAX_M)
-    
+
     output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi,
                                                        vessel_radius, n_wall, delta_n_sol, tree_workers=TREE_WORKERS)
-    
+
     if not np.all(np.isfinite(output)):
         raise ValueError("Constructed density contains non-finite values.")
 
@@ -321,7 +321,7 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
                 plane, diagnostics = construct_density_plane(sol[plane_index], linear_profile[plane_index], theta, rho,
                                                              grid_points, boundary, vessel_radius, l_parallel_0,
                                                              n_axis, n_lcfs, n_wall, alpha, sol_beta)
-                
+
                 output[plane_index] = plane
                 boundaries[plane_index] = diagnostics["boundary"]
                 normals[plane_index] = diagnostics["normal"]
@@ -362,7 +362,7 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
     elapsed = perf_counter() - start_time
     sim_io.log.info("Constructed %d density planes in %.3f s (%.3f s/plane).",
                     phi_deg.size, elapsed, elapsed / phi_deg.size)
-    
+
     metadata = {
         "phi_grid_deg": phi_deg,
         "lcfs_boundary_xz_m": boundaries,
@@ -389,7 +389,7 @@ def build_density_field(analysis_dir, sol, linear_profile, rho, theta, phi_deg,
 def plot_density_plane(density_plane, grid_x, grid_z, boundary, vessel_radius, phi_value,
                        n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
                        sim_io, output_subdir):
-    
+
     plot_x = np.vstack((grid_x[-1], grid_x))
     plot_z = np.vstack((grid_z[-1], grid_z))
     plot_density = np.vstack((density_plane[-1], density_plane)) / n_axis
@@ -427,7 +427,7 @@ def plot_density_plane(density_plane, grid_x, grid_z, boundary, vessel_radius, p
 def generate_density_plots(field, rho, theta, phi_deg, boundaries, vessel_radius,
                            n_axis, color_scale, plot_vmin, plot_vmax, show_lcfs,
                            sim_io, output_subdir, show_progress):
-    
+
     _, grid_x, grid_z, _ = common.make_grid(rho, theta)
     progress = tqdm(  range(phi_deg.size), desc="Plotting piecewise density", unit="plane", dynamic_ncols=True, disable=not show_progress)
     log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
@@ -441,7 +441,7 @@ def generate_density_plots(field, rho, theta, phi_deg, boundaries, vessel_radius
 
 def generate_midplane_density_plot(field, rho, theta, phi_deg,
                                    vessel_radius, n_axis, n_lcfs, sim_io, output_subdir):
-    
+
     theta_lfs_index = common.nearest_coordinate_index(theta, 2.0 * np.pi, "theta_LFS")
     theta_hfs_index = common.nearest_coordinate_index(theta, np.pi, "theta_HFS")
     distance_from_lfs = np.concatenate( (vessel_radius - rho[::-1], vessel_radius + rho[1:]) )
@@ -496,7 +496,7 @@ def main():
         raise ValueError("Logarithmic plot limits require PLOT_VMIN > 0.")
     if not np.isclose(vessel_radius, rho[-1], rtol=0.0, atol=1e-12):
         raise ValueError("The exact wall boundary requires VESSEL_RADIUS_M to equal the outermost rho grid node.")
-    
+
     sim_io = IOHandler(args.analysis_dir)
     sim_io.startLog(log_name="solDensity.log", subdir=output_subdir, logger_name=output_subdir)
     output_data_dir = Path(sim_io.data_dir) / output_subdir

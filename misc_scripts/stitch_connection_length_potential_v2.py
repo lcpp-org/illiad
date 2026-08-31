@@ -269,7 +269,7 @@ def construct_plane(sol_plane, core_plane,
                     vessel_radius, l_parallel_0,
                     delta_phi_0w, delta_phi_sol,
                     alpha, sol_beta):
-    
+
     boundary = common.resample_closed_curve(lcfs_points, BOUNDARY_RESAMPLE_POINTS)
     normals = common.outward_normals(boundary)
 
@@ -314,7 +314,7 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
                           delta_phi_0w, delta_phi_sol,
                           alpha, sol_beta,
                           output_path, sim_io, show_progress):
-    
+
     diagnostic_shape = (phi_deg.size, BOUNDARY_RESAMPLE_POINTS)
     boundary_all = np.empty(diagnostic_shape + (2,), dtype=np.float64)
     normal_all = np.empty_like(boundary_all)
@@ -361,7 +361,7 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
                                 np.min(diagnostics["bridge_width"]), np.median(diagnostics["bridge_width"]), np.max(diagnostics["bridge_width"]),
                                 np.min(diagnostics["chi_wall"]),
                                 diagnostics["potential_min"], diagnostics["potential_max"])
-                
+
                 if phi_index % 10 == 0:
                     output.flush()
                     gc.collect()
@@ -492,7 +492,7 @@ def main():
     input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol_data, core_data, rho, theta, phi_deg, sol_path, core_path = input_data
 
-    vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M)) 
+    vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
     if PLOT_VMIN is None:
         plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else PHI_WALL)
     else:

@@ -58,7 +58,7 @@ def load_poincare_settings(analysis_dir, project_root=PROJECT_ROOT):
     """Load saved Poincare inputs and the identified LCFS index."""
     log_path = (Path(project_root) / "output" / analysis_dir
                  / "logs" / "Poincare" / "poincare.log")
-    
+
     if not log_path.is_file(): raise FileNotFoundError(f"Poincare log not found: {log_path}")
 
     settings = {}
@@ -103,13 +103,13 @@ def load_lcfs_boundary(analysis_dir, phi_deg, lcfs_index,
     theta = np.asarray(theta[finite], dtype=np.float64)
     rho = np.asarray(rho[finite], dtype=np.float64)
     boundary = np.unique(np.column_stack((rho * np.cos(theta), rho * np.sin(theta))), axis=0)
-    
+
     if boundary.shape[0] < 4:
         raise ValueError(f"LCFS surface {lcfs_index} in {poincare_path} has fewer than four unique finite points.")
 
     center = 0.5 * (boundary.min(axis=0) + boundary.max(axis=0))
     poloidal_angle = np.arctan2(boundary[:, 1] - center[1], boundary[:, 0] - center[0])
-    
+
     boundary = boundary[np.argsort(poloidal_angle)]
     spline, _ = splprep(boundary.T, s=float(spline_smoothing), per=True)
     boundary = np.column_stack(splev(np.linspace(0.0, 1.0, int(boundary_points), endpoint=False), spline))
@@ -138,7 +138,7 @@ def seed_plane_degrees(n_seed_planes, seed_phi_deg, n_planes):
     """Return equally spaced seed planes selected from the output planes."""
     if (isinstance(n_seed_planes, bool) or not isinstance(n_seed_planes, int) or n_seed_planes <= 0):
         raise ValueError("N_SEED_PLANES must be a positive integer.")
-    
+
     if n_seed_planes > n_planes or n_planes % n_seed_planes:
         raise ValueError(f"N_SEED_PLANES must be a positive divisor of N_PLANES={n_planes}.")
 

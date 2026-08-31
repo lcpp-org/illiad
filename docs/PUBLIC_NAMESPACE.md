@@ -5,7 +5,7 @@ under `illiad.utilities.*`. Former `classes.*`, `utility.*`, and
 `plot_funcs.*` packages have been removed.
 
 Detailed stability and method contracts are defined in
-[PUBLIC_API.md](PUBLIC_API.md). In version 1.0.0, the installed commands,
+[PUBLIC_API.md](PUBLIC_API.md). In version 1.1.0, the installed commands,
 documented JSON keys, version identifier, and run-configuration utilities are
 stable. Documented research-class object models remain provisional.
 
