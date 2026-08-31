@@ -194,3 +194,4 @@ Miniforge3-Linux-x86_64.sh
 # Local analysis JSON inputs. Keep checkout-specific defaults and variants under
 # input_files/ without tracking them.
 *.json
+!input_files/*.example.json

@@ -1,32 +1,42 @@
-"""Command-line adapter for SOL plasma-density construction."""
+"""Command-line adapter for SOL connection-length regularization."""
 
 import argparse
 
 from illiad.io import IOHandler
-from illiad.sol import SOLDensity
+from illiad.sol import SOLRegularizer
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 
 DEFAULT_INPUTS = {
     "ANLYS_DIR": "DEFAULT",
-    "ANLYS_SUBDIR": "SOLTrace_RegularGrid_Density",
-    "SOL_SUBDIR": "SOLTrace_RegularGrid",
-    "SOL_FIELD_FILENAME": "connection_length_field_m.npy",
-    "NFIELD_SUBDIR": "LCFS19",
-    "NFIELD_FILENAME": "nField_LCFS19alpha1p0.npy",
-    "LCFS_INDEX": None,
+    "ANLYS_SUBDIR": "SOLTrace_RegularGrid",
+    "TRACE_SUBDIR": "SOLTrace",
+    "LCFS_INDEX": 19,
 
-    "N_AXIS": 1.0,
-    "N_LCFS": 0.3,
-    "N_WALL": 1e-4,
-    "ALPHA": 0.85,
-    "SOL_BETA": 0.5,
-    "L_PARALLEL_0_M": None,
+    "N_RHO": 191,
+    "N_THETA": 180,
+    "RHO_MIN": 0.0,
+    "RHO_MAX": 0.19,
+
+    "INTERPOLATION_SPACE": "log",
+    "FILL_METHOD": "idw",
+    "IDW_NEIGHBORS": 8,
+    "IDW_POWER": 2.0,
+    "TREE_WORKERS": -1,
+    "RAW_CHUNK_SIZE": 250000,
+    "OUTPUT_FIELD_FILENAME": "connection_length_field_m.npy",
 
     "GENERATE_PLOTS": True,
-    "SHOW_LCFS": False,
-    "COLOR_SCALE": "log",
     "SHOW_PROGRESS": True,
+    "COLOR_SCALE": "log",
+    "COLORMAP": "afmhot",
+    "N_LEVELS": 50,
+    "VMIN": None,
+    "VMAX": None,
+    "CONTOUR_EXTEND": "both",
+    "DPI": 250,
+    "VESSEL_RADIUS_M": 0.19,
+    "PHYSICAL_PHI_OFFSET_DEG": 198.0,
 }
 
 _CLI_INPUTS = object()
@@ -34,7 +44,10 @@ _CLI_INPUTS = object()
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Construct an ILLIAD piecewise core/SOL plasma-density field."
+        description=(
+            "Regularize saved SOL crossings onto an ILLIAD "
+            "(phi, theta, rho) field mesh."
+        )
     )
     parser.add_argument(
         "inputs_path",
@@ -65,24 +78,27 @@ def main(input_overrides=_CLI_INPUTS):
     if input_overrides is _CLI_INPUTS:
         args = parse_args()
         input_overrides = (
-            load_inputs_json(args.inputs, "SOL density inputs")
-            if args.inputs else None
+            load_inputs_json(args.inputs, "SOL regularizer inputs")
+            if args.inputs
+            else None
         )
     params = merge_input_params(DEFAULT_INPUTS, input_overrides)
 
     sim_io = IOHandler(params["ANLYS_DIR"])
     sim_io.startLog(
-        log_name="solDensity.log",
+        log_name="solRegularizer.log",
         subdir=params["ANLYS_SUBDIR"],
-        logger_name="SOLDensity",
+        logger_name="SOLRegularizer",
     )
-    analysis = SOLDensity(sim_io, params)
+    analysis = SOLRegularizer(sim_io, params)
     analysis.run()
 
-    print(f"Saved density field: {analysis.output_path}")
-    print(f"Saved density metadata: {analysis.metadata_path}")
+    print(f"Saved regular connection-length field: {analysis.output_path}")
     if params["GENERATE_PLOTS"]:
-        print(f"Saved density plots: {sim_io.plot_dir}/{params['ANLYS_SUBDIR']}")
+        print(
+            "Saved regular-grid plots: "
+            f"{sim_io.plot_dir}/{params['ANLYS_SUBDIR']}"
+        )
 
 
 if __name__ == "__main__":

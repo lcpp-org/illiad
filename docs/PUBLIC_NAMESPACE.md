@@ -5,7 +5,7 @@ under `illiad.utilities.*`. Former `classes.*`, `utility.*`, and
 `plot_funcs.*` packages have been removed.
 
 Detailed stability and method contracts are defined in
-[PUBLIC_API.md](PUBLIC_API.md). In version 1.0.0, the installed commands,
+[PUBLIC_API.md](PUBLIC_API.md). In version 1.1.0, the installed commands,
 documented JSON keys, version identifier, and run-configuration utilities are
 stable. Documented research-class object models remain provisional.
 
@@ -40,11 +40,18 @@ interpolated profile or an existing regular scalar field.
 
 ```python
 from illiad.sol import (
+    CrossingChunk,
+    NpyPlaneCrossingSource,
+    PlaneCrossingSource,
+    SOLDensity,
+    SOLPotential,
+    SOLRegularizer,
     SOLTracer,
     build_torch_magnetic_field,
     load_lcfs_boundary,
     load_poincare_settings,
     minimum_boundary_distance,
+    open_plane_crossing_source,
     resolve_device,
 )
 ```
@@ -53,9 +60,15 @@ from illiad.sol import (
 LCFS-exterior seed grids, traces both directions with a `TorchMesh`, saves
 compact toroidal-plane crossings, and produces optional contour plots.
 
-There are no public density or potential analysis classes yet.
-`illiad-sol-density` and `illiad-sol-potential` are reserved dummy commands;
-they do not expose or call the prototype scripts under `misc_scripts`.
+`SOLRegularizer` consumes plane crossing chunks and writes the regular
+float64 `(phi, theta, rho)` connection-length field used by later SOL
+profile analyses. `PlaneCrossingSource` defines the chunk interface, and
+`NpyPlaneCrossingSource` adapts current compact and legacy expanded outputs.
+
+`SOLDensity` and `SOLPotential` are the package-native profile stitchers.
+They consume saved interior, connection-length, and Poincare artifacts and
+share their LCFS geometry and attenuation implementation through
+`illiad.sol.stitching`.
 
 ## Particles, Boris, and Collisions
 

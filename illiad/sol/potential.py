@@ -27,13 +27,11 @@ the Boris workflow may therefore continue to apply ``PLASMA_POTENTIAL`` when
 loading the resulting electric field.
 """
 
-import argparse
 from contextlib import nullcontext
 import gc
 import os
 from pathlib import Path
-import re
-import sys
+from types import SimpleNamespace
 from time import perf_counter
 
 import matplotlib.pyplot as plt
@@ -41,50 +39,14 @@ from matplotlib.colors import LogNorm
 from matplotlib.path import Path as MplPath
 import numpy as np
 
-from scipy.interpolate import RegularGridInterpolator
-from scipy.ndimage import gaussian_filter1d
-from scipy.spatial import cKDTree
-
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-from illiad.io import IOHandler
-from illiad.sol import (load_lcfs_boundary, load_poincare_settings)
-
-from misc_scripts import stitch_connection_length_common as common
+from .tracer import load_lcfs_boundary, load_poincare_settings
+from . import stitching as common
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-os.chdir(PROJECT_ROOT)
-
-
-# Analysis settings
-ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-SOL_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid"
-NFIELD_SUBDIR = "LCFS41"
-#NFIELD_FILENAME = "nField_LCFS40alpha1p0.npy"
-NFIELD_FILENAME = "nField_LCFS41_linear.npy"
-SOL_FIELD_FILENAME = "connection_length_field_m.npy"
-
-# None first infers the surface from NFIELD_FILENAME (LCFS<number>), then
-# falls back to LCFS_INDEX in the Poincare log.  This prevents an appended
-# Poincare run from silently changing the boundary paired with the nField.
-LCFS_INDEX = 41
-
-# Piecewise-potential inputs.  These defaults preserve the normalized scalar
-# convention used by the original stitcher and by PLASMA_POTENTIAL scaling.
-PHI_WALL = 0.0
-DELTA_PHI_0W = 1.0
-DELTA_PHI_SOL = 0.2
-ALPHA = 0.85
-SOL_BETA = 0.5
-
-# Numerical LCFS connection-length reference.  None derives the single-line
-# trace limit 2*pi*R0*SPINS from the Poincare log.  It is an intentional model
-# reference, not a claim that the physical LCFS connection length is finite.
-L_PARALLEL_0_M = None
+# Numerical and plotting implementation settings not exposed by the CLI.
 MAJOR_RADIUS_M = 0.72
 VESSEL_RADIUS_M = None  # None uses the outermost rho grid node
 
@@ -101,139 +63,26 @@ LAMBDA_PHI_MIN_M = None
 LAMBDA_PHI_MAX_M = None
 
 # Output and plot settings
-GENERATE_PLOTS = True
-SHOW_PROGRESS = True
 FIGSIZE = (7, 6)
 DPI = 250
 COLORMAP = "afmhot"
-COLOR_SCALE = "log"  # "linear" or "log"
 N_LEVELS = 12
-PLOT_VMIN = None  # None uses PHI_WALL
-PLOT_VMAX = None  # None uses PHI_WALL + the selected DELTA_PHI_0W
+PLOT_VMIN = None
+PLOT_VMAX = None
 LOG_PLOT_VMIN = 1e-5  # Positive floor when log scale uses default limits
 CONTOUR_EXTEND = "neither"
-SHOW_LCFS = True
 PHYSICAL_PHI_OFFSET_DEG = 198.0
 MIDPLANE_TRACE_PHI_DEG = (324.0, 360.0)
 MIDPLANE_TRACE_FIGSIZE = (8, 5)
 
 # Output file names
-OUTPUT_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Stitched_v2-3"  # None uses f"{SOL_SUBDIR}_Stitched_v2"
 OUTPUT_FIELD_FILENAME = "stitched_nfield_connection_length.npy"
 MODEL_METADATA_FILENAME = "piecewise_potential_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_potential_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_potential_trace.png"
 
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description=(
-            "Construct the piecewise nField / connection-length potential."
-        )
-    )
-    parser.add_argument(
-        "analysis_dir",
-        nargs="?",
-        default=ANALYSIS_DIR,
-        help=f"Existing directory under output/ (default: {ANALYSIS_DIR}).",
-    )
-    parser.add_argument(
-        "--sol-subdir",
-        default=SOL_SUBDIR,
-        help=f"Regular SOL field data subdirectory (default: {SOL_SUBDIR}).",
-    )
-    parser.add_argument(
-        "--sol-field-file",
-        default=SOL_FIELD_FILENAME,
-        help=(
-            "Connection-length filename inside --sol-subdir "
-            f"(default: {SOL_FIELD_FILENAME})."
-        ),
-    )
-    parser.add_argument(
-        "--nfield-subdir",
-        default=NFIELD_SUBDIR,
-        help=f"Interior nField data subdirectory (default: {NFIELD_SUBDIR}).",
-    )
-    parser.add_argument(
-        "--nfield-file",
-        default=NFIELD_FILENAME,
-        help=f"Interior nField filename (default: {NFIELD_FILENAME}).",
-    )
-    parser.add_argument(
-        "--output-subdir",
-        default=OUTPUT_SUBDIR,
-        help="Output subdirectory (default: <sol-subdir>_Stitched_v2).",
-    )
-    parser.add_argument(
-        "--lcfs-index",
-        type=int,
-        default=LCFS_INDEX,
-        help=(
-            "LCFS Poincare surface index (default: infer from nField filename, "
-            "then fall back to the Poincare log)."
-        ),
-    )
-    parser.add_argument(
-        "--delta-phi-0w",
-        type=float,
-        default=DELTA_PHI_0W,
-        help=f"Axis-to-wall potential difference (default: {DELTA_PHI_0W}).",
-    )
-    parser.add_argument(
-        "--delta-phi-sol",
-        type=float,
-        default=DELTA_PHI_SOL,
-        help=f"LCFS-to-wall potential difference (default: {DELTA_PHI_SOL}).",
-    )
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        default=ALPHA,
-        help=f"Interior profile exponent applied to linear nField (default: {ALPHA}).",
-    )
-    parser.add_argument(
-        "--sol-beta",
-        type=float,
-        default=SOL_BETA,
-        help=f"Connection-length exponent beta (default: {SOL_BETA}).",
-    )
-    parser.add_argument(
-        "--l-parallel-0-m",
-        type=float,
-        default=L_PARALLEL_0_M,
-        help=(
-            "Finite LCFS connection-length reference in meters (default: "
-            "derive 2*pi*R0*SPINS from the Poincare log)."
-        ),
-    )
-    parser.add_argument(
-        "--plots",
-        action=argparse.BooleanOptionalAction,
-        default=GENERATE_PLOTS,
-        help="Generate one potential contour plot per toroidal plane.",
-    )
-    parser.add_argument(
-        "--show-lcfs",
-        action=argparse.BooleanOptionalAction,
-        default=SHOW_LCFS,
-        help="Draw the LCFS boundary on generated potential plots.",
-    )
-    parser.add_argument(
-        "--color-scale",
-        choices=("linear", "log"),
-        default=COLOR_SCALE,
-        help=f"Potential-plot color scale (default: {COLOR_SCALE}).",
-    )
-    parser.add_argument(
-        "--progress",
-        action=argparse.BooleanOptionalAction,
-        default=SHOW_PROGRESS,
-        help="Show construction and plotting progress bars.",
-    )
-    return parser.parse_args()
-
-def validate_settings(delta_phi_0w, delta_phi_sol, alpha, sol_beta):
-    if not np.isfinite(PHI_WALL):
+def validate_settings(phi_wall, delta_phi_0w, delta_phi_sol, alpha, sol_beta):
+    if not np.isfinite(phi_wall):
         raise ValueError("PHI_WALL must be finite.")
     if not 0.0 < delta_phi_sol < delta_phi_0w:
         raise ValueError("Require 0 < DELTA_PHI_SOL < DELTA_PHI_0W.")
@@ -259,14 +108,13 @@ def validate_settings(delta_phi_0w, delta_phi_sol, alpha, sol_beta):
         raise ValueError("Require PLOT_VMIN < PLOT_VMAX.")
     if CONTOUR_EXTEND not in {"neither", "both", "min", "max"}:
         raise ValueError("Invalid CONTOUR_EXTEND setting.")
-    if COLOR_SCALE not in {"linear", "log"}:
-        raise ValueError("COLOR_SCALE must be 'linear' or 'log'.")
     if LOG_PLOT_VMIN <= 0.0:
         raise ValueError("LOG_PLOT_VMIN must be positive.")
 
 def construct_plane(sol_plane, core_plane,
                     theta, rho, grid_points, lcfs_points,
                     vessel_radius, l_parallel_0,
+                    phi_wall,
                     delta_phi_0w, delta_phi_sol,
                     alpha, sol_beta):
 
@@ -286,7 +134,7 @@ def construct_plane(sol_plane, core_plane,
     linear_profile = np.clip(np.asarray(core_plane, dtype=np.float64), 0.0, 1.0)
     interior_plane_data = 1.0 - (1.0 - linear_profile) ** alpha
 
-    output[inside] = (PHI_WALL + delta_phi_sol + delta_phi_core * interior_plane_data[inside])
+    output[inside] = (phi_wall + delta_phi_sol + delta_phi_core * interior_plane_data[inside])
 
     chi, diagnostics = common.construct_path_attenuation( sol_plane, interior_plane_data,
                                                          theta, rho, boundary, normals,
@@ -296,7 +144,7 @@ def construct_plane(sol_plane, core_plane,
                                                          lambda_min=LAMBDA_PHI_MIN_M, lambda_max=LAMBDA_PHI_MAX_M)
 
     output[~inside] = common.evaluate_exterior_profile(grid_points[~inside.ravel()], boundary, normals, chi,
-                                                       vessel_radius, PHI_WALL, delta_phi_sol, tree_workers=TREE_WORKERS)
+                                                       vessel_radius, phi_wall, delta_phi_sol, tree_workers=TREE_WORKERS)
     if not np.all(np.isfinite(output)):
         raise ValueError("Constructed potential contains non-finite values.")
 
@@ -311,6 +159,7 @@ def construct_plane(sol_plane, core_plane,
 def build_piecewise_field(analysis_dir, sol_data, core_data,
                           rho, theta, phi_deg, lcfs_index,
                           vessel_radius, l_parallel_0,
+                          phi_wall,
                           delta_phi_0w, delta_phi_sol,
                           alpha, sol_beta,
                           output_path, sim_io, show_progress):
@@ -343,6 +192,7 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
                 lcfs_points, _ = load_lcfs_boundary(analysis_dir, float(phi_deg[phi_index]), lcfs_index, spline_smoothing=1e-5, boundary_points=1000)
                 plane, diagnostics = construct_plane(sol_data[phi_index], core_data[phi_index], theta, rho,
                                                      grid_points, lcfs_points, vessel_radius, l_parallel_0,
+                                                     phi_wall,
                                                      delta_phi_0w, delta_phi_sol, alpha, sol_beta)
                 output[phi_index] = plane
                 boundary_all[phi_index] = diagnostics["boundary"]
@@ -392,7 +242,7 @@ def build_piecewise_field(analysis_dir, sol_data, core_data,
         "delta_phi_sol": np.array(delta_phi_sol),
         "alpha": np.array(alpha),
         "nfield_input_profile": np.array("1 - Psi_bar (alpha=1)"),
-        "phi_wall": np.array(PHI_WALL),
+        "phi_wall": np.array(phi_wall),
         "sol_beta": np.array(sol_beta),
         "lcfs_index": np.array(lcfs_index),
         "vessel_radius_m": np.array(vessel_radius),
@@ -448,7 +298,9 @@ def generate_plots(field, rho, theta, phi_deg, boundaries, vessel_radius, color_
             if phi_index % 10 == 0:
                 gc.collect()
 
-def generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius, delta_phi_0w, delta_phi_sol, sim_io, output_subdir,):
+def generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius,
+                                 phi_wall, delta_phi_0w, delta_phi_sol,
+                                 sim_io, output_subdir,):
     """Plot LFS-to-HFS horizontal-midplane potential at selected phi."""
     theta_lfs_index = common.nearest_coordinate_index(theta, 2.0 * np.pi, "theta_LFS")
     theta_hfs_index = common.nearest_coordinate_index(theta, np.pi, "theta_HFS")
@@ -458,7 +310,7 @@ def generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius, delt
     for requested_phi in MIDPLANE_TRACE_PHI_DEG:
         phi_index = common.nearest_coordinate_index(phi_deg, requested_phi, "phi_comp")
         potential = np.concatenate( (np.asarray(field[phi_index, theta_lfs_index, ::-1]), np.asarray(field[phi_index, theta_hfs_index, 1:])) )
-        normalized_potential = (potential - PHI_WALL) / delta_phi_0w
+        normalized_potential = (potential - phi_wall) / delta_phi_0w
         ax.plot(distance_from_lfs, normalized_potential, linewidth=1.5, label=rf"$\phi_{{comp}}={phi_deg[phi_index]:.0f}^\circ$")
 
     phi_sol_normalized = delta_phi_sol / delta_phi_0w
@@ -474,11 +326,14 @@ def generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius, delt
     sim_io.saveFig(MIDPLANE_TRACE_FILENAME, subdir=output_subdir, dpi=DPI)
     plt.close(fig)
 
-def main():
-    ## INPUT PREAMBLE
-    args = parse_args()
-
-    validate_settings(args.delta_phi_0w, args.delta_phi_sol, args.alpha, args.sol_beta)
+def _run_analysis(args, sim_io):
+    validate_settings(
+        args.phi_wall,
+        args.delta_phi_0w,
+        args.delta_phi_sol,
+        args.alpha,
+        args.sol_beta,
+    )
 
 
     output_subdir = (args.output_subdir if args.output_subdir is not None else f"{args.sol_subdir}_Stitched_v2")
@@ -486,18 +341,44 @@ def main():
     poincare_settings = load_poincare_settings(args.analysis_dir)
     lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
 
-    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings, major_radius_m=MAJOR_RADIUS_M)
-    print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "f"L_parallel,0={l_parallel_0:.6g} m")
-
-    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
+    input_data = common.load_inputs(sim_io.data_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol_data, core_data, rho, theta, phi_deg, sol_path, core_path = input_data
 
     vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
+    sol_data_dir = Path(sim_io.data_dir) / args.sol_subdir
+    common.validate_regular_grid_contract(
+        rho,
+        theta,
+        phi_deg,
+        vessel_radius,
+    )
+    trace_metadata = common.validate_trace_metadata(
+        sol_data_dir,
+        lcfs_index=lcfs_index,
+        vessel_radius_m=vessel_radius,
+        major_radius_m=MAJOR_RADIUS_M,
+    )
+    lcfs_preflight_planes = common.validate_lcfs_artifacts(
+        sim_io.data_dir,
+        phi_deg,
+        lcfs_index,
+        vessel_radius,
+    )
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(
+        args.l_parallel_0_m,
+        poincare_settings,
+        major_radius_m=MAJOR_RADIUS_M,
+        trace_data_dir=sol_data_dir,
+    )
+    print(
+        f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "
+        f"L_parallel,0={l_parallel_0:.6g} m"
+    )
     if PLOT_VMIN is None:
-        plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else PHI_WALL)
+        plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else args.phi_wall)
     else:
         plot_vmin = float(PLOT_VMIN)
-    plot_vmax = (PHI_WALL + args.delta_phi_0w if PLOT_VMAX is None else float(PLOT_VMAX))
+    plot_vmax = (args.phi_wall + args.delta_phi_0w if PLOT_VMAX is None else float(PLOT_VMAX))
 
     if plot_vmin >= plot_vmax:
         raise ValueError("Resolved plot limits require PLOT_VMIN < PLOT_VMAX.")
@@ -506,8 +387,6 @@ def main():
     if not np.isclose(vessel_radius, rho[-1], rtol=0.0, atol=1e-12):
         raise ValueError("The exact wall boundary requires VESSEL_RADIUS_M to equal the outermost rho grid node.")
 
-    sim_io = IOHandler(args.analysis_dir)
-    sim_io.startLog(log_name="solPotential.log", subdir=output_subdir, logger_name=output_subdir)
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_data_dir / OUTPUT_FIELD_FILENAME
@@ -528,7 +407,7 @@ def main():
         "FIELD_SHAPE": sol_data.shape,
         "LCFS_INDEX": lcfs_index,
         "LCFS_INDEX_SOURCE": lcfs_index_source,
-        "PHI_WALL": PHI_WALL,
+        "PHI_WALL": args.phi_wall,
         "DELTA_PHI_0W": args.delta_phi_0w,
         "DELTA_PHI_SOL": args.delta_phi_sol,
         "DELTA_PHI_CORE": delta_phi_core,
@@ -537,6 +416,8 @@ def main():
         "SOL_BETA": args.sol_beta,
         "L_PARALLEL_0_M": l_parallel_0,
         "L_PARALLEL_0_SOURCE": l_parallel_0_source,
+        "TRACE_METADATA_PREFLIGHT": trace_metadata,
+        "LCFS_PREFLIGHT_PLANES": lcfs_preflight_planes,
         "MAJOR_RADIUS_M": MAJOR_RADIUS_M,
         "SOL_CONNECTION_LENGTH_MIN_M": float(np.min(finite_sol)),
         "SOL_CONNECTION_LENGTH_MAX_M": float(np.max(finite_sol)),
@@ -567,6 +448,7 @@ def main():
     field, metadata = build_piecewise_field(args.analysis_dir, sol_data, core_data,
                                             rho, theta, phi_deg, lcfs_index,
                                             vessel_radius, l_parallel_0,
+                                            args.phi_wall,
                                             args.delta_phi_0w, args.delta_phi_sol,
                                             args.alpha, args.sol_beta,
                                             output_path, sim_io, args.progress)
@@ -583,7 +465,8 @@ def main():
     ## PLOTTING
     if args.plots:
         generate_midplane_trace_plot(field, rho, theta, phi_deg, vessel_radius,
-                                     args.delta_phi_0w, args.delta_phi_sol, sim_io, output_subdir)
+                                     args.phi_wall, args.delta_phi_0w,
+                                     args.delta_phi_sol, sim_io, output_subdir)
         sim_io.log.info("Saved horizontal-midplane potential trace: %s/%s.", output_subdir, MIDPLANE_TRACE_FILENAME)
         generate_plots(field, rho, theta, phi_deg, metadata["lcfs_boundary_xz_m"], vessel_radius,
                        args.color_scale, plot_vmin, plot_vmax, args.show_lcfs,
@@ -592,6 +475,52 @@ def main():
 
     sim_io.log.info("## PIECEWISE NFIELD / CONNECTION-LENGTH POTENTIAL FINISHED ##")
 
+    return field, metadata, output_path, metadata_path
 
-if __name__ == "__main__":
-    main()
+
+class SOLPotential:
+    """Construct a piecewise core/SOL electrostatic-potential field.
+
+    The analysis consumes an existing linear interior profile, a regular-grid
+    SOL connection-length field, and saved Poincare surfaces. It does not
+    perform field-line tracing.
+    """
+
+    def __init__(self, IO_handler, input_params):
+        self.simIO = IO_handler
+        self.input_params = dict(input_params)
+        self.field = None
+        self.metadata = None
+        self.output_path = None
+        self.metadata_path = None
+
+    def run(self):
+        """Build, save, and optionally plot the potential field."""
+        params = self.input_params
+        for key in ("GENERATE_PLOTS", "SHOW_LCFS", "SHOW_PROGRESS"):
+            if not isinstance(params[key], bool):
+                raise ValueError(f"{key} must be a boolean")
+        if params["COLOR_SCALE"] not in {"linear", "log"}:
+            raise ValueError("COLOR_SCALE must be 'linear' or 'log'")
+        args = SimpleNamespace(
+            analysis_dir=params["ANLYS_DIR"],
+            sol_subdir=params["SOL_SUBDIR"],
+            sol_field_file=params["SOL_FIELD_FILENAME"],
+            nfield_subdir=params["NFIELD_SUBDIR"],
+            nfield_file=params["NFIELD_FILENAME"],
+            output_subdir=params["ANLYS_SUBDIR"],
+            lcfs_index=params["LCFS_INDEX"],
+            phi_wall=params["PHI_WALL"],
+            delta_phi_0w=params["DELTA_PHI_0W"],
+            delta_phi_sol=params["DELTA_PHI_SOL"],
+            alpha=params["ALPHA"],
+            sol_beta=params["SOL_BETA"],
+            l_parallel_0_m=params["L_PARALLEL_0_M"],
+            plots=params["GENERATE_PLOTS"],
+            show_lcfs=params["SHOW_LCFS"],
+            color_scale=params["COLOR_SCALE"],
+            progress=params["SHOW_PROGRESS"],
+        )
+        result = _run_analysis(args, self.simIO)
+        self.field, self.metadata, self.output_path, self.metadata_path = result
+        return self.field

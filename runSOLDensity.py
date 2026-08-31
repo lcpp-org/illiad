@@ -1,4 +1,4 @@
-"""Direct-execution launcher for the reserved SOL density command."""
+"""Direct-execution launcher for SOL density construction."""
 
 from illiad.cli.sol_density import main
 

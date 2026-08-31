@@ -1,0 +1,21 @@
+{
+  "ANLYS_DIR": "DEFAULT",
+  "ANLYS_SUBDIR": "SOLTrace_RegularGrid_Potential",
+  "SOL_SUBDIR": "SOLTrace_RegularGrid",
+  "SOL_FIELD_FILENAME": "connection_length_field_m.npy",
+  "NFIELD_SUBDIR": "LCFS19",
+  "NFIELD_FILENAME": "nField_LCFS19alpha1p0.npy",
+  "LCFS_INDEX": null,
+
+  "PHI_WALL": 0.0,
+  "DELTA_PHI_0W": 1.0,
+  "DELTA_PHI_SOL": 0.2,
+  "ALPHA": 0.85,
+  "SOL_BETA": 0.5,
+  "L_PARALLEL_0_M": null,
+
+  "GENERATE_PLOTS": true,
+  "SHOW_LCFS": true,
+  "COLOR_SCALE": "log",
+  "SHOW_PROGRESS": true
+}

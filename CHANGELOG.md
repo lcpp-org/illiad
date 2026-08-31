@@ -3,14 +3,45 @@
 Notable changes to ILLIAD are recorded here. The project follows Semantic
 Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
 
-## [1.0.0] - Unreleased
+## [1.1.0] - 2026-08-30
+
+### Added
+
+- The package-native `illiad.sol.SOLRegularizer`, chunk-oriented crossing
+  source interface, `illiad-sol-regularize` command, and JSON input template.
+- Append-only plane-sharded trace output and the unified
+  `illiad-sol-connection-length` modes. Direct `trace_regularize` runs pair
+  both directions per field-line batch and accumulate fixed-size regular-grid
+  statistics without retaining a raw crossing dataset.
+- Package-native `illiad.sol.SOLDensity` and `illiad.sol.SOLPotential`
+  analyses, their installed commands, shared SOL stitching helpers, and JSON
+  input templates.
+- `RBF_QUERY_BATCH_SIZE` for bounding local RBF interpolation query memory.
+
+### Changed
+
+- Aligned SOL density and potential defaults with the generic
+  `DEFAULT/LCFS19/SOLTrace_RegularGrid` chain, propagated trace geometry and
+  length metadata through regularization, and added stitcher preflight checks
+  for grids, LCFS planes, vessel geometry, and trace provenance.
+- Updated SOL tracing to append packed per-plane crossing shards while
+  retaining compatibility with earlier monolithic NumPy crossing files.
+
+### Fixed
+
+- Used the total-flux array, rather than the normalized-flux array, to infer
+  the number of profile toroidal planes during flux interpolation.
+- Clipped the linear core-profile fraction to `[0, 1]` before SOL density
+  evaluation.
+
+## [1.0.0] - 2026-08-07
 
 ### Added
 
 - The official PyTorch-backed `illiad.sol.SOLTracer` analysis and
   `illiad-sol-trace` command for open-field-line connection-length tracing.
 - Reserved `illiad-sol-density` and `illiad-sol-potential` command names. These
-  commands are placeholders and do not yet implement profile analyses.
+  commands were placeholders and did not yet implement profile analyses.
 - Periodically wrapped local 3-D flux interpolation and support for generating
   gradients from an existing regular scalar field.
 - Rotational-transform-based island-chain identification and strided subset
@@ -41,6 +72,5 @@ Versioning for the stable interfaces defined in `docs/PUBLIC_API.md`.
 
 ### Not Included
 
-- Official SOL density and potential analysis classes. The current prototype
-  scripts remain outside the installed package and public compatibility
-  contract.
+- Official SOL density and potential analysis classes. The prototype scripts
+  remained outside the installed package and public compatibility contract.

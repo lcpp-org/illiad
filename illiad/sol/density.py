@@ -15,12 +15,11 @@ normalization is ``n_axis = 1`` so the result can continue to be scaled by
 the Boris ``PLASMA_DENSITY`` input when loaded as a density field.
 """
 
-import argparse
 from contextlib import nullcontext
 import gc
 import os
 from pathlib import Path
-import sys
+from types import SimpleNamespace
 from time import perf_counter
 
 import matplotlib.pyplot as plt
@@ -30,36 +29,11 @@ import numpy as np
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-os.chdir(PROJECT_ROOT)
-
-from illiad.io import IOHandler
-from illiad.sol import (load_lcfs_boundary, load_poincare_settings)
-
-from misc_scripts import stitch_connection_length_common as common
+from .tracer import load_lcfs_boundary, load_poincare_settings
+from . import stitching as common
 
 
-# Analysis settings
-ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-SOL_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid"
-NFIELD_SUBDIR = "LCFS40"
-NFIELD_FILENAME = "nField_LCFS40_linear.npy"
-OUTPUT_SUBDIR = None  # None uses f"{SOL_SUBDIR}_Density_v2"
-LCFS_INDEX = 41
-
-# Piecewise-density inputs.  These defaults produce a normalized density
-# field suitable for later multiplication by PLASMA_DENSITY.
-N_AXIS = 1.0
-N_LCFS = 0.3
-N_WALL = 1e-4
-ALPHA = 0.85
-SOL_BETA = 0.5
-
-# Numerical LCFS connection-length reference.
-L_PARALLEL_0_M = None
+# Numerical and plotting implementation settings not exposed by the CLI.
 MAJOR_RADIUS_M = 0.72
 
 # Surface mapping and numerical differentiation
@@ -75,136 +49,22 @@ LAMBDA_N_MIN_M = None
 LAMBDA_N_MAX_M = None
 
 # Output and plot settings
-GENERATE_PLOTS = True
-SHOW_PROGRESS = True
 FIGSIZE = (7, 6)
 DPI = 300
 COLORMAP = "afmhot"
-COLOR_SCALE = "log"  # "linear" or "log"
 N_LEVELS = 100
 PLOT_VMIN = None  # Normalized density; None uses n_wall/n_axis or log floor
 PLOT_VMAX = None  # Normalized density; None uses 1
 LOG_PLOT_VMIN = 1e-4
 CONTOUR_EXTEND = "neither"
-SHOW_LCFS = False
 PHYSICAL_PHI_OFFSET_DEG = 198.0
 MIDPLANE_TRACE_PHI_DEG = (324.0, 360.0)
 MIDPLANE_TRACE_FIGSIZE = (8, 5)
 
-SOL_FIELD_FILENAME = "connection_length_field_m.npy"
 OUTPUT_FIELD_FILENAME = "stitched_density_connection_length.npy"
 MODEL_METADATA_FILENAME = "piecewise_density_metadata.npz"
 OUTPUT_PLOT_FILENAME = "stitched_density_{phi_deg:03.0f}.png"
 MIDPLANE_TRACE_FILENAME = "midplane_density_trace.png"
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Construct the piecewise flux / connection-length density."
-    )
-    parser.add_argument(
-        "analysis_dir",
-        nargs="?",
-        default=ANALYSIS_DIR,
-        help=f"Existing directory under output/ (default: {ANALYSIS_DIR}).",
-    )
-    parser.add_argument(
-        "--sol-subdir",
-        default=SOL_SUBDIR,
-        help=f"Regular SOL field data subdirectory (default: {SOL_SUBDIR}).",
-    )
-    parser.add_argument(
-        "--sol-field-file",
-        default=SOL_FIELD_FILENAME,
-        help=(
-            "Connection-length filename inside --sol-subdir "
-            f"(default: {SOL_FIELD_FILENAME})."
-        ),
-    )
-    parser.add_argument(
-        "--nfield-subdir",
-        default=NFIELD_SUBDIR,
-        help=f"Linear flux-profile data subdirectory (default: {NFIELD_SUBDIR}).",
-    )
-    parser.add_argument(
-        "--nfield-file",
-        default=NFIELD_FILENAME,
-        help=f"Linear flux-profile filename (default: {NFIELD_FILENAME}).",
-    )
-    parser.add_argument(
-        "--output-subdir",
-        default=OUTPUT_SUBDIR,
-        help="Output subdirectory (default: <sol-subdir>_Density_v2).",
-    )
-    parser.add_argument(
-        "--lcfs-index",
-        type=int,
-        default=LCFS_INDEX,
-        help="LCFS Poincare surface index.",
-    )
-    parser.add_argument(
-        "--n-axis",
-        type=float,
-        default=N_AXIS,
-        help=f"Peak or magnetic-axis density (default: {N_AXIS}).",
-    )
-    parser.add_argument(
-        "--n-lcfs",
-        type=float,
-        default=N_LCFS,
-        help=f"Density at the LCFS (default: {N_LCFS}).",
-    )
-    parser.add_argument(
-        "--n-wall",
-        type=float,
-        default=N_WALL,
-        help=f"Wall-adjacent density or numerical floor (default: {N_WALL}).",
-    )
-    parser.add_argument(
-        "--alpha",
-        type=float,
-        default=ALPHA,
-        help=f"Interior density-profile exponent (default: {ALPHA}).",
-    )
-    parser.add_argument(
-        "--sol-beta",
-        type=float,
-        default=SOL_BETA,
-        help=f"Connection-length exponent beta_n (default: {SOL_BETA}).",
-    )
-    parser.add_argument(
-        "--l-parallel-0-m",
-        type=float,
-        default=L_PARALLEL_0_M,
-        help=(
-            "Finite LCFS connection-length reference in meters (default: "
-            "derive 2*pi*R0*SPINS from the Poincare log)."
-        ),
-    )
-    parser.add_argument(
-        "--plots",
-        action=argparse.BooleanOptionalAction,
-        default=GENERATE_PLOTS,
-        help="Generate density contour and midplane plots.",
-    )
-    parser.add_argument(
-        "--show-lcfs",
-        action=argparse.BooleanOptionalAction,
-        default=SHOW_LCFS,
-        help="Draw the LCFS boundary on generated density contour plots.",
-    )
-    parser.add_argument(
-        "--color-scale",
-        choices=("linear", "log"),
-        default=COLOR_SCALE,
-        help=f"Density-contour color scale (default: {COLOR_SCALE}).",
-    )
-    parser.add_argument(
-        "--progress",
-        action=argparse.BooleanOptionalAction,
-        default=SHOW_PROGRESS,
-        help="Show construction and plotting progress bars.",
-    )
-    return parser.parse_args()
 
 def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
     if not all(np.isfinite(value) for value in (n_axis, n_lcfs, n_wall)):
@@ -233,8 +93,6 @@ def validate_settings(n_axis, n_lcfs, n_wall, alpha, sol_beta):
         and LAMBDA_N_MIN_M > LAMBDA_N_MAX_M
     ):
         raise ValueError("LAMBDA_N_MIN_M cannot exceed LAMBDA_N_MAX_M.")
-    if COLOR_SCALE not in {"linear", "log"}:
-        raise ValueError("COLOR_SCALE must be 'linear' or 'log'.")
     if LOG_PLOT_VMIN <= 0.0:
         raise ValueError("LOG_PLOT_VMIN must be positive.")
     if CONTOUR_EXTEND not in {"neither", "both", "min", "max"}:
@@ -259,7 +117,10 @@ def construct_density_plane(sol_plane, linear_profile_plane,
 
     delta_n_core = n_axis - n_lcfs
     delta_n_sol = n_lcfs - n_wall
-    density_profile = 1.0 - (1.0 - linear_profile_plane) ** alpha
+    linear_profile = np.clip(
+        np.asarray(linear_profile_plane, dtype=np.float64), 0.0, 1.0
+    )
+    density_profile = 1.0 - (1.0 - linear_profile) ** alpha
 
     output = np.empty((theta.size, rho.size), dtype=np.float64)
 
@@ -465,10 +326,7 @@ def generate_midplane_density_plot(field, rho, theta, phi_deg,
     sim_io.saveFig(MIDPLANE_TRACE_FILENAME, subdir=output_subdir, dpi=DPI)
     plt.close(fig)
 
-def main():
-    ## INPUT PREAMBLE
-    args = parse_args()
-
+def _run_analysis(args, sim_io):
     validate_settings(args.n_axis, args.n_lcfs, args.n_wall, args.alpha, args.sol_beta)
 
 
@@ -477,13 +335,39 @@ def main():
     poincare_settings = load_poincare_settings(args.analysis_dir)
     lcfs_index, lcfs_index_source = common.resolve_lcfs_index(args.lcfs_index, args.nfield_file, poincare_settings)
 
-    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(args.l_parallel_0_m, poincare_settings, major_radius_m=MAJOR_RADIUS_M)
-    print(f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and L_parallel,0={l_parallel_0:.6g} m")
-
-    input_data = common.load_inputs(args.analysis_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
+    input_data = common.load_inputs(sim_io.data_dir, args.sol_subdir, args.nfield_subdir, args.nfield_file, sol_field_filename=args.sol_field_file)
     sol, linear_profile, rho, theta, phi_deg, sol_path, profile_path = input_data
 
     vessel_radius = (float(rho[-1]) if VESSEL_RADIUS_M is None else float(VESSEL_RADIUS_M))
+    sol_data_dir = Path(sim_io.data_dir) / args.sol_subdir
+    common.validate_regular_grid_contract(
+        rho,
+        theta,
+        phi_deg,
+        vessel_radius,
+    )
+    trace_metadata = common.validate_trace_metadata(
+        sol_data_dir,
+        lcfs_index=lcfs_index,
+        vessel_radius_m=vessel_radius,
+        major_radius_m=MAJOR_RADIUS_M,
+    )
+    lcfs_preflight_planes = common.validate_lcfs_artifacts(
+        sim_io.data_dir,
+        phi_deg,
+        lcfs_index,
+        vessel_radius,
+    )
+    l_parallel_0, l_parallel_0_source = common.resolve_l_parallel_0(
+        args.l_parallel_0_m,
+        poincare_settings,
+        major_radius_m=MAJOR_RADIUS_M,
+        trace_data_dir=sol_data_dir,
+    )
+    print(
+        f"Using LCFS surface {lcfs_index} ({lcfs_index_source}) and "
+        f"L_parallel,0={l_parallel_0:.6g} m"
+    )
     if PLOT_VMIN is None:
         plot_vmin = (LOG_PLOT_VMIN if args.color_scale == "log" else args.n_wall / args.n_axis)
     else:
@@ -497,8 +381,6 @@ def main():
     if not np.isclose(vessel_radius, rho[-1], rtol=0.0, atol=1e-12):
         raise ValueError("The exact wall boundary requires VESSEL_RADIUS_M to equal the outermost rho grid node.")
 
-    sim_io = IOHandler(args.analysis_dir)
-    sim_io.startLog(log_name="solDensity.log", subdir=output_subdir, logger_name=output_subdir)
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_data_dir / OUTPUT_FIELD_FILENAME
@@ -528,6 +410,8 @@ def main():
         "SOL_BETA": args.sol_beta,
         "L_PARALLEL_0_M": l_parallel_0,
         "L_PARALLEL_0_SOURCE": l_parallel_0_source,
+        "TRACE_METADATA_PREFLIGHT": trace_metadata,
+        "LCFS_PREFLIGHT_PLANES": lcfs_preflight_planes,
         "MAJOR_RADIUS_M": MAJOR_RADIUS_M,
         "SOL_CONNECTION_LENGTH_MIN_M": float(np.min(finite_sol)),
         "SOL_CONNECTION_LENGTH_MAX_M": float(np.max(finite_sol)),
@@ -580,5 +464,52 @@ def main():
 
     sim_io.log.info("## PIECEWISE PLASMA-DENSITY MODEL FINISHED ##")
 
-if __name__ == "__main__":
-    main()
+    return field, metadata, output_path, metadata_path
+
+
+class SOLDensity:
+    """Construct a piecewise core/SOL plasma-density field.
+
+    The analysis consumes an existing linear interior profile, a regular-grid
+    SOL connection-length field, and saved Poincare surfaces. It does not
+    perform field-line tracing.
+    """
+
+    def __init__(self, IO_handler, input_params):
+        self.simIO = IO_handler
+        self.input_params = dict(input_params)
+        self.field = None
+        self.metadata = None
+        self.output_path = None
+        self.metadata_path = None
+
+    def run(self):
+        """Build, save, and optionally plot the density field."""
+        params = self.input_params
+        for key in ("GENERATE_PLOTS", "SHOW_LCFS", "SHOW_PROGRESS"):
+            if not isinstance(params[key], bool):
+                raise ValueError(f"{key} must be a boolean")
+        if params["COLOR_SCALE"] not in {"linear", "log"}:
+            raise ValueError("COLOR_SCALE must be 'linear' or 'log'")
+        args = SimpleNamespace(
+            analysis_dir=params["ANLYS_DIR"],
+            sol_subdir=params["SOL_SUBDIR"],
+            sol_field_file=params["SOL_FIELD_FILENAME"],
+            nfield_subdir=params["NFIELD_SUBDIR"],
+            nfield_file=params["NFIELD_FILENAME"],
+            output_subdir=params["ANLYS_SUBDIR"],
+            lcfs_index=params["LCFS_INDEX"],
+            n_axis=params["N_AXIS"],
+            n_lcfs=params["N_LCFS"],
+            n_wall=params["N_WALL"],
+            alpha=params["ALPHA"],
+            sol_beta=params["SOL_BETA"],
+            l_parallel_0_m=params["L_PARALLEL_0_M"],
+            plots=params["GENERATE_PLOTS"],
+            show_lcfs=params["SHOW_LCFS"],
+            color_scale=params["COLOR_SCALE"],
+            progress=params["SHOW_PROGRESS"],
+        )
+        result = _run_analysis(args, self.simIO)
+        self.field, self.metadata, self.output_path, self.metadata_path = result
+        return self.field

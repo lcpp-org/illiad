@@ -12,6 +12,8 @@ include runFieldsolver.py
 include runFluxCalc.py
 include runFluxGrad.py
 include runSOLTrace.py
+include runSOLRegularize.py
+include runSOLConnectionLength.py
 include runSOLDensity.py
 include runSOLPotential.py
 include runPoincare.py

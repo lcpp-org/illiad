@@ -6,13 +6,13 @@
     |  ██║██║    ██║    ██║██╔══██║██║  ██║            |
     |  ██║██████╗██████╗██║██║  ██║██████╔╝            |
     |  ╚═╝╚═════╝╚═════╝╚═╝╚═╝  ╚═╝╚═════╝             |
-    | Illinois Lagrangian Ion Advection and Deposition |
+    | ILlinois Lagrangian Ion Advection and Deposition |
     ----------------------------------------------------
 ```
 
 # ILLIAD
 
-**ILLIAD** (*Illinois Lagrangian Ion Advection and Deposition*) is a Python
+**ILLIAD** ( **IL**linois **L**agrangian **I**on **A**dvection and **D**eposition) is a Python
 modeling framework for reconstructing three-dimensional magnetic and
 electrostatic fields and simulating trace impurity-ion transport through the
 scrape-off layer (SOL).
@@ -25,13 +25,13 @@ and lithium ion dynamics.
 
 ## Release Status
 
-The current source tree identifies as version 1.0.0; this does not by itself
+The current source tree identifies as version 1.1.0; this does not by itself
 indicate that a Git tag or package release has been published. Version 1.0.0
-establishes the supported active command names and JSON configuration interface
-documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). SOL density and
-potential analysis classes are planned for a later release; their reserved
-commands are not implementations and are not part of the v1.0.0 scientific
-workflow. See [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
+established the supported command names and JSON configuration interface
+documented in [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md). Version 1.1.0 adds
+package-native SOL density and potential construction, regularization, and a
+bounded-memory unified connection-length workflow. See
+[CHANGELOG.md](CHANGELOG.md) for the release summary.
 
 ## Features
 
@@ -43,7 +43,8 @@ workflow. See [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
 - Integrate toroidal flux and interpolate normalized interior profiles with
   independent 2-D or periodically wrapped local 3-D RBF fits.
 - Trace open SOL field lines on CPU or CUDA with the PyTorch-backed
-  `SOLTracer`, retaining compact plane-sorted crossing data.
+  `SOLTracer`, retaining compact plane-sorted crossing data, and regularize
+  saved crossings onto the package-standard scalar-field mesh.
 - Generate a Cartesian electric field from either a newly interpolated flux
   profile or an existing regular scalar field.
 - Advance lithium ions with a Boris-Buneman full-orbit pusher, optional
@@ -53,7 +54,8 @@ workflow. See [CHANGELOG.md](CHANGELOG.md) for the unreleased summary.
 ## Repository Layout
 
 - `illiad/cli/`: adapters behind the installed commands.
-- `illiad/sol/`: the official `SOLTracer` analysis and shared LCFS helpers.
+- `illiad/sol/`: official SOL tracing, regularization, profile, and shared
+  LCFS analyses.
 - `illiad/flux/`: flux calculation, interpolation, and gradient analyses.
 - `illiad/mesh/`: NumPy-backed `Mesh` and PyTorch-backed `TorchMesh` classes.
 - `illiad/`: Poincare, Boris, collision, particle, IO, and plotting code.
@@ -95,7 +97,7 @@ pip install -e ".[fitting,viewer,export]"
 
 ## Commands
 
-Six active workflow commands use JSON inputs:
+Ten active workflow commands use JSON inputs:
 
 ```bash
 illiad-fieldsolver --inputs input_files/fieldsolver_inputs.example.json
@@ -103,6 +105,10 @@ illiad-poincare --inputs input_files/poincare_inputs.example.json
 illiad-flux-calc --inputs input_files/flux_calc_inputs.example.json
 illiad-flux-grad --inputs input_files/flux_grad_inputs.example.json
 illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
+illiad-sol-regularize --inputs input_files/sol_regularize_inputs.example.json
+illiad-sol-connection-length trace_regularize --inputs input_files/sol_connection_length_inputs.example.json
+illiad-sol-density --inputs input_files/sol_density_inputs.example.json
+illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
 illiad-boris --inputs input_files/boris_inputs.example.json
 ```
 
@@ -126,18 +132,6 @@ illiad-poincare input_files/poincare_inputs.json
 
 Supply either the positional path or `--inputs`, but not both.
 
-Two additional command names are installed as placeholders for planned
-analysis classes:
-
-```text
-illiad-sol-density
-illiad-sol-potential
-```
-
-These placeholders do not run analyses and do not import or dispatch to
-`misc_scripts`. `--help` describes their reserved purpose; invoking either
-without `--help` exits with a clear not-implemented message.
-
 All relative inputs and the `output/` tree are resolved from the process
 working directory. The preferred Python imports include:
 
@@ -145,7 +139,7 @@ working directory. The preferred Python imports include:
 from illiad.io import IOHandler
 from illiad.mesh import Mesh, TorchMesh
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLTracer
+from illiad.sol import SOLDensity, SOLPotential, SOLRegularizer, SOLTracer
 ```
 
 See [`docs/PUBLIC_API.md`](docs/PUBLIC_API.md) for command and configuration
@@ -208,17 +202,65 @@ illiad-sol-trace --inputs input_files/sol_trace_inputs.example.json
 
 `SOLTracer` samples exterior seed points, traces both field directions until
 the wall or configured length limit, and captures crossings at regular
-toroidal planes. Compact outputs include `raw_points_rtp.npy`,
-`raw_fieldline_id.npy`, `raw_source_direction.npy`, `plane_offsets.npy`,
-`plane_phi_deg.npy`, and `fieldline_connection_length_m.npy`, plus seed,
-directional, and wall-hit metadata.
+toroidal planes. The `trace` path continuously appends packed records under
+`raw_crossings/`, publishes its manifest only after a successful trace, and
+retains `plane_phi_deg.npy`, `fieldline_connection_length_m.npy`, seed,
+directional, and wall-hit metadata. The reader also remains compatible with
+the earlier monolithic NumPy representation.
+
+Regularize those saved crossings onto the flux-compatible
+`(phi, theta, rho)` mesh with:
+
+```bash
+illiad-sol-regularize --inputs input_files/sol_regularize_inputs.example.json
+```
+
+`SOLRegularizer` reads each toroidal plane through a bounded chunk interface,
+averages finite positive samples at their nearest regular-grid nodes, and
+fills unsampled exterior cells in seam-free poloidal `(x, z)` coordinates.
+It writes `connection_length_field_m.npy` and its coordinate arrays for the
+density and potential stages.
+
+The unified command exposes retention through its mode rather than through
+separate output-product flags:
+
+```bash
+illiad-sol-connection-length trace --inputs input_files/sol_connection_length_inputs.example.json
+illiad-sol-connection-length regularize --inputs input_files/sol_connection_length_inputs.example.json
+illiad-sol-connection-length trace_regularize --inputs input_files/sol_connection_length_inputs.example.json
+```
+
+`trace_regularize` traces both directions for each bounded field-line batch,
+temporarily spools only regular-cell and field-line IDs, and folds that batch
+into fixed-size sufficient statistics as soon as its connection lengths are
+known. It retains the regular field and compact trace metadata, but no raw
+crossing dataset. `regularize` never removes its externally supplied raw
+trace input.
 
 ### 5. SOL density and potential
 
-`illiad-sol-density` and `illiad-sol-potential` reserve the final installed
-names for future official analysis classes. They intentionally have no current
-analysis implementation. Existing density and potential prototypes remain
-source-only research scripts and are outside the installed workflow.
+Build the density and normalized electrostatic-potential fields from the
+linear interior profile, the regular SOL connection-length field, and saved
+Poincare surfaces:
+
+```bash
+illiad-sol-density --inputs input_files/sol_density_inputs.example.json
+illiad-sol-potential --inputs input_files/sol_potential_inputs.example.json
+```
+
+`SOLDensity` and `SOLPotential` preserve the float64
+`(phi, theta, rho)` scalar-field and coordinate-file contract used by
+`FluxGradientor`. Both models anchor at the LCFS, bridge the unsampled
+LCFS-to-SOL interval, integrate the connection-length-dependent attenuation
+to the wall, and can produce contour and midplane diagnostics.
+
+Their official defaults consume `DEFAULT/data/SOLTrace_RegularGrid` together
+with `DEFAULT/data/LCFS19/nField_LCFS19alpha1p0.npy`. Before constructing any
+planes, both analyses verify the complete regular-grid convention, every
+selected Poincare LCFS plane, the vessel boundary, and any propagated trace
+geometry metadata. Unless explicitly configured, `L_PARALLEL_0_M` comes from
+the SOL trace-length metadata when available and otherwise falls back to the
+Poincare spin count for legacy artifacts.
 
 ### 6. Run lithium ion transport
 

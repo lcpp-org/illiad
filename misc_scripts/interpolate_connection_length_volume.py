@@ -39,9 +39,10 @@ from misc_scripts.plot_connection_length_volume import load_raw_samples
 
 # Analysis settings
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-DATA_SUBDIR = "ConLenVolumeTorch_30spins_MID2mm"
-OUTPUT_SUBDIR = None  # None uses f"{DATA_SUBDIR}_RegularGrid"
-LCFS_INDEX = None     # None reads LCFS_INDEX from the Poincare log
+#DATA_SUBDIR = "ConLenVolumeTorch_30spins_MID2mm"
+DATA_SUBDIR = "SOLTrace3c"
+OUTPUT_SUBDIR = "SOLTrace3c_RegularGrid_log"  # None uses f"{DATA_SUBDIR}_RegularGrid"
+LCFS_INDEX = 40     # None reads LCFS_INDEX from the Poincare log
 
 # Regular grid. These defaults match the field/surface-parameter mesh.
 N_RHO = 191
@@ -50,7 +51,7 @@ RHO_MIN = 0.0
 RHO_MAX = 0.19
 
 # Interpolation settings
-INTERPOLATION_SPACE = "linear"  # "linear" or "log"
+INTERPOLATION_SPACE = "log"  # "linear" or "log"
 FILL_METHOD = "idw"             # "idw", "nearest", or "none"
 IDW_NEIGHBORS = 8
 IDW_POWER = 2.0
@@ -65,8 +66,8 @@ COLORMAP = "afmhot"
 N_LEVELS = 50
 VMIN = None
 VMAX = None
-CONTOUR_EXTEND = "auto"         # "auto", "neither", "both", "min", "max"
-DPI = 300
+CONTOUR_EXTEND = "both"         # "auto", "neither", "both", "min", "max"
+DPI = 250
 VESSEL_RADIUS = 0.19
 
 FIELD_FILENAME = "connection_length_field_m.npy"
@@ -153,15 +154,11 @@ def validate_settings(n_rho, n_theta):
 def make_regular_grid(n_rho, n_theta):
     """Return flux-compatible radial and poloidal node arrays."""
     rho = np.linspace(RHO_MIN, RHO_MAX, n_rho, dtype=np.float64)
-    theta = np.linspace(
-        2.0 * np.pi / n_theta,
-        2.0 * np.pi,
-        n_theta,
-        dtype=np.float64,
-    )
+    theta = np.linspace(2.0 * np.pi / n_theta, 2.0 * np.pi, n_theta, dtype=np.float64)
     grid_theta, grid_rho = np.meshgrid(theta, rho, indexing="ij")
     grid_x = grid_rho * np.cos(grid_theta)
     grid_z = grid_rho * np.sin(grid_theta)
+
     return rho, theta, grid_rho, grid_theta, grid_x, grid_z
 
 
@@ -237,26 +234,13 @@ def make_color_scale(values):
 def grid_indices(points_rtp, n_rho, n_theta):
     """Map RTP points to their nearest periodic regular-grid nodes."""
     radial_spacing = (RHO_MAX - RHO_MIN) / (n_rho - 1)
-    rho_index = np.rint(
-        (points_rtp[:, 0] - RHO_MIN) / radial_spacing
-    ).astype(np.int64)
+    rho_index = np.rint( (points_rtp[:, 0] - RHO_MIN) / radial_spacing ).astype(np.int64)
     theta_spacing = 2.0 * np.pi / n_theta
-    theta_index = (
-        np.rint(np.remainder(points_rtp[:, 1], 2.0 * np.pi) / theta_spacing)
-        .astype(np.int64)
-        - 1
-    ) % n_theta
+    theta_index = ( np.rint(np.remainder(points_rtp[:, 1], 2.0 * np.pi) / theta_spacing).astype(np.int64) - 1) % n_theta
     return rho_index, theta_index
 
 
-def accumulate_plane(
-    points,
-    value_source,
-    start,
-    stop,
-    n_rho,
-    n_theta,
-):
+def accumulate_plane(points, value_source, start, stop, n_rho, n_theta,):
     """Aggregate every finite raw plane sample into its nearest grid cell."""
     cell_count = n_rho * n_theta
     value_sum = np.zeros(cell_count, dtype=np.float64)
@@ -281,18 +265,11 @@ def accumulate_plane(
         value_chunk = value_chunk[finite]
         if INTERPOLATION_SPACE == "log":
             value_chunk = np.log(value_chunk)
-        rho_index, theta_index = grid_indices(
-            point_chunk,
-            n_rho,
-            n_theta,
-        )
+        rho_index, theta_index = grid_indices(point_chunk, n_rho, n_theta)
+
         valid_index = (rho_index >= 0) & (rho_index < n_rho)
         flat_index = theta_index[valid_index] * n_rho + rho_index[valid_index]
-        value_sum += np.bincount(
-            flat_index,
-            weights=value_chunk[valid_index],
-            minlength=cell_count,
-        )
+        value_sum += np.bincount(flat_index, weights=value_chunk[valid_index], minlength=cell_count)
         sample_count += np.bincount(flat_index, minlength=cell_count)
         used_samples += int(np.count_nonzero(valid_index))
 
@@ -301,18 +278,13 @@ def accumulate_plane(
     gridded[occupied] = value_sum[occupied] / sample_count[occupied]
     if INTERPOLATION_SPACE == "log":
         gridded[occupied] = np.exp(gridded[occupied])
-    return (
-        gridded.reshape(n_theta, n_rho),
-        sample_count.reshape(n_theta, n_rho),
-        used_samples,
-    )
+
+    return (gridded.reshape(n_theta, n_rho), sample_count.reshape(n_theta, n_rho), used_samples)
 
 
 def exterior_mask(boundary, grid_x, grid_z):
     closed_boundary = np.vstack((boundary, boundary[0]))
-    inside = MplPath(closed_boundary).contains_points(
-        np.column_stack((grid_x.ravel(), grid_z.ravel()))
-    )
+    inside = MplPath(closed_boundary).contains_points( np.column_stack((grid_x.ravel(), grid_z.ravel())))
     return ~inside.reshape(grid_x.shape)
 
 
@@ -334,171 +306,70 @@ def fill_missing_cells(field, exterior, grid_x, grid_z):
         source_values = np.log(source_values)
 
     tree = cKDTree(source_points)
-    neighbor_count = 1 if FILL_METHOD == "nearest" else min(
-        IDW_NEIGHBORS,
-        source_points.shape[0],
-    )
-    distances, indices = tree.query(
-        target_points,
-        k=neighbor_count,
-        workers=TREE_WORKERS,
-    )
+    neighbor_count = 1 if FILL_METHOD == "nearest" else min(IDW_NEIGHBORS, source_points.shape[0])
+    distances, indices = tree.query(target_points, k=neighbor_count, workers=TREE_WORKERS,)
     if neighbor_count == 1:
         filled_values = source_values[indices]
     else:
         distances = np.maximum(distances, np.finfo(np.float64).eps)
         weights = distances ** (-IDW_POWER)
-        filled_values = np.sum(
-            weights * source_values[indices],
-            axis=1,
-        ) / np.sum(weights, axis=1)
+        filled_values = np.sum(weights * source_values[indices], axis=1) / np.sum(weights, axis=1)
     if INTERPOLATION_SPACE == "log":
         filled_values = np.exp(filled_values)
     field[missing] = filled_values
-    return (
-        field,
-        int(np.count_nonzero(occupied)),
-        int(np.count_nonzero(missing)),
-    )
+    return (field, int(np.count_nonzero(occupied)), int(np.count_nonzero(missing)),)
 
 
-def interpolate_field(
-    analysis_dir,
-    points,
-    value_source,
-    offsets,
-    phi_deg,
-    lcfs_index,
-    rho,
-    theta,
-    grid_x,
-    grid_z,
-    output_path,
-    sim_io,
-    show_progress,
-):
+def interpolate_field(analysis_dir, points, value_source, offsets,
+                      phi_deg, lcfs_index, rho, theta, grid_x, grid_z,
+                      output_path, sim_io, show_progress):
+
     """Build and save the complete regular connection-length field."""
-    field = np.lib.format.open_memmap(
-        output_path,
-        mode="w+",
-        dtype=np.float64,
-        shape=(phi_deg.size, theta.size, rho.size),
-    )
+    field = np.lib.format.open_memmap(output_path, mode="w+", dtype=np.float64, shape=(phi_deg.size, theta.size, rho.size))
+
     start_time = perf_counter()
-    progress = tqdm(
-        range(phi_deg.size),
-        desc="Regularizing connection length",
-        unit="plane",
-        dynamic_ncols=True,
-        disable=not show_progress,
-    )
-    log_context = (
-        logging_redirect_tqdm(loggers=[sim_io.log])
-        if show_progress
-        else nullcontext()
-    )
+    progress = tqdm(range(phi_deg.size), desc="Regularizing connection length", unit="plane", dynamic_ncols=True, disable=not show_progress)
+
+    log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
     with log_context:
         for plane_index in progress:
             plane_start = int(offsets[plane_index])
             plane_stop = int(offsets[plane_index + 1])
-            boundary, _ = load_lcfs_boundary(
-                analysis_dir,
-                float(phi_deg[plane_index]),
-                lcfs_index,
-            )
+            boundary, _ = load_lcfs_boundary( analysis_dir, float(phi_deg[plane_index]), lcfs_index)
             exterior = exterior_mask(boundary, grid_x, grid_z)
-            binned, counts, used_samples = accumulate_plane(
-                points,
-                value_source,
-                plane_start,
-                plane_stop,
-                rho.size,
-                theta.size,
-            )
-            regular, occupied_count, filled_count = fill_missing_cells(
-                binned,
-                exterior,
-                grid_x,
-                grid_z,
-            )
+            binned, counts, used_samples = accumulate_plane(points, value_source, plane_start, plane_stop, rho.size, theta.size)
+            regular, occupied_count, filled_count = fill_missing_cells(binned, exterior, grid_x, grid_z)
             field[plane_index] = regular
-            sim_io.log.info(
-                "Regularized phi=%03.0f deg: %d/%d raw samples used, "
-                "%d directly occupied exterior cells, %d filled cells, "
-                "%d samples in the busiest cell.",
-                phi_deg[plane_index],
-                used_samples,
-                plane_stop - plane_start,
-                occupied_count,
-                filled_count,
-                int(counts.max(initial=0)),
-            )
+            sim_io.log.info("Regularized phi=%03.0f deg: %d/%d raw samples used, %d directly occupied exterior cells, %d filled cells, %d samples in the busiest cell.",
+                            phi_deg[plane_index], used_samples, plane_stop - plane_start, occupied_count, filled_count, int(counts.max(initial=0)))
+
             if (plane_index + 1) % 10 == 0:
                 field.flush()
                 gc.collect()
     field.flush()
-    sim_io.log.info(
-        "REGULAR CONNECTION-LENGTH FIELD FINISHED IN %.3f seconds.",
-        perf_counter() - start_time,
-    )
+    sim_io.log.info("REGULAR CONNECTION-LENGTH FIELD FINISHED IN %.3f seconds.", perf_counter() - start_time)
     return np.load(output_path, mmap_mode="r")
 
 
-def plot_plane(
-    plane,
-    rho,
-    theta,
-    phi_deg,
-    boundary,
-    levels,
-    norm,
-    extend,
-    sim_io,
-    output_subdir,
-):
+def plot_plane(plane, rho, theta, phi_deg,
+               boundary, levels, norm, extend,
+               sim_io, output_subdir):
+
     """Plot one regular field plane in the original Cartesian cross-section."""
     plot_theta = np.concatenate(([0.0], theta))
     plot_data = np.vstack((plane[-1], plane))
-    plot_theta_grid, plot_rho_grid = np.meshgrid(
-        plot_theta,
-        rho,
-        indexing="ij",
-    )
+    plot_theta_grid, plot_rho_grid = np.meshgrid(plot_theta, rho, indexing="ij")
     plot_x = plot_rho_grid * np.cos(plot_theta_grid)
     plot_z = plot_rho_grid * np.sin(plot_theta_grid)
 
     fig, ax = plt.subplots(figsize=(7, 6))
-    color_artist = ax.contourf(
-        plot_x,
-        plot_z,
-        plot_data,
-        levels=levels,
-        norm=norm,
-        cmap=COLORMAP,
-        extend=extend,
-    )
+    color_artist = ax.contourf(plot_x, plot_z, plot_data, levels=levels, norm=norm, cmap=COLORMAP, extend=extend)
     closed_boundary = np.vstack((boundary, boundary[0]))
-    ax.plot(
-        closed_boundary[:, 0],
-        closed_boundary[:, 1],
-        color="black",
-        linewidth=1.0,
-        label="LCFS",
-    )
+    ax.plot(closed_boundary[:, 0], closed_boundary[:, 1], color="black", linewidth=1.0, label="LCFS")
     vessel_angle = np.linspace(0.0, 2.0 * np.pi, 720)
-    ax.plot(
-        VESSEL_RADIUS * np.cos(vessel_angle),
-        VESSEL_RADIUS * np.sin(vessel_angle),
-        color="0.35",
-        linewidth=1.0,
-        label="Vessel wall",
-    )
+    ax.plot(VESSEL_RADIUS * np.cos(vessel_angle), VESSEL_RADIUS * np.sin(vessel_angle), color="0.35", linewidth=1.0, label="Vessel wall")
     physical_phi = (phi_deg + 198.0) % 360.0
-    ax.set_title(
-        "Regular-grid connection length\n"
-        f"$\\phi_{{phy}}={physical_phi:03.0f}^\\circ$ CW from North split, "
-        f"$\\phi_c={phi_deg:03.0f}^\\circ$"
-    )
+    ax.set_title(f"Regular-grid connection length\n$\\phi_{{phy}}={physical_phi:03.0f}^\\circ$ CW from North split, $\\phi_c={phi_deg:03.0f}^\\circ$")
     ax.set_xlabel(r"$x=\rho\cos\theta$ [m]")
     ax.set_ylabel(r"$z=\rho\sin\theta$ [m]")
     ax.set_xlim(-VESSEL_RADIUS, VESSEL_RADIUS)
@@ -516,58 +387,20 @@ def plot_plane(
     gc.collect()
 
 
-def plot_field(
-    analysis_dir,
-    field,
-    rho,
-    theta,
-    phi_deg,
-    lcfs_index,
-    value_source,
-    sim_io,
-    output_subdir,
-    show_progress,
-):
-    levels, norm, extend, value_min, value_max = make_color_scale(
-        source_value_array(value_source)
-    )
-    sim_io.log.info(
-        "Regular-grid plot color range: %g to %g m (%s).",
-        value_min,
-        value_max,
-        COLOR_SCALE,
-    )
-    progress = tqdm(
-        range(phi_deg.size),
-        desc="Plotting regular field",
-        unit="plane",
-        dynamic_ncols=True,
-        disable=not show_progress,
-    )
-    log_context = (
-        logging_redirect_tqdm(loggers=[sim_io.log])
-        if show_progress
-        else nullcontext()
-    )
+def plot_field(analysis_dir, field,
+               rho, theta, phi_deg, lcfs_index, value_source,
+               sim_io, output_subdir, show_progress):
+
+    levels, norm, extend, value_min, value_max = make_color_scale(source_value_array(value_source))
+    sim_io.log.info("Regular-grid plot color range: %g to %g m (%s).", value_min, value_max, COLOR_SCALE)
+    progress = tqdm( range(phi_deg.size), desc="Plotting regular field", unit="plane", dynamic_ncols=True, disable=not show_progress)
+    log_context = (logging_redirect_tqdm(loggers=[sim_io.log]) if show_progress else nullcontext())
     with log_context:
         for plane_index in progress:
-            boundary, _ = load_lcfs_boundary(
-                analysis_dir,
-                float(phi_deg[plane_index]),
-                lcfs_index,
-            )
-            plot_plane(
-                field[plane_index],
-                rho,
-                theta,
-                float(phi_deg[plane_index]),
-                boundary,
-                levels,
-                norm,
-                extend,
-                sim_io,
-                output_subdir,
-            )
+            boundary, _ = load_lcfs_boundary(analysis_dir, float(phi_deg[plane_index]), lcfs_index)
+            plot_plane(field[plane_index], rho, theta, float(phi_deg[plane_index]),
+                       boundary, levels, norm, extend,
+                       sim_io, output_subdir)
 
 
 def main():
@@ -595,17 +428,10 @@ def main():
         / args.data_subdir
     )
     points, value_source, offsets, phi_deg = load_raw_samples(raw_data_dir)
-    rho, theta, _, _, grid_x, grid_z = make_regular_grid(
-        args.rho_count,
-        args.theta_count,
-    )
+    rho, theta, _, _, grid_x, grid_z = make_regular_grid(args.rho_count, args.theta_count)
 
     sim_io = IOHandler(args.analysis_dir)
-    sim_io.startLog(
-        log_name="interpolate_connection_length_volume.log",
-        subdir=output_subdir,
-        logger_name=output_subdir,
-    )
+    sim_io.startLog(log_name="interpolate_connection_length_volume.log", subdir=output_subdir, logger_name=output_subdir,)
     output_data_dir = Path(sim_io.data_dir) / output_subdir
     output_data_dir.mkdir(parents=True, exist_ok=True)
     field_path = output_data_dir / FIELD_FILENAME
@@ -645,67 +471,30 @@ def main():
         "CONTOUR_EXTEND": CONTOUR_EXTEND,
         "DPI": DPI,
     }
+
     input_keys = list(run_settings)
-    sim_io.inputsBoilerplate(
-        "CONNECTION-LENGTH REGULAR-FIELD INPUTS",
-        run_settings,
-        input_keys,
-    )
+    sim_io.inputsBoilerplate( "CONNECTION-LENGTH REGULAR-FIELD INPUTS", run_settings, input_keys)
 
     sim_io.saveNumpyData(rho, RHO_FILENAME.removesuffix(".npy"), subdir=output_subdir)
-    sim_io.saveNumpyData(
-        theta,
-        THETA_FILENAME.removesuffix(".npy"),
-        subdir=output_subdir,
-    )
-    sim_io.saveNumpyData(
-        phi_deg,
-        PHI_FILENAME.removesuffix(".npy"),
-        subdir=output_subdir,
-    )
+    sim_io.saveNumpyData(theta, THETA_FILENAME.removesuffix(".npy"), subdir=output_subdir)
+    sim_io.saveNumpyData(phi_deg, PHI_FILENAME.removesuffix(".npy"), subdir=output_subdir)
 
     print(f"Reading raw connection-length data: {raw_data_dir}")
     print(f"Regular field shape (phi, theta, rho): {run_settings['FIELD_SHAPE']}")
-    field = interpolate_field(
-        args.analysis_dir,
-        points,
-        value_source,
-        offsets,
-        phi_deg,
-        lcfs_index,
-        rho,
-        theta,
-        grid_x,
-        grid_z,
-        field_path,
-        sim_io,
-        args.progress,
-    )
+    field = interpolate_field(args.analysis_dir, points, value_source, offsets,
+                              phi_deg, lcfs_index, rho, theta, grid_x, grid_z,
+                              field_path, sim_io, args.progress)
+
     sim_io.log.info("Saved regular connection-length field: %s", field_path)
 
     if args.plots:
-        plot_field(
-            args.analysis_dir,
-            field,
-            rho,
-            theta,
-            phi_deg,
-            lcfs_index,
-            value_source,
-            sim_io,
-            output_subdir,
-            args.progress,
-        )
-        sim_io.log.info(
-            "Saved %d regular-grid contour plots: %s",
-            phi_deg.size,
-            Path(sim_io.plot_dir) / output_subdir,
-        )
+        plot_field(args.analysis_dir, field,
+                   rho, theta, phi_deg, lcfs_index, value_source,
+                   sim_io, output_subdir, args.progress)
+        sim_io.log.info("Saved %d regular-grid contour plots: %s", phi_deg.size, Path(sim_io.plot_dir) / output_subdir)
+
 
     sim_io.log.info("## CONNECTION-LENGTH REGULAR-FIELD ANALYSIS FINISHED ##")
-    print(f"Saved regular field: {field_path}")
-    if args.plots:
-        print(f"Saved contour plots: {Path(sim_io.plot_dir) / output_subdir}")
 
 
 if __name__ == "__main__":

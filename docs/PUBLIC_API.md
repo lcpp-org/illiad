@@ -1,6 +1,6 @@
 # ILLIAD Public API
 
-This document defines the public interface of ILLIAD version 1.0.0. Interfaces
+This document defines the public interface of ILLIAD version 1.1.0. Interfaces
 not listed here are implementation details even when they are importable from
 a source checkout.
 
@@ -37,28 +37,27 @@ bitwise-identical output.
 | `illiad-flux-calc` | Active | Integrate toroidal flux and diagnose island chains. | `input_files/flux_calc_inputs.example.json` |
 | `illiad-flux-grad` | Active | Interpolate a scalar profile and/or generate its Cartesian electric field. | `input_files/flux_grad_inputs.example.json` |
 | `illiad-sol-trace` | Active | Trace open SOL field lines with the PyTorch solver. | `input_files/sol_trace_inputs.example.json` |
-| `illiad-sol-density` | Placeholder | Reserve the command name for a future density analysis class. | None |
-| `illiad-sol-potential` | Placeholder | Reserve the command name for a future potential analysis class. | None |
+| `illiad-sol-regularize` | Active | Regularize saved SOL crossings onto a scalar-field mesh. | `input_files/sol_regularize_inputs.example.json` |
+| `illiad-sol-connection-length` | Active | Select retained tracing, existing-raw regularization, or direct bounded-memory trace regularization. | `input_files/sol_connection_length_inputs.example.json` |
+| `illiad-sol-density` | Active | Construct a piecewise core/SOL plasma-density field. | `input_files/sol_density_inputs.example.json` |
+| `illiad-sol-potential` | Active | Construct a piecewise core/SOL electrostatic-potential field. | `input_files/sol_potential_inputs.example.json` |
 | `illiad-boris` | Active | Run full-orbit lithium-ion transport. | `input_files/boris_inputs.example.json` |
 
-The six active commands accept:
+The ten active commands accept:
 
 ```text
 --inputs PATH
 ```
 
 `PATH` is a UTF-8 JSON file whose top-level value is an object. Supplied values
-override built-in defaults. Omitting `--inputs` uses those defaults.
-The same path may instead be supplied as the optional positional `INPUTS`
-argument. Supplying both forms is an input error; neither form takes
-precedence.
+override built-in defaults. Omitting `--inputs` uses those defaults. The
+unified connection-length command first requires one of `trace`, `regularize`,
+or `trace_regularize`; its input object contains separate `TRACE` and
+`REGULARIZE` sections. For the other active commands, the same path may instead
+be supplied as the optional positional `INPUTS` argument. Supplying both forms
+is an input error; neither form takes precedence.
 Relative input paths and `output/` are resolved from the process working
 directory.
-
-The two placeholder commands accept only standard `-h`/`--help`. Invoking one
-without `--help` exits unsuccessfully with a not-implemented message. They do
-not import, install, or dispatch to `misc_scripts`, and they do not yet define
-JSON contracts.
 
 Root `run*.py` launchers mirror the command modules for source-checkout use.
 Installed commands are canonical; `illiad.cli`, launcher modules, and their
@@ -126,7 +125,7 @@ inputs but do not control the active detector.
 | Shared analysis and magnetic inputs | `ANLYS_DIR`, `ANLYS_SUBDIR`, `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX`, `MAX_SUBSETS` |
 | Interpolation control | `RUN_INTERPOLATOR`, `INPUT_FIELD_NAME`, `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
-| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON` |
+| RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON`, `RBF_QUERY_BATCH_SIZE` |
 | Periodic 3-D interpolation | `RBF_PHI_HALF_WINDOW`, `RBF_PHI_SCALE`, `RBF_POINTS_PER_SURFACE_PER_PHI` |
 | Gradient construction | `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`, `GRADIENT_FILTER_BUFFER` |
 
@@ -138,6 +137,8 @@ exactly `2d` or `3d`:
   `RBF_PHI_HALF_WINDOW` selects adjacent source planes,
   `RBF_PHI_SCALE` supplies the angular length scale, and
   `RBF_POINTS_PER_SURFACE_PER_PHI` limits each surface's contribution.
+  `RBF_QUERY_BATCH_SIZE` bounds how many target mesh points are evaluated in
+  one local-RBF solve batch without changing the fitted sources or query order.
 
 Both modes retain float64 source, query, interpolated, and saved arrays. Source
 labels run from 1 at the magnetic axis to 0 at the LCFS, and `rho=0` is filled
@@ -171,12 +172,80 @@ values, integrates both directions from each valid exterior seed, and
 terminates each solve at the wall or numerical length limit
 `2*pi*MAJOR_RADIUS_M*SPINS`.
 
-Compact raw output is sorted by toroidal plane. `plane_offsets.npy` indexes
-each plane's slice in `raw_points_rtp.npy`; `raw_fieldline_id.npy` maps each
-crossing to `fieldline_connection_length_m.npy`; and
-`raw_source_direction.npy` distinguishes forward, reverse, and inserted seed
-samples. Directional lengths, wall intersections, masks, seed coordinates,
-and plane coordinates are saved alongside them.
+Compact raw output is appended directly to packed per-plane files under
+`raw_crossings/`. Its `manifest.json` records the plane coordinates and sample
+counts, while each crossing record stores RTP, field-line ID, and source
+direction. `fieldline_connection_length_m.npy` resolves the value for each
+field-line ID. Directional lengths, wall intersections, masks, seed
+coordinates, and plane coordinates are saved alongside the shards. The
+crossing reader continues to accept the earlier plane-sorted monolithic NumPy
+files for existing runs.
+
+### `sol_regularize_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `TRACE_SUBDIR`, `OUTPUT_FIELD_FILENAME` |
+| Surface and grid | `LCFS_INDEX`, `N_RHO`, `N_THETA`, `RHO_MIN`, `RHO_MAX`, `VESSEL_RADIUS_M` |
+| Accumulation and fill | `INTERPOLATION_SPACE`, `FILL_METHOD`, `IDW_NEIGHBORS`, `IDW_POWER`, `TREE_WORKERS`, `RAW_CHUNK_SIZE` |
+| Plots | `GENERATE_PLOTS`, `SHOW_PROGRESS`, `COLOR_SCALE`, `COLORMAP`, `N_LEVELS`, `VMIN`, `VMAX`, `CONTOUR_EXTEND`, `DPI`, `PHYSICAL_PHI_OFFSET_DEG` |
+
+The regularizer consumes either compact field-line-indexed trace output or
+the legacy expanded connection-length array through a plane/chunk source
+interface. It preserves the nearest-node accumulation, optional linear or
+logarithmic averaging, and seam-free exterior fill used by the research
+interpolator. Output is a float64 `(phi, theta, rho)` field plus matching
+coordinate arrays.
+
+### `sol_connection_length_inputs.example.json`
+
+The unified input contains independent `TRACE` and `REGULARIZE` objects so the
+sparse seed grid and final regular grid retain separate `N_RHO`, `N_THETA`,
+`RHO_MIN`, and `RHO_MAX` settings. The required CLI mode defines the products:
+
+- `trace` retains raw plane shards and compact trace metadata.
+- `regularize` reads existing raw crossings and does not remove them.
+- `trace_regularize` retains the regular field and compact trace metadata but
+  does not create a complete raw crossing dataset.
+
+Direct mode pairs both directions for each field-line batch. Its temporary
+records contain only regular-cell and field-line IDs and are consumed after
+the batch connection lengths resolve. The accumulator size is fixed by the
+configured regular field shape.
+
+### `sol_density_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `SOL_SUBDIR`, `SOL_FIELD_FILENAME`, `NFIELD_SUBDIR`, `NFIELD_FILENAME` |
+| Surface selection | Optional `LCFS_INDEX`; `null` infers `LCFS<number>` from `NFIELD_FILENAME`, then falls back to the Poincare log |
+| Density model | `N_AXIS`, `N_LCFS`, `N_WALL`, `ALPHA`, `SOL_BETA`, optional `L_PARALLEL_0_M` |
+| Diagnostics | `GENERATE_PLOTS`, `SHOW_LCFS`, `COLOR_SCALE`, `SHOW_PROGRESS` |
+
+The density model requires `N_AXIS > N_LCFS > N_WALL >= 0`. The output is a
+float64 `(phi, theta, rho)` field normalized by `N_AXIS` when the default
+`N_AXIS=1` is retained. The official defaults select the generic
+`DEFAULT/LCFS19` workflow. Before calculation, the command validates the
+regular grid, all selected LCFS planes, the vessel radius, and propagated
+trace geometry metadata. With `L_PARALLEL_0_M=null`, trace-length metadata is
+preferred; legacy artifacts fall back to the positive `SPINS` value recorded
+by the Poincare workflow.
+
+### `sol_potential_inputs.example.json`
+
+| Group | Keys |
+| --- | --- |
+| Input/output location | `ANLYS_DIR`, `ANLYS_SUBDIR`, `SOL_SUBDIR`, `SOL_FIELD_FILENAME`, `NFIELD_SUBDIR`, `NFIELD_FILENAME` |
+| Surface selection | Optional `LCFS_INDEX`, with the same inference rule as the density command |
+| Potential model | `PHI_WALL`, `DELTA_PHI_0W`, `DELTA_PHI_SOL`, `ALPHA`, `SOL_BETA`, optional `L_PARALLEL_0_M` |
+| Diagnostics | `GENERATE_PLOTS`, `SHOW_LCFS`, `COLOR_SCALE`, `SHOW_PROGRESS` |
+
+The potential model requires
+`0 < DELTA_PHI_SOL < DELTA_PHI_0W`. It preserves the gradient-compatible
+float64 `(phi, theta, rho)` layout, enforces `PHI_WALL` at the vessel wall,
+and writes coordinate arrays and compressed model metadata beside the field.
+It uses the same generic defaults, artifact preflight, and
+`L_PARALLEL_0_M` provenance order as the density command.
 
 ### `boris_inputs.example.json`
 
@@ -242,7 +311,16 @@ from illiad.mesh import Mesh, TorchMesh
 from illiad.particle import Particle, FieldLine, Ion
 from illiad.poincare import Poincare
 from illiad.flux import FluxCalculator, FluxInterpolator, FluxGradientor
-from illiad.sol import SOLTracer
+from illiad.sol import (
+    CrossingChunk,
+    NpyPlaneCrossingSource,
+    PlaneCrossingSource,
+    SOLDensity,
+    SOLPotential,
+    SOLRegularizer,
+    SOLTracer,
+    open_plane_crossing_source,
+)
 from illiad.boris import Boris
 from illiad.collisions import Collisions
 from illiad.utilities.coordtrans import RTP_to_XYZ, XYZ_to_RTP
@@ -264,13 +342,17 @@ from illiad import plotting
 | `FluxInterpolator` | `FluxInterpolator(io_handler, field, input_params)`; `run` |
 | `FluxGradientor` | `FluxGradientor(io_handler, field, input_params)`; `run` |
 | `SOLTracer` | `SOLTracer(io_handler, magnetic_field, input_params)`; `build_initial_conditions`, `log_inputs`, `trace`, `plot`, `run` |
+| `SOLRegularizer` | `SOLRegularizer(io_handler, input_params, crossing_source=None)`; `run` |
+| `SOLDensity` | `SOLDensity(io_handler, input_params)`; `run` |
+| `SOLPotential` | `SOLPotential(io_handler, input_params)`; `run` |
 | `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; condition, solver, output, diagnostic, and `run` methods |
 | `Collisions` | Collision-model resolution and ion-neutral and ion-ion numerical operators |
 
 `illiad.sol` also exports `build_torch_magnetic_field`,
 `load_lcfs_boundary`, `load_poincare_settings`,
-`minimum_boundary_distance`, and `resolve_device`. No density or potential
-analysis class is currently public.
+`minimum_boundary_distance`, `resolve_device`, `CrossingChunk`,
+`PlaneCrossingSource`, `NpyPlaneCrossingSource`, and
+`open_plane_crossing_source`.
 
 ## Output and Data Compatibility
 
