@@ -25,6 +25,7 @@ from matplotlib.path import Path as MplPath
 import matplotlib.tri as mtri
 import numpy as np
 from scipy.interpolate import splev, splprep
+from scipy.spatial import cKDTree
 import torch
 from tqdm import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -870,7 +871,7 @@ def integrate_directional_batch(
         desc=f"Torch batch {batch_number}/{batch_count}",
         unit="step",
         dynamic_ncols=True,
-        mininterval=1.0,
+        mininterval=5.0,
         disable=not show_progress,
     )
     log_context = (
@@ -1494,6 +1495,26 @@ def _unique_plane_samples(points_rtp, values, max_samples, sample_seed):
     return points_rtp[unique_indices], values[unique_indices]
 
 
+def extend_plot_samples_to_wall(x, z, values, vessel_radius):
+    """Append a plot-only wall ring using nearest-sample values in x-z space.
+
+    Inputs must be finite, unique samples. Empty slices remain empty.
+    The 720-point ring approximates the circular wall without tracing new lines.
+    """
+    if not len(values):
+        return x, z, values
+    angles = np.linspace(0.0, 2.0 * np.pi, 720, endpoint=False)
+    wall_points = vessel_radius * np.column_stack((np.cos(angles), np.sin(angles)))
+    distances, indices = cKDTree(np.column_stack((x, z))).query(wall_points)
+    # Avoid duplicate vertices when saved samples already lie on the ring.
+    missing = distances > np.finfo(np.float64).eps * max(1.0, vessel_radius)
+    return (
+        np.concatenate((x, wall_points[missing, 0])),
+        np.concatenate((z, wall_points[missing, 1])),
+        np.concatenate((values, values[indices[missing]])),
+    )
+
+
 def plot_plane_samples(
     points_rtp,
     values,
@@ -1518,6 +1539,11 @@ def plot_plane_samples(
         x = points_rtp[:, 0] * np.cos(points_rtp[:, 1])
         z = points_rtp[:, 0] * np.sin(points_rtp[:, 1])
         try:
+            plot_values = values
+            if params.get("PLOT_EXTEND_TO_WALL", False):
+                x, z, plot_values = extend_plot_samples_to_wall(
+                    x, z, values, params["VESSEL_RADIUS_M"]
+                )
             triangulation = mtri.Triangulation(x, z)
             triangle_x = x[triangulation.triangles]
             triangle_z = z[triangulation.triangles]
@@ -1557,7 +1583,7 @@ def plot_plane_samples(
 
             color_artist = ax.tricontourf(
                 triangulation,
-                values,
+                plot_values,
                 levels=levels,
                 norm=norm,
                 cmap=params["COLORMAP"],
@@ -1697,6 +1723,8 @@ def _require_positive_integer(params, key):
 
 def validate_runtime_settings(params):
     """Validate connection-length inputs before allocating large tensors."""
+    if not isinstance(params.get("PLOT_EXTEND_TO_WALL", False), bool):
+        raise ValueError("PLOT_EXTEND_TO_WALL must be a boolean.")
     for key in (
         "SPINS",
         "N_PLANES",
