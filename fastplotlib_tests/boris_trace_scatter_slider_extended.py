@@ -23,17 +23,15 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib.colors import LinearSegmentedColormap
 
-# import UIUC colors for consistency with other plots
-try:
-    from plot_funcs.plotFuncs import UIUC
-except ImportError:
-    UIUC = {
-        "il_blue": '#13294B',
-        "il_orange": '#FF5F05',
-        "il_storm": '#707372',  # Added a default color for il_storm
-        "il_stormdark1": '#4A4C4B',  # Added a default color for il_storm
-        "il_stormdark2": '#252525',  # Added a default color for il_storm
-    }
+# UIUC colors for consistency with other plots
+UIUC = {
+    "il_blue": '#13294B',
+    "il_lightblue": '#4A90E2',
+    "il_orange": '#FF5F05',
+    "il_storm": '#707372',  # Added a default color for il_storm
+    "il_stormdark1": '#4A4C4B',  # Added a default color for il_storm
+    "il_stormdark2": '#252525',  # Added a default color for il_storm
+}
 
 colors = [
 
@@ -227,6 +225,15 @@ def build_arg_parser() -> ArgFileParser:
     parser.add_argument("--R0", type=float, default=0.72, help="Major radius for the torus shell.")
     parser.add_argument("--a", type=float, default=0.19, help="Minor radius for the torus shell.")
     parser.add_argument("--size", default="1280x760", help="Window size as WIDTHxHEIGHT.")
+    parser.add_argument(
+        "--present-method",
+        choices=("bitmap", "screen"),
+        default="bitmap",
+        help=(
+            "Interactive Qt canvas presentation method. 'screen' may improve "
+            "FPS but is less portable; ignored for --export-mp4."
+        ),
+    )
     parser.add_argument("--hide-zero-rows", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--show-torus", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--show-ports", action=argparse.BooleanOptionalAction, default=True, help="Show HIDRA port outlines on the torus wall.")
@@ -703,21 +710,30 @@ def add_torus(subplot,
         )
 
 
+# def setup_camera(subplot, R0: float, a: float) -> None:
+#     extent = float(R0 + a)
+#     try:
+#         subplot.camera.show_rect(-extent, extent, -extent, extent)
+#     except Exception:
+#         pass
+#     try:
+#         #subplot.camera.local.position = (1.45, -1.85, 0.75)
+#         subplot.camera.local.position = (0.0, -1.0, 0.35)
+#         subplot.camera.look_at((0.0, -0.0, -0.0))
+#         subplot.camera.set_state({'fov': 60.0, 'zoom': 0.01})
+
+#     except Exception:
+#         pass
 def setup_camera(subplot, R0: float, a: float) -> None:
     extent = float(R0 + a)
-    try:
-        subplot.camera.show_rect(-extent, extent, -extent, extent)
-    except Exception:
-        pass
-    try:
-        #subplot.camera.local.position = (1.45, -1.85, 0.75)
-        subplot.camera.local.position = (0.0, -1.0, 0.35)
-        subplot.camera.look_at((0.0, -0.0, -0.0))
-        subplot.camera.set_state({'fov': 60.0, 'zoom': 0.01})
-
-    except Exception:
-        pass
-
+    subplot.camera.show_rect(-extent, extent, -extent, extent)
+    #subplot.camera.local.position = (1.45, -1.85, 0.75)
+    #subplot.camera.local.position = (0.0, -1.0, 0.57)
+    subplot.camera.local.position = (0.0, -0.5, 0.28)
+    subplot.camera.look_at((0.0, 0.0, -0.04))
+    subplot.camera.fov = 0.0
+    # Larger zoom values fill more of the frame; excessive zoom crops the scene.
+    subplot.auto_scale(zoom=1.0)
 
 def set_subplot_background(subplot, color: str) -> None:
     try:
@@ -1593,7 +1609,7 @@ def export_mp4(
     )
 
     setup_camera(subplot, args.R0, args.a)
-    figure.show(axes_visible=args.axes)
+    figure.show(autoscale=False, axes_visible=args.axes)
 
     args.export_mp4.parent.mkdir(parents=True, exist_ok=True)
     print(f"Exporting {len(frame_indices)} frames to {args.export_mp4}")
@@ -1737,7 +1753,11 @@ def main() -> int:
         histogram_panel = make_energy_histogram_panel(args, custom_cmap_colors, histogram_canvas, histogram_axis)
         side_canvases.append(histogram_canvas)
 
-    canvas = QRenderWidget(size=size, title="Boris ion positions")
+    canvas = QRenderWidget(
+        size=size,
+        title="Boris ion positions",
+        present_method=args.present_method,
+    )
     figure = fpl.Figure(cameras="3d", controller_types="orbit", canvas=canvas, size=size)
     subplot = figure[0, 0]
     set_subplot_background(subplot, args.plot_background)
@@ -1829,7 +1849,7 @@ def main() -> int:
     state.update_histogram()
     state.update_running_fraction()
     setup_camera(subplot, args.R0, args.a)
-    figure.show(axes_visible=args.axes)
+    figure.show(autoscale=False, axes_visible=args.axes)
     viewer = TraceSliderWindow(
         QtCore,
         QtWidgets,
