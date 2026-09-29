@@ -55,8 +55,8 @@ class Collisions():
         alpha = torch.exp(-nu * self.dt / 2)
 
         sigma = torch.sqrt(kbTgasqMi * (1.0 - alpha**2))
-
         eta = torch.randn_like(v)
+        
         v_new = v * alpha[:, None] + sigma[:, None] * eta # Apply the viscous drag factor to the velocities
 
         return v_new
