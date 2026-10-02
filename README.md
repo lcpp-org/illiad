@@ -89,6 +89,21 @@ pip install -e .
 ```
 
 Replace `cu126` with the appropriate PyTorch build for the local system.
+On the Campus Cluster, run `module load python/3.11.11` followed by
+`unset PYTHONPATH PYTHONHOME` before creating or activating the environment.
+Set `export PYTHONNOUSERSITE=1` to exclude user-site packages. Use the same
+setup in batch scripts: activating a virtual environment alone does not remove
+inherited `PYTHONPATH` entries such as `scratch/mypython3` or another Python
+version's packages.
+
+The [cluster documentation](https://docs.ncsa.illinois.edu/systems/icc/en/latest/user_guide/software.html#python-on-the-campus-cluster)
+recommends group project space for persistent software installations; scratch
+software may be removed. If package directories remain but files such as
+`matplotlib/pyplot.py` and package `__init__.py` files are missing, create a fresh
+environment and reinstall the dependencies. Preserve the old environment until
+the replacement passes import checks; changing `PYTHONPATH` cannot restore
+missing files.
+
 Optional fitting, viewer, and export dependencies are available as extras:
 
 ```bash

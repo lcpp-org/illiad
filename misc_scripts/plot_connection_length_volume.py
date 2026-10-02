@@ -30,16 +30,16 @@ from illiad.sol import (
 
 # DATA AND OUTPUT SETTINGS
 ANALYSIS_DIR = "IOTA4_1000sp_atol1e-9"
-DATA_SUBDIR = "SOLtrace_500"
+DATA_SUBDIR = "SOLtrace_500c"
 OUTPUT_SUBDIR = DATA_SUBDIR
 
 # None replots every saved plane. A single number or an iterable of numbers
 # selects computational toroidal angles in degrees; for example, 18 or
 # [18, 90, 180].
 PHI_DEG = None
-LCFS_INDEX = 30  # None reads LCFS_INDEX from the Poincare log
+LCFS_INDEX = 20  # None reads LCFS_INDEX from the Poincare log
 
-OUTPUT_FILENAME = "connection_length_{phi_deg:03.0f}_replot_3.png"
+OUTPUT_FILENAME = "connection_length_{phi_deg:03.0f}_replot_4.png"
 
 # PLOT SETTINGS
 FIGSIZE = (7, 6)

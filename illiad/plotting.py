@@ -756,7 +756,7 @@ def boris_plotTracesPoincare(ion_traces, b_hidra, runString='default', simIO=Non
                 labels=['', '', '', '', '', '', '', ''], fontsize=12)
 
     plotname = 'IonTracesPoin.png'
-    simIO.saveFig(plotname, dpi=600)
+    simIO.saveFig(plotname, dpi=300)
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
     #plt.show()
@@ -769,7 +769,7 @@ def poincare_plotPoincareBW(radtheta_pts, point_total, phi_deg, b_hidra, analysi
         dpi = plot_args['dpi']
     else:
         title_on = True
-        dpi = 400
+        dpi = 300
 
     rho_max = b_hidra.a
     num_sets = len(radtheta_pts)
