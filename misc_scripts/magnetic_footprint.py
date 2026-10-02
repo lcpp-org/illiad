@@ -35,11 +35,11 @@ from illiad.utilities.run_config import load_inputs_json, merge_input_params
 LOGGER_NAME = "MagneticFootprint"
 
 DEFAULT_INPUTS = {
-    "ANALYSIS_NAME": "iota3_1mm",
+    "ANALYSIS_NAME": "IOTA5_footprint_1mm",
 
     # Magnetic configuration
     "CURRENT_TOR": 0.486,  # [kA]
-    "CURRENT_HEL": 0.900,  # [kA]
+    "CURRENT_HEL": 0.710,  # [kA]
     "CONFIG_TOR": "default_toroidal",
     "CONFIG_HEL": "default_helical",
     "ENABLE_ERRFIELD": True,
@@ -56,16 +56,16 @@ DEFAULT_INPUTS = {
     "ATOL": 1e-8,
     "NTHREADS": -1,
 
-    # The current Boris wall plots use phi_wall = -phi_comp + 18 degrees.
+    # Boris uses phi_wall = (-phi_comp + 180 + offset) % 360 degrees.
     "PHI_WALL_OFFSET_DEG": 18.0,
 
     # Plot controls
     "COLOR_SCALE": "log",
     "COLORMAP": "viridis",
-    "N_LEVELS": 60,
+    "N_LEVELS": 50,
     "VMIN": None,
     "VMAX": None,
-    "DPI": 300,
+    "DPI": 250,
 }
 
 _CLI_INPUTS = object()
@@ -156,9 +156,10 @@ def make_initial_conditions(params):
     )
 
     # The wall map follows the current Boris convention: phi is CCW from the
-    # South-side split, while computational RTP phi is clockwise.
+    # South-side split, while computational RTP phi is clockwise. Invert
+    # boris_plotWallHist's phi_wall = (-phi_comp + 180 + offset) % 360.
     phi_comp_deg = (
-        params["PHI_WALL_OFFSET_DEG"] - phi_grid_deg
+        180.0 + params["PHI_WALL_OFFSET_DEG"] - phi_grid_deg
     ) % 360.0
     theta_comp_deg = theta_grid_deg % 360.0
     start_rho = params["RMINOR"] - params["WALL_OFFSET_M"]
@@ -268,10 +269,14 @@ def trace_field_lines(initial_conditions_rtp, params, magnetic_field, sim_io):
 
 def wall_rtp_to_map_degrees(wall_rtp, phi_wall_offset_deg):
     """Convert computational wall RTP coordinates to the Boris wall map."""
-    wall_theta_deg = np.rad2deg(wall_rtp[..., 1])
-    wall_theta_deg = (wall_theta_deg + 180.0) % 360.0 - 180.0
+    # Match Boris's strict > pi wrap, keeping theta == pi at +180 degrees.
+    # Use a new array so the saved computational coordinates stay unchanged.
+    wall_theta = wall_rtp[..., 1]
+    wall_theta_deg = np.rad2deg(
+        np.where(wall_theta > np.pi, wall_theta - 2.0 * np.pi, wall_theta)
+    )
     wall_phi_deg = (
-        -np.rad2deg(wall_rtp[..., 2]) + phi_wall_offset_deg
+        -np.rad2deg(wall_rtp[..., 2]) + 180.0 + phi_wall_offset_deg
     ) % 360.0
     return wall_phi_deg, wall_theta_deg
 
