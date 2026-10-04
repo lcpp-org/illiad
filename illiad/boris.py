@@ -120,9 +120,17 @@ class Boris(Collisions):
             raise ValueError('WARP_STEP_CHUNK_SIZE must be a positive int32 integer')
         return int(value)
 
+    @staticmethod
+    def validate_warp_compaction_interval(value):
+        """Physical steps between active-ID filtering passes; zero disables."""
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or not 0 <= value < 2**31:
+            raise ValueError('WARP_COMPACTION_INTERVAL must be a nonnegative int32 integer')
+        return int(value)
+
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1, freq_corr=False, ion_neutral_collisions=None,
-                        ion_ion_collisions=None, method=None, warp_step_chunk_size=16):
+                        ion_ion_collisions=None, method=None, warp_step_chunk_size=16,
+                        warp_compaction_interval=256):
         """Dispatch to Torch (default) or optional Warp with identical outputs.
 
         method overrides the constructor's choice for this call only. Both
@@ -131,13 +139,15 @@ class Boris(Collisions):
         """
         selected = self.require_method(self.method if method is None else method)
         warp_step_chunk_size = self.validate_warp_step_chunk_size(warp_step_chunk_size)
+        warp_compaction_interval = self.validate_warp_compaction_interval(warp_compaction_interval)
         if selected == 'warp':
             from .boris_warp import solve
             return solve(self, ions, Bfield, Efield=Efield, nfield=nfield,
                          trace_IDs=trace_IDs, trace_stride=trace_stride,
                          freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
                          ion_ion_collisions=ion_ion_collisions,
-                         step_chunk_size=warp_step_chunk_size)
+                         step_chunk_size=warp_step_chunk_size,
+                         compaction_interval=warp_compaction_interval)
         return self.torch_solver(ions, Bfield, Efield=Efield, nfield=nfield,
                                  trace_IDs=trace_IDs, trace_stride=trace_stride,
                                  freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
@@ -475,7 +485,7 @@ class Boris(Collisions):
     def save_output(self, outputArray, ion_traces):
         """Saves the output data to files in the specified output directory."""
         trace_filename = 'Ion_traces'
-        self.IO.saveNumpyData(ion_traces, trace_filename)
+        self.IO.saveNumpyData(ion_traces.astype(np.float32, copy=False), trace_filename)
         self.IO.log.info('OUTPUT ION TRACES: {}'.format(trace_filename))
 
         wallpts_filename = 'Wallpt_OUTPUT'
@@ -484,7 +494,7 @@ class Boris(Collisions):
 
     def run(self, Bfield, Efield=None, nfield=None,
             ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
-            trace_stride=1, method=None, warp_step_chunk_size=16):
+            trace_stride=1, method=None, warp_step_chunk_size=16, warp_compaction_interval=256):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -497,6 +507,7 @@ class Boris(Collisions):
             trace_stride: Save one trace sample every trace_stride timesteps.
             method: Optional 'torch'/'warp' override for this run.
             warp_step_chunk_size: Physical steps per Warp launch (default 16); ignored by Torch.
+            warp_compaction_interval: Steps between Warp active-ID filtering (default 256; 0 disables).
 
         Returns:
             Tuple containing:
@@ -516,7 +527,8 @@ class Boris(Collisions):
             trace_IDs = trace_IDs,
             trace_stride = trace_stride,
             method = method,
-            warp_step_chunk_size = warp_step_chunk_size
+            warp_step_chunk_size = warp_step_chunk_size,
+            warp_compaction_interval = warp_compaction_interval
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)

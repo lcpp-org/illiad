@@ -199,6 +199,17 @@ def count_active(active: wp.array(dtype=wp.int32), count: wp.array(dtype=wp.int3
 
 
 @wp.kernel
+def compact_active_ids(active: wp.array(dtype=wp.int32),
+                       source: wp.array(dtype=wp.int32),
+                       destination: wp.array(dtype=wp.int32),
+                       count: wp.array(dtype=wp.int32)):
+    particle = source[wp.tid()]
+    if active[particle] != 0:
+        slot = wp.atomic_add(count, 0, 1)
+        destination[slot] = particle
+
+
+@wp.kernel
 def initialize_velocity(
     x: wp.array(dtype=wp.vec3d),
     v: wp.array(dtype=wp.vec3d),
@@ -245,8 +256,12 @@ def push_and_record_wall(
     trace_next: wp.array(dtype=wp.int32),
     traces: wp.array2d(dtype=wp.vec3d),
     trace_stride: int,
+    active_ids: wp.array(dtype=wp.int32),
+    use_compaction: int,
 ):
     i = wp.tid()  # One logical GPU thread owns one particle for the whole chunk.
+    if use_compaction == 1:
+        i = active_ids[i]
     if active[i] == 0:
         return
 
@@ -357,7 +372,8 @@ def make_density_grid(values, b_grid, *, scale=1.0):
 
 def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                    collisions=None, density_grid=None, seed=None, trace_ids=(),
-                   trace_stride=1, freq_corr=False, show_progress=False, step_chunk_size=16):
+                   trace_stride=1, freq_corr=False, show_progress=False, step_chunk_size=16,
+                   compaction_interval=256):
     """Advance particles, returning device arrays and the valid trace length.
 
     steps is the number of position updates (existing self.nsteps - 1).
@@ -368,6 +384,7 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     """
     from .boris import Boris
     step_chunk_size = Boris.validate_warp_step_chunk_size(step_chunk_size)
+    compaction_interval = Boris.validate_warp_compaction_interval(compaction_interval)
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError('dt must be finite and positive')
     if isinstance(steps, bool) or int(steps) != steps or not 0 <= steps < 2**31:
@@ -418,6 +435,13 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     qdt2m = wp.array(np.ascontiguousarray(q_over_m * (dt / 2)),
                     dtype=wp.float64, device=device)
     active = wp.ones(n, dtype=wp.int32, device=device)
+    # Swap ID buffers after each filter; all physical state stays indexed by
+    # original particle ID, including RNG and trace lookup arrays.
+    use_compaction = int(compaction_interval > 0)
+    active_ids = wp.array(np.arange(n if use_compaction else 0, dtype=np.int32),
+                          dtype=wp.int32, device=device)
+    spare_ids = wp.empty_like(active_ids)
+    launch_count = n
     wall_x = wp.zeros(n, dtype=wp.vec3d, device=device)
     wall_v = wp.zeros(n, dtype=wp.vec3d, device=device)
     hit_step = wp.full(n, value=-1, dtype=wp.int32, device=device)
@@ -453,23 +477,32 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
         from tqdm import tqdm
         progress = tqdm(total=int(steps), ncols=100, mininterval=2.0, desc='Boris (warp)')
     last_active_check = 0
+    check_interval = compaction_interval or 256
     for step in range(1, int(steps) + 1, step_chunk_size):
         chunk_steps = min(step_chunk_size, int(steps) - step + 1)
         end_step = step + chunk_steps - 1
-        wp.launch(push_and_record_wall, dim=n,
+        wp.launch(push_and_record_wall, dim=launch_count,
                   inputs=[x, v, qdt2m, active, wall_x, wall_v, hit_step,
                           last_inside_step, b_grid, e_grid, has_e, dt, step,
                           collisions, density_grid, has_density, random_states, int(freq_corr),
-                          chunk_steps, trace_heads, trace_next, traces, trace_stride],
+                          chunk_steps, trace_heads, trace_next, traces, trace_stride,
+                          active_ids, use_compaction],
                   device=device)
         if progress is not None:
             progress.update(chunk_steps)
-        # Check at chunk boundaries, approximately every 256 physical steps.
-        if end_step - last_active_check >= 256 or end_step == steps:
+        # Filtering/counting synchronizes only at the selected chunk boundaries.
+        if end_step - last_active_check >= check_interval or end_step == steps:
             last_active_check = end_step
             remaining.zero_()
-            wp.launch(count_active, dim=n, inputs=[active, remaining], device=device)
+            if use_compaction:
+                wp.launch(compact_active_ids, dim=launch_count,
+                          inputs=[active, active_ids, spare_ids, remaining], device=device)
+            else:
+                wp.launch(count_active, dim=n, inputs=[active, remaining], device=device)
             n_remaining = int(remaining.numpy()[0])
+            if use_compaction:
+                active_ids, spare_ids = spare_ids, active_ids
+                launch_count = n_remaining
             if progress is not None:
                 progress.set_postfix({'active': n_remaining}, refresh=False)
             if n_remaining == 0:
@@ -492,11 +525,13 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
 
 
 def run_wall_only(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
-                  collisions=None, density_grid=None, seed=None, step_chunk_size=16):
+                  collisions=None, density_grid=None, seed=None, step_chunk_size=16,
+                  compaction_interval=256):
     """Wall-only NumPy interface retained for the prototype benchmark."""
     result = _run_particles(x0, v0, charge_mass_ratio, b_grid, dt=dt, steps=steps,
                             e_grid=e_grid, collisions=collisions,
-                            density_grid=density_grid, seed=seed, step_chunk_size=step_chunk_size)
+                            density_grid=density_grid, seed=seed, step_chunk_size=step_chunk_size,
+                            compaction_interval=compaction_interval)
     return {key: result[key].numpy() for key in
             ('wall_position_xyz', 'wall_velocity_xyz', 'hit_step', 'last_inside_step')}
 
@@ -531,7 +566,7 @@ def _vector_grid_from_torch(mesh):
 
 def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
           freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
-          step_chunk_size=16):
+          step_chunk_size=16, compaction_interval=256):
     """Adapter returning the same four Torch tensors as Boris.parallel_solver."""
     from contextlib import nullcontext
     import logging
@@ -575,7 +610,7 @@ def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_st
             dt=solver.dt, steps=solver.nsteps-1, e_grid=e,
             collisions=c, density_grid=n, trace_ids=trace_IDs,
             trace_stride=trace_stride, freq_corr=freq_corr, show_progress=True,
-            step_chunk_size=step_chunk_size)
+            step_chunk_size=step_chunk_size, compaction_interval=compaction_interval)
         for particle in ions:
             particle.setPosition(0, particle.pos0_XYZ)
         traces = (wp.to_torch(result['traces'])[:result['trace_count']] if len(trace_IDs)
