@@ -3,7 +3,8 @@
 The production `illiad-boris` workflow supports two `BORIS_METHOD` values:
 
 ```json
-"BORIS_METHOD": "warp"
+"BORIS_METHOD": "warp",
+"WARP_STEP_CHUNK_SIZE": 16
 ```
 
 Use `"torch"` for the existing PyTorch implementation (also the default when
@@ -55,7 +56,8 @@ solver.setConditions(ions, cond_string, dt=dt, tmax=tmax)
 output = solver.run(Bfield, Efield, nfield,
                     ion_neutral_collisions="langevin",
                     ion_ion_collisions="fokker_planck",
-                    trace_IDs=[0, 10], trace_stride=100)
+                    trace_IDs=[0, 10], trace_stride=100,
+                    warp_step_chunk_size=16)
 ```
 
 `run(..., method="torch")` or `parallel_solver(..., method="torch")` overrides the
@@ -77,9 +79,38 @@ one-spacing angular grid origin, sector wrapping, vector rotations, density
 layout, and additive magnetic error field.
 
 A kernel fuses interpolation, collision half-steps, pushing, and wall recording.
-Each original particle retains one thread; inactive threads return immediately.
-The host checks for complete termination every 256 steps and trims traces to the
-actual last hit. There is no active-list compaction or CUDA graph capture.
+`WARP_STEP_CHUNK_SIZE` controls physical timesteps per launch (default 16; a
+positive int32 integer). Set it to 1 for one timestep per launch. Torch ignores
+this setting. `DT`, `TMAX`, and collision half-step durations do not change.
+The final chunk is shortened to the remaining number of steps.
+
+Each original particle retains one thread. Position, velocity, and RNG state
+stay local across substeps, while fields and density are interpolated anew at
+every physical step. A thread stops immediately on a wall hit. There is no
+active-list compaction or CUDA graph capture. The host checks for complete
+termination at chunk boundaries after at least 256 steps since the previous
+check, or at the final chunk, then trims traces to the actual last hit.
+
+Selected trace samples are written inside the kernel using global timestep
+indices, including every substep with `STRIDE: 1`. Initial and final samples
+remain present. A finishing kernel fills post-termination samples with each
+tracked particle's frozen wall position, preserving the rectangular trace format.
+Chunk size does not multiply trace storage; selected particle count and `STRIDE`
+still determine it. Selected traces require an additional int32 lookup per particle
+and per trace selection; wall-only runs omit those lookups.
+
+Chunking reduces launch overhead and repeated state loads/stores. Larger chunks
+are not necessarily faster: workload imbalance, register use, and slower progress
+updates can offset the benefit. The default of 16 is a starting point, not a
+measured optimum for your GPU. Benchmark, for example, sizes 1, 8, 16, and 32:
+
+```bash
+python misc_scripts/benchmark_warp_boris.py --inputs input_files/your_boris_inputs.json --warp-step-chunk-size 16
+```
+
+Without that override, the benchmark reads `WARP_STEP_CHUNK_SIZE` from the JSON
+(default 16), and records the effective size in its timing report. Its wall-only
+measurements do not measure full-trace recording overhead.
 
 Warp compilation is lazy. The first use of a changed kernel can take appreciable
 time; its persistent cache normally avoids recompilation on subsequent runs.

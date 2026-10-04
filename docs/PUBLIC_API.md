@@ -259,7 +259,7 @@ It uses the same generic defaults, artifact preflight, and
 | Ion properties | `ION_MASS`, `ION_TEMP`, `CHARGE_NUM` |
 | Plasma potential | Optional `PLASMA_POTENTIAL`; otherwise derived from background inputs. |
 | Particle initialization | `LCFS_INDEX`, `DELTRS`, `NPHI`, `NTHETA`, `NPARTICLES_PER_EMITTER` |
-| Time integration | `DT`, `TMAX` |
+| Time integration | `DT`, `TMAX`; `WARP_STEP_CHUNK_SIZE` (positive integer, default 16; Warp only, 1 disables chunking) |
 | Trace selection | `TRACK_NPHI`, `TRACK_NTHETA`, `TRACK_NPARTICLES_PER_EMITTER`, `STRIDE` |
 | Output | `OUTPUT_DIRECTORY_NAME`, `TAG` |
 

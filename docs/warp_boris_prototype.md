@@ -6,8 +6,8 @@ The original `misc_scripts/warp_boris_prototype.py` and collision module now
 re-export package functions for compatibility. The benchmark uses the package.
 
 The notes below describe the original wall-only prototype interface. Production
-Warp additionally supports selected traces, frequency correction, and early
-termination; use the backend guide for current production behavior.
+Warp additionally supports selected traces, frequency correction, timestep
+chunking (`WARP_STEP_CHUNK_SIZE`, default 16), and early termination; use the backend guide for current production behavior.
 
 ## What is implemented
 
