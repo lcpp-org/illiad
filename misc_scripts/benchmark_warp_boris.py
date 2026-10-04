@@ -1,4 +1,4 @@
-"""Casual collisionless B+E benchmark using existing Boris input/field files.
+"""Casual Boris benchmark using collision models and fields from an input JSON.
 
 Run from any directory with --help. Times include particle setup and wall-result
 download, but exclude field loading, field upload, and compilation warmup.
@@ -23,8 +23,11 @@ import illiad.mesh.torch_mesh as mesh_module
 import illiad.utilities.coordtrans as coordtrans
 import illiad.utilities.point_generators as point_generators
 from illiad.cli.boris import DEFAULT_INPUTS, resolve_plasma_potential
+from illiad.collisions import Collisions
 from illiad.utilities import physical_constants as const
-from misc_scripts.warp_boris_prototype import make_grid, run_wall_only
+from illiad.boris_warp import (
+    make_grid, make_density_grid, make_collision_config, run_wall_only,
+)
 
 
 def save_comparison_plots(results, directory, *, steps, dt, R0):
@@ -198,7 +201,15 @@ def load_fields(params):
     e = mesh_module.TorchMesh(R0=b.R0, a=b.a)
     e.loadCartesianField(str(e_path), period_=np.array([0, 1, 1]),
                          att_mult=float(params['PLASMA_POTENTIAL']))
-    return b, e, e_path
+    n, n_path = None, None
+    if params['ION_ION_COLLISIONS']:
+        n_path = Path(params['FIELD_FILE_DENSITY'])
+        if not n_path.is_absolute():
+            n_path = ROOT / n_path
+        n = mesh_module.TorchMesh(R0=b.R0, a=b.a)
+        n.loadScalarField(str(n_path), period_=np.array([0, 1, 1]),
+                          att_mult=float(params['PLASMA_DENSITY']))
+    return b, e, n, e_path, n_path
 
 
 def main():
@@ -227,38 +238,54 @@ def main():
         if old in supplied and new not in supplied:
             supplied[new] = supplied[old]
     params = {**DEFAULT_INPUTS, **supplied}
+    resolver = Collisions()
+    neutral_model = resolver._resolve_ion_neutral_collision_model(params['ION_NEUTRAL_COLLISIONS'])
+    ion_model = resolver._resolve_ion_ion_collision_model(params['ION_ION_COLLISIONS'])
+    params['ION_NEUTRAL_COLLISIONS'] = neutral_model
+    params['ION_ION_COLLISIONS'] = ion_model
     params['M_GAS_AMU'] = const.get_species_mass_amu(params['BACKGROUND_GAS_SPECIES'])
     params['PLASMA_POTENTIAL'], _ = resolve_plasma_potential(params)
+    plasma_settings = dict(T_gas_eV=params['NEUTRAL_GAS_TEMP_EV'], Ti_eV=params['ION_TEMP'],
+                           n_gas=params['NEUTRAL_GAS_DENSITY'], n_e=params['PLASMA_DENSITY'],
+                           m_gas_amu=params['M_GAS_AMU'])
+    collisions = make_collision_config(ion_neutral_collisions=neutral_model,
+                                       ion_ion_collisions=ion_model, **plasma_settings)
+    stochastic = neutral_model == 'langevin' or ion_model is not None
     dt = args.dt if args.dt is not None else float(params['DT'])
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError('DT must be finite and positive')
     print(f'Loading solved fields from {args.inputs}', flush=True)
-    b, e, e_path = load_fields(params)
+    b, e, n, e_path, n_path = load_fields(params)
     error = b.err_adder.cpu().numpy() if bool(b.errField) else (0., 0., 0.)
     bw = make_grid(b.B.cpu().numpy(), R0=b.R0, a=b.a, periods=int(b.periodicity[2]),
                    device=warp_device, addend=error)
     ew = make_grid(e.B.cpu().numpy(), R0=e.R0, a=e.a, periods=1, device=warp_device)
+    # Torch has already applied PLASMA_DENSITY and clamped negative values.
+    # Convert back to the saved scalar layout; do not multiply a second time.
+    nw = (make_density_grid(n.value.cpu().numpy().transpose(2, 1, 0), bw)
+          if n is not None else None)
 
     # Generate once, outside timing; both backends and all repeats share it.
     ions, x0, v0, initial_conditions = initialize_particles(params, args.particles, b, e)
     q_over_m = np.array([ion.charge_mass_ratio for ion in ions])
     solver = boris_module.Boris(None)
-    solver.setConditions(ions, 'Warp benchmark', dt=dt, tmax=args.steps*dt)
+    solver.setConditions(ions, 'Warp benchmark', dt=dt, tmax=args.steps*dt, **plasma_settings)
 
     def run_torch(steps):
         solver.nsteps = steps + 1  # Avoid float floor-division changing the workload.
         for ion in ions:
             ion.pos_XYZ.clear()
         wall_x, wall_v, last, _ = solver.parallel_solver(
-            ions, b, Efield=e, trace_IDs=[], trace_stride=steps,
-            ion_neutral_collisions=None, ion_ion_collisions=None)
+            ions, b, Efield=e, nfield=n, trace_IDs=[], trace_stride=steps,
+            ion_neutral_collisions=neutral_model, ion_ion_collisions=ion_model)
         wall_x, wall_v, last = wall_x.cpu().numpy(), wall_v.cpu().numpy(), last.cpu().numpy()
         hit = np.any(wall_x != 0, axis=1)
         return {'wall_position_xyz': wall_x, 'wall_velocity_xyz': wall_v,
                 'last_inside_step': last, 'hit_step': np.where(hit, last+1, -1)}
 
     def run_warp(steps):
-        return run_wall_only(x0, v0, q_over_m, bw, e_grid=ew, dt=dt, steps=steps)
+        return run_wall_only(x0, v0, q_over_m, bw, e_grid=ew, dt=dt, steps=steps,
+                             collisions=collisions, density_grid=nw)
 
     def synchronize():
         if device.type == 'cuda':
@@ -266,7 +293,13 @@ def main():
         wp.synchronize_device(warp_device)
 
     print(f'{device}: {args.particles} particles, {args.steps} steps, dt={dt:g} s, '
-          f'{args.repeats} repeats; collisionless, no traces', flush=True)
+          f'{args.repeats} repeats; no traces', flush=True)
+    print(f'Collisions: neutral={neutral_model}, ion-ion={ion_model}', flush=True)
+    if n_path is not None:
+        print(f'Density: {n_path}\nDensity multiplier: {params["PLASMA_DENSITY"]:g} m^-3', flush=True)
+    if stochastic:
+        print('Stochastic models use independent random draws across backends and repeats; '
+              'particle-by-particle differences are not a numerical parity test.', flush=True)
     print(f'E: {e_path}\nPotential multiplier: {params["PLASMA_POTENTIAL"]:g} V', flush=True)
     print('Warming both backends (including Warp compilation)...', flush=True)
     for run in (run_torch, run_warp):
@@ -308,6 +341,9 @@ def main():
     medians = {name: float(np.median(values)) for name, values in times.items()}
     ratio = medians['torch'] / medians['warp']
     report = {'inputs': str(args.inputs.resolve()), 'electric_field': str(e_path),
+              'density_field': str(n_path) if n_path is not None else None,
+              'collisions': {'ion_neutral': neutral_model, 'ion_ion': ion_model,
+                             'stochastic': stochastic, **plasma_settings},
               'device': str(device), 'torch_version': torch.__version__, 'warp_version': wp.__version__,
               'particles': args.particles, 'steps': args.steps, 'dt': dt,
               'initial_conditions': initial_conditions, 'plasma_potential': params['PLASMA_POTENTIAL'],

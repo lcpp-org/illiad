@@ -20,7 +20,7 @@ from .collisions import Collisions, kg_per_amu, kboltz, eps0, sqrt_pi, Li_mass, 
 
 class Boris(Collisions):
     """Class to handle Boris analysis of magnetic field lines."""
-    def __init__(self, io_handler, anlys_name='Boris', tag=None):
+    def __init__(self, io_handler, anlys_name='Boris', tag=None, *, method='torch'):
         """Initializes the Boris class with the specified solver parameters and writes to log.
 
         Args:
@@ -42,6 +42,7 @@ class Boris(Collisions):
         self.anlys_name = anlys_name
         self.solver = 'boris_buneman'
         self.tag = tag
+        self.method = self.resolve_method(method)
 
         # self.IO.createSubDir(anlys_name)
         # self.IO.log.info("+----------------+-------------------------+")
@@ -89,7 +90,51 @@ class Boris(Collisions):
         # self.IO.log.info(f"| NSTEPS         | {self.nsteps:<23} |")
         # self.IO.log.info("+----------------+-------------------------+")
 
+    @staticmethod
+    def resolve_method(method):
+        """Validate a Boris execution method without importing optional Warp."""
+        if isinstance(method, str) and method.strip().lower() in ('torch', 'warp'):
+            return method.strip().lower()
+        raise ValueError("BORIS_METHOD must be 'torch' or 'warp'")
+
+    @staticmethod
+    def require_method(method):
+        """Fail before workflow setup if a selected optional backend is absent."""
+        method = Boris.resolve_method(method)
+        if method == 'warp':
+            try:
+                from . import boris_warp
+            except ModuleNotFoundError as exc:
+                if exc.name == 'warp':
+                    raise ImportError(
+                        "BORIS_METHOD='warp' requires NVIDIA Warp; install illiad-fieldlines[warp] "
+                        "or select BORIS_METHOD='torch'."
+                    ) from exc
+                raise
+        return method
+
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
+                        trace_stride=1, freq_corr=False, ion_neutral_collisions=None,
+                        ion_ion_collisions=None, method=None):
+        """Dispatch to Torch (default) or optional Warp with identical outputs.
+
+        method overrides the constructor's choice for this call only. Both
+        backends return wall XYZ, wall velocity, last-inside step, and selected
+        traces, including initial/stride/final samples, as Torch tensors.
+        """
+        selected = self.require_method(self.method if method is None else method)
+        if selected == 'warp':
+            from .boris_warp import solve
+            return solve(self, ions, Bfield, Efield=Efield, nfield=nfield,
+                         trace_IDs=trace_IDs, trace_stride=trace_stride,
+                         freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
+                         ion_ion_collisions=ion_ion_collisions)
+        return self.torch_solver(ions, Bfield, Efield=Efield, nfield=nfield,
+                                 trace_IDs=trace_IDs, trace_stride=trace_stride,
+                                 freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
+                                 ion_ion_collisions=ion_ion_collisions)
+
+    def torch_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1,
                         freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None):
         """
@@ -169,7 +214,7 @@ class Boris(Collisions):
                 Bvec = torch.empty([Nparticles, 3], dtype=torch.float64, device=device)
                 Bvec = Bfield.interpField(pos_k).T
                 Bmag = torch.linalg.norm(Bvec, axis=-1)
-                Bhat = Bvec / Bmag[:, None]
+                Bhat = Bvec / torch.where(Bmag > 0, Bmag, 1.0)[:, None]
                 tvec = torch.tan(qdt2m * Bmag)[:, None] * Bhat
             else:
                 tvec = (Bfield.interpField(pos_k) * qdt2m).T
@@ -256,8 +301,8 @@ class Boris(Collisions):
                         )
 
                     if freq_corr:
-                        Bmag_active = torch.linalg.norm(b_vecs_active, axis=-1)
-                        Bhat_active = b_vecs_active / Bmag_active[:, None]
+                        Bmag_active = torch.linalg.norm(b_vecs_active.T, axis=-1)
+                        Bhat_active = b_vecs_active.T / torch.where(Bmag_active > 0, Bmag_active, 1.0)[:, None]
                         tvec_active = torch.tan(qdt2m_active * Bmag_active)[:, None] * Bhat_active
                     else:
                         tvec_active = (b_vecs_active * qdt2m_active).T
@@ -377,11 +422,14 @@ class Boris(Collisions):
         ion_traces = trace_output_.cpu().numpy()
 
         # filter out rows containing all zeros
-        wallPt_output = wallPt_output[~np.all(wallPt_output == 0, axis=1)]
-        # Filter velocity_output and get the indices of nonzero rows
-        nonzero_indices = ~np.all(velocity_output == 0, axis=1)
+        nonzero_indices = ~np.all(wallPt_output == 0, axis=1)
+        wallPt_output = wallPt_output[nonzero_indices]
         velocity_output = velocity_output[nonzero_indices]
         max_timeStep = max_timeStep[nonzero_indices]
+
+        if len(wallPt_output) == 0:
+            self.IO.log.info('No wall hits; saving empty wall output and selected traces.')
+            return np.empty((7, 0)), np.empty(0), np.empty(0), np.empty(0), ion_traces
 
         speed_output = np.linalg.norm(velocity_output, axis=1)
         ion_mass_kg = self.ion_list[0].mass #* kg_per_amu
@@ -427,7 +475,7 @@ class Boris(Collisions):
 
     def run(self, Bfield, Efield=None, nfield=None,
             ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
-            trace_stride=1):
+            trace_stride=1, method=None):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -438,6 +486,7 @@ class Boris(Collisions):
             ion_ion_collisions: Ion-ion collision model name, or None.
             trace_IDs: List of particle IDs to trace. Defaults to [].
             trace_stride: Save one trace sample every trace_stride timesteps.
+            method: Optional 'torch'/'warp' override for this run.
 
         Returns:
             Tuple containing:
@@ -455,7 +504,8 @@ class Boris(Collisions):
             ion_neutral_collisions = ion_neutral_collisions,
             ion_ion_collisions = ion_ion_collisions,
             trace_IDs = trace_IDs,
-            trace_stride = trace_stride
+            trace_stride = trace_stride,
+            method = method
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)

@@ -270,6 +270,7 @@ class IOHandler:
         param_values = param_dict
 
         self.log.info('\n|=======================================================================================|'
+                      +'\n| BORIS METHOD: {}'.format(param_values.get("BORIS_METHOD", "torch"))
                       +'\n| LOADED TOROIDAL FIELD CONFIG: {}'.format(param_values["CONFIG_TOR"])
                       +'\n| LOADED TOROIDAL COIL CURRENT: {}'.format(param_values["TOROIDAL_CURRENT"])
                       +'\n| LOADED HELICAL FIELD CONFIG: {}'.format(param_values["CONFIG_HEL"])

@@ -24,6 +24,7 @@ from illiad.utilities.point_generators import ionInitializer
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
+    "BORIS_METHOD": "torch",
     "CONFIG_TOR": "default_toroidal",
     "CONFIG_HEL": "default_helical",
     "ENABLE_ERRFIELD": True,
@@ -116,6 +117,7 @@ def resolve_plasma_potential(params):
 ## RUN SIMULATION:
 def boris_runner(params):
 
+    params["BORIS_METHOD"] = Boris.require_method(params.get("BORIS_METHOD", "torch"))
     stride = int(params["STRIDE"])
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
@@ -192,7 +194,8 @@ def boris_runner(params):
     simIO.saveNumpyData(initVelPos, IC_filename)
     simIO.log.info('OUTPUT IC DATA: {}'.format(IC_filename))
 
-    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"])
+    ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"],
+                       method=params["BORIS_METHOD"])
     ion_tracer.plotInitEnergies(initVelPos, params["ION_MASS"], runString=cond_string+params["TAG"], simIO=simIO)
     ion_tracer.plotInitVelocities(
         initVelPos, initial_normals, Rmajor=b_hidra.R0,
@@ -224,7 +227,8 @@ def boris_runner(params):
                                                                                     ion_ion_collisions=params["ION_ION_COLLISIONS"],
                                                                                     trace_IDs=particle_tracker_list,
                                                                                     trace_stride=stride)
-    simIO.log.info('PYTORCH STATS:\n' + torch.cuda.memory_summary())
+    if torch.cuda.is_available():
+        simIO.log.info('PYTORCH ALLOCATOR STATS (excludes Warp allocations):\n' + torch.cuda.memory_summary())
 
     # COORDINATE FLIIPING & CONVERSION
     phi_plot = output_array[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
@@ -237,18 +241,20 @@ def boris_runner(params):
 
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
-    ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90],
-                                colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
-                                runString='AngleCombined', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_out,
-                                colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
-                                runString='EnergyCombined', simIO=simIO, cond_string=cond_string)
-    ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180],
-                                colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
-                                runString='PHIAngleCombined', simIO=simIO, cond_string=cond_string)
+    if output_array.shape[1]:
+        ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
+        ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90],
+                                    colorLabel='Ion Deposition Angle (deg. from normal)', myColormap='viridis',
+                                    runString='AngleCombined', simIO=simIO, cond_string=cond_string)
+        ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, energy_out,
+                                    colorLabel='Ion Deposition Energy (eV)', myColormap='magma',
+                                    runString='EnergyCombined', simIO=simIO, cond_string=cond_string)
+        ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, toroidal_angles, colorRange=[0, 180],
+                                    colorLabel='Ion Deposition Toroidal Angle (deg. from $\\hat{\\phi}$)', myColormap='coolwarm',
+                                    runString='PHIAngleCombined', simIO=simIO, cond_string=cond_string)
 
-    ion_tracer.plotTraces(traces, b_hidra, runString='Traces', simIO=simIO)
+    if traces.shape[1]:
+        ion_tracer.plotTraces(traces, b_hidra, runString='Traces', simIO=simIO)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED! ##\n\n\n')

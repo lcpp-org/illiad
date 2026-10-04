@@ -528,7 +528,9 @@ def boris_plotParticlesOverTime(maxN_array, tot_particles, tmax, dt, runString='
     # Estimate residence time using trapezoidal integration of the fraction running over time
     tau_res = np.trapz(frac_running, dx=dt)
     if frac_running[-1] > 0:
-        slope = (np.log(frac_running[-1]) - np.log(frac_running[-101])) / 100 / dt # use wider range for slope to reduce noise
+        window = min(100, len(frac_running) - 1)
+        slope = ((np.log(frac_running[-1]) - np.log(frac_running[-1-window])) / window / dt
+                 if window else -1e-1)
         slope = min(slope, -1e-1)  # prevent division by zero or very small slope
         tau_res_corr = -frac_running[-1] / slope
     else:
