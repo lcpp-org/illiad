@@ -4,7 +4,8 @@ The production `illiad-boris` workflow supports two `BORIS_METHOD` values:
 
 ```json
 "BORIS_METHOD": "warp",
-"WARP_STEP_CHUNK_SIZE": 16
+"WARP_STEP_CHUNK_SIZE": 16,
+"WARP_COMPACTION_INTERVAL": 256
 ```
 
 Use `"torch"` for the existing PyTorch implementation (also the default when
@@ -35,7 +36,9 @@ the Python API also allows the existing constant-density fallback. This preserve
 the current collision models and mass conventions, including Li-He full FP.
 
 Both methods save `Wallpt_OUTPUT.npy` and `Ion_traces.npy` through the existing
-output handler and use the existing plots. Trace selection and `STRIDE` work for
+output handler and use the existing plots. Saved `Ion_traces.npy` arrays use
+float32; solver state, in-memory traces, and wall outputs retain float64.
+Trace selection and `STRIDE` work for
 Warp: samples include the initial state, stride samples, and the final state,
 including early termination. Wall positions remain the first outside-wall sample,
 not an interpolated surface crossing. The wall output's timestep row retains the
@@ -57,7 +60,7 @@ output = solver.run(Bfield, Efield, nfield,
                     ion_neutral_collisions="langevin",
                     ion_ion_collisions="fokker_planck",
                     trace_IDs=[0, 10], trace_stride=100,
-                    warp_step_chunk_size=16)
+                    warp_step_chunk_size=16, warp_compaction_interval=256)
 ```
 
 `run(..., method="torch")` or `parallel_solver(..., method="torch")` overrides the
@@ -86,10 +89,33 @@ The final chunk is shortened to the remaining number of steps.
 
 Each original particle retains one thread. Position, velocity, and RNG state
 stay local across substeps, while fields and density are interpolated anew at
-every physical step. A thread stops immediately on a wall hit. There is no
-active-list compaction or CUDA graph capture. The host checks for complete
-termination at chunk boundaries after at least 256 steps since the previous
-check, or at the final chunk, then trims traces to the actual last hit.
+every physical step. A thread stops immediately on a wall hit.
+
+`WARP_COMPACTION_INTERVAL` sets the physical steps between active-particle ID
+filtering passes (default 256; nonnegative int32 integer). The pass occurs at the
+first chunk boundary at or beyond that interval since the previous pass, and at
+the final chunk. For example, chunk size 16 and interval 100 filter every 112
+steps. Subsequent pushes launch only the retained particles. A zero survivor
+count stops the host loop, and traces are trimmed to the exact last hit.
+
+Set the interval to 0 to disable compaction. This keeps the original full-particle
+launch size and checks for complete termination at chunk boundaries after at
+least 256 steps since the previous check, or at the final chunk. Torch ignores
+both Warp settings. There is no CUDA graph capture.
+
+Compaction uses two reusable int32 ID buffers and an atomic append per survivor.
+Particle state, RNG state, wall output, and traces remain indexed by permanent
+particle IDs. GPU scheduling may reorder the active list, but it does not change
+particle identity or the random stream assigned to that particle. Selected
+traces, including duplicate selections and terminated particles, retain their
+existing order and format.
+
+Filtering costs a kernel launch and a survivor-count download. Very frequent
+filtering can outweigh the benefit, particularly while most particles remain
+active. This reduces scheduled work, not retained particle/output memory: the
+two ID buffers add approximately 8 bytes per original particle. They are omitted
+when compaction is disabled. The default interval is a starting point, not a
+measured GPU optimum.
 
 Selected trace samples are written inside the kernel using global timestep
 indices, including every substep with `STRIDE: 1`. Initial and final samples
@@ -109,8 +135,11 @@ python misc_scripts/benchmark_warp_boris.py --inputs input_files/your_boris_inpu
 ```
 
 Without that override, the benchmark reads `WARP_STEP_CHUNK_SIZE` from the JSON
-(default 16), and records the effective size in its timing report. Its wall-only
-measurements do not measure full-trace recording overhead.
+(default 16). `--warp-compaction-interval 0` disables compaction for comparison;
+otherwise it reads `WARP_COMPACTION_INTERVAL` (default 256). Both effective values
+are recorded in the timing report. Keep chunk size fixed when comparing
+compaction intervals. These wall-only measurements do not measure full-trace
+recording overhead.
 
 Warp compilation is lazy. The first use of a changed kernel can take appreciable
 time; its persistent cache normally avoids recompilation on subsequent runs.

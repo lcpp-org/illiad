@@ -1,6 +1,7 @@
 {
   "BORIS_METHOD": "torch",
   "WARP_STEP_CHUNK_SIZE": 16,
+  "WARP_COMPACTION_INTERVAL": 256,
   "CONFIG_TOR": "default_toroidal",
   "CONFIG_HEL": "default_helical",
   "ENABLE_ERRFIELD": true,

@@ -274,6 +274,8 @@ illiad-boris --inputs input_files/boris_inputs.example.json
 Set `"BORIS_METHOD": "warp"` in that JSON to use the optional NVIDIA Warp
 backend; `"torch"` remains the default. `"WARP_STEP_CHUNK_SIZE": 16` sets physical
 timesteps per Warp launch; use 1 to disable chunking without changing `DT`.
+`"WARP_COMPACTION_INTERVAL": 256` periodically filters the surviving particle IDs
+to reduce subsequent launch sizes; use 0 to disable compaction.
 Both use the same initialization,
 fields, collisions, and output workflow. See [Boris backends](docs/boris_backends.md)
 for requirements, trace support, and timing/memory details.

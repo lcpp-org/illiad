@@ -7,7 +7,8 @@ re-export package functions for compatibility. The benchmark uses the package.
 
 The notes below describe the original wall-only prototype interface. Production
 Warp additionally supports selected traces, frequency correction, timestep
-chunking (`WARP_STEP_CHUNK_SIZE`, default 16), and early termination; use the backend guide for current production behavior.
+chunking (`WARP_STEP_CHUNK_SIZE`, default 16), active-ID compaction
+(`WARP_COMPACTION_INTERVAL`, default 256), and early termination; use the backend guide for current production behavior.
 
 ## What is implemented
 
