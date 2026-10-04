@@ -39,6 +39,13 @@ class BackendSelection(unittest.TestCase):
                 bm.Boris.validate_warp_step_chunk_size(value)
         self.assertEqual(bm.Boris.validate_warp_step_chunk_size(np.int64(16)), 16)
 
+    def test_compaction_interval_validation(self):
+        for value in (-1, True, np.bool_(True), 1.5, 2.0, '256', None, 2**31):
+            with self.assertRaisesRegex(ValueError, 'WARP_COMPACTION_INTERVAL'):
+                bm.Boris.validate_warp_compaction_interval(value)
+        for value in (0, 1, np.int64(256)):
+            self.assertEqual(bm.Boris.validate_warp_compaction_interval(value), value)
+
     def test_default_torch_push(self):
         with tempfile.TemporaryDirectory() as tmp, \
                 patch.object(bm, 'device', torch.device('cpu')), \
@@ -139,7 +146,8 @@ class BackendParity(unittest.TestCase):
                     self.assertEqual(result[0].shape[1], 0)
                 self.assertTrue(np.isfinite(result[-1]).all())
                 np.testing.assert_array_equal(self.saved['Wallpt_OUTPUT'], result[0])
-                np.testing.assert_array_equal(self.saved['Ion_traces'], result[-1])
+                self.assertEqual(self.saved['Ion_traces'].dtype, np.float32)
+                np.testing.assert_array_equal(self.saved['Ion_traces'], result[-1].astype(np.float32))
 
     def test_fields_share_storage(self):
         from illiad.boris_warp import _vector_grid_from_torch
@@ -187,10 +195,11 @@ class BackendParity(unittest.TestCase):
                              ('langevin', 'linear_fp'), ('langevin', 'fokker_planck')]:
             config = wb.make_collision_config(ion_neutral_collisions=neutral, ion_ion_collisions=ion)
             reference = None
-            for chunk in (1, 4, 16, 128):
+            for chunk, interval in ((c, i) for c in (1, 4, 16, 128) for i in (0, 4, 256)):
                 result = wb._run_particles(x, v, q, grid, dt=1e-8, steps=35,
                     e_grid=electric, density_grid=density, collisions=config, seed=317,
-                    trace_ids=list(range(len(ions))), step_chunk_size=chunk)
+                    trace_ids=list(range(len(ions))), step_chunk_size=chunk,
+                    compaction_interval=interval)
                 arrays = {key: result[key].numpy() for key in
                           ('wall_position_xyz', 'wall_velocity_xyz', 'hit_step', 'last_inside_step')}
                 arrays['traces'] = result['traces'].numpy()[:result['trace_count']]
@@ -199,7 +208,7 @@ class BackendParity(unittest.TestCase):
                 else:
                     for key in arrays:
                         np.testing.assert_allclose(arrays[key], reference[key], rtol=1e-12, atol=1e-10,
-                                                   err_msg=f'{neutral}/{ion}, chunk={chunk}, {key}')
+                                                   err_msg=f'{neutral}/{ion}, chunk={chunk}, compact={interval}, {key}')
 
     def test_chunk_launch_count(self):
         from illiad import boris_warp as wb
@@ -209,6 +218,37 @@ class BackendParity(unittest.TestCase):
                 self.b, self.e, trace_IDs=[0], trace_stride=1, warp_step_chunk_size=4)
         pushes = [call for call in launch.call_args_list if call.args[0] is wb.push_and_record_wall]
         self.assertEqual(len(pushes), 5)
+
+    def test_compaction_launch_sizes_and_trace_identity(self):
+        from illiad import boris_warp as wb
+        zero = self.field(np.zeros((3, 5, 8, 4)), 'zero')
+        ions = [Ion(np.array([r, 0., 0.]), 6.941, 1) for r in (.90995, .90955, .8)]
+        for ion in ions:
+            ion.initVelocity(np.array([1e4, 0., 0.]))
+        # First two hit on steps 1 and 5; non-divisible interval rounds up to
+        # step 6. Keep duplicate/negative trace selections across ID filtering.
+        reference = None
+        for interval in (0, 4):
+            with patch.object(wb.wp, 'launch', wraps=wb.wp.launch) as launch:
+                result = self.solver(ions, 'warp', steps=19).run(
+                    zero, trace_IDs=[2, 0, -2, 0], trace_stride=1,
+                    warp_step_chunk_size=3, warp_compaction_interval=interval)
+            pushes = [c.kwargs['dim'] for c in launch.call_args_list
+                      if c.args[0] is wb.push_and_record_wall]
+            self.assertEqual(pushes, [3]*7 if interval == 0 else [3, 3, 1, 1, 1, 1, 1])
+            if reference is None:
+                reference = result
+            else:
+                for actual, expected in zip(result, reference):
+                    np.testing.assert_allclose(actual, expected, atol=1e-12, rtol=0)
+        with patch.object(wb.wp, 'launch', wraps=wb.wp.launch) as launch:
+            result = self.solver(ions[:2], 'warp', steps=19).parallel_solver(
+                ions[:2], zero, trace_IDs=[0, 1], trace_stride=3,
+                warp_step_chunk_size=3, warp_compaction_interval=4)
+        pushes = [c.kwargs['dim'] for c in launch.call_args_list
+                  if c.args[0] is wb.push_and_record_wall]
+        self.assertEqual(pushes, [2, 2])  # All terminated: no zero-sized push.
+        self.assertEqual(tuple(result[-1].shape), (3, 2, 3))  # steps 0, 3, 5
 
 
 if __name__ == '__main__':

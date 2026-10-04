@@ -173,6 +173,8 @@ def parse_args():
     parser.add_argument('--dt', type=float, help='Override JSON DT')
     parser.add_argument('--warp-step-chunk-size', type=int,
                         help='Physical steps per Warp launch (JSON WARP_STEP_CHUNK_SIZE, default 16; 1 disables)')
+    parser.add_argument('--warp-compaction-interval', type=int,
+                        help='Physical steps between Warp active-ID filtering (JSON default 256; 0 disables)')
     parser.add_argument('--device', default='cuda:0', help='cuda:0 (default), cuda:N, or cpu')
     parser.add_argument('--output', type=Path, help='Optional JSON timing/comparison report')
     parser.add_argument('--plot-dir', type=Path,
@@ -243,6 +245,9 @@ def main():
     chunk_size = boris_module.Boris.validate_warp_step_chunk_size(
         args.warp_step_chunk_size if args.warp_step_chunk_size is not None
         else params.get('WARP_STEP_CHUNK_SIZE', 16))
+    compaction_interval = boris_module.Boris.validate_warp_compaction_interval(
+        args.warp_compaction_interval if args.warp_compaction_interval is not None
+        else params.get('WARP_COMPACTION_INTERVAL', 256))
     resolver = Collisions()
     neutral_model = resolver._resolve_ion_neutral_collision_model(params['ION_NEUTRAL_COLLISIONS'])
     ion_model = resolver._resolve_ion_ion_collision_model(params['ION_ION_COLLISIONS'])
@@ -290,7 +295,8 @@ def main():
 
     def run_warp(steps):
         return run_wall_only(x0, v0, q_over_m, bw, e_grid=ew, dt=dt, steps=steps,
-                             collisions=collisions, density_grid=nw, step_chunk_size=chunk_size)
+                             collisions=collisions, density_grid=nw, step_chunk_size=chunk_size,
+                             compaction_interval=compaction_interval)
 
     def synchronize():
         if device.type == 'cuda':
@@ -300,7 +306,7 @@ def main():
     print(f'{device}: {args.particles} particles, {args.steps} steps, dt={dt:g} s, '
           f'{args.repeats} repeats; no traces', flush=True)
     print(f'Collisions: neutral={neutral_model}, ion-ion={ion_model}', flush=True)
-    print(f'Warp physical timesteps per launch: {chunk_size}', flush=True)
+    print(f'Warp physical timesteps per launch: {chunk_size}; compaction interval: {compaction_interval}', flush=True)
     if n_path is not None:
         print(f'Density: {n_path}\nDensity multiplier: {params["PLASMA_DENSITY"]:g} m^-3', flush=True)
     if stochastic:
@@ -352,7 +358,7 @@ def main():
                              'stochastic': stochastic, **plasma_settings},
               'device': str(device), 'torch_version': torch.__version__, 'warp_version': wp.__version__,
               'particles': args.particles, 'steps': args.steps, 'dt': dt,
-              'warp_step_chunk_size': chunk_size,
+              'warp_step_chunk_size': chunk_size, 'warp_compaction_interval': compaction_interval,
               'initial_conditions': initial_conditions, 'plasma_potential': params['PLASMA_POTENTIAL'],
               'seconds': times, 'median_seconds': medians, 'torch_over_warp': ratio,
               'comparison': comparison}
@@ -360,7 +366,7 @@ def main():
           f'Torch/Warp = {ratio:.2f}x')
     print('Wall comparison:', json.dumps(comparison, indent=2))
     print('Times include particle setup and wall download; exclude field loading/upload and warmup.\n'
-          'Torch compacts active particles; Warp chunks timesteps and periodically checks for complete termination.\n'
+          'Torch compacts active particles; Warp chunks timesteps with optional periodic active-ID compaction.\n'
           'This compares the eager Torch and package Warp solvers; no torch.compile or CUDA graphs.')
     plot_dir = args.plot_dir or (args.output.with_suffix('') if args.output else
                                 ROOT / 'output/warp_boris_benchmark')
