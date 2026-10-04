@@ -113,9 +113,16 @@ class Boris(Collisions):
                 raise
         return method
 
+    @staticmethod
+    def validate_warp_step_chunk_size(value):
+        """Physical timesteps per Warp launch; one disables chunking."""
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)) or not 1 <= value < 2**31:
+            raise ValueError('WARP_STEP_CHUNK_SIZE must be a positive int32 integer')
+        return int(value)
+
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1, freq_corr=False, ion_neutral_collisions=None,
-                        ion_ion_collisions=None, method=None):
+                        ion_ion_collisions=None, method=None, warp_step_chunk_size=16):
         """Dispatch to Torch (default) or optional Warp with identical outputs.
 
         method overrides the constructor's choice for this call only. Both
@@ -123,12 +130,14 @@ class Boris(Collisions):
         traces, including initial/stride/final samples, as Torch tensors.
         """
         selected = self.require_method(self.method if method is None else method)
+        warp_step_chunk_size = self.validate_warp_step_chunk_size(warp_step_chunk_size)
         if selected == 'warp':
             from .boris_warp import solve
             return solve(self, ions, Bfield, Efield=Efield, nfield=nfield,
                          trace_IDs=trace_IDs, trace_stride=trace_stride,
                          freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
-                         ion_ion_collisions=ion_ion_collisions)
+                         ion_ion_collisions=ion_ion_collisions,
+                         step_chunk_size=warp_step_chunk_size)
         return self.torch_solver(ions, Bfield, Efield=Efield, nfield=nfield,
                                  trace_IDs=trace_IDs, trace_stride=trace_stride,
                                  freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
@@ -475,7 +484,7 @@ class Boris(Collisions):
 
     def run(self, Bfield, Efield=None, nfield=None,
             ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
-            trace_stride=1, method=None):
+            trace_stride=1, method=None, warp_step_chunk_size=16):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -487,6 +496,7 @@ class Boris(Collisions):
             trace_IDs: List of particle IDs to trace. Defaults to [].
             trace_stride: Save one trace sample every trace_stride timesteps.
             method: Optional 'torch'/'warp' override for this run.
+            warp_step_chunk_size: Physical steps per Warp launch (default 16); ignored by Torch.
 
         Returns:
             Tuple containing:
@@ -505,7 +515,8 @@ class Boris(Collisions):
             ion_ion_collisions = ion_ion_collisions,
             trace_IDs = trace_IDs,
             trace_stride = trace_stride,
-            method = method
+            method = method,
+            warp_step_chunk_size = warp_step_chunk_size
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)

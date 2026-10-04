@@ -25,6 +25,7 @@ from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
     "BORIS_METHOD": "torch",
+    "WARP_STEP_CHUNK_SIZE": 16,
     "CONFIG_TOR": "default_toroidal",
     "CONFIG_HEL": "default_helical",
     "ENABLE_ERRFIELD": True,
@@ -118,6 +119,8 @@ def resolve_plasma_potential(params):
 def boris_runner(params):
 
     params["BORIS_METHOD"] = Boris.require_method(params.get("BORIS_METHOD", "torch"))
+    params["WARP_STEP_CHUNK_SIZE"] = Boris.validate_warp_step_chunk_size(
+        params.get("WARP_STEP_CHUNK_SIZE", 16))
     stride = int(params["STRIDE"])
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
@@ -226,7 +229,8 @@ def boris_runner(params):
                                                                                     ion_neutral_collisions=params["ION_NEUTRAL_COLLISIONS"],
                                                                                     ion_ion_collisions=params["ION_ION_COLLISIONS"],
                                                                                     trace_IDs=particle_tracker_list,
-                                                                                    trace_stride=stride)
+                                                                                    trace_stride=stride,
+                                                                                    warp_step_chunk_size=params["WARP_STEP_CHUNK_SIZE"])
     if torch.cuda.is_available():
         simIO.log.info('PYTORCH ALLOCATOR STATS (excludes Warp allocations):\n' + torch.cuda.memory_summary())
 

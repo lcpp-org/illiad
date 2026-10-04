@@ -240,48 +240,72 @@ def push_and_record_wall(
     has_density: int,
     random_states: wp.array(dtype=wp.uint32),
     freq_corr: int,
+    chunk_steps: int,
+    trace_heads: wp.array(dtype=wp.int32),
+    trace_next: wp.array(dtype=wp.int32),
+    traces: wp.array2d(dtype=wp.vec3d),
+    trace_stride: int,
 ):
-    i = wp.tid()  # One logical GPU thread owns one particle.
+    i = wp.tid()  # One logical GPU thread owns one particle for the whole chunk.
     if active[i] == 0:
         return
 
     xi = x[i]
     vi = v[i]
-    e = wp.vec3d(wp.float64(0.0))
-    if has_e == 1:
-        e = sample_vector(e_grid, xi) * qdt2m[i]
-    t = rotation_vector(sample_vector(b_grid, xi), qdt2m[i], freq_corr)
-
-    ne = collisions.n_e
-    if collisions.ion != 0 and has_density == 1:
-        ne = sample_density(density, b_grid, xi)
+    qi = qdt2m[i]
     state = wp.uint32(0)
     stochastic = collisions.neutral == 2 or collisions.ion != 0
     if stochastic:
         state = random_states[i]
-    if collisions.neutral != 0 or collisions.ion != 0:
-        vi, state = collision_hstep(vi, ne, collisions, dt, state)
+    for offset in range(chunk_steps):
+        current_step = step + offset
+        e = wp.vec3d(wp.float64(0.0))
+        if has_e == 1:
+            e = sample_vector(e_grid, xi) * qi
+        t = rotation_vector(sample_vector(b_grid, xi), qi, freq_corr)
+        ne = collisions.n_e
+        if collisions.ion != 0 and has_density == 1:
+            ne = sample_density(density, b_grid, xi)
+        if collisions.neutral != 0 or collisions.ion != 0:
+            vi, state = collision_hstep(vi, ne, collisions, dt, state)
 
-    vm = vi + e
-    vp = vm + wp.cross(vm, t)
-    s = t * (wp.float64(2.0) / (wp.float64(1.0) + wp.dot(t, t)))
-    vi = vm + wp.cross(vp, s) + e
-    xi = xi + vi * dt
-    # Match Torch: reuse pre-push density, and collide before recording wall v.
-    if collisions.neutral != 0 or collisions.ion != 0:
-        vi, state = collision_hstep(vi, ne, collisions, dt, state)
+        vm = vi + e
+        vp = vm + wp.cross(vm, t)
+        rotation = t * (wp.float64(2.0) / (wp.float64(1.0) + wp.dot(t, t)))
+        vi = vm + wp.cross(vp, rotation) + e
+        xi = xi + vi * dt
+        # Reuse this substep's pre-push density; collide before recording wall v.
+        if collisions.neutral != 0 or collisions.ion != 0:
+            vi, state = collision_hstep(vi, ne, collisions, dt, state)
+
+        if traces.shape[1] > 0 and current_step % trace_stride == 0:
+            slot = trace_heads[i]
+            while slot >= 0:
+                traces[current_step // trace_stride, slot] = xi
+                slot = trace_next[slot]
+        if minor_radius(xi, b_grid.R0) >= b_grid.a:
+            active[i] = 0
+            wall_x[i] = xi  # First outside point, not a projected wall intersection.
+            wall_v[i] = vi
+            hit_step[i] = current_step
+            break
+        last_inside_step[i] = current_step  # Existing Boris maxStep convention.
+
     if stochastic:
         random_states[i] = state
     x[i] = xi
     v[i] = vi
 
-    if minor_radius(xi, b_grid.R0) >= b_grid.a:
-        active[i] = 0
-        wall_x[i] = xi  # First outside point, not a projected wall intersection.
-        wall_v[i] = vi
-        hit_step[i] = step
-    else:
-        last_inside_step[i] = step  # Existing Boris maxStep convention.
+
+@wp.kernel
+def fill_terminated_traces(x: wp.array(dtype=wp.vec3d), ids: wp.array(dtype=wp.int32),
+                           hit_step: wp.array(dtype=wp.int32),
+                           traces: wp.array2d(dtype=wp.vec3d), stride: int):
+    row, slot = wp.tid()
+    particle = ids[slot]
+    # Preserve rectangular traces: terminated particles remain at their wall point.
+    if hit_step[particle] >= 0 and row * stride >= hit_step[particle]:
+        traces[row, slot] = x[particle]
 
 
 def make_grid(values, *, R0, a, periods, device, addend=(0.0, 0.0, 0.0)):
@@ -333,7 +357,7 @@ def make_density_grid(values, b_grid, *, scale=1.0):
 
 def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                    collisions=None, density_grid=None, seed=None, trace_ids=(),
-                   trace_stride=1, freq_corr=False, show_progress=False):
+                   trace_stride=1, freq_corr=False, show_progress=False, step_chunk_size=16):
     """Advance particles, returning device arrays and the valid trace length.
 
     steps is the number of position updates (existing self.nsteps - 1).
@@ -342,6 +366,8 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     collisions is a make_collision_config() result (default: all off).
     density_grid overrides the ion-ion constant density. seed controls Warp only.
     """
+    from .boris import Boris
+    step_chunk_size = Boris.validate_warp_step_chunk_size(step_chunk_size)
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError('dt must be finite and positive')
     if isinstance(steps, bool) or int(steps) != steps or not 0 <= steps < 2**31:
@@ -400,7 +426,15 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     traces = wp.empty((1 + int(steps)//trace_stride + 1, len(ids)), dtype=wp.vec3d, device=device)
     if len(ids):
         wp.launch(record_trace, dim=len(ids), inputs=[x, trace_indices, traces, 0], device=device)
-    trace_row = 1
+    # Linked slots preserve duplicate/negative trace-ID semantics without copying
+    # all particle state. No lookup storage is needed for wall-only runs.
+    heads = np.full(n if len(ids) else 0, -1, dtype=np.int32)
+    next_slot = np.full(len(ids), -1, dtype=np.int32)
+    for slot, particle in enumerate(ids):
+        next_slot[slot] = heads[particle]
+        heads[particle] = slot
+    trace_heads = wp.array(heads, dtype=wp.int32, device=device)
+    trace_next = wp.array(next_slot, dtype=wp.int32, device=device)
     remaining = wp.zeros(1, dtype=wp.int32, device=device)
     stochastic = collisions.neutral == 2 or collisions.ion != 0
     random_states = wp.empty(n if stochastic else 0, dtype=wp.uint32, device=device)
@@ -414,34 +448,39 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     wp.launch(initialize_velocity, dim=n,
               inputs=[x, v, qdt2m, b_grid, e_grid, has_e, int(freq_corr)], device=device)
     final_step = int(steps)
-    iterator = range(1, int(steps) + 1)
+    progress = None
     if show_progress:
         from tqdm import tqdm
-        iterator = tqdm(iterator, ncols=100, mininterval=2.0, desc='Boris (warp)')
-    for step in iterator:
+        progress = tqdm(total=int(steps), ncols=100, mininterval=2.0, desc='Boris (warp)')
+    last_active_check = 0
+    for step in range(1, int(steps) + 1, step_chunk_size):
+        chunk_steps = min(step_chunk_size, int(steps) - step + 1)
+        end_step = step + chunk_steps - 1
         wp.launch(push_and_record_wall, dim=n,
                   inputs=[x, v, qdt2m, active, wall_x, wall_v, hit_step,
                           last_inside_step, b_grid, e_grid, has_e, dt, step,
-                          collisions, density_grid, has_density, random_states, int(freq_corr)],
+                          collisions, density_grid, has_density, random_states, int(freq_corr),
+                          chunk_steps, trace_heads, trace_next, traces, trace_stride],
                   device=device)
-        if step % trace_stride == 0:
-            if len(ids):
-                wp.launch(record_trace, dim=len(ids), inputs=[x, trace_indices, traces, trace_row], device=device)
-            trace_row += 1
-        # Amortize host/device synchronization. Dead particles have frozen state,
-        # so trim samples back to the exact last hit when all have terminated.
-        if step % 256 == 0 or step == steps:
+        if progress is not None:
+            progress.update(chunk_steps)
+        # Check at chunk boundaries, approximately every 256 physical steps.
+        if end_step - last_active_check >= 256 or end_step == steps:
+            last_active_check = end_step
             remaining.zero_()
             wp.launch(count_active, dim=n, inputs=[active, remaining], device=device)
             n_remaining = int(remaining.numpy()[0])
-            if show_progress:
-                iterator.set_postfix({'active': n_remaining}, refresh=False)
+            if progress is not None:
+                progress.set_postfix({'active': n_remaining}, refresh=False)
             if n_remaining == 0:
                 final_step = int(hit_step.numpy().max())
                 break
-    if show_progress:
-        iterator.close()
+    if progress is not None:
+        progress.close()
     trace_count = 1 + final_step//trace_stride
+    if len(ids):
+        wp.launch(fill_terminated_traces, dim=(trace_count, len(ids)),
+                  inputs=[x, trace_indices, hit_step, traces, trace_stride], device=device)
     if final_step % trace_stride != 0:
         if len(ids):
             wp.launch(record_trace, dim=len(ids), inputs=[x, trace_indices, traces, trace_count], device=device)
@@ -453,11 +492,11 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
 
 
 def run_wall_only(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
-                  collisions=None, density_grid=None, seed=None):
+                  collisions=None, density_grid=None, seed=None, step_chunk_size=16):
     """Wall-only NumPy interface retained for the prototype benchmark."""
     result = _run_particles(x0, v0, charge_mass_ratio, b_grid, dt=dt, steps=steps,
                             e_grid=e_grid, collisions=collisions,
-                            density_grid=density_grid, seed=seed)
+                            density_grid=density_grid, seed=seed, step_chunk_size=step_chunk_size)
     return {key: result[key].numpy() for key in
             ('wall_position_xyz', 'wall_velocity_xyz', 'hit_step', 'last_inside_step')}
 
@@ -491,7 +530,8 @@ def _vector_grid_from_torch(mesh):
 
 
 def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
-          freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None):
+          freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
+          step_chunk_size=16):
     """Adapter returning the same four Torch tensors as Boris.parallel_solver."""
     from contextlib import nullcontext
     import logging
@@ -534,7 +574,8 @@ def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_st
             np.asarray([particle.charge_mass_ratio for particle in ions]), b,
             dt=solver.dt, steps=solver.nsteps-1, e_grid=e,
             collisions=c, density_grid=n, trace_ids=trace_IDs,
-            trace_stride=trace_stride, freq_corr=freq_corr, show_progress=True)
+            trace_stride=trace_stride, freq_corr=freq_corr, show_progress=True,
+            step_chunk_size=step_chunk_size)
         for particle in ions:
             particle.setPosition(0, particle.pos0_XYZ)
         traces = (wp.to_torch(result['traces'])[:result['trace_count']] if len(trace_IDs)

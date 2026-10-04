@@ -271,6 +271,7 @@ class IOHandler:
 
         self.log.info('\n|=======================================================================================|'
                       +'\n| BORIS METHOD: {}'.format(param_values.get("BORIS_METHOD", "torch"))
+                      +'\n| WARP STEP CHUNK SIZE (Warp only): {}'.format(param_values.get("WARP_STEP_CHUNK_SIZE", 16))
                       +'\n| LOADED TOROIDAL FIELD CONFIG: {}'.format(param_values["CONFIG_TOR"])
                       +'\n| LOADED TOROIDAL COIL CURRENT: {}'.format(param_values["TOROIDAL_CURRENT"])
                       +'\n| LOADED HELICAL FIELD CONFIG: {}'.format(param_values["CONFIG_HEL"])
