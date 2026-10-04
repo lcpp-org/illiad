@@ -271,6 +271,11 @@ prepared density and electric fields:
 illiad-boris --inputs input_files/boris_inputs.example.json
 ```
 
+Set `"BORIS_METHOD": "warp"` in that JSON to use the optional NVIDIA Warp
+backend; `"torch"` remains the default. Both use the same initialization,
+fields, collisions, and output workflow. See [Boris backends](docs/boris_backends.md)
+for requirements, trace support, and timing/memory details.
+
 Ion-neutral collisions accept `viscous_drag`, `langevin`, or `null`. Ion-ion
 collisions accept `linear_fp`, `fokker_planck`, or `null`. Enabled operators
 are applied as half-steps around the Boris push.

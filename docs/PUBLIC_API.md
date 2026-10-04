@@ -251,6 +251,7 @@ It uses the same generic defaults, artifact preflight, and
 
 | Group | Keys |
 | --- | --- |
+| Execution | `BORIS_METHOD`: `torch` (default) or optional `warp`; see [backend guide](boris_backends.md). |
 | Magnetic configuration | `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `TOROIDAL_CURRENT`, `HELICAL_CURRENT` |
 | Upstream fields | `FIELD_FILE_DENSITY`, `FIELD_FILE_ELECTRIC` |
 | Collision selection | `ION_NEUTRAL_COLLISIONS`, `ION_ION_COLLISIONS` |
@@ -345,7 +346,7 @@ from illiad import plotting
 | `SOLRegularizer` | `SOLRegularizer(io_handler, input_params, crossing_source=None)`; `run` |
 | `SOLDensity` | `SOLDensity(io_handler, input_params)`; `run` |
 | `SOLPotential` | `SOLPotential(io_handler, input_params)`; `run` |
-| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None)`; condition, solver, output, diagnostic, and `run` methods |
+| `Boris` | `Boris(io_handler, anlys_name="Boris", tag=None, *, method="torch")`; condition, solver, output, diagnostic, and `run` methods |
 | `Collisions` | Collision-model resolution and ion-neutral and ion-ion numerical operators |
 
 `illiad.sol` also exports `build_torch_magnetic_field`,

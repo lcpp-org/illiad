@@ -86,6 +86,10 @@ from illiad.collisions import (
 )
 ```
 
+`Boris(..., method="torch")` is the default; `method="warp"` selects the optional
+Warp backend. The CLI selects it through `BORIS_METHOD`. See
+[Boris backends](boris_backends.md) for the shared inputs and outputs.
+
 Ion-neutral collision selectors are `viscous_drag` and `langevin`. Ion-ion
 collision selectors are `linear_fp` and `fokker_planck`. Use `None` to disable
 either collision category programmatically.

@@ -39,6 +39,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+warp = [
+    "warp-lang>=1.17",
+]
 fitting = [
     "scikit-learn",
 ]
@@ -57,6 +60,7 @@ dev = [
     "build",
 ]
 all = [
+    "warp-lang>=1.17",
     "scikit-learn",
     "fastplotlib",
     "pygfx",
@@ -85,6 +89,9 @@ illiad-sol-potential = "illiad.cli.sol_potential:main"
 illiad-boris = "illiad.cli.boris:main"
 
 [dependency-groups]
+warp = [
+    "warp-lang>=1.17",
+]
 fitting = [
     "scikit-learn",
 ]

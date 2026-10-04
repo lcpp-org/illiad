@@ -1,21 +1,27 @@
-# Collisionless Warp Boris prototype
+# Warp Boris prototype
 
-The standalone implementation is
-[`misc_scripts/warp_boris_prototype.py`](../misc_scripts/warp_boris_prototype.py).
-It is a proposed backend, not connected to the production CLI. Nothing needs to
-be installed to read it; executing it requires NumPy and NVIDIA Warp.
+The prototype has been integrated into the production package as the optional
+`BORIS_METHOD="warp"` backend. See [Boris backends](boris_backends.md).
+The original `misc_scripts/warp_boris_prototype.py` and collision module now
+re-export package functions for compatibility. The benchmark uses the package.
+
+The notes below describe the original wall-only prototype interface. Production
+Warp additionally supports selected traces, frequency correction, and early
+termination; use the backend guide for current production behavior.
 
 ## What is implemented
 
-- One `VectorGrid` struct describing an already calculated Cartesian vector field.
-- Three `@wp.func` device helpers: `minor_radius`, `rotate_z`, `sample_vector`.
+- `VectorGrid` and `DensityGrid` structs for calculated vector/scalar fields.
+- Device helpers for geometry, vector interpolation, and scalar density sampling.
 - Two `@wp.kernel` entry points: `initialize_velocity`, `push_and_record_wall`.
-- Two ordinary Python functions: `make_grid`, `run_wall_only`.
+- Host functions: `make_grid`, `make_density_grid`, `run_wall_only`.
+- Optional neutral/ion-ion operators, configuration, and a random-state
+  initialization kernel in `misc_scripts/warp_collision_operators.py`.
 
 Each timestep launches one logical thread per original particle. Its thread
-interpolates B and optional E, performs the ordinary Boris update, advances the
-position, and records the first outside-wall state. Inactive threads return
-immediately. There are no collision models, density field, frequency correction,
+interpolates B and optional E/density, applies optional collision half-steps around
+the ordinary Boris update, advances the position, and records the first
+outside-wall state. Inactive threads return immediately. There is no frequency correction,
 particle trace arrays, device-side timestep chunks, CUDA graphs, or active-list
 compaction. The Python loop runs the requested number of steps even if all
 particles have hit the wall. This keeps launch and state-management syntax visible.
@@ -141,8 +147,8 @@ reuse the corresponding part of `Boris.post_solver`. There is no trace return.
 
 ## How much production code would change?
 
-This prototype adds **one Python file and this note; no existing files change**.
-A production collisionless backend would replace the numerical logic in these
+The prototype uses two Python files plus the separate benchmark and this note;
+the production solver is unchanged. A production collisionless backend would replace the numerical logic in these
 existing functions, preferably by leaving Torch implementations available and
 adding Warp counterparts:
 
@@ -158,6 +164,100 @@ Thus **two existing computational areas / three principal functions** require
 substantial porting. File loading, field generation, ion initialization, and
 wall plotting can remain in their existing Python workflows. Trace-dependent
 plotting and saving need to be skipped when integrating this wall-only path.
+The collision-enabled extension additionally ports the operators from
+`illiad/collisions.py` into `misc_scripts/warp_collision_operators.py` and the
+scalar density lookup from `TorchMesh` into the prototype.
+
+## Collision operators and density field
+
+`run_wall_only` remains collisionless by default. Pass a `CollisionConfig` made
+by `make_collision_config()` to enable the same named models as the Torch solver:
+
+| Selector | Accepted models |
+| --- | --- |
+| `ion_neutral_collisions` | `None`, `viscous_drag`, `langevin` |
+| `ion_ion_collisions` | `None`, `linear_fp`, `fokker_planck` |
+
+As in the existing selector contract, `False` and strings `none`, `false`, `off`
+disable a model. Invalid names and `True` are rejected.
+
+For example, after constructing `b_grid`, `e_grid`, and initial particle arrays:
+
+```python
+from misc_scripts.warp_boris_prototype import (
+    make_collision_config, make_density_grid, run_wall_only,
+)
+
+# The saved scalar file is (phi, theta, r), unlike Cartesian vector-field files.
+# Apply PLASMA_DENSITY once, as TorchMesh.loadScalarField does. If the file is
+# already physical density in m^-3, use scale=1.0 instead.
+n_grid = make_density_grid(
+    np.load(params["FIELD_FILE_DENSITY"]), b_grid,
+    scale=params["PLASMA_DENSITY"],
+)
+collisions = make_collision_config(
+    ion_neutral_collisions=params["ION_NEUTRAL_COLLISIONS"],
+    ion_ion_collisions=params["ION_ION_COLLISIONS"],
+    n_gas=params["NEUTRAL_GAS_DENSITY"],
+    T_gas_eV=params["NEUTRAL_GAS_TEMP_EV"],
+    Ti_eV=params["ION_TEMP"],
+    m_gas_amu=4.002603,  # He; supply the mass of the configured background gas
+    n_e=params["PLASMA_DENSITY"],
+)
+result = run_wall_only(
+    x0, v0, q_over_m, b_grid, e_grid=e_grid, dt=dt, steps=steps,
+    collisions=collisions, density_grid=n_grid,
+)
+```
+
+`make_density_grid` transposes to internal `(r, theta, phi)` order, scales and
+clamps negative values to zero, matching `loadScalarField`. Density must cover
+the full torus on nodes aligned with B: its saved shape must be
+`(B.nphi*B.periods, B.ntheta, B.nr)`. Sampling uses B's toroidal volume weights
+and offsets the unwrapped phi indices into the full-torus scalar array before
+wrapping. Scalar values are never vector-rotated. Omitting `density_grid` uses
+the configured constant `n_e`; neutral collisions use `n_gas`, not that field.
+
+The timestep ordering reproduces `Boris.parallel_solver`:
+
+1. Sample B/E and ion-ion density at the current position.
+2. Apply the neutral half-step, then the ion-ion half-step.
+3. Apply Boris and advance position.
+4. Apply neutral and ion-ion half-steps again using the same density sample.
+5. Record wall position and the velocity after those second half-steps.
+
+The startup velocity adjustment stays collisionless, as in the current solver.
+No density evaluation is attempted at an outside-wall position.
+
+The port preserves existing physics choices: neutral cross section `1e-19 m^2`,
+gas-mass-based thermal variance for Langevin and linear FP (the current Boris
+driver sets `m_ion_amu = m_gas_amu`), and fixed Li/He masses, unit charge numbers,
+zero background drift, and `lnLambda=10` for full FP. It retains the small-x
+Chandrasekhar series and small-speed floors. This is a backend port, not a change
+to those model assumptions.
+
+Each stochastic particle has its own persistent Warp random state indexed by
+its original row. Neutral/ion-ion draws and both half-steps consume successive
+samples; state advances across timesteps. `seed=None` chooses a fresh seed per
+call; an integer `seed` in `[0, 2**31)` gives repeatable Warp runs. Warp and Torch
+do not produce identical random streams from an equal seed. Warp 1.17's native
+`randn` draws are float32; they are promoted to float64 before all collision
+arithmetic. Deterministic drag needs no random state.
+
+The benchmark script resolves the JSON collision selectors and passes the same
+models, density, and plasma settings to both backends. Setting both selectors to
+`null` retains collisionless benchmarking.
+
+Validation in `warpenv` used actual compiled CPU kernels: all four operators and
+the Coulomb rates matched Torch with supplied identical Gaussian samples;
+density interpolation matched random points and all five magnetic sector seams;
+collisionless, drag, and both combined stochastic models matched the full Torch
+one-step wall outputs. Identical Gaussian draws were supplied to Torch for these
+checks, so they test the formulas rather than comparing unrelated realizations.
+Two-step combined-model checks also matched, exercising RNG-state advancement
+and density resampling between timesteps. Constant-density fallback, selector
+validation, repeatable seeds, and distinct-seed behavior were checked separately.
+GPU validation and performance measurements have not been performed.
 
 ## Validation boundary
 
@@ -210,7 +310,9 @@ libraries must be able to use the selected device.
 The script uses the existing toroidal/helical B component files and combines
 them using the supplied JSON's currents and attenuation settings, exactly as
 the Boris CLI does. It loads `FIELD_FILE_ELECTRIC` and applies the resolved
-`PLASMA_POTENTIAL` multiplier. No field solver or density file is needed. The
+`PLASMA_POTENTIAL` multiplier. When ion-ion collisions are enabled, it also loads
+`FIELD_FILE_DENSITY`, applies `PLASMA_DENSITY` once, and shares the resulting
+physical density values between backends. No field solver is run. The
 default JSON points to the existing IOTA3 NewSOLTrace500 NoIslands2 E field at
 25 V; other Boris JSONs can be passed with `--inputs`. Relative field paths are
 resolved from the repository root.
@@ -236,9 +338,31 @@ share the exact same selected positions and velocities. Initializer data/figure
 saves are disabled through a read-only IO adapter, protecting existing production
 artifacts. The initializer still builds its diagnostic figures in memory, so
 startup may take some time. That work is outside the timing. The former circular
-shell option has been removed. Both collision selectors and tracing remain
-disabled, `DT` is retained unless overridden with `--dt`, and `--steps` replaces
+shell option has been removed. Collision selectors follow the input JSON;
+tracing remains disabled. `DT` is retained unless overridden with `--dt`, and `--steps` replaces
 the long production `TMAX`.
+
+`ION_NEUTRAL_COLLISIONS` accepts `viscous_drag`, `langevin`, or `null`;
+`ION_ION_COLLISIONS` accepts `linear_fp`, `fokker_planck`, or `null`.
+Disabled aliases are normalized before deciding whether to load density. The
+default input enables `langevin` plus `fokker_planck`. Both backends receive
+`NEUTRAL_GAS_DENSITY`, `NEUTRAL_GAS_TEMP_EV`, `ION_TEMP`, `PLASMA_DENSITY`, and the
+mass resolved from `BACKGROUND_GAS_SPECIES`. With ion-ion collisions disabled,
+no density file is opened. Neutral collisions use the constant neutral density.
+
+Stochastic collisions use independent random draws across backends and repeats;
+the initial particle arrays are still shared. Wall/step differences therefore
+describe independent realizations, not deterministic numerical parity. Compare
+the distributions and survival curves rather than expecting matching individual
+trajectories. The final-repeat plots retain their existing behavior.
+
+The integrated JSON-driven benchmark was smoke-tested in `warpenv` on CPU with
+the solved IOTA3 fields and a reduced production LCFS grid (2 toroidal planes,
+8 poloidal emitters, 32 particles, 10 steps). Langevin + full FP, drag + linear
+FP, and disabled selectors all completed and saved the reports/plots/arrays.
+The disabled case used an intentionally missing density path to verify that
+density loading is skipped. These short runs had no wall hits and are workflow
+checks, not stochastic distribution validation or GPU benchmarks.
 
 Timing includes particle allocations/uploads, startup velocity adjustment,
 stepping, and NumPy wall-result download for both backends. Field loading/upload,
@@ -249,7 +373,8 @@ than one means Warp was faster). Torch's progress rendering is disabled within
 this standalone process. No production source is monkey-patched on disk.
 
 The optional JSON report records the times, workload, library versions, device,
-and wall comparison. Hits and last-inside steps are compared by original
+resolved collision models and plasma settings, density-field path, and wall
+comparison. Hits and last-inside steps are compared by original
 particle row; maximum wall position/velocity differences use particles that hit
 in both backends. Differences are reported, not treated as benchmark failures.
 If neither backend records wall hits, wall-vector comparisons are null rather

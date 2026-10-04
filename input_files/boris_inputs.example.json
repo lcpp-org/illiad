@@ -1,4 +1,5 @@
 {
+  "BORIS_METHOD": "torch",
   "CONFIG_TOR": "default_toroidal",
   "CONFIG_HEL": "default_helical",
   "ENABLE_ERRFIELD": true,
