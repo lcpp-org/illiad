@@ -11,7 +11,7 @@ import numpy as np
 import logging
 from PIL import Image
 from tqdm import tqdm
-from illiad.utilities.coordtrans import XYZ_to_RTP2
+from illiad.utilities.coordtrans import XYZ_to_RTP2, wall_plot_angles
 
 # UIUC branding color palette
 UIUC = {
@@ -25,11 +25,11 @@ UIUC = {
 
 ## PORT PLOTTING CONVENIENCE FUNCTION
 def global_plotPorts(ax_, simIO):
-    """Plots the ports on the given axis."""
+    """Plot north-referenced CSV ports in CCW degrees from the south split."""
     # Import data on HIDRA port size/locations for plotting
     ports = simIO.loadPorts_fromCSV('input_files/HIDRA_ports.csv')
     for port in ports.T:
-        port_plot = patches.Ellipse((port[0], port[1]), port[2], port[3],
+        port_plot = patches.Ellipse(((port[0] - 180.0) % 360.0, port[1]), port[2], port[3],
                                     fill=True, alpha=0.2, facecolor='black', edgecolor='black', linewidth=0.0)
         ax_.add_patch(port_plot)
 
@@ -46,14 +46,7 @@ def boris_plotWallHist(wallPtArray, runString, simIO, cond_string):
     electric_field_V = parts[3][:-1]  # Remove 'V' suffix
     charge_num_Z = parts[4][1:]  # Remove 'Z' prefix
 
-    phi_plot = wallPtArray[2]*(-1) + 2*np.pi # convert to phi= +CCW (viewing from outside VV)
-    theta_plot = wallPtArray[1]
-    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-
-    # shift to physical phi=0 at at the South-side split, convert to deg.
-    a_phi = 18. # (deg), phi_comp 18 CW from south-split
-    phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
-    theta_plot_deg = theta_plot*(180/np.pi)
+    phi_plot_deg, theta_plot_deg = wall_plot_angles(wallPtArray[:3].T)
 
     # define bin edges for 2d histogram
     phi_edges = np.linspace(0, 360, 361)
@@ -575,21 +568,7 @@ def boris_plotCombined_Hist(wallPtArray, maxN_array, tot_particles, tmax, dt, ru
     simIO.log.info('Plotting Combined Histogram...')
 
     ## CREATE HISTOGRAM
-    # extract theta and phi
-    theta_plot = wallPtArray[1]
-    # convert to phi= +CCW (as if viewing from outside the vaccum vessel)
-    phi_plot = wallPtArray[2]*(-1) + 2*np.pi
-
-    # shift theta domain to -180 to 180
-    # for i in range(len(theta_plot)):
-    #     if theta_plot[i]>np.pi: theta_plot[i] -= 2*np.pi
-    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-
-    # convert to degrees
-    # shift to physical phi=0 at at the South-side split
-    a_phi = 18 #positive for consitency w/ histogram func! -18. # degrees, phi_comp is 18 CW from south-side split
-    phi_plot_deg = (phi_plot*(180/np.pi) + 180. + a_phi) % 360.
-    theta_plot_deg = theta_plot*(180/np.pi)
+    phi_plot_deg, theta_plot_deg = wall_plot_angles(wallPtArray[:3].T)
 
     # define bin edges for 2d histogram
     phi_edges = np.linspace(0, 360, 361)

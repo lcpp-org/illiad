@@ -18,6 +18,27 @@ def _require_torch():
     if torch is None:
         raise ImportError("PyTorch is required for this torch-based coordinate transform.")
 
+
+def computational_phi_to_wall_deg(phi_rad):
+    """Convert computational radians to CCW degrees from the south split.
+
+    Computational phi is clockwise, with zero 18 degrees clockwise from
+    the south split. Thus phi_comp=0 maps to 342 degrees on the wall plot.
+    """
+    return (-np.rad2deg(np.asarray(phi_rad)) - 18.0) % 360.0
+
+
+def wall_plot_angles(rtp):
+    """Return wall (phi, theta) degrees for (..., 3) computational RTP.
+
+    Do not modify the input. Keep theta=pi at +180 degrees, matching the
+    existing wall plots' endpoint convention.
+    """
+    rtp = np.asarray(rtp)
+    theta = rtp[..., 1]
+    theta = np.where(theta > np.pi, theta - 2.0 * np.pi, theta)
+    return computational_phi_to_wall_deg(rtp[..., 2]), np.rad2deg(theta)
+
 def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     """Converts r-theta-phi coordinates to Cartesian coordinates.
 

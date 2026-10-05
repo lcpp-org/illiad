@@ -21,6 +21,7 @@ from illiad.collisions import Collisions
 from illiad.mesh import TorchMesh
 from illiad.io import IOHandler
 from illiad.utilities.point_generators import ionInitializer
+from illiad.utilities.coordtrans import wall_plot_angles
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
@@ -238,14 +239,8 @@ def boris_runner(params):
     if torch.cuda.is_available():
         simIO.log.info('PYTORCH ALLOCATOR STATS (excludes Warp allocations):\n' + torch.cuda.memory_summary())
 
-    # COORDINATE FLIIPING & CONVERSION
-    phi_plot = output_array[2]*(-1) + 2*np.pi # flip phi for the perspective outside the vacuum vessel
-    a_phi = 18. #-36. # degrees, phi_comp is 18 CW from south-side split
-    phi_plot_deg = (phi_plot*(180/np.pi) + a_phi) % 360.
-
-    theta_plot = output_array[1]
-    theta_plot[theta_plot>np.pi] -= 2*np.pi #shift so that (theta=0) is centered in the plot
-    theta_plot_deg = theta_plot*(180/np.pi)
+    # Display angles only; retain computational coordinates in the output arrays.
+    phi_plot_deg, theta_plot_deg = wall_plot_angles(output_array[:3].T)
 
     ## PLOTTING
     ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
