@@ -383,8 +383,10 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     density_grid overrides the ion-ion constant density. seed controls Warp only.
     """
     from .boris import Boris
+
     step_chunk_size = Boris.validate_warp_step_chunk_size(step_chunk_size)
     compaction_interval = Boris.validate_warp_compaction_interval(compaction_interval)
+
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError('dt must be finite and positive')
     if isinstance(steps, bool) or int(steps) != steps or not 0 <= steps < 2**31:
@@ -409,6 +411,7 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     r2 = xy2 + x0[:, 2]**2 + b_grid.R0**2 - 2 * b_grid.R0 * np.sqrt(xy2)
     if np.any(np.sqrt(np.maximum(r2, 0.0)) >= b_grid.a):
         raise ValueError('initial particles must be strictly inside the wall')
+    
     device = b_grid.values.device
     if collisions is None:
         collisions = make_collision_config()
@@ -429,6 +432,7 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
           or e_grid.nphi != b_grid.nphi * b_grid.periods):
         raise ValueError('E must be a full-torus grid aligned with B on the same device')
 
+
     n = len(x0)
     x = wp.array(x0, dtype=wp.vec3d, device=device)
     v = wp.array(v0, dtype=wp.vec3d, device=device)
@@ -438,9 +442,9 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     # Swap ID buffers after each filter; all physical state stays indexed by
     # original particle ID, including RNG and trace lookup arrays.
     use_compaction = int(compaction_interval > 0)
-    active_ids = wp.array(np.arange(n if use_compaction else 0, dtype=np.int32),
-                          dtype=wp.int32, device=device)
+    active_ids = wp.array(np.arange(n if use_compaction else 0, dtype=np.int32), dtype=wp.int32, device=device)
     spare_ids = wp.empty_like(active_ids)
+
     launch_count = n
     wall_x = wp.zeros(n, dtype=wp.vec3d, device=device)
     wall_v = wp.zeros(n, dtype=wp.vec3d, device=device)
@@ -460,6 +464,7 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     trace_heads = wp.array(heads, dtype=wp.int32, device=device)
     trace_next = wp.array(next_slot, dtype=wp.int32, device=device)
     remaining = wp.zeros(1, dtype=wp.int32, device=device)
+    
     stochastic = collisions.neutral == 2 or collisions.ion != 0
     random_states = wp.empty(n if stochastic else 0, dtype=wp.uint32, device=device)
     if stochastic:
@@ -540,6 +545,7 @@ def _vector_grid_from_torch(mesh):
     """Share a TorchMesh's float64 field without a host roundtrip or field copy."""
     import torch
     periods = np.asarray(mesh.periodicity)
+
     if periods.shape != (3,) or tuple(periods[:2]) != (0, 1) or periods[2] < 1:
         raise ValueError('Warp Boris requires mesh periodicity [0, 1, P] with P >= 1')
     expected = (mesh.nr, mesh.ntheta, mesh.nphi, 3)
@@ -547,20 +553,24 @@ def _vector_grid_from_torch(mesh):
         raise ValueError('Warp Boris requires float64 Cartesian fields with shape (nr, ntheta, nphi, 3)')
     if min(expected[:3]) < 2 or not mesh.R0 > mesh.a > 0:
         raise ValueError('Warp Boris requires at least two nodes per axis and R0 > a > 0')
+    
     g = VectorGrid()
     g.nr, g.ntheta, g.nphi = mesh.nr, mesh.ntheta, mesh.nphi
     g.periods = int(periods[2])
     g.R0, g.a = float(mesh.R0), float(mesh.a)
     g.dr, g.dtheta, g.dphi, g.phi_max = map(float, (mesh.dr, mesh.dtheta, mesh.dphi, mesh.phi_max))
+
     expected_spacing = (g.a/(g.nr-1), 2*np.pi/g.ntheta,
                         2*np.pi/(g.periods*g.nphi), 2*np.pi/g.periods)
     if not np.allclose((g.dr, g.dtheta, g.dphi, g.phi_max), expected_spacing, rtol=1e-12, atol=0):
         raise ValueError('Warp Boris requires uniform, aligned toroidal mesh spacing')
+    
     addend = np.zeros(3)
     if bool(mesh.errField):
         addend = mesh.err_adder.detach().cpu().numpy() if torch.is_tensor(mesh.err_adder) else mesh.err_adder
     g.addend = wp.vec3d(*np.asarray(addend, dtype=np.float64))
     g.values = wp.from_torch(mesh.B, dtype=wp.vec3d)
+
     return g
 
 
