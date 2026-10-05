@@ -14,8 +14,8 @@ phi_wall [0, 360]. Footprint samples retain their saved computational locations
 as pixel centers. Deposition reproduces boris_plotWallHist's angular probability
 density (per degree squared), not particle flux per square meter.
 
-Geometry is an ideal torus, in millimeters. Keep the three output files together.
-OBJ is unitless: select millimeters in the importing application. The texture
+Geometry is an ideal torus, in meters. Keep the three output files together.
+OBJ is unitless: select meters in the importing application. The texture
 contains only the scalar map, without plot labels or port overlays.
 """
 
@@ -39,7 +39,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output/hidra_inventor_wall"
 RMAJOR_M = 0.72
 # Preserved from the generated script. Choose the surface matching your data;
 # magnetic_footprint.py uses RMINOR=0.19 m, with launches just inside that wall.
-WALL_RADIUS_M = 0.19 - 0.001
+WALL_RADIUS_M = 0.19
 PHI_WALL_OFFSET_DEG = 18.0
 COLORMAP = "inferno"
 COLOR_SCALE = "linear"
@@ -50,12 +50,12 @@ MM_PER_M = 1000.0
 # Same transform and row-vector multiplication as boxMagneticField.py.
 # To transform from X Y Z coordinate system set up in the code (+x at 18 degrees CW from the South Side and +y at 18 degrees CW from
 # the East Side +Z towards the roof forming a right handed system)
-# to the XYZ coordinates according to tokamak energ (+x at North Side Split, +y at the East Side and +z towards the floor - also right handed)
+# to the target XYZ coordinates (+x towards the South Side Split, +y East, and +z up - also right handed).
 RAD18 = np.deg2rad(18.0)
 CODE_TO_INVENTOR = np.array([
-    [-np.cos(RAD18), -np.sin(RAD18), 0.0],
-    [-np.sin(RAD18), np.cos(RAD18), 0.0],
-    [0.0, 0.0, -1.0],
+    [np.cos(RAD18), -np.sin(RAD18), 0.0],
+    [np.sin(RAD18), np.cos(RAD18), 0.0],
+    [0.0, 0.0, 1.0],
 ])
 # T.T @ T = I and det(T) = +1: rotate both vertices and normals, preserving
 # handedness and winding. This Cartesian rotation is separate from Boris's
@@ -196,7 +196,7 @@ def export_map(data, theta, phi, output_dir=OUTPUT_DIR, *, major_radius=RMAJOR_M
                    f"map_Kd {texture.name}\n", encoding="utf-8")
     with obj.open("w", encoding="utf-8") as stream:
         stream.write("# Ideal vacuum-facing torus; units: millimeters\n"
-                     "# Tokamak Energy frame: +X North split, +Y East, +Z floor\n"
+                     "# Target frame: +X South-side split, +Y East, +Z up\n"
                      f"# Major radius: {major_radius * MM_PER_M:g}; wall radius: {wall_radius * MM_PER_M:g}\n"
                      f"# Texture: {cmap}, {scale}, vmin={low:g}, vmax={high:g}; missing=gray\n"
                      f"mtllib {mtl.name}\n")

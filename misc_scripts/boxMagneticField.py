@@ -86,11 +86,12 @@ Data frame is organized 3 X 191 X 180 X 72
 72 - for the phi
 """
 rad18 = np.deg2rad(18)
-transMatrix = np.array([[-np.cos(rad18), -np.sin(rad18), 0],[-np.sin(rad18), np.cos(rad18), 0], [0,0, -1]])
+transMatrix = np.array([[np.cos(rad18), -np.sin(rad18), 0],[np.sin(rad18), np.cos(rad18), 0], [0,0, 1]])
 """
 To transform from X Y Z coordinate system set up in the code (+x at 18 degrees CW from the South Side and +y at 18 degrees CW from 
 the East Side +Z towards the roof forming a right handed system)
-to the XYZ coordinates according to tokamak energ (+x at North Side Split, +y at the East Side and +z towards the floor - also right handed)
+to the target XYZ coordinates (+x towards the South Side Split, +y East, and +z up - also right handed).
+Vectors use row-vector multiplication: target = source @ transMatrix.
 """
 transMatrixInv = np.linalg.inv(transMatrix)
 #print(transMatrix @ transMatrixInv)
