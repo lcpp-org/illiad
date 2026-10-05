@@ -141,8 +141,8 @@ class Boris(Collisions):
         warp_step_chunk_size = self.validate_warp_step_chunk_size(warp_step_chunk_size)
         warp_compaction_interval = self.validate_warp_compaction_interval(warp_compaction_interval)
         if selected == 'warp':
-            from .boris_warp import solve
-            return solve(self, ions, Bfield, Efield=Efield, nfield=nfield,
+            from .boris_warp import warp_solve
+            return warp_solve(self, ions, Bfield, Efield=Efield, nfield=nfield,
                          trace_IDs=trace_IDs, trace_stride=trace_stride,
                          freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
                          ion_ion_collisions=ion_ion_collisions,
