@@ -564,7 +564,7 @@ def _vector_grid_from_torch(mesh):
     return g
 
 
-def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
+def warp_solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
           freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
           step_chunk_size=16, compaction_interval=256):
     """Adapter returning the same four Torch tensors as Boris.parallel_solver."""
@@ -615,5 +615,7 @@ def solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_st
             particle.setPosition(0, particle.pos0_XYZ)
         traces = (wp.to_torch(result['traces'])[:result['trace_count']] if len(trace_IDs)
                   else torch.empty((result['trace_count'], 0, 3), dtype=torch.float64, device=device))
-        return (wp.to_torch(result['wall_position_xyz']), wp.to_torch(result['wall_velocity_xyz']),
-                wp.to_torch(result['last_inside_step']), traces)
+        return (wp.to_torch(result['wall_position_xyz']),
+                wp.to_torch(result['wall_velocity_xyz']),
+                wp.to_torch(result['last_inside_step']),
+                traces)
