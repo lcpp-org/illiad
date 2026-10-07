@@ -25,7 +25,7 @@ def computational_phi_to_wall_deg(phi_rad):
     Computational phi is clockwise, with zero 18 degrees clockwise from
     the south split. Thus phi_comp=0 maps to 342 degrees on the wall plot.
     """
-    return (-np.rad2deg(np.asarray(phi_rad)) - 18.0) % 360.0
+    return (-np.rad2deg(np.asarray(phi_rad)) + 720 - 18.0) % 360.0
 
 
 def wall_plot_angles(rtp):
