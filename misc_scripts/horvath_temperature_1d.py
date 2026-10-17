@@ -69,6 +69,14 @@ AXIS_TEMPERATURE_EV = None      # Measured value: fit chi if supplied
 OUTER_GRADIENT_EV_M = 0.0       # dT/dx, x increasing outward (not plot distance)
 
 
+def heating_w_m3(temperature_ev, n_slow, n_fast, t_fast):
+    """Horvath (3)-(4), with every temperature converted from eV to joules."""
+    tau = (4*np.pi*epsilon_0/e**2)**2 * 3*np.sqrt(m_e)*(e*t_fast)**1.5
+    tau = tau / (8*np.sqrt(2*np.pi)*n_slow*COULOMB_LOG)
+    return 1.5*n_fast*e*(t_fast-temperature_ev)/tau
+
+
+
 def slow_density_m3(x, psi, lcfs_x):
     """INPUT HOOK: replace with measured density or a particle-balance model."""
     core = N_LCFS + (N_AXIS - N_LCFS) * np.clip(psi, 0.0, 1.0)
@@ -86,6 +94,8 @@ def fast_temperature_ev(x, psi):
     return np.full_like(x, FAST_TEMPERATURE_EV)
 
 
+
+# LOSS DUE TO ATOMIC PROCESSES
 def atomic_loss_w_m3(x, temperature_ev, n_slow, n_fast):
     """CALCULATION SKELETON: return total atomic energy loss in W/m^3.
 
@@ -98,18 +108,60 @@ def atomic_loss_w_m3(x, temperature_ev, n_slow, n_fast):
     return np.zeros_like(temperature_ev)
 
 
-def heating_w_m3(temperature_ev, n_slow, n_fast, t_fast):
-    """Horvath (3)-(4), with every temperature converted from eV to joules."""
-    tau = (4*np.pi*epsilon_0/e**2)**2 * 3*np.sqrt(m_e)*(e*t_fast)**1.5
-    tau = tau / (8*np.sqrt(2*np.pi)*n_slow*COULOMB_LOG)
-    return 1.5*n_fast*e*(t_fast-temperature_ev)/tau
+def ionization_loss_w_m3(x, temperature_ev, fasttemp_ev, fast_frac, n_target, prefactor, ionization_energy_ev):
+    """CALCULATION SKELETON: return ionization energy loss in W/m^3.
+   
+    TODO: add species-specific ionization rates and thresholds.
+    """
+    # prefactor passed as an argument
+    n_e = slow_density_m3
+    Q_slow = n_e * (1 - fast_frac) * n_target * prefactor * ionization_energy_ev * np.exp(-ionization_energy_ev/temperature_ev)
+    Q_fast = n_e * fast_frac * n_target * prefactor * ionization_energy_ev * np.exp(-ionization_energy_ev/fasttemp_ev)
+
+    return Q_slow + Q_fast
 
 
-def parallel_loss_w_m3(temperature_ev, n_slow, length_to_wall):
+def excitation_loss_w_m3(x, temperature_ev, n_slow, n_fast, n_neutral, excitation_energy_ev):
+    """CALCULATION SKELETON: return excitation energy loss in W/m^3.
+
+    TODO: add species-specific excitation rates and thresholds.
+    """
+    return np.zeros_like(temperature_ev)
+
+
+def recombination_loss_w_m3(x, temperature_ev, n_slow, n_fast, n_ion, recombination_energy_ev):
+    """CALCULATION SKELETON: return recombination energy loss in W/m^3.
+
+    TODO: add species-specific recombination rates and thresholds.
+    """
+    return np.zeros_like(temperature_ev)
+
+
+
+# LOSS DUE TO TRANSPORT
+def perpendicular_cond_loss_w_m3(temperature_ev, n_slow, length_to_wall):
+    """Horvath (11)-(14); perpendicular conduction loss in W/m^3."""
+    # Nonnegative trial values keep Newton iterations real; final T must be >0.
+    energy = e*np.maximum(temperature_ev, 0.0)
+
+    return n_slow * energy * np.sqrt(energy/(ION_MASS_U*atomic_mass)) / length_to_wall
+
+
+def parallel_cond_loss_w_m3(temperature_ev, n_slow, length_to_wall):
     """Horvath (11)-(14); no X-point multiplier in this second SOL method."""
     # Nonnegative trial values keep Newton iterations real; final T must be >0.
     energy = e*np.maximum(temperature_ev, 0.0)
     return SHEATH_DELTA*n_slow*energy*np.sqrt(energy/(ION_MASS_U*atomic_mass))/length_to_wall
+
+
+def parallel_conv_loss_w_m3(temperature_ev, n_slow, length_to_wall):
+    pass
+
+
+def perpendicular_conv_loss_w_m3(r, x, t, core):
+        return -1.5*e*t*PARTICLE_D_M2_S*r["ns"].derivative()(x) if core else 0.0
+
+
 
 
 def midplane_line(field, rho, theta, phi):
@@ -205,31 +257,43 @@ def solve_temperature(regions, chi, axis_temperature=None):
     if not np.isfinite(chi) or chi <= 0 or (axis_temperature is not None and
             (not np.isfinite(axis_temperature) or axis_temperature <= 0)):
         raise ValueError("chi and an optional measured axis temperature must be positive.")
+
+    
     lengths = [r["x"][-1]-r["x"][0] for r in regions]
     q_scale = 1000.0  # W/m^2, just numerical conditioning
 
-    def convection(r, x, t, core):
-        return -1.5*e*t*PARTICLE_D_M2_S*r["ns"].derivative()(x) if core else 0.0
+    # perpendicular convective transport only in core
+    # def convection(r, x, t, core):
+    #     return -1.5*e*t*PARTICLE_D_M2_S*r["ns"].derivative()(x) if core else 0.0
 
     def rhs(u, y, parameters=()):
         diffusivity = np.exp(parameters[0]) if axis_temperature is not None else chi
         result = []
         for i, r in enumerate(regions):
+
             x = r["x"][0] + lengths[i]*u
             t, q = y[2*i], y[2*i+1]*q_scale
             ns, nf, tf = r["ns"](x), r["nf"](x), r["tf"](x)
-            dt = (convection(r, x, t, i == 0)-q)/(e*ns*diffusivity)
+
+            # perpendicular convective transport only in core
+            dtransp = (perpendicular_conv_loss_w_m3(r, x, t, i == 0)-q)/(e*ns*diffusivity)
+
+            # parallel conductive transport only outside core
+            parallel = 0.0
+            if i > 0:
+                parallel = parallel_cond_loss_w_m3(t, ns, r["L"](x))
+
             loss = atomic_loss_w_m3(x, t, ns, nf)
-            parallel = 0.0 if i == 0 else parallel_loss_w_m3(t, ns, r["L"](x))
+
             dq = heating_w_m3(t, ns, nf, tf)-loss-parallel
-            result.extend((lengths[i]*dt, lengths[i]*dq/q_scale))
+            result.extend((lengths[i]*dtransp, lengths[i]*dq/q_scale))
         return np.array(result)
 
     def bc(left, right, parameters=()):
         diffusivity = np.exp(parameters[0]) if axis_temperature is not None else chi
         r = regions[1]
         q_outer = -e*r["ns"](r["x"][-1])*diffusivity*OUTER_GRADIENT_EV_M
-        residual = [left[1]-convection(regions[0], 0, left[0], True)/q_scale,
+        residual = [left[1]-perpendicular_conv_loss_w_m3(regions[0], 0, left[0], True)/q_scale,
                     right[0]-left[2], right[1]-left[3], right[3]-q_outer/q_scale]
         if axis_temperature is not None:
             residual.append(left[0]-axis_temperature)
@@ -273,7 +337,7 @@ def main():
         L = np.full_like(x, np.nan) if i == 0 else r["L"](x)
         heat = heating_w_m3(t, ns, nf, tf)
         atom = atomic_loss_w_m3(x, t, ns, nf)
-        parallel = np.zeros_like(x) if i == 0 else parallel_loss_w_m3(t, ns, L)
+        parallel = np.zeros_like(x) if i == 0 else parallel_cond_loss_w_m3(t, ns, L)
         axes[0].plot(100*d, t, label="Inside LCFS" if i == 0 else "Outside LCFS (method 2)")
         axes[1].plot(100*d, r["psi"], color="C2")
         axes[2].semilogy(100*d, L, color="C3")

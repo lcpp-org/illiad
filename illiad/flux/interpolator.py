@@ -92,6 +92,19 @@ class FluxInterpolator:
         self.alpha = input_params.get("ALPHA", 1.0)
         self.guess_phi_index = input_params.get("GUESS_PHI_INDEX", None)
         self.inv_surf_indices = _surface_indices(input_params.get("INV_SURF_INDICES", []))
+        hollow_indices = np.asarray(input_params.get("HOLLOW_ISLAND_SURF_INDICES", []))
+        if hollow_indices.ndim != 1 or (
+            hollow_indices.size and hollow_indices.dtype.kind not in "iu"
+        ):
+            raise ValueError("HOLLOW_ISLAND_SURF_INDICES must be a list of integer indices")
+        self.hollow_island_indices = np.unique(hollow_indices.astype(int))
+        self.hollow_normal_surfaces = input_params.get("HOLLOW_NORMAL_SURFACES", 1)
+        if (
+            isinstance(self.hollow_normal_surfaces, (bool, np.bool_))
+            or not isinstance(self.hollow_normal_surfaces, (int, np.integer))
+            or self.hollow_normal_surfaces < 0
+        ):
+            raise ValueError("HOLLOW_NORMAL_SURFACES must be a nonnegative integer")
         self.output_file_name = input_params.get("OUTPUT_FILE_NAME", "default")
         self.debug = input_params.get("DEBUG", False)
 
@@ -205,7 +218,8 @@ class FluxInterpolator:
         Notes:
             Surfaces outside the LCFS and surfaces listed in
             INV_SURF_INDICES are manually marked invalid. The LCFS itself is
-            manually marked valid.
+            manually marked valid. Hollow selection then overrides validity
+            for the island chain and higher-index surfaces.
         """
 
         sum_flux = np.nansum(self.total_flux_norm, axis=0)
@@ -227,6 +241,7 @@ class FluxInterpolator:
         self.valid_surface[self.lcfs_index] = True
         self.valid_surface[:self.lcfs_index] = False
         self.valid_surface[self.inv_surf_indices] = False
+        self._apply_hollow_selection()
 
         self.linear_flux_array = linear_flux_array
         self.profile_select_str = '"Best" flux profile, at phi={:03d} deg'.format(
@@ -235,6 +250,38 @@ class FluxInterpolator:
         self.simIO.log.info(self.profile_select_str)
 
         self.simIO.log.info(f'Valid Surfaces: {self.valid_surface}')
+
+
+    def _apply_hollow_selection(self):
+        """Keep the island chain and the first N normal surfaces after it.
+
+        Lower-index surfaces retain their usual validity. The last Poincare
+        surface supplies the magnetic axis and is always excluded here.
+        """
+        islands = self.hollow_island_indices
+        if not islands.size:
+            return
+        axis_index = self.n_surfaces - 1
+        if np.any(islands <= self.lcfs_index) or np.any(islands >= axis_index):
+            raise ValueError(
+                "HOLLOW_ISLAND_SURF_INDICES must lie strictly between the LCFS "
+                "and the final magnetic-axis surface"
+            )
+        first_normal = int(islands[-1]) + 1
+        stop_normal = first_normal + self.hollow_normal_surfaces
+        if stop_normal > axis_index:
+            raise ValueError(
+                "HOLLOW_NORMAL_SURFACES exceeds the number of normal surfaces "
+                "between the island chain and the magnetic axis"
+            )
+        self.valid_surface[islands] = True
+        self.valid_surface[first_normal:] = False
+        self.valid_surface[first_normal:stop_normal] = True
+        self.simIO.log.info(
+            f"Hollow interpolation: island surfaces {islands.tolist()}, "
+            f"normal surfaces {list(range(first_normal, stop_normal))}; "
+            "magnetic-axis samples excluded"
+        )
 
 
     def save_best_flux_profile(self):
@@ -453,11 +500,15 @@ class FluxInterpolator:
         phi_deg = self.phi_gens[phi_index]
         filename = 'Poincare_{:03.0f}.npy'.format(phi_deg)
         flux_surfaces = self.simIO.loadNumpyData(filename, subdir="Poincare")
-        axis_point = _axis_point_at_phi(
-            self.axis_array, phi_deg, self.axis_phi_gens
-        )
-        point_blocks = [axis_point[None, :]]
-        value_blocks = [np.array([1.0])]
+        point_blocks = []
+        value_blocks = []
+        if not self.hollow_island_indices.size:
+            axis_point = _axis_point_at_phi(
+                self.axis_array, phi_deg, self.axis_phi_gens
+            )
+            point_blocks.append(axis_point[None, :])
+            value_blocks.append(np.array([1.0]))
+        surface_sample_count = 0
         for surface_index in range(self.lcfs_index, self.n_surfaces):
             if not self.valid_surface[surface_index]:
                 self.simIO.log.info(f'Skipping surface {surface_index} (not valid)')
@@ -474,8 +525,9 @@ class FluxInterpolator:
             value_blocks.append(np.full(
                 len(points), self.linear_flux_array[surface_index]
             ))
+            surface_sample_count += len(points)
 
-        if len(point_blocks) == 1:
+        if surface_sample_count == 0:
             raise ValueError(f"No valid Poincare samples found in {filename}")
 
         samples = (
