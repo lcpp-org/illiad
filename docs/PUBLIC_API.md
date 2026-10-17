@@ -125,6 +125,7 @@ inputs but do not control the active detector.
 | Shared analysis and magnetic inputs | `ANLYS_DIR`, `ANLYS_SUBDIR`, `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD`, `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
 | Prior flux selection | `SMALLEST_ISLAND_INDEX`, `MAX_SUBSETS` |
 | Interpolation control | `RUN_INTERPOLATOR`, `INPUT_FIELD_NAME`, `ALPHA`, `DEBUG`, `INV_SURF_INDICES`, `GUESS_PHI_INDEX`, `OUTPUT_FILE_NAME`, `FLUX_INTERPOLATION_MODE` |
+| Hollow surface selection | `HOLLOW_ISLAND_SURF_INDICES`, `HOLLOW_NORMAL_SURFACES` |
 | RBF interpolation | `RBF_KERNEL`, `RBF_NEIGHBORS`, `RBF_SMOOTHING`, `RBF_EPSILON`, `RBF_QUERY_BATCH_SIZE` |
 | Periodic 3-D interpolation | `RBF_PHI_HALF_WINDOW`, `RBF_PHI_SCALE`, `RBF_POINTS_PER_SURFACE_PER_PHI` |
 | Gradient construction | `LEGACY_FILTER_GRADIENTS_OUTSIDE_LCFS`, `GRADIENT_FILTER_BUFFER` |
@@ -141,8 +142,38 @@ exactly `2d` or `3d`:
   one local-RBF solve batch without changing the fitted sources or query order.
 
 Both modes retain float64 source, query, interpolated, and saved arrays. Source
-labels run from 1 at the magnetic axis to 0 at the LCFS, and `rho=0` is filled
-from the poloidal average of the innermost repaired radial shell.
+labels run from 1 at the magnetic axis to 0 at the LCFS. In ordinary interpolation
+the magnetic axis is explicitly included; hollow interpolation omits that
+constraint. In both cases `rho=0` is filled from the poloidal average of the
+innermost repaired radial shell (a coordinate-origin repair, not an imposed
+magnetic-axis value).
+
+A nonempty `HOLLOW_ISLAND_SURF_INDICES` list enables hollow interpolation.
+All listed island surfaces are marked valid, followed by the first
+`HOLLOW_NORMAL_SURFACES` normal surfaces in increasing index order above the
+highest island index. This optional count defaults to **1** and accepts
+nonnegative integers; zero retains only the islands and the usual lower-index
+surfaces. All subsequent surfaces are excluded, including the final Poincare
+surface used to locate the magnetic axis. The separate magnetic-axis sample
+with label 1 is also omitted. The count must fit before that final surface,
+and island indices must lie strictly between the LCFS and the final surface.
+Hollow selection overrides upstream validity and `INV_SURF_INDICES` for the
+islands and higher indices; other surfaces keep their usual validity rules.
+An empty island list (the default) leaves existing interpolation unchanged.
+These controls select interpolation samples; they do not prescribe a hollow
+profile depth.
+
+The non-ideal `flux_grad_iota{3,4,5}_hollow.json` configurations use island
+ranges 54–75, 55–68, and 35–45, respectively. With the default count they also
+retain normal surfaces 76, 69, and 46. Each preserves its corresponding `full`
+case's RBF settings. Run the interpolation first, then use
+`sol_potential_inputs_iota{3,4,5}_hollow.json` and/or
+`sol_density_inputs_iota{3,4,5}_hollow.json` to stitch its saved core field.
+`flux_grad_iota{3,4,5}_stitched_potential_hollow.json` generates the electric
+field from the stitched potential. Set `HOLLOW_NORMAL_SURFACES` in the initial
+interpolation configuration; changing it requires regenerating the core and
+dependent stitched fields. These configurations use fixed output names, so
+rename outputs and downstream inputs if retaining multiple count variants.
 
 With `RUN_INTERPOLATOR` set to `false`, interpolation is skipped and
 `INPUT_FIELD_NAME` names an existing scalar array relative to
