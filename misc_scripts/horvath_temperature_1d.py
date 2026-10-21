@@ -49,10 +49,12 @@ from illiad.sol import load_lcfs_boundary
 
 # Saved geometry: these three inputs must describe the same configuration/LCFS.
 ANALYSIS = "IOTA3_1000sp_atol1e-9"
-FLUX_FILE = "LCFS40/nField_LCFS40_linear.npy"
+FLUX_FILE = "LCFS40/nField_LCFS40_linear_no_islands_n256_eps100_s0p01.npy"#"LCFS40/nField_LCFS40_linear.npy"
+# "LCFS40/nField_LCFS40_linear_no_islands_n256_eps100_s0p01.npy"
+# "LCFS40/nField_LCFS40_linear_hollow.npy" # no! this is for potential, not density!
 SOL_SUBDIR = "SOLtrace_500c_RegularGrid"
 LCFS_INDEX = 40
-PHI_DEG = 306.0                 # Computational angle, as in plotPsiProfile_NEW.py
+PHI_DEG = 306.0                 # Computational angle, as in plotPsiProfile_NEW.py RLP=306deg.
 VESSEL_RADIUS_M = 0.19
 WALL_CLEARANCE_M = 0.002
 SAMPLES_PER_REGION = 250
@@ -62,7 +64,7 @@ N_AXIS = 1.0e18
 N_LCFS = 1.0e17
 N_FLOOR = 1.0e15
 DENSITY_SOL_DECAY_M = 0.01
-FAST_FRACTION = 0.05            # n_fast / n_slow
+FAST_FRACTION = 0.03            # n_fast / n_slow
 FAST_TEMPERATURE_EV = 120.0
 COULOMB_LOG = 10.0
 ION_MASS_U = 4.0026             # Argon 39.948; use  for helium, 1.0078 for H
@@ -108,7 +110,8 @@ def fast_temperature_ev(x, psi):
 
 
 
-# LOSS DUE TO ATOMIC PROCESSES
+# ATOMIC PROCESS LOSSES
+#######################
 def validate_neutral_densities(neutrals):
     """Normalize species symbols and check prescribed uniform densities."""
     result = {}
@@ -263,9 +266,7 @@ def ionization_loss_w_m3(species, charge_states, temperature_ev, n_slow, n_targe
                          target_mass_u=None, fasttemp_ev=None, fast_frac=0.0,
                          return_details=False, check_fit_range=True,
                          table_path=ROOT / "input_files" / "voronov_table.dat"):
-    """Sum n_target[q] * (n_slow*k_slow[q]+n_fast*k_fast[q]) * E_ion[q]*e.
-
-    Returns total threshold-energy loss [W/m^3]. All densities are m^-3.
+    """Returns total threshold-energy loss [W/m^3]. All densities are m^-3.
     n_target is {initial_charge: density}; a scalar/array is also accepted for
     a SINGLE transition. [0, 1] requires {0: n_neutral, 1: n_singly_ionized}.
     No charge-state abundances are inferred or evolved. Arrays broadcast.
@@ -277,6 +278,7 @@ def ionization_loss_w_m3(species, charge_states, temperature_ev, n_slow, n_targe
     including coefficients, events per volume per second, and separate losses.
     The slow-electron BVP should use only loss_slow_w_m3, not the fast loss.
 
+    Sum n_target[q] * (n_slow*k_slow[q]+n_fast*k_fast[q]) * E_ion[q]*e.
     Example: ionization_loss_w_m3('O', [0, 1], 20., 1e18,
                 {0: 1e16, 1: 2e15}, target_temperature_ev={0: 0.03, 1: 1.},
                 target_mass_u=15.999)
@@ -473,7 +475,8 @@ def recombination_loss_w_m3(x, temperature_ev, n_slow, n_fast, n_ion, recombinat
 
 
 
-# LOSS DUE TO TRANSPORT
+# TRANSPORT LOSSES
+##################
 def perpendicular_cond_loss_w_m3(temperature_ev, n_slow, length_to_wall):
     """Horvath (11)-(14); perpendicular conduction loss in W/m^3."""
     # Nonnegative trial values keep Newton iterations real; final T must be >0.
@@ -497,6 +500,7 @@ def perpendicular_conv_loss_w_m3(r, x, t, core):
 def parallel_conv_loss_w_m3(temperature_ev, n_slow, length_to_wall):
     """Horvath parallel convective loss in W/m^3. (neglected for all regions!)"""
     pass
+
 
 
 def midplane_line(field, rho, theta, phi):
