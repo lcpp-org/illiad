@@ -63,14 +63,14 @@ SAMPLES_PER_REGION = 250
 N_AXIS = 1.0e18
 N_LCFS = 1.0e17
 N_FLOOR = 1.0e15
-DENSITY_SOL_DECAY_M = 0.01
-FAST_FRACTION = 0.03            # n_fast / n_slow
-FAST_TEMPERATURE_EV = 120.0
+DENSITY_SOL_DECAY_M = 0.001
+FAST_FRACTION = 0.01            # n_fast / n_slow
+FAST_TEMPERATURE_EV = 180.0
 COULOMB_LOG = 10.0
 ION_MASS_U = 4.0026             # Argon 39.948; use  for helium, 1.0078 for H
-SHEATH_DELTA = 5.5              # Horvath: Ar ~11, He ~5.5, H ~5
+SHEATH_FACTOR = 5.5              # Horvath: Ar ~11, He ~5.5, H ~5
 L_TO_WALL_FACTOR = 1.0          # Fraction of saved wall-to-wall L used in sheath loss
-CHI_M2_S = 10.5                 # Constant perpendicular thermal diffusivity
+CHI_PERP = 10.5                 # Constant perpendicular thermal diffusivity
 PARTICLE_D_M2_S = 0.8            # Set >0 to include core particle convection
 AXIS_TEMPERATURE_EV = None      # Measured value: fit chi if supplied
 OUTER_GRADIENT_EV_M = 0.0       # dT/dx, x increasing outward (not plot distance)
@@ -84,18 +84,18 @@ NEUTRAL_DENSITIES_M3 = {"He": 1e16, "Li": 1e14}
 PLT_BOUNDS = "clip"
 
 
-def heating_w_m3(temperature_ev, n_slow, n_fast, t_fast):
-    """Horvath (3)-(4), with every temperature converted from eV to joules."""
-    tau = (4*np.pi*epsilon_0/e**2)**2 * 3*np.sqrt(m_e)*(e*t_fast)**1.5
-    tau = tau / (8*np.sqrt(2*np.pi)*n_slow*COULOMB_LOG)
-    return 1.5*n_fast*e*(t_fast-temperature_ev)/tau
 
 
 
-def slow_density_m3(x, psi, lcfs_x):
+
+def slow_density_m3(x, psi, lcfs_x, l_parallel):
     """INPUT HOOK: replace with measured density or a particle-balance model."""
     core = N_LCFS + (N_AXIS - N_LCFS) * np.clip(psi, 0.0, 1.0)
-    sol = N_FLOOR + (N_LCFS - N_FLOOR) * np.exp(-np.maximum(x-lcfs_x, 0) / DENSITY_SOL_DECAY_M)
+
+    # Use the parallel connection length for the SOL density decay instead of a fixed decay length.
+    #sol = N_FLOOR + (N_LCFS - N_FLOOR) * np.exp(-np.maximum(x-lcfs_x, 0) / DENSITY_SOL_DECAY_M)
+    sol = N_FLOOR + (N_LCFS - N_FLOOR) * np.exp(-np.maximum(x-lcfs_x, 0) / l_parallel)
+
     return np.where(x <= lcfs_x, core, sol)
 
 
@@ -108,8 +108,27 @@ def fast_temperature_ev(x, psi):
     """INPUT HOOK: replace with a measured/calculated fast-electron profile."""
     return np.full_like(x, FAST_TEMPERATURE_EV)
 
+###############
+# HEATING POWER
+###############
+def heating_w_m3(temperature_ev, n_slow, n_fast, t_fast):
+    """Horvath Eq.3 - absorbed power density, and Eq.4 - energy relaxation time,
+      with every temperature converted from eV to joules."""
+
+    tau_term1 = (4 * np.pi * epsilon_0 / e**2)**2 
+
+    tau_numerator = 3 * m_e * (e * t_fast)**1.5
+
+    tau_denominator = 8 * np.sqrt(2*np.pi*m_e) * n_slow * COULOMB_LOG
+
+    tau = tau_term1 * tau_numerator / tau_denominator
+
+    ## Check if '3' (boltzmann constant) should be here!
+    return 1.5 * n_fast * e * (t_fast - temperature_ev) / tau
 
 
+
+#######################
 # ATOMIC PROCESS LOSSES
 #######################
 def validate_neutral_densities(neutrals):
@@ -145,7 +164,9 @@ def atomic_loss_w_m3(x, temperature_ev, n_slow, n_fast, *,
     """
     neutrals = validate_neutral_densities(
         NEUTRAL_DENSITIES_M3 if neutral_densities is None else neutral_densities)
+    
     x, te, ns, nf = np.broadcast_arrays(x, temperature_ev, n_slow, n_fast)
+
     for value, name in ((te, "temperature_ev"), (ns, "n_slow"), (nf, "n_fast")):
         _nonnegative_finite(value, name)
     total = np.zeros_like(te, dtype=float)
@@ -477,30 +498,37 @@ def recombination_loss_w_m3(x, temperature_ev, n_slow, n_fast, n_ion, recombinat
 
 # TRANSPORT LOSSES
 ##################
+# TODO: 'Effective' ion mass for multi-species plasmas in conduction losses?
+#       - can be taken care of in input if constant & prescribed density fraction
+
 def perpendicular_cond_loss_w_m3(temperature_ev, n_slow, length_to_wall):
     """Horvath (11)-(14); perpendicular conduction loss in W/m^3."""
     # Nonnegative trial values keep Newton iterations real; final T must be >0.
     energy = e*np.maximum(temperature_ev, 0.0)
 
-    return n_slow * energy * np.sqrt(energy/(ION_MASS_U*atomic_mass)) / length_to_wall
+    return -n_slow * CHI_PERP * np.sqrt(energy/(ION_MASS_U*atomic_mass)) / length_to_wall
+
+
+
+def perpendicular_conv_loss_w_m3(r, x, temperature_ev, core):
+    """Horvath perpendicular convective loss in W/m^3."""
+
+    return -1.5 * e * temperature_ev * PARTICLE_D_M2_S * r["ns"].derivative()(x) if core else 0.0
+
 
 
 def parallel_cond_loss_w_m3(temperature_ev, n_slow, length_to_wall):
     """Horvath (11)-(14) parallel conduction loss in W/m^3.; no X-point multiplier in this second SOL method."""
     # Nonnegative trial values keep Newton iterations real; final T must be >0.
     energy = e*np.maximum(temperature_ev, 0.0)
-    return SHEATH_DELTA*n_slow*energy*np.sqrt(energy/(ION_MASS_U*atomic_mass))/length_to_wall
+    bohm_speed = np.sqrt(energy/(ION_MASS_U*atomic_mass))
 
+    return n_slow * SHEATH_FACTOR * energy * bohm_speed / length_to_wall
 
-def perpendicular_conv_loss_w_m3(r, x, t, core):
-    """Horvath perpendicular convective loss in W/m^3."""
-    return -1.5*e*t*PARTICLE_D_M2_S*r["ns"].derivative()(x) if core else 0.0
 
 
 def parallel_conv_loss_w_m3(temperature_ev, n_slow, length_to_wall):
-    """Horvath parallel convective loss in W/m^3. (neglected for all regions!)"""
     pass
-
 
 
 def midplane_line(field, rho, theta, phi):
@@ -530,6 +558,7 @@ def load_profiles():
         raise ValueError("SOL trace LCFS does not match LCFS_INDEX.")
     if not np.isclose(float(np.load(sol_dir / "trace_vessel_radius_m.npy")), VESSEL_RADIUS_M):
         raise ValueError("SOL trace vessel radius does not match VESSEL_RADIUS_M.")
+    
     flux = np.load(data / FLUX_FILE, mmap_mode="r")
     # Native nField coordinates, as in Mesh.loadScalarField(period=[0,1,1]).
     nphi, ntheta, nr = flux.shape
@@ -540,6 +569,7 @@ def load_profiles():
     # Preserve their core samples; only the example density hook clips psi.
     if not np.all(np.isfinite(psi)) or not 0 < np.max(psi) <= 1.001:
         raise ValueError("Expected finite ILLIAD normalized flux with a maximum near 1.")
+    
     boundary, _ = load_lcfs_boundary(ANALYSIS, PHI_DEG, LCFS_INDEX)
     end = np.roll(boundary, -1, axis=0)
     crossing = (boundary[:, 1] > 0) != (end[:, 1] > 0)
@@ -569,6 +599,7 @@ def load_profiles():
     gap = r_sol[first] - r_lcfs
     if gap > 3*np.max(np.diff(r_sol)):
         raise ValueError("Connection-length gap at LCFS exceeds three grid spacings.")
+    
     print(f"Holding first exterior L constant across {gap*1000:.2f} mm LCFS mask gap.")
     length_interp = PchipInterpolator(r_sol[valid]-r_axis, lengths[valid], extrapolate=False)
 
@@ -579,12 +610,15 @@ def load_profiles():
         p = np.interp(x+r_axis, r_flux, psi) if core else np.zeros_like(x)
         if core:
             p[-1] = 0.0  # exact LCFS value for the core hook
-        ns = slow_density_m3(x, p, lcfs_x)
+
+        L = np.full_like(x, np.inf) if core else L_TO_WALL_FACTOR*length_interp(np.maximum(x, r_sol[first]-r_axis))
+
+        ns = slow_density_m3(x, p, lcfs_x, L)
         nf, tf = fast_density_m3(x, p, ns), fast_temperature_ev(x, p)
         if not (np.all(np.isfinite([ns, nf, tf])) and np.all(ns > 0)
                 and np.all(nf >= 0) and np.all(tf > 0)):
             raise ValueError("Input hooks must return finite positive densities/temperatures (nf may be zero).")
-        L = np.full_like(x, np.inf) if core else L_TO_WALL_FACTOR*length_interp(np.maximum(x, r_sol[first]-r_axis))
+
         regions.append(dict(x=x, psi=p, ns=PchipInterpolator(x, ns),
                             nf=PchipInterpolator(x, nf), tf=PchipInterpolator(x, tf),
                             L=None if core else PchipInterpolator(x, L)))
@@ -596,50 +630,61 @@ def solve_temperature(regions, chi, axis_temperature=None, *, neutral_densities=
     if not np.isfinite(chi) or chi <= 0 or (axis_temperature is not None and
             (not np.isfinite(axis_temperature) or axis_temperature <= 0)):
         raise ValueError("chi and an optional measured axis temperature must be positive.")
+    
+    if neutral_densities is None:
+        neutrals = validate_neutral_densities(NEUTRAL_DENSITIES_M3)
+    else:
+        neutrals = neutral_densities
 
-    neutrals = validate_neutral_densities(
-        NEUTRAL_DENSITIES_M3 if neutral_densities is None else neutral_densities)
     lengths = [r["x"][-1]-r["x"][0] for r in regions]
     q_scale = 1000.0  # W/m^2, just numerical conditioning
 
-    # perpendicular convective transport only in core
-    # def convection(r, x, t, core):
-    #     return -1.5*e*t*PARTICLE_D_M2_S*r["ns"].derivative()(x) if core else 0.0
 
     def rhs(u, y, parameters=()):
         diffusivity = np.exp(parameters[0]) if axis_temperature is not None else chi
         result = []
-        for i, r in enumerate(regions):
 
-            x = r["x"][0] + lengths[i]*u
-            t, q = y[2*i], y[2*i+1]*q_scale
+        for i, r in enumerate(regions):
+            # calculate the spatial coordinate within the current region
+            x = r["x"][0] + lengths[i] * u
+            # load density profiles and T_ef values for the current region
             ns, nf, tf = r["ns"](x), r["nf"](x), r["tf"](x)
+            # extract the temperature and heat flux for the current region
+            t, q = y[2*i], y[2*i+1]*q_scale
 
             # perpendicular convective transport only in core
-            dtransp = (perpendicular_conv_loss_w_m3(r, x, t, i == 0)-q)/(e*ns*diffusivity)
+            dtransp = (perpendicular_conv_loss_w_m3(r, x, t, i==0) - q) / (e*ns*diffusivity)
 
             # parallel conductive transport only outside core
             parallel = 0.0
-            if i > 0:
-                parallel = parallel_cond_loss_w_m3(t, ns, r["L"](x))
+            if i > 0: parallel = parallel_cond_loss_w_m3(t, ns, r["L"](x))
 
+            # ionization and excitation losses ( + recombination eventually?)
             # Newton trial temperatures may be negative; final temperatures must be positive.
-            loss = atomic_loss_w_m3(x, np.maximum(t, 0.0), ns, nf,
-                                    neutral_densities=neutrals)
+            loss = atomic_loss_w_m3(x, np.maximum(t, 0.0), ns, nf, neutral_densities=neutrals)
 
-            dq = heating_w_m3(t, ns, nf, tf)-loss-parallel
+            dq = heating_w_m3(t, ns, nf, tf) - loss - parallel
+
             result.extend((lengths[i]*dtransp, lengths[i]*dq/q_scale))
+
         return np.array(result)
+
+
 
     def bc(left, right, parameters=()):
         diffusivity = np.exp(parameters[0]) if axis_temperature is not None else chi
         r = regions[1]
-        q_outer = -e*r["ns"](r["x"][-1])*diffusivity*OUTER_GRADIENT_EV_M
+        q_outer = -e * r["ns"](r["x"][-1]) * diffusivity * OUTER_GRADIENT_EV_M
         residual = [left[1]-perpendicular_conv_loss_w_m3(regions[0], 0, left[0], True)/q_scale,
-                    right[0]-left[2], right[1]-left[3], right[3]-q_outer/q_scale]
+                    right[0]-left[2],
+                    right[1]-left[3],
+                    right[3]-q_outer/q_scale]
+        
         if axis_temperature is not None:
             residual.append(left[0]-axis_temperature)
         return np.array(residual)
+
+
 
     u = np.linspace(0, 1, SAMPLES_PER_REGION)
     guess = np.zeros((4, len(u)))
@@ -649,12 +694,14 @@ def solve_temperature(regions, chi, axis_temperature=None, *, neutral_densities=
         guess, _ = solve_temperature(regions, chi, neutral_densities=neutrals)
     parameters = [np.log(chi)] if axis_temperature is not None else []
     solution = solve_bvp(rhs, bc, u, guess, p=parameters, tol=1e-4, max_nodes=20000)
+
     if not solution.success:
         raise RuntimeError(f"Temperature solve failed: {solution.message}; check input profiles and boundary conditions.")
     values = solution.sol(u)
     if not np.all(np.isfinite(values)) or np.any(values[[0, 2]] <= 0):
         raise RuntimeError("The input model produced a nonpositive/nonfinite temperature.")
     fitted_chi = float(np.exp(solution.p[0])) if axis_temperature is not None else chi
+    
     print(f"chi_perp={fitted_chi:.6g} m^2/s; max BVP residual={max(solution.rms_residuals):.3g}")
     return values, fitted_chi
 
@@ -662,7 +709,7 @@ def solve_temperature(regions, chi, axis_temperature=None, *, neutral_densities=
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "output" / ANALYSIS / "Horvath_temperature_1d_neutrals")
-    parser.add_argument("--chi", type=float, default=CHI_M2_S)
+    parser.add_argument("--chi", type=float, default=CHI_PERP)
     parser.add_argument("--axis-temperature", type=float, default=AXIS_TEMPERATURE_EV,
                         help="Measured inner T [eV]; if supplied, fit chi (using --chi as initial guess).")
     parser.add_argument("--neutral", action="append", metavar="SPECIES=DENSITY_M3",
@@ -670,6 +717,8 @@ def main():
     parser.add_argument("--no-neutrals", action="store_true", help="Disable neutral atomic losses.")
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
+
+    
     if args.neutral and args.no_neutrals:
         parser.error("Use --neutral or --no-neutrals, not both.")
     neutrals = {} if args.no_neutrals else NEUTRAL_DENSITIES_M3
@@ -686,9 +735,12 @@ def main():
                 parser.error(f"Invalid or duplicate --neutral {entry!r}; use e.g. He=1e16.")
     neutrals = validate_neutral_densities(neutrals)
     print(f"Prescribed neutral densities [m^-3]: {neutrals}; PLT bounds={PLT_BOUNDS}.")
+
+
     regions, r_axis, lcfs_x = load_profiles()
-    values, chi = solve_temperature(regions, args.chi, args.axis_temperature,
-                                    neutral_densities=neutrals)
+    values, chi = solve_temperature(regions, args.chi, args.axis_temperature, neutral_densities=neutrals)
+
+
     fig, axes = plt.subplots(3, 1, figsize=(8, 9), sharex=True, layout="constrained")
     power_fig, power_ax = plt.subplots(figsize=(8, 4), layout="constrained")
     rows = []
