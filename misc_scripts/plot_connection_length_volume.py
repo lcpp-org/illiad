@@ -29,17 +29,17 @@ from illiad.sol import (
 
 
 # DATA AND OUTPUT SETTINGS
-ANALYSIS_DIR = "IOTA4_1000sp_atol1e-9"
-DATA_SUBDIR = "SOLtrace_500c"
+ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
+DATA_SUBDIR = "Oct24SOLTrace400_Warp"
 OUTPUT_SUBDIR = DATA_SUBDIR
 
 # None replots every saved plane. A single number or an iterable of numbers
 # selects computational toroidal angles in degrees; for example, 18 or
 # [18, 90, 180].
-PHI_DEG = None
-LCFS_INDEX = 20  # None reads LCFS_INDEX from the Poincare log
+PHI_DEG = 108
+LCFS_INDEX = 40  # None reads LCFS_INDEX from the Poincare log
 
-OUTPUT_FILENAME = "connection_length_{phi_deg:03.0f}_replot_4.png"
+OUTPUT_FILENAME = "connection_length_{phi_deg:03.0f}_replot.png"
 
 # PLOT SETTINGS
 FIGSIZE = (7, 6)
@@ -48,7 +48,7 @@ COLOR_SCALE = "log"       # "log" or "linear"
 COLORMAP = "afmhot"      # Any Matplotlib colormap
 N_LEVELS = 50
 VMIN = 0.05               # None uses the minimum positive saved value
-VMAX = 6000               # None uses the maximum positive saved value
+VMAX = 5000               # None uses the maximum positive saved value
 CONTOUR_EXTEND = "auto"   # "auto", "neither", "both", "min", or "max"
 MASK_COLOR = "white"
 ANTIALIASED = False
@@ -90,7 +90,7 @@ ASPECT = "equal"
 X_LABEL = r"$x=\rho\cos\theta$ [m]"
 Y_LABEL = r"$z=\rho\sin\theta$ [m]"
 
-SHOW_GRID = True
+SHOW_GRID = False
 GRID_COLOR = "0.75"
 GRID_LINEWIDTH = 0.4
 GRID_ALPHA = 0.8
@@ -98,7 +98,7 @@ GRID_ALPHA = 0.8
 SHOW_LEGEND = False
 LEGEND_LOCATION = "upper right"
 
-COLORBAR_LABEL = "Connection length [m]"
+COLORBAR_LABEL = "$L_c$ [m]"
 COLORBAR_PAD = 0.03
 COLORBAR_TICKS = None
 
@@ -487,8 +487,8 @@ def plot_plane(
             pad=COLORBAR_PAD,
             ticks=colorbar_ticks,
         )
-        colorbar.set_label(COLORBAR_LABEL)
-
+        colorbar.set_label(COLORBAR_LABEL, size=18)
+        colorbar.ax.tick_params(labelsize=18)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=DPI, bbox_inches=SAVE_BBOX)
     print(f"Saved plot with {points_rtp.shape[0]} samples: {output_path}")

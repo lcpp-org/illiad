@@ -32,9 +32,9 @@ from illiad.sol import (
 
 # DATA AND OUTPUT SETTINGS
 ANALYSIS_DIR = "IOTA3_1000sp_atol1e-9"
-DATA_SUBDIR = "ConLenVolume_REDO_250spins_rk1mm_RegularGrid_Stitched_v2"
+DATA_SUBDIR = "SOLtrace_500c_RegularGrid_Potential_full_linear"
 OUTPUT_SUBDIR = None  # None writes replots to the input data subdirectory
-LCFS_INDEX = None     # None reads LCFS_INDEX from the Poincare log
+LCFS_INDEX = 40     # None reads LCFS_INDEX from the Poincare log
 
 # None replots every saved plane. A scalar or iterable selects computational
 # toroidal angles in degrees; for example, 18 or [18, 90, 180]. The same
@@ -45,7 +45,7 @@ FIELD_FILENAME = "stitched_nfield_connection_length.npy"
 RHO_FILENAME = "rho_grid_m.npy"
 THETA_FILENAME = "theta_grid_rad.npy"
 PHI_FILENAME = "phi_grid_deg.npy"
-OUTER_BOUNDARY_FILENAME = "stitch_outer_boundary_xz_m.npy"
+OUTER_BOUNDARY_FILENAME = None #"stitch_outer_boundary_xz_m.npy"
 BOUNDARY_METADATA_FILENAME = "stitch_boundary_metadata.npz"
 OUTPUT_FILENAME = "stitched_field_{phi_deg:03.0f}_replot.png"
 
@@ -61,10 +61,10 @@ VMAX = 1.0                 # None uses the maximum finite saved value
 CONTOUR_EXTEND = "both"   # "auto", "neither", "both", "min", or "max"
 ANTIALIASED = False
 
-SHOW_LCFS = False
+SHOW_LCFS = True
 LCFS_COLOR = "black"
 LCFS_LINESTYLE = "-"
-LCFS_LINEWIDTH = 1.2
+LCFS_LINEWIDTH = 0.5
 LCFS_LABEL = "LCFS"
 
 SHOW_STITCH_BOUNDARY = False
@@ -93,7 +93,7 @@ ASPECT = "equal"
 X_LABEL = r"$x=\rho\cos\theta$ [m]"
 Y_LABEL = r"$z=\rho\sin\theta$ [m]"
 
-SHOW_GRID = True
+SHOW_GRID = False
 GRID_COLOR = "0.75"
 GRID_LINEWIDTH = 0.4
 GRID_ALPHA = 1.0
@@ -101,7 +101,7 @@ GRID_ALPHA = 1.0
 SHOW_LEGEND = False
 LEGEND_LOCATION = "upper right"
 
-COLORBAR_LABEL = "Stitched scalar field"
+COLORBAR_LABEL = None #"Stitched scalar field"
 COLORBAR_PAD = 0.03
 COLORBAR_TICKS = None
 

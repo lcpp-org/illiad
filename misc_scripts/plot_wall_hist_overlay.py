@@ -5,6 +5,8 @@ The density and bins match illiad.plotting.boris_plotWallHist: normalize over
 the full wall, then display only the first toroidal period (no period folding).
 Below-threshold bins are transparent. Runs are drawn in list order,
 with later entries on top; legend labels are inferred from run names.
+Set FILL_ALPHAS or --fill-alphas to one opacity for all runs, or one per run.
+Use --style contour for interpolated filled contours with opaque outlines.
 """
 
 import argparse
@@ -13,8 +15,7 @@ import re
 import sys
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
-from matplotlib.lines import Line2D
+from matplotlib.colors import ListedColormap, to_rgba
 from matplotlib.patches import Patch
 import numpy as np
 
@@ -27,13 +28,13 @@ from illiad.utilities.coordtrans import wall_plot_angles
 
 # Editable settings; run order also defines the color and legend order.
 RUNS = [
-    #PROJECT_ROOT / "output/IOTA4_1000sp_atol1e-9/data/0mm_LCFS50_2eV_25V_Z1_APS26_IOTA4_evap_collisions_on_2ms",    
     PROJECT_ROOT / "output/IOTA3_1000sp_atol1e-9/data/0mm_LCFS50_2eV_25V_Z1_APS26_IOTA3_evap_collisions_on_2ms",
+    PROJECT_ROOT / "output/IOTA4_1000sp_atol1e-9/data/0mm_LCFS50_2eV_25V_Z1_APS26_IOTA4_evap_collisions_on_2ms",
     PROJECT_ROOT / "output/IOTA5_1000sp_atol1e-9/data/0mm_LCFS33_2eV_25V_Z1_APS26_IOTA5_evap_collisions_on_3ms",
 ]
 # Colors follow list positions and cycle if there are more runs than colors.
-COLORS = ["blue", "green", "red", "darkorange", "purple", "brown",
-          "deeppink", "gray", "olive", "cyan"]
+COLORS = ["blue", "green", "red", "darkorange", "purple", "brown"]
+FILL_ALPHAS = [0.35]  # One value for all runs, or one per run; range [0, 1].
 THRESHOLD = 1e-5
 OUTPUT = PROJECT_ROOT / "output/wall_hist_overlay/IOTA3_IOTA4_IOTA5.png"
 DPI = 300
@@ -59,7 +60,7 @@ def load_histogram(run):
 
 
 def plot_overlay(runs=RUNS, threshold=THRESHOLD, output=OUTPUT, show=False,
-                 style="filled"):
+                 style="filled", fill_alphas=FILL_ALPHAS):
     """Save the overlay and return its path."""
     runs = list(runs)
     if not runs:
@@ -68,6 +69,13 @@ def plot_overlay(runs=RUNS, threshold=THRESHOLD, output=OUTPUT, show=False,
         raise ValueError("Threshold must be finite and positive.")
     if style not in ("filled", "contour"):
         raise ValueError("Style must be 'filled' or 'contour'.")
+    alphas = np.atleast_1d(np.asarray(fill_alphas, dtype=float))
+    if (alphas.ndim != 1 or alphas.size not in (1, len(runs))
+            or not np.isfinite(alphas).all()
+            or np.any((alphas < 0) | (alphas > 1))):
+        raise ValueError("Fill alphas must be one value or one per run, all in [0, 1].")
+    alphas = np.broadcast_to(alphas, (len(runs),))
+
     # Load all data before creating output; keep full-wall normalization.
     densities = [load_histogram(run) for run in runs]
     names = [Path(run).name for run in runs]
@@ -91,24 +99,27 @@ def plot_overlay(runs=RUNS, threshold=THRESHOLD, output=OUTPUT, show=False,
                 theta = (THETA_EDGES[:-1] + THETA_EDGES[1:]) / 2
                 phi = np.r_[phi[-1] - 360, phi, phi[0] + 360]
                 theta = np.r_[theta[-1] - 360, theta, theta[0] + 360]
-                ax.contour(
-                    phi, theta, np.pad(densities[index], 1, mode="wrap"),
-                    levels=[threshold], colors=[colors[index]],
-                    linewidths=1.2, zorder=index + 1,
-                )
+                padded = np.pad(densities[index], 1, mode="wrap")
+                ax.contourf(phi, theta, padded,
+                            levels=[threshold, max(threshold, padded.max()) + threshold],
+                            colors=[colors[index]], alpha=alphas[index],
+                            zorder=index + 1)
+                ax.contour(phi, theta, padded,
+                           levels=[threshold], colors=[colors[index]],
+                           linewidths=1.2, zorder=index + 1,
+                           )
             else:
                 layer = np.ma.masked_where(~visible, np.ones(visible.shape))
                 cmap = ListedColormap([colors[index]])
                 cmap.set_bad((0, 0, 0, 0))
-                ax.pcolormesh(
-                    PHI_EDGES[:73], THETA_EDGES, layer,
-                    cmap=cmap, vmin=0, vmax=1, shading="flat",
-                    edgecolors="none", rasterized=True, zorder=index + 1,
-                )
-            print(
-                f"{labels[index]}: {np.count_nonzero(visible)} bins at or above "
-                f"{threshold:g} in phi_plot = 0--72 degrees"
-            )
+                ax.pcolormesh(PHI_EDGES[:73], THETA_EDGES, layer,
+                              cmap=cmap, vmin=0, vmax=1, shading="flat",
+                              edgecolors="none", rasterized=True, zorder=index + 1,
+                              alpha=alphas[index],
+                              )
+            print(f"{labels[index]}: {np.count_nonzero(visible)} bins at or above "
+                  f"{threshold:g} in phi_plot = 0--72 degrees"
+                  )
         ax.set_xlim(0, 72)
         ax.set_ylim(-180, 180)
         ax.set_aspect(0.2)
@@ -117,20 +128,16 @@ def plot_overlay(runs=RUNS, threshold=THRESHOLD, output=OUTPUT, show=False,
         ax.set_yticklabels(["−180°", "Bottom (−90°)", "Outer (0°)", "Top (90°)", "180°"])
         ax.set_xlabel(r"$\phi_{\mathrm{plot}}$ (degrees CCW from south split)")
         ax.set_ylabel("Poloidal location")
-        relation = "=" if style == "contour" else r"\geq"
-        ax.set_title(
-            "Wall deposition overlay\n"
-            rf"Full-wall density ${relation}$ {threshold:g} deg$^{{-2}}$"
-        )
+        relation = r"\geq"
+        #ax.set_title("Wall deposition overlay\n"
+        #             rf"Full-wall density ${relation}$ {threshold:g} deg$^{{-2}}$"
+        #             )
         handles = [
-            Line2D([], [], color=c, linewidth=1.2, label=l)
-            if style == "contour" else Patch(facecolor=c, label=l)
-            for l, c in zip(labels, colors)
+            Patch(facecolor=to_rgba(c, a),
+                  edgecolor=c if style == "contour" else "none", label=l)
+            for l, c, a in zip(labels, colors, alphas)
         ]
-        legend = ax.legend(
-            handles=handles,
-            loc="upper left", framealpha=1,
-        )
+        legend = ax.legend(handles=handles, loc="upper left", framealpha=1)
         legend.set_zorder(len(runs) + 2)
         ax.set_axisbelow(False)
         ax.grid(linewidth=0.4, alpha=0.3, zorder=len(runs) + 1)
@@ -147,7 +154,7 @@ def plot_overlay(runs=RUNS, threshold=THRESHOLD, output=OUTPUT, show=False,
 
 def main(default_style="filled"):
     description = (
-        "Overlay wall-density contour outlines at one threshold over "
+        "Overlay filled wall-density contours at one threshold over "
         "phi_plot = 0--72 degrees, using full-wall normalization."
         if default_style == "contour" else __doc__
     )
@@ -157,6 +164,11 @@ def main(default_style="filled"):
         help="Run directories containing Wallpt_OUTPUT.npy, drawn in this order.",
     )
     parser.add_argument("--threshold", type=float, default=THRESHOLD)
+    parser.add_argument("--style", choices=("filled", "contour"), default=default_style)
+    parser.add_argument(
+        "--fill-alphas", nargs="+", type=float, default=FILL_ALPHAS, metavar="ALPHA",
+        help="Fill opacity in [0, 1]: one value for all runs, or one per run.",
+    )
     default_output = (
         OUTPUT.with_stem(OUTPUT.stem + "_contours")
         if default_style == "contour" else OUTPUT
@@ -165,7 +177,7 @@ def main(default_style="filled"):
     parser.add_argument("--show", action="store_true")
     args = parser.parse_args()
     plot_overlay(args.runs, args.threshold, args.output, args.show,
-                 style=default_style)
+                 style=args.style, fill_alphas=args.fill_alphas)
 
 
 if __name__ == "__main__":
