@@ -44,9 +44,9 @@ def minor_radius(x: wp.vec3d, R0: wp.float64):
 @wp.func
 def rotate_z(v: wp.vec3d, angle: wp.float64):
     # Match the actual TorchMesh matrix; phi-coordinate signs are handled below.
-    c = wp.cos(angle)
-    s = wp.sin(angle)
-    return wp.vec3d(c * v[0] - s * v[1], s * v[0] + c * v[1], v[2])
+    cos_angle = wp.cos(angle)
+    sin_angle = wp.sin(angle)
+    return wp.vec3d(cos_angle * v[0] - sin_angle * v[1], sin_angle * v[0] + cos_angle * v[1], v[2])
 
 
 @wp.func
