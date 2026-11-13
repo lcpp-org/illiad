@@ -29,8 +29,8 @@ from illiad.boris_warp import VectorGrid, make_grid
 DEVICE = "cuda"
 INTEGRATOR = "rk4"
 STEP_SIZE_M = 0.005
-ACTIVE_SEEDS = 512*2  # Each slot has two directional lanes; refill after both finish.
-SAMPLES_PER_CHUNK = 32*2
+ACTIVE_SEEDS = 512*1024  # Each slot has two directional lanes; refill after both finish.
+SAMPLES_PER_CHUNK = 32*8
 WALL_BISECTIONS = 32
 MIN_FIELD_MAGNITUDE = 1e-14
 PHI_BATCHES = False
