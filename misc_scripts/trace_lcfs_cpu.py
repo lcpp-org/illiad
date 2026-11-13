@@ -205,7 +205,7 @@ def plot_results(output, color_scale=None):
     plots = output / "plots"
     plots.mkdir(exist_ok=True)
     surface_index = settings.get("surface_index", settings.get("lcfs_index"))
-    title = f"Surface {surface_index}, offset {settings['offset_mm']:g} mm; LSODA"
+    title = f"Surface {surface_index}, offset {settings['offset_mm']:g} mm; {settings.get('solver', 'LSODA')}"
     if not len(xyz):
         plot_initial_points(plots, settings, [data], norm, cmap, label, title)
         return

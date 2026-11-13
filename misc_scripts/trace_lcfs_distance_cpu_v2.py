@@ -6,6 +6,9 @@ Example (length is the maximum in EACH direction)::
         --phi-deg 306 --nrho 32 --ntheta 48 --offset-mm 5 --length-m 100 --workers 4
 
 See docs/lcfs_distance_cpu_trace_v2.md for outputs, offset geometry, and length limits.
+
+Use --no-plots to skip all figures while retaining summaries and CSVs. It works
+with --all-phi and --delete-paths; generate per-point figures later with --plot-only.
 """
 
 import argparse
@@ -13,9 +16,12 @@ from copy import copy
 from concurrent.futures import ProcessPoolExecutor
 import csv
 import json
+import os
 from pathlib import Path
 import sys
+import tempfile
 from textwrap import fill
+import zipfile
 
 import matplotlib
 matplotlib.use("Agg")
@@ -54,7 +60,7 @@ COLOR_SCALE = "log"  # "linear" or "log"; applies to new plots and --plot-only.
 DISTANCE_SURFACE_INDEX = 21  # None uses the run's logged LCFS.
 DISTANCE_POLOIDAL_POINTS = 256  # Per saved toroidal slice; increase to check convergence.
 DISTANCE_STATISTIC = "min"  # Closest sampled approach across both directions, including launch.
-DELETE_PATHS = False  # Remove this run's seed path files only after summaries/plots succeed.
+DELETE_PATHS = False  # Remove seed path files after summaries and any requested plots succeed.
 ALL_PHI = False  # Run all saved toroidal launch planes sequentially in phiDDD folders.
 PATH_PLOTS = True  # Disable for dense batches; all per-point color plots still run.
 
@@ -64,6 +70,44 @@ EXTRA_METRIC_SHAPES = {
     "lcfs_min_xyz_m": (3,), "wall_connection_length_m": (),
     "wall_connection_is_lower_bound": (), "wall_connection_direction": (),
 }
+
+
+def load_summary(output):
+    """Read every array so truncated archives and corrupt members fail before plotting."""
+    path = Path(output) / "summary.npz"
+    try:
+        with path.open("rb") as stream:
+            with np.load(stream, allow_pickle=False) as saved:
+                return dict(saved)
+    except (zipfile.BadZipFile, EOFError, ValueError) as exc:
+        raise ValueError(
+            f"Cannot read summary archive {path} ({path.stat().st_size:,} bytes): {exc}. "
+            "The file may be truncated or corrupt. Copy the complete summary.npz from the "
+            "original run and verify its size/checksum; also check the CSV and mesh files. "
+            "--plot-only cannot reconstruct missing data. The existing files were not changed."
+        ) from exc
+
+
+def save_summary(output, **data):
+    """Publish only a fully written, readable archive; preserve any previous summary."""
+    destination = Path(output) / "summary.npz"
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w+b", prefix=".summary-", suffix=".npz",
+                                         dir=destination.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+            np.savez_compressed(stream, **data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        # Loading all members checks the archive and CRCs before publication/cleanup.
+        with temporary.open("rb") as stream:
+            with np.load(stream, allow_pickle=False) as saved:
+                for key in saved.files:
+                    saved[key]
+        temporary.replace(destination)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def wall_connection_metrics(lengths, hits):
@@ -152,16 +196,13 @@ def ensure_path_metrics(output, data, settings):
                 if key.startswith("wall_connection_"):
                     dtype = bool if key.endswith("lower_bound") else int if key.endswith("direction") else float
                     data[key] = np.asarray([record[key] for record in records], dtype=dtype)
-        temporary = output / "summary.updated.npz"
-        np.savez_compressed(temporary, **data)
-        temporary.replace(output / "summary.npz")
+        save_summary(output, **data)
     write_point_metrics(output, data, settings)
 
 
 def delete_saved_paths(output):
-    """Delete only enumerated seed files after durable summaries and plotting succeed."""
-    with np.load(output / "summary.npz") as saved:
-        data = dict(saved)
+    """Delete enumerated seed files after durable summaries and any requested plots succeed."""
+    data = load_summary(output)
     if any(key not in data for key in EXTRA_METRIC_SHAPES) or not (output / "point_metrics.csv").is_file():
         raise ValueError("Cannot delete paths before all per-point metrics have been saved.")
     removed = 0
@@ -173,7 +214,7 @@ def delete_saved_paths(output):
     settings = json.loads((output / "settings.json").read_text())
     settings.update(paths_deleted=True)
     (output / "settings.json").write_text(json.dumps(settings, indent=2) + "\n")
-    print(f"Deleted {removed} seed path files; retained per-point summaries and plots: {output}")
+    print(f"Deleted {removed} seed path files; retained per-point summaries: {output}")
 
 
 def resolve_grid_counts(args):
@@ -329,8 +370,7 @@ def distance_color_scale(values, color_scale, statistic):
 
 def plot_results(output, color_scale=None, statistic=DISTANCE_STATISTIC, include_paths=True):
     settings = json.loads((output / "settings.json").read_text())
-    with np.load(output / "summary.npz") as saved:
-        data = dict(saved)
+    data = load_summary(output)
     ensure_path_metrics(output, data, settings)
     if include_paths and all((output / "paths" / f"seed_{i:05d}.npz").is_file() for i in range(len(data["seed_xyz_m"]))):
         base.plot_results(output, color_scale=color_scale)
@@ -411,7 +451,7 @@ def plot_distance_initial_points(plots, settings, datasets, norm, cmap, label, t
                 selected = complete == is_complete
                 if np.any(selected):
                     ax.scatter(*points[selected].T, c=total[selected], norm=norm, cmap=cmap,
-                               marker=marker, s=50, edgecolors="black",
+                               marker=marker, s=30, edgecolors="black",
                                linewidths=0.5 if len(xyz) < 500 else 0.1,
                                label=description if description not in seen else "_nolegend_")
                     seen.add(description)
@@ -422,7 +462,7 @@ def plot_distance_initial_points(plots, settings, datasets, norm, cmap, label, t
                xlim=(-1.1 * settings["vessel_radius_m"], 1.1 * settings["vessel_radius_m"]),
                ylim=(-1.1 * settings["vessel_radius_m"], 1.1 * settings["vessel_radius_m"]),
                title=title + f"\nLaunch plane $\\phi_{{comp}}={phi:g}^\\circ$")
-        ax.legend(fontsize=8)
+        #ax.legend(fontsize=8)
         ax.grid(alpha=0.2)
         if has_seeds:
             fig.colorbar(plt.cm.ScalarMappable(norm=norm, cmap=cmap), ax=ax, label=label)
@@ -448,15 +488,14 @@ def plot_combined_offsets(output, color_scale=None, statistic=DISTANCE_STATISTIC
                 raise ValueError(f"Cannot combine offset plots with different {key}: {folder}")
         if settings.get("surface_index", settings.get("lcfs_index")) != reference.get("surface_index", reference.get("lcfs_index")):
             raise ValueError(f"Cannot combine different flux surfaces: {folder}")
-        with np.load(folder / "summary.npz") as saved:
-            data = dict(saved)
+        data = load_summary(folder)
         ensure_path_metrics(folder, data, settings)
         datasets.append(dict(data, offset_mm=settings["offset_mm"]))
     total = np.concatenate([data[f"lcfs_distance_{statistic}_m"] * 1000 for data in datasets])
     norm, cmap, label = distance_color_scale(total, color_scale, statistic)
     index = reference.get("surface_index", reference.get("lcfs_index"))
     offsets_text = ", ".join(f"{entry['offset_mm']:g}" for entry in entries)
-    title = f"Grid {reference['nrho']} x {reference['ntheta']}; exclusion LCFS {index}; distance to LCFS {reference['distance_surface_index']}; LSODA\n" + fill(f"Offsets [mm]: {offsets_text}", width=60)
+    title = f"Grid {reference['nrho']} x {reference['ntheta']}; exclusion LCFS {index}; distance to LCFS {reference['distance_surface_index']}; {reference.get('solver', 'LSODA')}\n" + fill(f"Offsets [mm]: {offsets_text}", width=60)
     plots = output / "plots"
     plots.mkdir(exist_ok=True)
     lengths = np.concatenate([data["length_m"].sum(axis=1) for data in datasets])
@@ -469,7 +508,8 @@ def plot_combined_offsets(output, color_scale=None, statistic=DISTANCE_STATISTIC
     print(f"Saved combined initial-point plots: {plots}")
 
 
-def parse_args(argv=None):
+def build_parser(cpu_options=True):
+    """Share geometry/output arguments with alternate integration backends."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("run_dir", nargs="?", type=Path, default=RUN_DIR)
     planes = parser.add_mutually_exclusive_group()
@@ -477,7 +517,9 @@ def parse_args(argv=None):
     planes.add_argument("--all-phi", action="store_true", default=ALL_PHI,
                         help="Batch all saved toroidal planes sequentially in phiDDD folders")
     parser.add_argument("--delete-paths", action=argparse.BooleanOptionalAction, default=DELETE_PATHS,
-                        help="Delete seed path files after summaries and plots succeed; also supports --plot-only")
+                        help="Delete seed path files after summaries and requested plots succeed; also supports --plot-only")
+    parser.add_argument("--no-plots", action="store_true",
+                        help="Skip all figures, including combined plots; still save every summary and CSV")
     parser.add_argument("--path-plots", action=argparse.BooleanOptionalAction, default=PATH_PLOTS,
                         help="Render full 3D/projected paths; --no-path-plots keeps only per-point color plots")
     parser.add_argument("--nrho", "--npoints-rho", type=int, default=NPOINTS_RHO,
@@ -492,10 +534,11 @@ def parse_args(argv=None):
     parser.add_argument("--offset-mm", "--offsets-mm", nargs="+", type=float, default=OFFSET_MM,
                         help="One or more signed poloidal exclusion margins in mm; positive expands LCFS")
     parser.add_argument("--length-m", type=float, default=LENGTH_M, help="Maximum arc length PER DIRECTION")
-    parser.add_argument("--workers", type=int, default=WORKERS, help="CPU processes; each loads its own field")
-    parser.add_argument("--rtol", type=float, help="Default: saved Poincare RTOL")
-    parser.add_argument("--atol", type=float, help="Default: saved Poincare ATOL")
-    parser.add_argument("--max-step-m", type=float, default=0.02, help="Maximum LSODA step (default: 0.02 m)")
+    if cpu_options:
+        parser.add_argument("--workers", type=int, default=WORKERS, help="CPU processes; each loads its own field")
+        parser.add_argument("--rtol", type=float, help="Default: saved Poincare RTOL")
+        parser.add_argument("--atol", type=float, help="Default: saved Poincare ATOL")
+        parser.add_argument("--max-step-m", type=float, default=0.02, help="Maximum LSODA step (default: 0.02 m)")
     parser.add_argument("--sample-step-m", type=float, default=0.01, help="Maximum saved path spacing (default: 0.01 m)")
     parser.add_argument("--smoothing", type=float, default=1e-5, help="Selected surface spline smoothing (same as SOL loader)")
     parser.add_argument("--output", type=Path, help="Default: RUN_DIR/lcfs_distance_cpu_trace_v2; use distinct folders for scans")
@@ -512,11 +555,23 @@ def parse_args(argv=None):
                         help="Mesh samples per saved toroidal plane (default: 256)")
     parser.add_argument("--distance-statistic", choices=("min", "mean", "max"), default=DISTANCE_STATISTIC,
                         help="Initial-point colors: closest sampled approach (default), weighted mean, or maximum")
-    return parser.parse_args(argv)
+    return parser
 
 
-def run_offset(args, validate_only=False):
-    """Trace one offset, or validate its inputs/geometry without writing output."""
+def parse_args(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.no_plots and (args.plot_only or args.combined_only):
+        parser.error("--no-plots cannot be combined with --plot-only or --combined-only")
+    return args
+
+
+def run_offset(args, validate_only=False, backend=None):
+    """Trace one offset, or validate its inputs/geometry without writing output.
+
+    Optional backends supply metadata(config) and trace(tasks, config, vertices,
+    faces), yielding the same per-seed result records as trace_seed.
+    """
     run = args.run_dir.resolve()
     output = (args.output or run / "lcfs_distance_cpu_trace_v2").resolve()
     if args.plot_only:
@@ -587,6 +642,8 @@ def run_offset(args, validate_only=False):
                   lcfs_min_s_method="arc length from launch; global sampled minimum; exact ties shortest s then forward",
                   wall_connection_method="minimum forward/backward arc length from launch; lower bound if selected direction is capped",
                   paths_deleted=False)
+    if backend is not None:
+        config.update(backend.metadata(config))
     if validate_only:
         return
     (output / "paths").mkdir(parents=True, exist_ok=True)
@@ -615,6 +672,8 @@ def run_offset(args, validate_only=False):
 
     if not tasks:
         print("No grid seeds survive LCFS/vessel filtering; saving empty results without tracing.", flush=True)
+    elif backend is not None:
+        collect(backend.trace(tasks, config, vertices, faces))
     elif args.workers == 1:
         initialize_worker(config)
         collect(map(trace_seed, tasks))
@@ -628,7 +687,7 @@ def run_offset(args, validate_only=False):
                            out=np.zeros(len(xyz)), where=total_length > 0)
     total_max = maxima.max(axis=1)
     total_min = minima.min(axis=1)
-    np.savez_compressed(output / "summary.npz", **stack_path_metrics(records),
+    save_summary(output, **stack_path_metrics(records),
                         lcfs_reference_boundaries_xz_m=reference_boundaries,
                         lcfs_distance_min_m=total_min, lcfs_distance_direction_min_m=minima,
                         lcfs_distance_integral_m2=integrals,
@@ -653,13 +712,13 @@ def run_offset(args, validate_only=False):
         for i in range(len(xyz)):
             writer.writerow((i, planes[plane_id[i]], *means[i], total_mean[i],
                              *maxima[i], total_max[i], *minima[i], total_min[i], total_length[i], hit[i].all()))
-    with np.load(output / "summary.npz") as saved:
-        write_point_metrics(output, saved, config)
-    plot_results(output, color_scale=args.color_scale, statistic=args.distance_statistic,
-                 include_paths=args.path_plots)
+    write_point_metrics(output, load_summary(output), config)
+    if not args.no_plots:
+        plot_results(output, color_scale=args.color_scale, statistic=args.distance_statistic,
+                     include_paths=args.path_plots)
     if args.delete_paths:
         delete_saved_paths(output)
-    print(f"Saved per-point metrics and plots: {output}")
+    print(f"Saved per-point metrics{' (plots skipped)' if args.no_plots else ' and plots'}: {output}")
 
 
 def main(argv=None):
@@ -669,7 +728,7 @@ def main(argv=None):
     run_args(args)
 
 
-def run_args(args):
+def run_args(args, backend=None):
     output = (args.output or args.run_dir.resolve() / "lcfs_distance_cpu_trace_v2").resolve()
     phi_manifest = output / "phi_scan.json"
     if phi_manifest.is_file():
@@ -682,7 +741,7 @@ def run_args(args):
             if args.combined_only and not (child.output / "offset_scan.json").is_file():
                 plot_results(child.output, args.color_scale, args.distance_statistic, include_paths=False)
             else:
-                run_args(child)
+                run_args(child, backend=backend)
             _PLOT_DISTANCE_CACHE.clear()
         return
     if args.all_phi and not (args.plot_only or args.combined_only):
@@ -709,7 +768,7 @@ def run_args(args):
             child.all_phi = False
             child.phi_deg = [entry["phi_deg"]]
             child.output = output / entry["directory"]
-            run_args(child)
+            run_args(child, backend=backend)
             _PLOT_DISTANCE_CACHE.clear()
         return
     manifest = output / "offset_scan.json"
@@ -719,12 +778,12 @@ def run_args(args):
                 for entry in json.loads(manifest.read_text())["offsets"]:
                     child = copy(args)
                     child.output = output / entry["directory"]
-                    run_offset(child)
+                    run_offset(child, backend=backend)
             plot_combined_offsets(output, color_scale=args.color_scale, statistic=args.distance_statistic)
         elif args.combined_only:
             raise ValueError("--combined-only requires an offset scan directory containing offset_scan.json.")
         else:
-            run_offset(args)
+            run_offset(args, backend=backend)
         return
 
     offsets = np.atleast_1d(np.asarray(args.offset_mm, dtype=float))
@@ -736,7 +795,7 @@ def run_args(args):
         raise ValueError(f"Offset scan already exists: {output}. Choose --output or use --plot-only.")
     if len(offsets) == 1:
         args.offset_mm = float(offsets[0])
-        run_offset(args)
+        run_offset(args, backend=backend)
         return
 
     if (output / "settings.json").exists():
@@ -753,13 +812,14 @@ def run_args(args):
     # Check every offset before starting a potentially long scan. This catches
     # invalid geometry and existing outputs even at the end of the list.
     for child in jobs:
-        run_offset(child, validate_only=True)
+        run_offset(child, validate_only=True, backend=backend)
     output.mkdir(parents=True, exist_ok=True)
     manifest.write_text(json.dumps({"offsets": entries}, indent=2) + "\n")
     for number, child in enumerate(jobs, start=1):
         print(f"Offset {number}/{len(jobs)}: {child.offset_mm:g} mm", flush=True)
-        run_offset(child)
-    plot_combined_offsets(output, color_scale=args.color_scale, statistic=args.distance_statistic)
+        run_offset(child, backend=backend)
+    if not args.no_plots:
+        plot_combined_offsets(output, color_scale=args.color_scale, statistic=args.distance_statistic)
 
 
 if __name__ == "__main__":
