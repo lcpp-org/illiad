@@ -1,0 +1,14 @@
+{
+  "lambda_T_u_m": 0.02,
+  "T_lcfs_eV": 50.0,
+  "n_lcfs_m3": 1e18,
+  "parallel_temperature_model": "isothermal",
+  "target_T_fraction": 0.0,
+  "Ti_eV": 2.0,
+  "gamma_i": 1.0,
+  "ion_mass_u": 4.002602,
+  "D_perp_m2_s": 1.0,
+  "source_m3_s": 0.0,
+  "wedge_angle_rad": 1.0,
+  "missing_leg_length_m": 100.0
+}
