@@ -1,0 +1,10 @@
+{
+  "flux_file": "output/IOTA3_1000sp_atol1e-9/data/LCFS36/nField_LCFS36_linear.npy",
+  "flux_lcfs_index": 36,
+  "flux_vessel_radius_m": 0.19,
+  "density_peak_m3": 2e18,
+  "temperature_peak_eV": 100.0,
+  "density_alpha": 1.0,
+  "temperature_alpha": 1.0,
+  "temperature_field": "Tu"
+}
