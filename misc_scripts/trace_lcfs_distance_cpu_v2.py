@@ -21,6 +21,7 @@ from pathlib import Path
 import sys
 import tempfile
 from textwrap import fill
+from time import perf_counter
 import zipfile
 
 import matplotlib
@@ -200,13 +201,13 @@ def ensure_path_metrics(output, data, settings):
     write_point_metrics(output, data, settings)
 
 
-def delete_saved_paths(output):
+def delete_saved_paths(output, *, paths_written=True):
     """Delete enumerated seed files after durable summaries and any requested plots succeed."""
     data = load_summary(output)
     if any(key not in data for key in EXTRA_METRIC_SHAPES) or not (output / "point_metrics.csv").is_file():
         raise ValueError("Cannot delete paths before all per-point metrics have been saved.")
     removed = 0
-    for i in range(len(data["seed_xyz_m"])):
+    for i in range(len(data["seed_xyz_m"]) if paths_written else 0):
         path = output / "paths" / f"seed_{i:05d}.npz"
         if path.is_file():
             path.unlink()
@@ -661,14 +662,18 @@ def run_offset(args, validate_only=False, backend=None):
           f"maximum {args.length_m:g} m per direction", flush=True)
 
     def collect(results):
+        last_report = perf_counter()
+        completed = 0
         for seed_id, lengths, hits, distance_integrals, distance_maxima, distance_minima, metrics in results:
             length[seed_id], hit[seed_id] = lengths, hits
             integrals[seed_id], maxima[seed_id] = distance_integrals, distance_maxima
             minima[seed_id] = distance_minima
             records[seed_id] = metrics
-            print(f"Seed {seed_id + 1}/{len(xyz)}: L+={lengths[0]:.6g} m, "
-                  f"L-={lengths[1]:.6g} m; "
-                  f"{'wall-to-wall' if all(hits) else 'length capped'}", flush=True)
+            completed += 1
+            # Warp reports queue progress itself; throttle CPU collection reports.
+            if backend is None and perf_counter() - last_report >= 10:
+                print(f"Tracing: {completed}/{len(xyz)} seeds complete", flush=True)
+                last_report = perf_counter()
 
     if not tasks:
         print("No grid seeds survive LCFS/vessel filtering; saving empty results without tracing.", flush=True)
@@ -717,7 +722,7 @@ def run_offset(args, validate_only=False, backend=None):
         plot_results(output, color_scale=args.color_scale, statistic=args.distance_statistic,
                      include_paths=args.path_plots)
     if args.delete_paths:
-        delete_saved_paths(output)
+        delete_saved_paths(output, paths_written=config.get("paths_written", True))
     print(f"Saved per-point metrics{' (plots skipped)' if args.no_plots else ' and plots'}: {output}")
 
 

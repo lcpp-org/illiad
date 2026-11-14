@@ -29,8 +29,8 @@ from illiad.boris_warp import VectorGrid, make_grid
 DEVICE = "cuda"
 INTEGRATOR = "rk4"
 STEP_SIZE_M = 0.005
-ACTIVE_SEEDS = 512*1024  # Each slot has two directional lanes; refill after both finish.
-SAMPLES_PER_CHUNK = 32*8
+ACTIVE_SEEDS = 1024*2048  # Each slot has two directional lanes; refill after both finish.
+SAMPLES_PER_CHUNK = 32*6
 WALL_BISECTIONS = 32
 MIN_FIELD_MAGNITUDE = 1e-14
 PHI_BATCHES = False
@@ -320,8 +320,13 @@ class WarpBackend:
         self.grid = None
         self.tree = None
 
+    def write_paths(self):
+        """Retain temporary paths only when requested output needs them."""
+        return not self.args.delete_paths or (not self.args.no_plots and self.args.path_plots)
+
     def metadata(self, config):
         return dict(solver=f"Warp {self.args.integrator.upper()}", backend="warp",
+                    paths_written=self.write_paths(),
                     warp_version=wp.__version__, dtype="float64",
                     queue_mode="per_phi" if self.args.phi_batches else "pooled_phi",
                     queue_refill="completed seed slots after each sample chunk",
@@ -353,7 +358,8 @@ class WarpBackend:
                 integrals.append(float(np.sum(np.diff(arc)*(distance[:-1]+distance[1:])/2)))
                 maxima.append(float(distance.max()))
                 minima.append(float(distance.min()))
-            np.savez_compressed(Path(config["output"])/"paths"/f"seed_{seed_id:05d}.npz", **paths)
+            if self.write_paths():
+                np.savez_compressed(Path(config["output"])/"paths"/f"seed_{seed_id:05d}.npz", **paths)
             yield seed_id, lengths, hits, integrals, maxima, minima, metrics
 
 
@@ -378,6 +384,9 @@ def parse_args(argv=None):
         if action.dest == "output":
             action.default = None
             action.help = "Default: RUN_DIR/lcfs_distance_warp"
+        elif action.dest == "delete_paths":
+            action.help = ("Skip writing seed paths unless full-path plots are requested; "
+                           "otherwise delete them after summaries/plots; also supports --plot-only")
         elif action.dest == "all_phi":
             action.help = "Queue all saved launch planes together; --phi-batches restores phiDDD batches"
     args = parser.parse_args(argv)
