@@ -112,6 +112,9 @@ def load_lcfs_boundary(analysis_dir, phi_deg, lcfs_index,
     poloidal_angle = np.arctan2(boundary[:, 1] - center[1], boundary[:, 0] - center[0])
 
     boundary = boundary[np.argsort(poloidal_angle)]
+    # FITPACK treats the final point as the periodic duplicate and ignores it.
+    # Close explicitly so that every measured Poincare point enters the fit.
+    boundary = np.vstack((boundary, boundary[0]))
     spline, _ = splprep(boundary.T, s=float(spline_smoothing), per=True)
     boundary = np.column_stack(splev(np.linspace(0.0, 1.0, int(boundary_points), endpoint=False), spline))
 
