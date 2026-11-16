@@ -156,10 +156,14 @@ def build_geometry(rho, theta, keep, boundary, R0, wall, dphi=1.0, quadrature=8)
 
     for t, center_angle in enumerate(theta):
         rows = np.flatnonzero(keep[:, t])
-        if (not len(rows) or rows[0] == 0 or rows[-1] != len(rho)-2
-                or np.any(np.diff(rows) != 1)):
-            raise ValueError("Each theta column must contain contiguous SOL seeds through the last interior radius")
         columns.append(rows)
+        # A narrow SOL wedge may contain no radial seed at this resolution.
+        # Preserve the empty column; do not create cells or bridge across it.
+        if not len(rows):
+            continue
+        if (rows[0] == 0 or rows[-1] != len(rho)-2
+                or np.any(np.diff(rows) != 1)):
+            raise ValueError("Each nonempty theta column must contain contiguous SOL seeds through the last interior radius")
         a, b = center_angle-dt/2, center_angle+dt/2
         knots = np.r_[a, angles[(angles > a) & (angles < b)], b]
         for k, r in enumerate(rows):
@@ -263,8 +267,8 @@ def solve_density(volume, edge_i, edge_j, conductance, boundary_conductance,
 def prepare_plane(data, settings, phi_deg, cfg, incomplete="error", quadrature=8):
     """Shared trace selection and geometry for the standalone Model A/B solvers."""
     cfg.validate()
-    if incomplete not in ("error", "no_flux", "long_leg"):
-        raise ValueError("incomplete must be error, no_flux or long_leg")
+    if incomplete not in ("error", "no_flux", "long_leg", "all_valid"):
+        raise ValueError("incomplete must be error, no_flux, long_leg or all_valid")
     if quadrature < 2:
         raise ValueError("quadrature must be >= 2")
     if settings["offset_mm"] != 0 or settings["surface_index"] != settings["distance_surface_index"]:
@@ -292,8 +296,11 @@ def prepare_plane(data, settings, phi_deg, cfg, incomplete="error", quadrature=8
     clean = (np.isfinite(lengths).all(axis=1) & (lengths > 0).all(axis=1)
              & np.isfinite(dmin) & (dmin >= 0) & np.isin(hits, [0, 1]).all(axis=1))
     hit_count = (hits == 1).sum(axis=1)
-    approximated = clean & (hit_count == 1) & (incomplete == "long_leg")
-    valid = clean & ((hit_count == 2) | approximated)
+    approximated = clean & (hit_count == 1) & (incomplete in ("long_leg", "all_valid"))
+    no_parallel_loss = clean & (hit_count == 0) & (incomplete == "all_valid")
+    valid = clean & ((hit_count == 2) | approximated | no_parallel_loss)
+    if incomplete == "all_valid" and not np.all(clean):
+        raise ValueError("all_valid requires valid trace records for every domain cell; corrupt data cannot be filled")
     rejected = seed_ids[~valid]
     if len(rejected):
         message = f"{len(rejected)}/{len(seed_ids)} seeds have incomplete/invalid wall traces or distances"
@@ -329,6 +336,8 @@ def prepare_plane(data, settings, phi_deg, cfg, incomplete="error", quadrature=8
             parallel_geometry(traced_lengths, signed_s, direction)
         xi, leg_minus, leg_plus = parallel_geometry(
             lengths, signed_s, direction)
+    no_parallel_loss = no_parallel_loss[valid]
+    xi[no_parallel_loss] = 0.0
     volume = mesh["volume_m3"][valid]
     result = dict(seed_id=seed_ids, rejected_seed_id=rejected,
                   rho_index=ir[valid], theta_index=it[valid],
@@ -336,13 +345,14 @@ def prepare_plane(data, settings, phi_deg, cfg, incomplete="error", quadrature=8
                   boundary_xz_m=data["boundaries_xz_m"][plane],
                   grid_rho_m=data["grid_rho_m"], grid_theta_rad=data["grid_theta_rad"],
                   phi_comp_deg=np.asarray(planes[plane]), plane_id=np.asarray(plane),
-                  xi=xi,
+                  xi=xi, no_parallel_loss=no_parallel_loss,
                   leg_minus_m=leg_minus, leg_plus_m=leg_plus, Lc_m=lengths.sum(axis=1),
                   traced_length_m=traced_lengths, effective_length_m=lengths, hit_wall=hits,
                   Lc_traced_m=traced_lengths.sum(axis=1), connection_approximated=approximated,
                   d_min_m=dmin, volume_m3=volume)
     diagnostics = dict(valid_cells=len(seed_ids), rejected_cells=len(rejected),
-                       complete_cells=int(np.count_nonzero(~approximated)),
+                       complete_cells=int(np.count_nonzero(hits.all(axis=1))),
+                       no_parallel_loss_cells=int(no_parallel_loss.sum()),
                        approximated_cells=int(np.count_nonzero(approximated)),
                        excluded_volume_m3=float(np.sum(mesh["volume_m3"][~valid])),
                        retained_volume_m3=float(np.sum(volume)))

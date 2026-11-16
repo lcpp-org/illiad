@@ -67,6 +67,7 @@ def plot_solution(data, settings, density_scale="log", marker_size=DEFAULT_MARKE
     excluded = (plane_points(data, "rejected_") if "rejected_rho_index" in data
                 else (np.array([]), np.array([])))
     approximate = data.get("connection_approximated", np.zeros(len(x), dtype=bool))
+    no_loss = data.get("no_parallel_loss", np.zeros(len(x), dtype=bool))
     density, Tu, Te = (np.asarray(data[key]) for key in ("n_e_m3", "Tu_eV", "Te_eV"))
     for key in ("n_e_m3", "Tu_eV", "Te_eV", "Lc_m", "d_min_m"):
         values = data[key]
@@ -79,7 +80,7 @@ def plot_solution(data, settings, density_scale="log", marker_size=DEFAULT_MARKE
         ("Electron density", density, r"$n_e$ [m$^{-3}$]", "viridis", positive_norm(density, density_scale)),
         (upstream_title, Tu, r"$T_u$ [eV]", "inferno", temperature_norm),
         ("Local electron temperature", Te, r"$T_e$ [eV]", "inferno", temperature_norm),
-        ("Effective connection length", data["Lc_m"], r"$L_{c,\mathrm{eff}}$ [m]", "viridis",
+        ("Connection length (neither-hit: traced lower bound)", data["Lc_m"], r"$L_{c,\mathrm{eff}}$ [m]", "viridis",
          positive_norm(data["Lc_m"], "log")),
         ("Sampled minimum LCFS distance", data["d_min_m"] * 1000, r"$d_{\min}$ [mm]", "cividis",
          positive_norm(data["d_min_m"] * 1000, "linear")),
@@ -93,7 +94,8 @@ def plot_solution(data, settings, density_scale="log", marker_size=DEFAULT_MARKE
     axes = np.asarray(axes).reshape(-1)
     for ax, index in zip(axes, selected):
         if index == 5:
-            for mask, color, label in ((~approximate, "#a8bac7", "Both wall hits"),
+            for mask, color, label in ((~approximate & ~no_loss, "#a8bac7", "Both wall hits"),
+                                      (no_loss, "#9467bd", "Neither hit: zero parallel loss"),
                                       (approximate, "#e69f00", "One hit: approximated")):
                 ax.scatter(x[mask], z[mask], color=color, s=marker_size, linewidths=0,
                            label=f"{label} ({np.count_nonzero(mask):,})")
