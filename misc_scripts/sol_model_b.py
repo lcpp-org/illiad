@@ -11,7 +11,7 @@ from pathlib import Path
 import warnings
 
 import numpy as np
-from scipy.constants import atomic_mass, elementary_charge as EV_J
+from scipy.constants import atomic_mass, epsilon_0, m_e, elementary_charge as EV_J
 from scipy.sparse import coo_matrix, diags
 from scipy.sparse.csgraph import connected_components
 from scipy.sparse.linalg import spsolve
@@ -39,14 +39,19 @@ class PowerSOLConfig(model_a.SOLConfig):
     residual_tolerance: float = 1e-8
     neutral_densities_m3: dict[str, float] = field(default_factory=dict)
     plt_bounds: str = "clip"
+    fast_fraction: float = 0.0
+    fast_temperature_eV: float = 200.0
+    coulomb_log: float = 10.0
 
     def validate(self):
         model_a.SOLConfig(**{key: getattr(self, key) for key in model_a.SOLConfig.__dataclass_fields__}).validate()
         for name in ("chi_perp_m2_s", "gamma_e", "source_lambda_m", "relaxation",
-                     "state_tolerance", "residual_tolerance"):
+                     "state_tolerance", "residual_tolerance", "fast_temperature_eV", "coulomb_log"):
             value = getattr(self, name)
             if not np.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
+        if not np.isfinite(self.fast_fraction) or self.fast_fraction < 0:
+            raise ValueError("fast_fraction must be finite and nonnegative")
         if self.relaxation > 1:
             raise ValueError("relaxation must lie in (0, 1]")
         if isinstance(self.max_iterations, bool) or not isinstance(self.max_iterations, int) or self.max_iterations < 1:
@@ -123,6 +128,20 @@ def balance(mesh, values, conductance, boundary, boundary_value, sink, source):
     return residual, relative_residual, influx, loss, injected, relative_balance
 
 
+def fast_electron_exchange(density, cfg):
+    """Prescribed nf/nb; return nf, relaxation time [s], H [W m^-3 eV^-1].
+
+    Horvath hot-population approximation: Q = H*(Tf-Te). No fast-particle
+    continuity or fast-population power balance is solved.
+    """
+    density = np.asarray(density, dtype=float)
+    positive_state(density, 'bulk density for fast-electron exchange')
+    nf = cfg.fast_fraction*density
+    tau = (3*(4*np.pi*epsilon_0)**2*np.sqrt(m_e)*(EV_J*cfg.fast_temperature_eV)**1.5
+           / (8*np.sqrt(2*np.pi)*density*EV_J**4*cfg.coulomb_log))
+    return nf, tau, 1.5*nf*EV_J/tau
+
+
 def atomic_terms(temperature_eV, density_m3, neutrals, bounds='clip'):
     """Neutral -> singly ionized particles and electron energy loss, no recycling.
 
@@ -174,7 +193,7 @@ def atomic_diagnostics(fields, temperature, density, volume, neutrals):
     return diagnostics
 
 
-def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progress=None, *, xi=None):
+def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progress=None, *, xi=None, no_parallel_loss=None):
     """Alternating sparse solves; also relax density when neutrals are enabled.
 
     Chi is defined by q = -n*e*chi*grad(Tu); no additional 3/2 factor is used.
@@ -189,7 +208,7 @@ def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progr
             or not np.isfinite(volume).all() or np.any(volume <= 0)):
         raise ValueError("Require positive finite cell volumes and aligned wall-to-wall lengths")
     if xi is None:
-        if atoms_enabled and cfg.parallel_temperature_model == 'spitzer_harm':
+        if (atoms_enabled or cfg.fast_fraction > 0) and cfg.parallel_temperature_model == 'spitzer_harm':
             raise ValueError("Supply xi for local Spitzer-Harm atomic temperatures")
         xi = np.zeros_like(volume)
     xi = np.asarray(xi)
@@ -197,6 +216,10 @@ def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progr
         xi = np.zeros_like(volume)  # Isothermal trace preparation deliberately stores NaN xi.
     if xi.shape != volume.shape or not np.isfinite(xi).all() or np.any((xi < 0) | (xi > 1)):
         raise ValueError("xi must be aligned with cells and lie in [0, 1]")
+    loss_mask = np.zeros(volume.shape, dtype=bool) if no_parallel_loss is None else np.asarray(no_parallel_loss, dtype=bool)
+    if loss_mask.shape != volume.shape:
+        raise ValueError('no_parallel_loss must align with cells')
+    xi = np.where(loss_mask, 0.0, xi)
     i, j = mesh['edge_i'], mesh['edge_j']
     area = mesh['edge_area_over_distance_m']
     boundary_area = mesh['boundary_area_over_distance_m']
@@ -214,7 +237,7 @@ def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progr
     for iteration in range(1, cfg.max_iterations+1):
         previous_n, previous_T = density, Tu
         cs_old = np.sqrt(EV_J*(previous_T+cfg.gamma_i*cfg.Ti_eV)/(cfg.ion_mass_u*atomic_mass))
-        nu_old = 2*cs_old/Lc
+        nu_old = np.where(loss_mask, 0.0, 2*cs_old/Lc)
         old_atoms = atomic_terms(model_a.local_Te(previous_T, xi, cfg), previous_n, neutrals, cfg.plt_bounds)
         density = spsolve(Kn+diags(volume*nu_old), rhs_n+volume*old_atoms['ionization_source_m3_s'])
         positive_state(density, "density trial (check components disconnected from the LCFS)")
@@ -229,19 +252,25 @@ def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progr
         # this is the original atomic loss, including PLT's density dependence.
         frozen_atoms = atomic_terms(model_a.local_Te(previous_T, xi, cfg), density, neutrals, cfg.plt_bounds)
         coefficient += frozen_atoms['atomic_loss_W_m3']/previous_T
-        trial = spsolve(KT+diags(volume*coefficient), bT*cfg.T_lcfs_eV+volume*source)
+        nf, tau_fast, H = fast_electron_exchange(density, cfg)
+        g = model_a.local_Te(np.ones_like(density), xi, cfg)
+        coefficient += H*g
+        trial = spsolve(KT+diags(volume*coefficient), bT*cfg.T_lcfs_eV+volume*(source+H*cfg.fast_temperature_eV))
         positive_state(trial, "temperature trial")
         Tu = (1-cfg.relaxation)*previous_T + cfg.relaxation*trial
         positive_state(Tu, "temperature")
         cs = np.sqrt(EV_J*(Tu+cfg.gamma_i*cfg.Ti_eV)/(cfg.ion_mass_u*atomic_mass))
-        nu = 2*cs/Lc
+        nu = np.where(loss_mask, 0.0, 2*cs/Lc)
         sheath = cfg.gamma_e*EV_J*density*Tu*nu
         Te = model_a.local_Te(Tu, xi, cfg)
         atoms = atomic_terms(Te, density, neutrals, cfg.plt_bounds)
         particles = balance(mesh, density, Gn, bn, cfg.n_lcfs_m3,
                             volume*nu*density, volume*(cfg.source_m3_s+atoms['ionization_source_m3_s']))
+        fast_power = H*(cfg.fast_temperature_eV-Te)
+        # Split signed exchange for residual scaling; preserve reverse transfer.
         energy = balance(mesh, Tu, GT, bT, cfg.T_lcfs_eV,
-                         volume*(sheath+atoms['atomic_loss_W_m3']), volume*source)
+                         volume*(sheath+atoms['atomic_loss_W_m3']+np.maximum(-fast_power, 0)),
+                         volume*(source+np.maximum(fast_power, 0)))
         change_n = float(np.max(np.abs(density-previous_n)/np.maximum(density, previous_n)))
         change_T = float(np.max(np.abs(Tu-previous_T)/np.maximum(Tu, previous_T)))
         history.append([iteration, change_n, change_T, particles[1], energy[1], particles[5], energy[5]])
@@ -258,16 +287,18 @@ def solve_coupled(mesh, Lc_m, d_min_m, cfg, weight_func=source_weight_exp, progr
     result = dict(n_e_m3=density, Tu_eV=Tu, sound_speed_m_s=cs, source_W_m3=source,
                   sheath_loss_W_m3=sheath, particle_residual_s_inv=particles[0],
                   energy_residual_W=energy[0], iteration_history=np.asarray(history))
-    result.update(atoms, atomic_temperature_eV=Te)
+    result.update(atoms, atomic_temperature_eV=Te, parallel_loss_rate_s_inv=nu,
+                  fast_density_m3=nf, fast_relaxation_time_s=tau_fast, fast_heating_W_m3=fast_power)
     diagnostics = dict(converged=True, iterations=iteration, density_relative_update=change_n,
                        temperature_relative_update=change_T,
                        max_scaled_particle_residual=particles[1], max_scaled_energy_residual=energy[1],
                        relative_particle_balance=particles[5], relative_energy_balance=energy[5],
                        lcfs_influx_s_inv=particles[2], parallel_loss_s_inv=particles[3],
                        volume_source_s_inv=particles[4], lcfs_heat_influx_W=energy[2],
-                       sheath_power_W=float(volume @ sheath), source_power_wedge_W=energy[4],
+                       sheath_power_W=float(volume @ sheath), source_power_wedge_W=float(volume @ source),
+                       fast_heating_power_W=float(volume @ fast_power),
                        requested_source_power_wedge_W=cfg.wedge_power_W,
-                       source_normalization_error_W=energy[4]-cfg.wedge_power_W,
+                       source_normalization_error_W=float(volume @ source)-cfg.wedge_power_W,
                        atomic_power_W=float(volume @ atoms['atomic_loss_W_m3']),
                        ionization_source_s_inv=float(volume @ atoms['ionization_source_m3_s']),
                        prescribed_particle_source_s_inv=float(volume.sum()*cfg.source_m3_s),
@@ -303,7 +334,7 @@ def exclude_unfed_components(result, mesh, cfg):
             result['rejected_'+name] = np.r_[result['rejected_'+name], result[name][~keep]]
         cell_fields = ('seed_id', 'rho_index', 'theta_index', 'xi', 'leg_minus_m', 'leg_plus_m', 'Lc_m',
                        'traced_length_m', 'effective_length_m', 'hit_wall', 'Lc_traced_m',
-                       'connection_approximated', 'd_min_m', 'volume_m3')
+                       'connection_approximated', 'no_parallel_loss', 'd_min_m', 'volume_m3')
         for name in cell_fields:
             result[name] = result[name][keep]
         remap = np.full(size, -1, dtype=int)
@@ -322,14 +353,24 @@ def solve_plane(data, settings, phi_deg, cfg=PowerSOLConfig(), incomplete='error
     # long_leg is an explicit user-requested extension of the PDF's strict policy.
     # Shared preparation preserves original lengths and flags every approximation.
     result, mesh, diagnostics = model_a.prepare_plane(data, settings, phi_deg, cfg, incomplete, quadrature)
-    result, mesh, removed_volume = exclude_unfed_components(result, mesh, cfg)
+    if incomplete == 'all_valid':
+        graph = diffusion_matrix(len(result['seed_id']), mesh['edge_i'], mesh['edge_j'], np.ones(len(mesh['edge_i'])))
+        _, labels = connected_components(graph, directed=False)
+        anchored = np.unique(labels[mesh['boundary_area_over_distance_m'] > 0])
+        if not np.all(np.isin(labels, anchored)):
+            raise ValueError('all_valid has a component disconnected from the LCFS; refusing to silently exclude it')
+        removed_volume = 0.0
+        result['disconnected_seed_id'] = np.array([], dtype=int)
+    else:
+        result, mesh, removed_volume = exclude_unfed_components(result, mesh, cfg)
     fields, balances = solve_coupled(mesh, result['Lc_m'], result['d_min_m'], cfg, weight_func, progress,
-                                    xi=result['xi'])
+                                    xi=result['xi'], no_parallel_loss=result['no_parallel_loss'])
     result.update(fields)
     result['Te_eV'] = model_a.local_Te(result['Tu_eV'], result['xi'], cfg)
     model_a.add_grid_fields(result)
     diagnostics.update(balances, valid_cells=len(result['seed_id']), rejected_cells=len(result['rejected_seed_id']),
-                       complete_cells=int(np.count_nonzero(~result['connection_approximated'])),
+                       complete_cells=int(np.count_nonzero(result['hit_wall'].all(axis=1))),
+                       no_parallel_loss_cells=int(result['no_parallel_loss'].sum()),
                        approximated_cells=int(np.count_nonzero(result['connection_approximated'])), zero_density_cells=0,
                        disconnected_cells=len(result['disconnected_seed_id']), disconnected_volume_m3=removed_volume,
                        excluded_volume_m3=diagnostics['excluded_volume_m3']+removed_volume,
@@ -340,7 +381,7 @@ def solve_plane(data, settings, phi_deg, cfg=PowerSOLConfig(), incomplete='error
 def save_solution(output, result, metadata):
     model_a.save_solution(output, result, metadata)
     columns = ('seed_id', 'source_W_m3', 'sheath_loss_W_m3', 'ionization_loss_W_m3',
-               'excitation_loss_W_m3', 'atomic_loss_W_m3', 'energy_residual_W')
+               'excitation_loss_W_m3', 'atomic_loss_W_m3', 'fast_heating_W_m3', 'energy_residual_W')
     np.savetxt(output/'power_balance.csv', np.column_stack([result[k] for k in columns]),
                delimiter=',', header=','.join(columns), comments='', fmt=['%d']+['%.12g']*(len(columns)-1))
     columns = ['seed_id', 'atomic_temperature_eV', 'ionization_source_m3_s', 'atomic_loss_W_m3']
@@ -361,7 +402,7 @@ def main(argv=None):
     planes.add_argument('--all-phi', action='store_true')
     parser.add_argument('--config', type=Path)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--incomplete', choices=('error', 'no_flux', 'long_leg'), default='error')
+    parser.add_argument('--incomplete', choices=('error', 'no_flux', 'long_leg', 'all_valid'), default='error')
     parser.add_argument('--quadrature', type=int, default=8)
     parser.add_argument('--plot', action='store_true')
     parser.add_argument('--plot-individual', action='store_true')

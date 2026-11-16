@@ -26,6 +26,28 @@ def slab_mesh(count, length=.1):
 
 
 class ModelBTests(unittest.TestCase):
+    def test_all_valid_keeps_neither_hit_and_conserves(self):
+        data, settings = fixture()
+        data['hit_wall'][7] = False
+        data['hit_wall'][8, 0] = False
+        cfg = b.PowerSOLConfig(parallel_temperature_model='spitzer_harm', source_power_wedge_W=.1)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            result, diag = b.solve_plane(data, settings, 12, cfg, incomplete='all_valid')
+        self.assertEqual(len(result['seed_id']), len(data['plane_id']))
+        self.assertEqual(len(result['rejected_seed_id']), 0)
+        mask = result['no_parallel_loss']
+        assert_allclose(result['seed_id'][mask], [7])
+        assert_allclose(result['parallel_loss_rate_s_inv'][mask], 0)
+        assert_allclose(result['sheath_loss_W_m3'][mask], 0)
+        assert_allclose(result['Te_eV'][mask], result['Tu_eV'][mask], rtol=0, atol=0)
+        self.assertEqual(diag['no_parallel_loss_cells'], 1)
+        self.assertLess(abs(diag['relative_particle_balance']), cfg.residual_tolerance)
+        self.assertLess(abs(diag['relative_energy_balance']), cfg.residual_tolerance)
+        data['length_m'][7, 0] = np.nan
+        with self.assertRaisesRegex(ValueError, 'valid trace records'):
+            b.solve_plane(data, settings, 12, cfg, incomplete='all_valid')
+
     def test_source_normalization_custom_kernel_and_total_power(self):
         volume, distance = np.array([.1, .3, .2]), np.array([0., .02, .1])
         cfg = b.PowerSOLConfig(source_power_wedge_W=17)

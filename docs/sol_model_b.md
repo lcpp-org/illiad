@@ -105,6 +105,59 @@ single effective ion mass used by the baseline closure. In a He/Li mixture this
 is a helium-background/impurity approximation unless the user chooses another
 effective mass; a large impurity fraction requires a more complete ion model.
 
+## Prescribed fast-electron heating
+
+Enable the minimal Horvath fast-to-bulk exchange with `fast_fraction` (default
+0, disabled), `fast_temperature_eV` (default 200 eV), and `coulomb_log` (default
+10). All are uniform prescribed inputs. The fraction means **nf / n_bulk**;
+`n_e_m3` remains the solved bulk density. No additional particle population is
+solved or added to the particle equation or atomic-rate density coordinate.
+
+```
+nf = fast_fraction * n_bulk
+ tau = 3*(4*pi*epsilon_0)^2*sqrt(m_e)*(e*Tf)^(3/2)
+       / (8*sqrt(2*pi)*n_bulk*e^4*coulomb_log)
+H = 1.5*nf*e/tau
+Q_fast = H*(Tf - Te)                     [W/m^3]
+```
+
+This matches the existing Horvath prototype's energy-transfer formula. It assumes
+a hot Maxwellian minority with a prescribed reservoir; validity becomes limited
+when bulk and fast temperatures are comparable. Reverse transfer for `Te > Tf`
+is retained, not clipped. At `n_bulk=1e18`, `Tf=200`, `Te=10`, fraction 0.01 and
+Coulomb logarithm 10, tau is about 4.87e-5 s and heating about 9.4e3 W/m^3.
+At fixed temperatures it scales as the square of bulk density.
+
+The energy equation has `source_W_m3 + Q_fast` on its right-hand side. Using
+`Te=g*Tu`, the temperature solve adds `H*g` to its loss coefficient and `H*Tf`
+to its source, evaluating H from the current density. Full nonlinear residuals
+use signed `H*(Tf-Te)` at the updated state; residual scaling treats negative
+exchange as cooling. Thus the reconstruction switch can change solved density
+and Tu even without neutrals. Neither-hit `all_valid` cells use g=1.
+
+The signed integrated budget is:
+
+```
+lcfs_heat_influx_W + source_power_wedge_W + fast_heating_power_W
+    = sheath_power_W + atomic_power_W
+```
+
+Fast heating is **calculated**, not normalized to an absorbed-power target.
+Check its integral against available experimental power. Keep the existing
+volumetric source zero when both would represent the same deposited power.
+`source_power_wedge_W` and its normalization diagnostic still describe only the
+original prescribed source. Saved NPZ fields include `fast_density_m3`,
+`fast_relaxation_time_s`, and signed `fast_heating_W_m3`; the latter also appears
+in `power_balance.csv`. There is no fast-electron atomic ionization/excitation,
+fast-population depletion or independent fast-temperature solve in this version.
+
+[The fast-heating example](../input_files/sol_model_b_fast.example.json) copies the
+current extended example, enables a 1% population at 200 eV and uses relaxation
+0.5. Your existing extended input is not changed. Use it with the normal Model B
+CLI, e.g. `--config input_files/sol_model_b_fast.example.json --incomplete all_valid`.
+The optional distance-dependent fast fraction is deferred; this version uses a
+uniform fraction as recommended.
+
 ## Equations and power convention
 
 With temperatures in eV and `e = 1.602176634e-19 J/eV`:
@@ -203,6 +256,43 @@ sets. No automatic continuation or Newton fallback is implemented in this
 prototype. Very cold converged temperatures are reported without flooring and
 should also be assessed against the physical assumptions.
 
+## Solve all valid SOL cells, including neither-wall-hit traces
+
+Use `--incomplete all_valid` to retain every valid cell in the saved SOL mask:
+
+- Two wall hits: measured wall-to-wall length and original parallel sinks.
+- One wall hit: existing finite `long_leg` approximation, using at least
+  `missing_leg_length_m` for the missing leg.
+- Neither wall hit: zero direct parallel particle and sheath-energy losses.
+  Perpendicular diffusion faces, volumetric heating and atomic processes remain
+  active. These cells use `Te = Tu`, the infinite-leg limit of the reconstruction.
+
+This is an infinite-connection approximation, not a determination that lines are
+closed. It inserts no numerical infinities. `no_parallel_loss` flags these cells
+in `solution.npz`; `parallel_loss_rate_s_inv` records the actual loss rate.
+Their `Lc_m` and effective-length arrays retain the finite traced lower bounds
+for provenance, **not** the length used to compute losses. The plot distinguishes
+neither-hit cells in purple and labels the connection-length panel accordingly.
+
+All diffusion faces between retained cells are restored, and heating is normalized
+over this larger domain. Results can therefore differ from an excluded-cell run
+through both transport connectivity and heating distribution. Sampled minimum
+LCFS distances remain based on the original finite traces.
+
+The mode rejects corrupt trace records and reports LCFS-disconnected components
+as errors instead of silently removing them. It does not guarantee a steady state
+for arbitrary sources or neutral mixtures. The normal positivity and nonlinear
+conservation checks still apply. This mode is exposed by the Model B CLI; existing
+trace policies keep their previous behavior. The domain means the saved SOL seed
+mask, not untraced wall nodes or the prescribed interior profile.
+
+```bash
+conda run --no-capture-output -n testenv python misc_scripts/sol_model_b.py \
+  output/lcfs_grid_distance_warp_some2 --all-phi \
+  --config input_files/sol_model_b_extended.example.json \
+  --incomplete all_valid --output output/sol_model_b_all_valid --plot-individual
+```
+
 ## Incomplete traces and disconnected components
 
 The default `--incomplete error` follows the PDF: every retained line must reach
@@ -232,7 +322,7 @@ apply to the retained domain.
 `parallel_temperature_model` is `isothermal` by default. `spitzer_harm` applies
 the same signed branch reconstruction as Model A, using the converged Tu.
 `target_T_fraction` sets the target temperature relative to Tu. This switch must
-leave both solved `n_e` and `Tu` unchanged **when atomic processes are disabled**,
+leave both solved `n_e` and `Tu` unchanged **when atomic processes and fast-electron heating are disabled**,
 and is tested that way. With atomic processes enabled, local Te feeds back into
 the balances through the rates.
 
