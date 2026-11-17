@@ -301,7 +301,7 @@ def parser():
     p.add_argument('--final-interval', type=float, help='Seconds in final interval; inferred from matching log when possible, otherwise omitted.')
     p.add_argument('--histogram', choices=['count', 'area', 'flux', 'density', 'energy'], default='area')
     p.add_argument('--plot-type', choices=['histogram', 'nodes', 'both'], default='histogram')
-    p.add_argument('--node-size', type=float, default=35., help='Mesh marker area in points squared.')
+    p.add_argument('--node-size', type=float, default=30., help='Mesh marker area in points squared.')
     p.add_argument('--magnetic-field', type=Path,
                    default=Path(__file__).resolve().parents[1] / 'input_files/It1000_Ih000_Iv000_1p000_1p000_64bit.npy',
                    help='Native magnetic field NPY; its shape defines rho/theta nodes.')
