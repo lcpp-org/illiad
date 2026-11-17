@@ -33,19 +33,19 @@ from illiad.boris_warp import VectorGrid, make_grid
 
 # Editable defaults; command-line arguments override these.
 RUN_DIR = PROJECT_ROOT / "output/IOTA3_1000sp_atol1e-9"
-SURFACE_INDEX = 36  # Exclusion surface; None uses the distance-reference LCFS.
+SURFACE_INDEX = 23  # Exclusion surface; None uses the distance-reference LCFS.
 PHI_DEG = [306]
 NPOINTS_RHO = None  # None reads the selected magnetic field mesh (currently 191).
 NPOINTS_THETA = None  # None reads the selected magnetic field mesh (currently 180).
 OFFSET_MM = 0.005  # Scalar or list, e.g. [0, 5, 10, 20]; positive expands the excluded LCFS interior.
-LENGTH_M = 30.0  # Per direction, unless the vessel wall is reached first.
+LENGTH_M = 20.0  # Per direction, unless the vessel wall is reached first.
 MAJOR_RADIUS_M = 0.72
 VESSEL_RADIUS_M = 0.19
 COLOR_SCALE = "log"  # "linear" or "log"; applies to new plots and --plot-only.
 
 
 # The exclusion surface defaults to this distance reference.
-DISTANCE_SURFACE_INDEX = 36  # None uses the run's logged LCFS.
+DISTANCE_SURFACE_INDEX = 23  # None uses the run's logged LCFS.
 DISTANCE_POLOIDAL_POINTS = 256  # Per saved toroidal slice; increase to check convergence.
 DISTANCE_STATISTIC = "min"  # Closest sampled approach across both directions, including launch.
 DELETE_PATHS = False  # Remove seed path files after summaries and any requested plots succeed.
@@ -409,6 +409,7 @@ class WarpBackend:
 def build_parser():
     """Expose geometry, output and Warp controls in one place."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--input-json", type=Path, help="JSON settings file; explicit CLI arguments override it")
     parser.add_argument("run_dir", nargs="?", type=Path, default=RUN_DIR)
     planes = parser.add_mutually_exclusive_group()
     planes.add_argument("--phi-deg", nargs="+", type=int, default=PHI_DEG, help="Computational launch planes in degrees")
@@ -466,6 +467,48 @@ def build_parser():
 
 def parse_args(argv=None):
     parser = build_parser()
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("--input-json", type=Path)
+    config_path = probe.parse_known_args(argv)[0].input_json
+    if config_path is not None:
+        try:
+            settings = json.loads(config_path.read_text())
+        except (OSError, ValueError) as exc:
+            parser.error(f"Cannot read input JSON: {exc}")
+        if not isinstance(settings, dict):
+            parser.error("Input JSON must be an object of argument names and values.")
+        actions = {a.dest: a for a in parser._actions if a.dest not in ("help", "input_json")}
+        unknown = settings.keys() - actions.keys()
+        if unknown:
+            parser.error(f"Unknown JSON settings: {sorted(unknown)}")
+        for key, value in settings.items():
+            action = actions[key]
+            if value is None:
+                if key not in ("output", "nrho", "ntheta", "surface_index", "distance_surface_index"):
+                    parser.error(f"{key} cannot be null")
+                continue
+            if isinstance(action, (argparse._StoreTrueAction, argparse.BooleanOptionalAction)):
+                if not isinstance(value, bool):
+                    parser.error(f"{key} must be a JSON boolean")
+                continue
+            values = value if action.nargs == "+" and isinstance(value, list) else [value]
+            if not values:
+                parser.error(f"{key} must not be empty")
+            converted = []
+            for item in values:
+                try:
+                    if action.type in (int, float) and (isinstance(item, bool) or not isinstance(item, (int, float))):
+                        raise ValueError("expected a number")
+                    if action.type is int and int(item) != item:
+                        raise ValueError("expected an integer")
+                    result = action.type(item) if action.type else item
+                    if action.choices and result not in action.choices:
+                        raise ValueError(f"choose from {action.choices}")
+                except (TypeError, ValueError) as exc:
+                    parser.error(f"Invalid {key}: {exc}")
+                converted.append(result)
+            settings[key] = converted if action.nargs == "+" else converted[0]
+        parser.set_defaults(**settings)
     args = parser.parse_args(argv)
     if args.no_plots and (args.plot_only or args.combined_only):
         parser.error("--no-plots cannot be combined with --plot-only or --combined-only")

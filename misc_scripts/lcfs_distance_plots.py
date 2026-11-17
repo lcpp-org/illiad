@@ -129,6 +129,9 @@ def distance_color_scale(values, color_scale, statistic):
     elif color_scale == "log":
         positive = values[values > 0]
         minimum = float(positive.min()) if positive.size else maximum / 10
+        minimum = max(minimum, 1e-1)
+        if maximum <= minimum:
+            maximum = minimum * 10
         if minimum == maximum:
             minimum /= np.sqrt(10)
             maximum *= np.sqrt(10)
