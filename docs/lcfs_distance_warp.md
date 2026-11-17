@@ -88,3 +88,19 @@ Tests default to Warp's CPU device. Set `ILLIAD_WARP_TEST_DEVICE=cuda` for GPU
 execution. They use synthetic fields and saved surfaces and block imports of the
 two retired CPU tracing scripts. CPU checks establish behavior only on that device; they do
 not measure GPU performance or full-scan convergence.
+
+## JSON inputs
+
+An editable example is `input_files/lcfs_distance_warp.example.json`:
+
+```bash
+conda run --no-capture-output -n warpenv python misc_scripts/trace_lcfs_distance_cpu_warp.py \
+    --input-json input_files/lcfs_distance_warp.example.json
+```
+
+Keys use CLI destination names with underscores. Omitted keys retain script
+defaults; explicit command-line arguments override JSON values. Relative paths
+are relative to the working directory. `output: null` selects the usual output
+folder. The example uses a 32-by-48 launch grid, 512 concurrent seed slots, and
+saves summaries without plots or paths. Edit the run and surface indices for your
+data. Use `all_phi: true` to select all saved planes instead of `phi_deg`.

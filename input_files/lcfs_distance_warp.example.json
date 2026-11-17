@@ -1,0 +1,28 @@
+{
+  "run_dir": "output/IOTA3_1000sp_atol1e-9",
+  "phi_deg": [
+    306
+  ],
+  "surface_index": 36,
+  "distance_surface_index": 36,
+  "nrho": 32,
+  "ntheta": 48,
+  "offset_mm": [
+    5.0
+  ],
+  "length_m": 30.0,
+  "device": "cuda",
+  "integrator": "rk4",
+  "step_size_m": 0.005,
+  "sample_step_m": 0.01,
+  "active_seeds": 512,
+  "samples_per_chunk": 32,
+  "distance_poloidal_points": 256,
+  "smoothing": 1e-05,
+  "no_plots": true,
+  "delete_paths": true,
+  "path_plots": false,
+  "color_scale": "log",
+  "distance_statistic": "min",
+  "output": null
+}
