@@ -25,6 +25,7 @@ from illiad.utilities.coordtrans import wall_plot_angles
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
+    "BOUNDARIES": [],
     "BORIS_METHOD": "torch",
     "WARP_STEP_CHUNK_SIZE": 16,
     "WARP_COMPACTION_INTERVAL": 256,
@@ -126,6 +127,8 @@ def boris_runner(params, *, initializer=None, velocity_distribution="cosine"):
         params.get("WARP_STEP_CHUNK_SIZE", 16))
     params["WARP_COMPACTION_INTERVAL"] = Boris.validate_warp_compaction_interval(
         params.get("WARP_COMPACTION_INTERVAL", 256))
+    from illiad.boundaries import parse_boundaries, BoundaryRecorder
+    boxes = parse_boundaries(params.get("BOUNDARIES", []))
     stride = int(params["STRIDE"])
     if stride < 1:
         raise ValueError("STRIDE must be a positive integer")
@@ -236,6 +239,14 @@ def boris_runner(params, *, initializer=None, velocity_distribution="cosine"):
             b_hidra, params['PLANE_HISTOGRAM_PHI_DEG'],
             min_normal_speed=params.get('PLANE_HISTOGRAM_MIN_NORMAL_SPEED', 0.))
     histogram_options = {} if plane_histogram is None else {'plane_histogram': plane_histogram}
+    boundary_recorder = None
+    if boxes:
+        boundary_recorder = BoundaryRecorder(
+            boxes, simIO._outputPath(simIO.data_dir, 'Boundary_events'),
+            buffer_rows=params.get('BOUNDARY_BUFFER_ROWS', 65536),
+            tolerance=params.get('BOUNDARY_TOLERANCE_M', 1e-10))
+        boundary_recorder.metadata['integration'] = dict(method=params['BORIS_METHOD'], dt_s=params['DT'])
+        histogram_options['boundary_recorder'] = boundary_recorder
 
     ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["ION_TEMP"],
                              n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
@@ -249,6 +260,8 @@ def boris_runner(params, *, initializer=None, velocity_distribution="cosine"):
                                                                                     warp_step_chunk_size=params["WARP_STEP_CHUNK_SIZE"],
                                                                                     warp_compaction_interval=params["WARP_COMPACTION_INTERVAL"],
                                                                                     **histogram_options)
+    if boundary_recorder is not None:
+        boundary_recorder.finish()
     if plane_histogram is not None:
         plane_histogram.save(simIO, dt=params["DT"], n_particles=N_particles)
     if torch.cuda.is_available():
@@ -258,7 +271,10 @@ def boris_runner(params, *, initializer=None, velocity_distribution="cosine"):
     phi_plot_deg, theta_plot_deg = wall_plot_angles(output_array[:3].T)
 
     ## PLOTTING
-    ion_tracer.plotParticlesOverTime(output_array[-1], N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
+    loss_steps = output_array[-1]
+    if boundary_recorder is not None:
+        loss_steps = np.concatenate((loss_steps, np.asarray(list(boundary_recorder.terminations.values())) / params['DT']))
+    ion_tracer.plotParticlesOverTime(loss_steps, N_particles, params["TMAX"], params["DT"], runString='RunningFraction', simIO=simIO)
     if output_array.shape[1]:
         ion_tracer.plotWallHist(output_array[:3], 'WallHistogram', simIO=simIO, cond_string=cond_string)
         ion_tracer.plotCombined(phi_plot_deg, theta_plot_deg, depo_angles, colorRange=[0, 90],

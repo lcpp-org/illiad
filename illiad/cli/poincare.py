@@ -28,6 +28,7 @@ from illiad.io import IOHandler
 from illiad.utilities.run_config import load_inputs_json, merge_input_params
 
 DEFAULT_INPUTS = {
+    "BOUNDARIES": [],
     "CURRENT_TOR": 0.486,  # [kA]
     "CURRENT_HEL": 0.900,  # [kA]
     "CONFIG_TOR": "default_toroidal",
@@ -137,10 +138,18 @@ def main(input_overrides=_CLI_INPUTS):
     solver_args = [params["SOLVER"], params["RTOL"], params["ATOL"], params["NTHREADS"], params["DOUBLE_LINE"]]
     poincare = Poincare(simIO, *solver_args)
     poincare.set_conditions(init_conds_rtp, params["SPINS"], b_hidra, nplanes=params["NPLANES"])
+    poincare.set_boundaries(params.get('BOUNDARIES', []),
+                            max_step=params.get('BOUNDARY_MAX_STEP_M', .005),
+                            curve_tolerance=params.get('BOUNDARY_CURVE_TOLERANCE_M', 1e-7),
+                            tolerance=params.get('BOUNDARY_TOLERANCE_M', 1e-10),
+                            buffer_rows=params.get('BOUNDARY_BUFFER_ROWS', 65536))
     out_tMax = poincare.run()[0]
 
     ## IDENTIFY LAST-CLOSED FLUX SURFACE
-    poincare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
+    if any(b.get('mode', 'absorbing') == 'absorbing' for b in params.get('BOUNDARIES', [])):
+        simIO.log.info('Skipping LCFS identification: survival is limited by absorbing objects.')
+    else:
+        poincare.identifyLCFS(LCFStype='inner', t_maxs=out_tMax)
 
     ## END RUN ##
     simIO.log.info('## SIM FINISHED ##\n\n\n\n')

@@ -1,5 +1,8 @@
 # Boris execution methods
 
+Both backends support the [oriented-box boundary prototype](box_boundaries.md)
+for absorbing objects and transparent crossing diagnostics.
+
 The production `illiad-boris` workflow supports two `BORIS_METHOD` values:
 
 ```json

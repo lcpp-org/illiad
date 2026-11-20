@@ -12,6 +12,7 @@ from illiad.sol.tracer import validate_runtime_settings
 
 
 DEFAULT_INPUTS = {
+    "BOUNDARIES": [],
     "ANLYS_DIR": "DEFAULT",
     "ANLYS_SUBDIR": "SOLTrace",
 

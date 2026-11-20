@@ -204,3 +204,9 @@ cells are zero. Existing directional-count archives suffice; supply `--duration`
 if the archive predates saved observation spans. No simulation rerun is needed.
 Physical absolute units require an appropriate `--particle-weight`; the default
 weight of one describes the simulated particle ensemble.
+
+## Box boundaries
+
+The shared runner accepts `BOUNDARIES` in the axis-source JSON. See
+[the box boundary prototype](box_boundaries.md) for dimensions, local rotations,
+absorbing/transparent modes, streaming event files, and face-map plotting.
