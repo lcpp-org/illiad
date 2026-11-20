@@ -231,6 +231,61 @@ def initialize_velocity(
     v[i] = vm - wp.cross(vp, s) * wp.float64(0.5) + e
 
 
+@wp.struct
+class PlaneHistogram:
+    enabled: int
+    counts: wp.array(dtype=wp.int64)
+    energy_sum: wp.array(dtype=wp.float64)
+    inverse_speed_sum: wp.array(dtype=wp.float64)
+    density_excluded: wp.array(dtype=wp.int64)
+    masses: wp.array(dtype=wp.float64)
+    min_speed: wp.float64
+    statistics: int
+    sin_phi: wp.float64
+    cos_phi: wp.float64
+    R0: wp.float64
+    a: wp.float64
+    dr: wp.float64
+    dtheta: wp.float64
+    nr: int
+    ntheta: int
+    tolerance: wp.float64
+
+
+@wp.func
+def record_plane_crossing(start: wp.vec3d, end: wp.vec3d, velocity: wp.vec3d, particle: int, h: PlaneHistogram):
+    s0 = start[0]*h.sin_phi + start[1]*h.cos_phi
+    s1 = end[0]*h.sin_phi + end[1]*h.cos_phi
+    if wp.abs(s0) <= h.tolerance:
+        s0 = wp.float64(0.0)
+    if wp.abs(s1) <= h.tolerance:
+        s1 = wp.float64(0.0)
+    if (s0 < wp.float64(0.0) and s1 >= wp.float64(0.0)) or (s0 > wp.float64(0.0) and s1 <= wp.float64(0.0)):
+        point = start + (s0/(s0-s1))*(end-start)
+        major_r = point[0]*h.cos_phi - point[1]*h.sin_phi
+        u = major_r-h.R0
+        rho = wp.sqrt(u*u + point[2]*point[2])
+        if major_r > wp.float64(0.0) and rho <= h.a:
+            theta = wp.atan2(point[2], u)
+            if theta < wp.float64(0.0):
+                theta += wp.float64(6.283185307179586)
+            ir = wp.clamp(int(wp.floor(rho/h.dr)), 0, h.nr-1)
+            it = wp.clamp(int(wp.floor(theta/h.dtheta)), 0, h.ntheta-1)
+            direction = int(0)
+            if s1 > s0:
+                direction = 1
+            index = (direction*h.nr+ir)*h.ntheta+it
+            wp.atomic_add(h.counts, index, wp.int64(1))
+            if h.statistics == 1:
+                energy = wp.float64(0.5)*h.masses[particle]*wp.dot(velocity, velocity)/wp.float64(1.602176634e-19)
+                wp.atomic_add(h.energy_sum, index, energy)
+                speed = wp.abs(velocity[0]*h.sin_phi + velocity[1]*h.cos_phi)
+                if speed > h.min_speed:
+                    wp.atomic_add(h.inverse_speed_sum, index, wp.float64(1.0)/speed)
+                else:
+                    wp.atomic_add(h.density_excluded, index, wp.int64(1))
+
+
 @wp.kernel
 def push_and_record_wall(
     x: wp.array(dtype=wp.vec3d),
@@ -258,6 +313,7 @@ def push_and_record_wall(
     trace_stride: int,
     active_ids: wp.array(dtype=wp.int32),
     use_compaction: int,
+    plane_histogram: PlaneHistogram,
 ):
     i = wp.tid()  # One logical GPU thread owns one particle for the whole chunk.
     if use_compaction == 1:
@@ -288,7 +344,10 @@ def push_and_record_wall(
         vp = vm + wp.cross(vm, t)
         rotation = t * (wp.float64(2.0) / (wp.float64(1.0) + wp.dot(t, t)))
         vi = vm + wp.cross(vp, rotation) + e
-        xi = xi + vi * dt
+        next_position = xi + vi * dt
+        if plane_histogram.enabled == 1:
+            record_plane_crossing(xi, next_position, vi, i, plane_histogram)
+        xi = next_position
         # Reuse this substep's pre-push density; collide before recording wall v.
         if collisions.neutral != 0 or collisions.ion != 0:
             vi, state = collision_hstep(vi, ne, collisions, dt, state)
@@ -373,7 +432,7 @@ def make_density_grid(values, b_grid, *, scale=1.0):
 def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                    collisions=None, density_grid=None, seed=None, trace_ids=(),
                    trace_stride=1, freq_corr=False, show_progress=False, step_chunk_size=16,
-                   compaction_interval=256):
+                   compaction_interval=256, plane_histogram=None, particle_masses_kg=None):
     """Advance particles, returning device arrays and the valid trace length.
 
     steps is the number of position updates (existing self.nsteps - 1).
@@ -477,6 +536,27 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     wp.launch(initialize_velocity, dim=n,
               inputs=[x, v, qdt2m, b_grid, e_grid, has_e, int(freq_corr)], device=device)
     final_step = int(steps)
+    histogram = PlaneHistogram()
+    if plane_histogram is not None:
+        histogram.enabled = 1
+        for name in ('sin_phi', 'cos_phi', 'R0', 'a', 'dr', 'dtheta', 'nr', 'ntheta'):
+            setattr(histogram, name, getattr(plane_histogram, name))
+        histogram.tolerance = plane_histogram.plane_tolerance_m
+        histogram.counts = wp.zeros(2*histogram.nr*histogram.ntheta, dtype=wp.int64, device=device)
+    else:
+        histogram.counts = wp.zeros(0, dtype=wp.int64, device=device)
+    histogram.statistics = int(plane_histogram is not None and particle_masses_kg is not None)
+    size = 2*histogram.nr*histogram.ntheta if histogram.statistics else 0
+    histogram.energy_sum = wp.zeros(size, dtype=wp.float64, device=device)
+    histogram.inverse_speed_sum = wp.zeros(size, dtype=wp.float64, device=device)
+    histogram.density_excluded = wp.zeros(size, dtype=wp.int64, device=device)
+    masses = np.empty(0)
+    if histogram.statistics:
+        masses = np.broadcast_to(np.asarray(particle_masses_kg, dtype=np.float64), (n,)).copy()
+        if not np.isfinite(masses).all() or np.any(masses <= 0):
+            raise ValueError('Histogram particle masses must be finite and positive')
+        histogram.min_speed = plane_histogram.min_normal_speed
+    histogram.masses = wp.array(masses, dtype=wp.float64, device=device)
     progress = None
     if show_progress:
         from tqdm import tqdm
@@ -491,7 +571,7 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                           last_inside_step, b_grid, e_grid, has_e, dt, step,
                           collisions, density_grid, has_density, random_states, int(freq_corr),
                           chunk_steps, trace_heads, trace_next, traces, trace_stride,
-                          active_ids, use_compaction],
+                          active_ids, use_compaction, histogram],
                   device=device)
         if progress is not None:
             progress.update(chunk_steps)
@@ -524,6 +604,14 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
             wp.launch(record_trace, dim=len(ids), inputs=[x, trace_indices, traces, trace_count], device=device)
         trace_count += 1
     wp.synchronize_device(device)
+    if plane_histogram is not None:
+        shape = (2, histogram.nr, histogram.ntheta)
+        plane_histogram.counts = histogram.counts.numpy().reshape(shape)
+        plane_histogram.duration_s = final_step*dt
+        plane_histogram.statistics = bool(histogram.statistics)
+        if histogram.statistics:
+            for name in ('energy_sum', 'inverse_speed_sum', 'density_excluded'):
+                setattr(plane_histogram, name, getattr(histogram, name).numpy().reshape(shape))
     return {'wall_position_xyz': wall_x, 'wall_velocity_xyz': wall_v,
             'hit_step': hit_step, 'last_inside_step': last_inside_step,
             'traces': traces, 'trace_count': trace_count}
@@ -576,7 +664,7 @@ def _vector_grid_from_torch(mesh):
 
 def warp_solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
           freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
-          step_chunk_size=16, compaction_interval=256):
+          step_chunk_size=16, compaction_interval=256, plane_histogram=None):
     """Adapter returning the same four Torch tensors as Boris.parallel_solver."""
     from contextlib import nullcontext
     import logging
@@ -620,7 +708,9 @@ def warp_solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), tra
             dt=solver.dt, steps=solver.nsteps-1, e_grid=e,
             collisions=c, density_grid=n, trace_ids=trace_IDs,
             trace_stride=trace_stride, freq_corr=freq_corr, show_progress=True,
-            step_chunk_size=step_chunk_size, compaction_interval=compaction_interval)
+            step_chunk_size=step_chunk_size, compaction_interval=compaction_interval,
+            plane_histogram=plane_histogram,
+            particle_masses_kg=[particle.mass for particle in ions] if plane_histogram is not None else None)
         for particle in ions:
             particle.setPosition(0, particle.pos0_XYZ)
         traces = (wp.to_torch(result['traces'])[:result['trace_count']] if len(trace_IDs)

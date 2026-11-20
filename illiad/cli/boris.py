@@ -118,7 +118,8 @@ def resolve_plasma_potential(params):
 
 
 ## RUN SIMULATION:
-def boris_runner(params):
+def boris_runner(params, *, initializer=None, velocity_distribution="cosine"):
+    """Run transport, optionally using a custom source and a streaming plane tally."""
 
     params["BORIS_METHOD"] = Boris.require_method(params.get("BORIS_METHOD", "torch"))
     params["WARP_STEP_CHUNK_SIZE"] = Boris.validate_warp_step_chunk_size(
@@ -192,7 +193,8 @@ def boris_runner(params):
     ## DEFINE LIST OF IONS AND THEIR INIT. POSITIONS/VELOCITIES
     init_conds = [params["LCFS_INDEX"], params["NPHI"], params["NTHETA"], params["DELTRS"], params["NPARTICLES_PER_EMITTER"]]
     ion_properties = [params["ION_MASS"], params["CHARGE_NUM"], params["ION_TEMP"]]
-    ion_list, initVelPos, initial_normals = ionInitializer(
+    initialize = ionInitializer if initializer is None else initializer
+    ion_list, initVelPos, initial_normals = initialize(
         init_conds, ion_properties, b_hidra, e_hidra, outputHandler=simIO
     )
 
@@ -204,9 +206,10 @@ def boris_runner(params):
     ion_tracer = Boris(simIO, params["OUTPUT_DIRECTORY_NAME"], params["TAG"],
                        method=params["BORIS_METHOD"])
     ion_tracer.plotInitEnergies(initVelPos, params["ION_MASS"], runString=cond_string+params["TAG"], simIO=simIO)
+    velocity_plot_options = {} if velocity_distribution == "cosine" else {"distribution": velocity_distribution}
     ion_tracer.plotInitVelocities(
         initVelPos, initial_normals, Rmajor=b_hidra.R0,
-        runString=cond_string+params["TAG"], simIO=simIO,
+        runString=cond_string+params["TAG"], simIO=simIO, **velocity_plot_options,
     )
 
     ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~##
@@ -225,6 +228,15 @@ def boris_runner(params):
                                 for theta_i in _track_theta_idx
                                 for p in _track_p_idx]
 
+    simIO.saveNumpyData(np.asarray(particle_tracker_list, dtype=np.int64), 'Trace_particle_IDs')
+    plane_histogram = None
+    if params.get('PLANE_HISTOGRAM_PHI_DEG') is not None:
+        from illiad.plane_crossings import PlaneCrossingHistogram
+        plane_histogram = PlaneCrossingHistogram(
+            b_hidra, params['PLANE_HISTOGRAM_PHI_DEG'],
+            min_normal_speed=params.get('PLANE_HISTOGRAM_MIN_NORMAL_SPEED', 0.))
+    histogram_options = {} if plane_histogram is None else {'plane_histogram': plane_histogram}
+
     ion_tracer.setConditions(ion_list, cond_string, params["DT"], params["TMAX"], params["NEUTRAL_GAS_TEMP_EV"], params["ION_TEMP"],
                              n_gas=params["NEUTRAL_GAS_DENSITY"], n_e=params["PLASMA_DENSITY"], m_gas_amu=params["M_GAS_AMU"])
     output_array, energy_out, depo_angles, toroidal_angles, traces = ion_tracer.run(Bfield=b_hidra,
@@ -235,7 +247,10 @@ def boris_runner(params):
                                                                                     trace_IDs=particle_tracker_list,
                                                                                     trace_stride=stride,
                                                                                     warp_step_chunk_size=params["WARP_STEP_CHUNK_SIZE"],
-                                                                                    warp_compaction_interval=params["WARP_COMPACTION_INTERVAL"])
+                                                                                    warp_compaction_interval=params["WARP_COMPACTION_INTERVAL"],
+                                                                                    **histogram_options)
+    if plane_histogram is not None:
+        plane_histogram.save(simIO, dt=params["DT"], n_particles=N_particles)
     if torch.cuda.is_available():
         simIO.log.info('PYTORCH ALLOCATOR STATS (excludes Warp allocations):\n' + torch.cuda.memory_summary())
 

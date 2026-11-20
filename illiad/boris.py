@@ -130,7 +130,7 @@ class Boris(Collisions):
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1, freq_corr=False, ion_neutral_collisions=None,
                         ion_ion_collisions=None, method=None, warp_step_chunk_size=16,
-                        warp_compaction_interval=256):
+                        warp_compaction_interval=256, plane_histogram=None):
         """Dispatch to Torch (default) or optional Warp with identical outputs.
 
         method overrides the constructor's choice for this call only. Both
@@ -147,15 +147,16 @@ class Boris(Collisions):
                          freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
                          ion_ion_collisions=ion_ion_collisions,
                          step_chunk_size=warp_step_chunk_size,
-                         compaction_interval=warp_compaction_interval)
+                         compaction_interval=warp_compaction_interval, plane_histogram=plane_histogram)
         return self.torch_solver(ions, Bfield, Efield=Efield, nfield=nfield,
                                  trace_IDs=trace_IDs, trace_stride=trace_stride,
                                  freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
-                                 ion_ion_collisions=ion_ion_collisions)
+                                 ion_ion_collisions=ion_ion_collisions, plane_histogram=plane_histogram)
 
     def torch_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1,
-                        freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None):
+                        freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
+                        plane_histogram=None):
         """
         Function to take in a particle and field object and solves the particle path until termination event or tmax
         using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
@@ -194,6 +195,9 @@ class Boris(Collisions):
 
         t_startInd = perf_counter()
         Nparticles = len(ions)
+        if plane_histogram is not None:
+            plane_histogram.prepare_torch(device, statistics=True)
+            histogram_masses = torch.tensor([ion.mass for ion in ions], dtype=torch.float64, device=device)
         max_trace_saves = 1 + ((self.nsteps - 1) // trace_stride) + 1
         trace_output = torch.zeros([max_trace_saves, len(trace_IDs), 3], dtype=torch.float64, device=device)
         trace_write_idx = 0
@@ -337,7 +341,10 @@ class Boris(Collisions):
 
                     v_k_active = vplus_active + Evec_active
 
-                    pos_active += v_k_active * self.dt
+                    next_position = pos_active + v_k_active * self.dt
+                    if plane_histogram is not None:
+                        plane_histogram.accumulate_torch(pos_active, next_position, v_k_active, histogram_masses[running])
+                    pos_active = next_position
 
                     # INSERT (SECOND)COLLISION HALF-STEP HERE IF DESIRED
                     ##-----------------------------------------##
@@ -413,6 +420,8 @@ class Boris(Collisions):
             )
         )
 
+        if plane_histogram is not None:
+            plane_histogram.duration_s = final_step*self.dt
         return wallPts, wallVelocities, maxStep, trace_output
 
     def post_solver(self, solver_output, Bfield):
@@ -494,7 +503,7 @@ class Boris(Collisions):
 
     def run(self, Bfield, Efield=None, nfield=None,
             ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
-            trace_stride=1, method=None, warp_step_chunk_size=16, warp_compaction_interval=256):
+            trace_stride=1, method=None, warp_step_chunk_size=16, warp_compaction_interval=256, plane_histogram=None):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -508,6 +517,7 @@ class Boris(Collisions):
             method: Optional 'torch'/'warp' override for this run.
             warp_step_chunk_size: Physical steps per Warp launch (default 16); ignored by Torch.
             warp_compaction_interval: Steps between Warp active-ID filtering (default 256; 0 disables).
+            plane_histogram: Optional PlaneCrossingHistogram accumulated every physical step.
 
         Returns:
             Tuple containing:
@@ -528,7 +538,8 @@ class Boris(Collisions):
             trace_stride = trace_stride,
             method = method,
             warp_step_chunk_size = warp_step_chunk_size,
-            warp_compaction_interval = warp_compaction_interval
+            warp_compaction_interval = warp_compaction_interval,
+            plane_histogram = plane_histogram
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)

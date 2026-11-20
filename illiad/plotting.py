@@ -237,14 +237,18 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     counts, bin_edges= np.histogram(E0s, bins=500, density=False)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    lnE = np.log(counts[counts > 0])  # take log of only positive values to avoid log(0)
-    startfit_i = np.where(counts == np.max(counts))[0][0] + 100 # start fitting 100 bins after the maximum for a better slope fit
-    stopfit_i = np.where(counts < 1)[0][0]
-    if stopfit_i > startfit_i:
-        slope, intercept = np.polyfit(bin_centers[startfit_i:stopfit_i], lnE[startfit_i:stopfit_i], 1)
-    else:
-        slope, intercept = np.polyfit(bin_centers, lnE, 1)
-    Te_calc = -1/slope
+    # Keep energies paired with their occupied bins for sparse particle samples.
+    startfit_i = int(np.argmax(counts)) + 100
+    empty = np.flatnonzero(counts < 1)
+    stopfit_i = int(empty[0]) if empty.size else len(counts)
+    fit_mask = counts > 0
+    if stopfit_i > startfit_i + 1:
+        fit_mask &= (np.arange(len(counts)) >= startfit_i) & (np.arange(len(counts)) < stopfit_i)
+    Te_calc = (2.0/3.0)*np.mean(E0s)  # Maxwellian moment fallback for undersampled tails.
+    if np.count_nonzero(fit_mask) >= 2:
+        slope, _ = np.polyfit(bin_centers[fit_mask], np.log(counts[fit_mask]), 1)
+        if np.isfinite(slope) and slope < 0:
+            Te_calc = -1/slope
 
     plt.figure()
     plt.grid(which='both', zorder=0)
@@ -266,7 +270,8 @@ def boris_plotInitEnergies(init_file, mass, runString='default', simIO=None):
     simIO.log.info('OUTPUT PLOT: {}'.format(plotname))
     plt.close()
 
-def boris_plotInitVelocities(init_conds, initial_normals, Rmajor=0.72, runString='default', simIO=None):
+def boris_plotInitVelocities(init_conds, initial_normals, Rmajor=0.72, runString='default', simIO=None,
+                             distribution='cosine'):
     """Plot local initial-velocity components and emission angle from the launch normal."""
     init_conds = np.asarray(init_conds)
     initial_normals = np.asarray(initial_normals)
@@ -321,18 +326,23 @@ def boris_plotInitVelocities(init_conds, initial_normals, Rmajor=0.72, runString
         ax.set_ylabel('# of Particles')
         ax.grid(which='both', zorder=0, alpha=0.4)
 
+    if distribution not in ('cosine', 'isotropic'):
+        raise ValueError("distribution must be cosine or isotropic")
+    angle_max = 180 if distribution == 'isotropic' else 90
     angle_ax = axes.flat[3]
     angle_ax.hist(
-        emission_angles_deg, bins=90, range=(0, 90), density=True,
+        emission_angles_deg, bins=90, range=(0, angle_max), density=True,
         color=UIUC['il_orange'], edgecolor=UIUC['il_blue'], label='Sampled',
     )
-    angle_grid_deg = np.linspace(0, 90, 361)
+    angle_grid_deg = np.linspace(0, angle_max, 361)
     angle_grid_rad = np.radians(angle_grid_deg)
     cosine_pdf_per_degree = np.sin(2*angle_grid_rad) * np.pi / 180
-    angle_ax.plot(angle_grid_deg, cosine_pdf_per_degree, color=UIUC['il_blue'],
-                  linewidth=2, label='Cosine-weighted expectation')
-    angle_ax.set_xlim(0, 90)
-    angle_ax.set_xlabel('Angle from Launch Normal (degrees)')
+    expected_pdf = .5*np.sin(angle_grid_rad)*np.pi/180 if distribution == 'isotropic' else cosine_pdf_per_degree
+    angle_ax.plot(angle_grid_deg, expected_pdf, color=UIUC['il_blue'],
+                  linewidth=2, label='Isotropic expectation' if distribution == 'isotropic' else 'Cosine-weighted expectation')
+    angle_ax.set_xlim(0, angle_max)
+    angle_ax.set_xlabel('Angle from Reference Direction (degrees)' if distribution == 'isotropic'
+                       else 'Angle from Launch Normal (degrees)')
     angle_ax.set_ylabel('Probability Density (1/degree)')
     angle_ax.grid(which='both', zorder=0, alpha=0.4)
     angle_ax.legend()
