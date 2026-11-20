@@ -104,6 +104,7 @@ Currents are in kiloamperes, radii in meters, and angles in degrees.
 | Magnetic configuration | `CURRENT_TOR`, `CURRENT_HEL`, `CONFIG_TOR`, `CONFIG_HEL`, `ENABLE_ERRFIELD` |
 | Surface sampling | `LCFS_INDEX`, `NPHI`, `NTHETA`, optional `PHI_GENs` |
 | Flux integration | `MAX_SUBSETS`, `SMOOTH_FCTR`, `INTEGRATE_EPSABS`, `INTEGRATE_EPSREL` |
+| Experimental regular-surface fit | `SURFACE_FIT` (`spline` default or `fourier`), `FOURIER_MODES`, `FOURIER_REGULARIZATION`, `FOURIER_MAX_GAP_DEG` |
 | Retained legacy inputs | `ISLAND_ALGORITHM`, `HIST_BINS` |
 | Diagnostics | `PLOT_ALL`, `BIG_MESH` |
 
@@ -115,6 +116,9 @@ The active island detector measures rotational transform from each ordered
 Poincare surface, matches low-order rationals with denominators no greater
 than `MAX_SUBSETS`, and splits matched chains by striding the crossing array.
 This permits distinct island-chain subset counts in one run.
+The optional Fourier fit applies only to unsplit surfaces and keeps the existing
+geometric angle about the magnetic axis. Island subsets retain their spline fits.
+See [Fourier contour experiments](fourier_surface_fits.md) for validation and limits.
 `ISLAND_ALGORITHM` and `HIST_BINS` remain accepted and logged for existing
 inputs but do not control the active detector.
 

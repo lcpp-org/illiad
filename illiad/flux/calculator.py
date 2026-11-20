@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from illiad.mesh import Mesh
 from illiad.utilities.coordtrans import axisShift, RTP_to_XYZ, XYZ_to_RTP
+from .fourier import FourierContour, fit_fourier_contour, validate_fourier_options
 
 np.set_printoptions(threshold=np.inf)
 mpl.rcParams.update({
@@ -52,6 +53,15 @@ class FluxCalculator:
         self.hist_bins = input_params['HIST_BINS']
         self.plot_all = input_params['PLOT_ALL']
         self.big_mesh = input_params['BIG_MESH']
+        self.surface_fit = input_params.get('SURFACE_FIT', 'spline')
+        if self.surface_fit not in ('spline', 'fourier'):
+            raise ValueError("SURFACE_FIT must be 'spline' or 'fourier'")
+        self.fourier_modes = input_params.get('FOURIER_MODES', 8)
+        self.fourier_regularization = input_params.get('FOURIER_REGULARIZATION', 1e-6)
+        self.fourier_max_gap = np.deg2rad(input_params.get('FOURIER_MAX_GAP_DEG', 90.0))
+        if self.surface_fit == 'fourier':
+            validate_fourier_options(self.fourier_modes, self.fourier_regularization,
+                                     self.fourier_max_gap)
 
         # Calculation state
         self.nsurfaces = None
@@ -152,17 +162,28 @@ class FluxCalculator:
         ax_psi = fig_post.add_subplot(211, ylabel='Toroidal Flux $\psi_{\phi}$\n$[g*m^2]$')
         ax_norm = fig_post.add_subplot(212, xlabel='Surface index', ylabel='Surface Parameter $\hat{\psi}_n$')
 
+        finite_flux = np.isfinite(self.tot_flux_array)
+        plot_flux = np.where(finite_flux, self.tot_flux_array, np.nan) * 10_000
+        if not np.all(finite_flux):
+            self.simIO.log.warning('Flux overview omits %d nonfinite values; saved arrays retain them.',
+                                   np.count_nonzero(~finite_flux))
         for i in range(len(self.phi_gens)):
-            ax_psi.plot(self.tot_flux_array[:,i]*10_000, label='{:d}'.format(int(self.phi_gens[i])), linewidth=1)
+            ax_psi.plot(plot_flux[:,i], label='{:d}'.format(int(self.phi_gens[i])), linewidth=1)
             ax_norm.plot(self.total_flux_norm.T[i], label='{:d}'.format(int(self.phi_gens[i])), linewidth=1)
         ax_psi.set_title('Toroidal Angles $\phi[\degree]$', loc='right', fontsize=8)
-        ax_psi.set_ylim(0, 1.1*10_000*np.max(self.tot_flux_array))
+        finite_values = plot_flux[np.isfinite(plot_flux)]
+        maximum = float(np.max(finite_values)) if finite_values.size else 0.0
+        ax_psi.set_ylim(0, 1.1*maximum if maximum > 0 else 1.0)
+        if not finite_values.size:
+            ax_psi.text(0.5, 0.5, 'No finite flux values', transform=ax_psi.transAxes,
+                        ha='center', va='center')
         ax_psi.grid(which='both', linestyle=':', linewidth=0.5)
         ax_psi.legend(loc='upper right', fontsize=5,ncols=3)
         ax_norm.set_ylim(0, 1.1)
         ax_norm.grid(which='both', linestyle=':', linewidth=0.5)
 
         self.simIO.saveFig(self.plot_subdir + '/Flux_v_Surface.png', dpi=250)
+        plt.close(fig_post)
         self.simIO.log.info('Finished, LCFS=#{}, ISLAND AXIS=#{}'.format(self.lcfs_index, self.smallest_island_index))
 
         # save the numpy arrays to individual files using simIO method
@@ -242,6 +263,8 @@ class FluxCalculator:
             self.valid_surfs[surf_index][phi_index] = valid_surface
             # use lcfs as reference for surface validation
             if surf_index == self.lcfs_index:
+                if self.surface_fit == 'fourier' and not valid_surface:
+                    raise ValueError('LCFS reconstruction failed; cannot normalize fluxes against an invalid boundary')
                 spline_lcfs_magaxis = spline_tr_magAxis
             else:
                 self.surface_validation(surf_index, phi_index,
@@ -600,7 +623,7 @@ class FluxCalculator:
             return -r*( bxy[0]*np.sin(phi) + bxy[1]*np.cos(phi) )
 
         # define the upper radial bound of the integration
-        def hfun(theta): return splev(theta, spline_parms)
+        def hfun(theta): return self.evaluate_contour(theta, spline_parms)
 
         # integrate toroidal flux
         spline_axis_rev = np.array(spline_axis, copy=True)
@@ -636,6 +659,25 @@ class FluxCalculator:
 
         return shifted_data, shift_flag
 
+
+    @staticmethod
+    def evaluate_contour(theta, contour):
+        """Evaluate either the legacy spline or a periodic Fourier contour."""
+        return contour(theta) if isinstance(contour, FourierContour) else splev(theta, contour)
+
+    def fit_surface_data(self, theta, radius, num_subsets=1):
+        """Fourier is opt-in for unsplit contours; island subsets keep splines."""
+        if self.surface_fit == 'fourier' and num_subsets == 1:
+            try:
+                fit = fit_fourier_contour(theta, radius, modes=self.fourier_modes,
+                                          regularization=self.fourier_regularization,
+                                          max_gap=self.fourier_max_gap)
+            except ValueError as exc:
+                return None, np.nan, True, str(exc)
+            residual = float(np.sum((fit(theta) - radius)**2))
+            self.simIO.log.info('Fourier fit: %s', fit.diagnostics)
+            return fit, residual, False, 'Periodic Fourier fit'
+        return self.spline_data(theta, radius, smoothing=self.smooth_fctr)
 
     def spline_data(self, theta_pts: np.ndarray, rad_pts: np.ndarray, smoothing=1e-5):
         """Create a smoothing spline fit of the data points.
@@ -701,9 +743,9 @@ class FluxCalculator:
             valid_surface (bool): Flag indicating if the surface is valid for interpolationn.
         """
 
-        radius_evals_locAxis = np.zeros([num_subsets, self.ntheta])
-        splined_tr_MagAxis   = np.zeros([num_subsets, self.ntheta, 2])
-        splined_tr_GeoAxis   = np.zeros([num_subsets, self.ntheta, 2])
+        radius_evals_locAxis = np.full([num_subsets, self.ntheta], np.nan)
+        splined_tr_MagAxis   = np.full([num_subsets, self.ntheta, 2], np.nan)
+        splined_tr_GeoAxis   = np.full([num_subsets, self.ntheta, 2], np.nan)
         subCenters_geo       = np.zeros([num_subsets, 2])
         theta_gens = np.linspace(2*np.pi/self.ntheta, 2*np.pi, self.ntheta)
 
@@ -715,6 +757,7 @@ class FluxCalculator:
         else: shiftint = 0
         # loop through subsets to spline, calculate flux, create regularly-spaced points
         subset_flux_list = []
+        valid_surface = True
         for subset_idx in range(num_subsets):
             current_center = subset_centers[surf_index][subset_idx]
             current_data = np.array(subset_data[surf_index][subset_idx], copy=True)
@@ -731,16 +774,16 @@ class FluxCalculator:
                 subCenters_geo[subset_idx] = current_center
 
             # fit spline to the current subset.
-            surface_spline_params, res, fail, msg = self.spline_data(*current_data.T, smoothing=self.smooth_fctr)
+            surface_spline_params, res, fail, msg = self.fit_surface_data(*current_data.T, num_subsets=num_subsets)
 
             if fail:
                 valid_surface = False # not a valid surface for interpolation
                 self.simIO.log.info('\t(B)Surface #{} NOT A VALID SURFACE!!! Residual: {}'.format(surf_index, res) )
                 self.simIO.log.info('\tSurface #{}, fail: {}\tmsg: {}'.format(surf_index, bool(fail), msg) )
+                subset_flux_list.append(np.nan)
                 continue
             else:
                 self.simIO.log.info( '\t(B)Surface #{} valid. Residual: {:.3e}'.format(surf_index, res) )
-                valid_surface = True # valid surface for interpolation
             # integrate an amount of toroidal field bounded by the flux surface [Tesla*m^2]
             this_flux = self.integrate_flux(surface_spline_params, np.array(current_center, copy=True),
                                             phi_deg*np.pi/180, self.field, err_abs=self.integrate_epsabs,
@@ -749,7 +792,7 @@ class FluxCalculator:
 
             # create a set of regularly-spaced points evaluated on the spline fit
             current_theta_gens = (theta_gens + current_center[0]) % (2*np.pi)
-            radius_evals_locAxis[subset_idx] = splev(current_theta_gens, surface_spline_params)
+            radius_evals_locAxis[subset_idx] = self.evaluate_contour(current_theta_gens, surface_spline_params)
             # shift island subsets back into the magnetic axis frame
             if num_subsets > 1:
                 shift_r = current_center[1]
