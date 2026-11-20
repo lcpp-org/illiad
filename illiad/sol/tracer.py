@@ -810,6 +810,7 @@ def integrate_directional_batch(
     progress_refresh_steps,
     progress_interval_steps,
     chunk_runner=None,
+    boundary_recorder=None,
 ):
     """Integrate one batch and return directional trace metadata."""
     device = magnetic_field.B.device
@@ -845,6 +846,13 @@ def integrate_directional_batch(
         device=device,
     )
     hit_wall = torch.zeros(batch_size, dtype=torch.bool, device=device)
+    hit_boundary = torch.zeros_like(hit_wall)
+    boundary_xyz = torch.full_like(positions, torch.nan) if boundary_recorder is not None else None
+    if boundary_recorder is not None:
+        from illiad.boundaries import validate_initial_positions
+        validate_initial_positions(boundary_recorder.boxes, initial_xyz, boundary_recorder.tolerance)
+        # Prototype observes each physical step before another can advance.
+        chunk_size, compile_chunks, chunk_runner = 1, False, None
     reached_limit = torch.zeros(batch_size, dtype=torch.bool, device=device)
     failed = torch.zeros(batch_size, dtype=torch.bool, device=device)
     running = torch.arange(batch_size, dtype=torch.int64, device=device)
@@ -917,6 +925,28 @@ def integrate_directional_batch(
                 step_sizes,
             )
 
+            box_rows = torch.empty(0, dtype=torch.int64, device=device)
+            box_fraction = torch.empty(0, dtype=torch.float64, device=device)
+            if boundary_recorder is not None:
+                valid_rows = torch.nonzero(segment_valid[0], as_tuple=True)[0]
+                starts = segment_start[0, valid_rows]
+                stops = segment_stop[0, valid_rows]
+                tangent = stops-starts
+                tangent = tangent / torch.clamp(torch.linalg.vector_norm(tangent, dim=1)[:, None], min=1e-30)
+                clipped, absorbed, fractions = boundary_recorder.process_torch(
+                    starts, stops, fieldline_id[active_global[valid_rows]], chunk_start+1,
+                    path_length[active_global[valid_rows]], step_sizes[0], tangent,
+                    major_radius=magnetic_field.R0, vessel_radius=magnetic_field.a,
+                    direction=source_direction[active_global[valid_rows]])
+                box_rows = valid_rows[absorbed]
+                box_fraction = fractions[absorbed]
+                segment_stop[0, box_rows] = clipped[absorbed]
+                segment_hit_wall[0, box_rows] = False
+                final_positions[box_rows] = clipped[absorbed]
+                survives_chunk[box_rows] = False
+                hit_boundary[active_global[box_rows]] = True
+                boundary_xyz[active_global[box_rows]] = clipped[absorbed]
+
             hit_step, hit_row = torch.nonzero(
                 segment_hit_wall,
                 as_tuple=True,
@@ -972,6 +1002,8 @@ def integrate_directional_batch(
             length_increment[hit_step, hit_row] = (
                 step_sizes[hit_step] * wall_fraction
             )
+            if boundary_recorder is not None:
+                length_increment[0, box_rows] = step_sizes[0]*box_fraction
             path_length[active_global] += length_increment.sum(dim=0)
             positions[active_global] = final_positions
             phi_unwrapped[active_global] += cumulative_delta[-1]
@@ -1046,7 +1078,9 @@ def integrate_directional_batch(
         "wall_xyz": wall_xyz.cpu().numpy(),
         "hit_wall": hit_wall.cpu().numpy(),
         "reached_limit": reached_limit.cpu().numpy(),
-        "valid_trace": (hit_wall | reached_limit).cpu().numpy(),
+        "valid_trace": (hit_wall | hit_boundary | reached_limit).cpu().numpy(),
+        **({"hit_boundary": hit_boundary.cpu().numpy(),
+            "boundary_xyz": boundary_xyz.cpu().numpy()} if boundary_recorder is not None else {}),
     }
 
 
@@ -1068,6 +1102,17 @@ def trace_connection_length_volume(
     progress_interval_steps,
 ):
     """Trace every seed in both directions in batched Torch integrations."""
+    from illiad.boundaries import parse_boundaries, BoundaryRecorder
+    boxes = parse_boundaries(settings.get('BOUNDARIES', []))
+    boundary_recorder = None
+    if boxes:
+        boundary_recorder = BoundaryRecorder(
+            boxes, Path(sim_io.data_dir)/settings['ANLYS_SUBDIR']/'Boundary_events',
+            coordinate='arc_length_m', buffer_rows=settings.get('BOUNDARY_BUFFER_ROWS', 65536),
+            tolerance=settings.get('BOUNDARY_TOLERANCE_M', 1e-10))
+        boundary_recorder.set_vessel(magnetic_field.R0, magnetic_field.a)
+        chunk_size, compile_chunks = 1, False
+        sim_io.log.info('Box prototype uses one-step eager chunks; integration step size is unchanged.')
     initial_conditions_rtp = seed_data["initial_conditions_rtp"]
     n_fieldlines = initial_conditions_rtp.shape[0]
     if n_fieldlines > np.iinfo(np.int32).max:
@@ -1083,6 +1128,8 @@ def trace_connection_length_volume(
     direction_length = np.full((n_fieldlines, 2), np.nan)
     wall_xyz = np.full((n_fieldlines, 2, 3), np.nan)
     hit_wall = np.zeros((n_fieldlines, 2), dtype=bool)
+    hit_boundary = np.zeros_like(hit_wall) if boxes else None
+    boundary_xyz = np.full_like(wall_xyz, np.nan) if boxes else None
     reached_limit = np.zeros((n_fieldlines, 2), dtype=bool)
     valid_trace = np.zeros((n_fieldlines, 2), dtype=bool)
 
@@ -1115,17 +1162,23 @@ def trace_connection_length_volume(
             progress_refresh_steps,
             progress_interval_steps,
             chunk_runner,
+            boundary_recorder=boundary_recorder,
         )
         result_index = (result["fieldline_id"], result["direction_column"])
         direction_length[result_index] = result["path_length"]
         wall_xyz[result_index] = result["wall_xyz"]
         hit_wall[result_index] = result["hit_wall"]
+        if boxes:
+            hit_boundary[result_index] = result["hit_boundary"]
+            boundary_xyz[result_index] = result["boundary_xyz"]
         reached_limit[result_index] = result["reached_limit"]
         valid_trace[result_index] = result["valid_trace"]
 
     crossing_store.finish()
     connection_length = np.sum(direction_length, axis=1)
     connection_length[~np.all(valid_trace, axis=1)] = np.nan
+    if boundary_recorder is not None:
+        boundary_recorder.finish()
     wall_rtp = np.full_like(wall_xyz, np.nan)
     finite_wall = np.all(np.isfinite(wall_xyz), axis=-1)
     wall_rtp[finite_wall] = XYZ_to_RTP_many(wall_xyz[finite_wall], magnetic_field.R0)
@@ -1137,6 +1190,7 @@ def trace_connection_length_volume(
         "wall_xyz": wall_xyz,
         "wall_rtp": wall_rtp,
         "hit_wall": hit_wall,
+        **({"hit_boundary": hit_boundary, "boundary_xyz": boundary_xyz} if boxes else {}),
         "reached_limit": reached_limit,
         "valid_trace": valid_trace,
         "trace_length_limit_m": float(max_length),
@@ -1168,6 +1222,17 @@ def trace_connection_length_volume_paired(
     progress_interval_steps,
 ):
     """Trace paired directions and resolve each bounded crossing spool."""
+    from illiad.boundaries import parse_boundaries, BoundaryRecorder
+    boxes = parse_boundaries(settings.get('BOUNDARIES', []))
+    boundary_recorder = None
+    if boxes:
+        boundary_recorder = BoundaryRecorder(
+            boxes, Path(sim_io.data_dir)/settings['ANLYS_SUBDIR']/'Boundary_events',
+            coordinate='arc_length_m', buffer_rows=settings.get('BOUNDARY_BUFFER_ROWS', 65536),
+            tolerance=settings.get('BOUNDARY_TOLERANCE_M', 1e-10))
+        boundary_recorder.set_vessel(magnetic_field.R0, magnetic_field.a)
+        chunk_size, compile_chunks = 1, False
+        sim_io.log.info('Box prototype uses one-step eager chunks; integration step size is unchanged.')
     initial_conditions_rtp = seed_data["initial_conditions_rtp"]
     n_fieldlines = initial_conditions_rtp.shape[0]
     if n_fieldlines > np.iinfo(np.int32).max:
@@ -1188,6 +1253,8 @@ def trace_connection_length_volume_paired(
     connection_length = np.full(n_fieldlines, np.nan)
     wall_xyz = np.full((n_fieldlines, 2, 3), np.nan)
     hit_wall = np.zeros((n_fieldlines, 2), dtype=bool)
+    hit_boundary = np.zeros_like(hit_wall) if boxes else None
+    boundary_xyz = np.full_like(wall_xyz, np.nan) if boxes else None
     reached_limit = np.zeros((n_fieldlines, 2), dtype=bool)
     valid_trace = np.zeros((n_fieldlines, 2), dtype=bool)
     seed_plane_for_fieldline = seed_data["seed_plane_index"][
@@ -1250,6 +1317,7 @@ def trace_connection_length_volume_paired(
                 progress_refresh_steps,
                 progress_interval_steps,
                 chunk_runner,
+                boundary_recorder=boundary_recorder,
             )
             crossing_store.finish()
             result_index = (
@@ -1259,6 +1327,9 @@ def trace_connection_length_volume_paired(
             direction_length[result_index] = result["path_length"]
             wall_xyz[result_index] = result["wall_xyz"]
             hit_wall[result_index] = result["hit_wall"]
+            if boxes:
+                hit_boundary[result_index] = result["hit_boundary"]
+                boundary_xyz[result_index] = result["boundary_xyz"]
             reached_limit[result_index] = result["reached_limit"]
             valid_trace[result_index] = result["valid_trace"]
             batch_length = np.sum(direction_length[batch_fieldline], axis=1)
@@ -1289,6 +1360,8 @@ def trace_connection_length_volume_paired(
             sink.abort()
             raise
 
+    if boundary_recorder is not None:
+        boundary_recorder.finish()
     wall_rtp = np.full_like(wall_xyz, np.nan)
     finite_wall = np.all(np.isfinite(wall_xyz), axis=-1)
     wall_rtp[finite_wall] = XYZ_to_RTP_many(
@@ -1307,6 +1380,7 @@ def trace_connection_length_volume_paired(
         "wall_xyz": wall_xyz,
         "wall_rtp": wall_rtp,
         "hit_wall": hit_wall,
+        **({"hit_boundary": hit_boundary, "boundary_xyz": boundary_xyz} if boxes else {}),
         "reached_limit": reached_limit,
         "valid_trace": valid_trace,
         "trace_length_limit_m": float(max_length),
@@ -1358,6 +1432,9 @@ def save_trace_metadata(
         "reached_max_length": trace_data["reached_limit"],
         "valid_trace": trace_data["valid_trace"],
     }
+    if 'hit_boundary' in trace_data:
+        small_outputs['hit_boundary'] = trace_data['hit_boundary']
+        small_outputs['boundary_intersection_xyz'] = trace_data['boundary_xyz']
     for name, values in small_outputs.items():
         sim_io.saveNumpyData(values, name, subdir=analysis_subdir)
     return data_dir

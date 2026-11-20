@@ -4,6 +4,7 @@ Imported lazily by Boris; importing the ordinary Torch solver does not need Warp
 """
 
 import numpy as np
+from .boundaries_warp import BoxEvents, surface_events, make_buffer, drain_buffer
 import warp as wp
 
 from .collisions_warp import (
@@ -314,6 +315,7 @@ def push_and_record_wall(
     active_ids: wp.array(dtype=wp.int32),
     use_compaction: int,
     plane_histogram: PlaneHistogram,
+    boundaries: BoxEvents,
 ):
     i = wp.tid()  # One logical GPU thread owns one particle for the whole chunk.
     if use_compaction == 1:
@@ -345,6 +347,12 @@ def push_and_record_wall(
         rotation = t * (wp.float64(2.0) / (wp.float64(1.0) + wp.dot(t, t)))
         vi = vm + wp.cross(vp, rotation) + e
         next_position = xi + vi * dt
+        box_owner = int(-1)
+        if boundaries.count > 0:
+            fraction, box_owner = surface_events(xi, next_position, vi, i, current_step,
+                                                 b_grid.R0, b_grid.a, boundaries)
+            if box_owner >= 0:
+                next_position = xi+(next_position-xi)*fraction
         if plane_histogram.enabled == 1:
             record_plane_crossing(xi, next_position, vi, i, plane_histogram)
         xi = next_position
@@ -357,6 +365,10 @@ def push_and_record_wall(
             while slot >= 0:
                 traces[current_step // trace_stride, slot] = xi
                 slot = trace_next[slot]
+        if box_owner >= 0:
+            active[i] = 0
+            hit_step[i] = current_step
+            break
         if minor_radius(xi, b_grid.R0) >= b_grid.a:
             active[i] = 0
             wall_x[i] = xi  # First outside point, not a projected wall intersection.
@@ -432,7 +444,8 @@ def make_density_grid(values, b_grid, *, scale=1.0):
 def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                    collisions=None, density_grid=None, seed=None, trace_ids=(),
                    trace_stride=1, freq_corr=False, show_progress=False, step_chunk_size=16,
-                   compaction_interval=256, plane_histogram=None, particle_masses_kg=None):
+                   compaction_interval=256, plane_histogram=None, particle_masses_kg=None,
+                   boundary_recorder=None, source_ids=None):
     """Advance particles, returning device arrays and the valid trace length.
 
     steps is the number of position updates (existing self.nsteps - 1).
@@ -471,7 +484,14 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
     if np.any(np.sqrt(np.maximum(r2, 0.0)) >= b_grid.a):
         raise ValueError('initial particles must be strictly inside the wall')
     
+    if boundary_recorder is not None:
+        from .boundaries import validate_initial_positions
+        validate_initial_positions(boundary_recorder.boxes, x0, boundary_recorder.tolerance)
+        boundary_recorder.set_vessel(b_grid.R0, b_grid.a)
     device = b_grid.values.device
+    boundaries = make_buffer(boundary_recorder, device)
+    boundary_source_ids = np.arange(len(x0)) if source_ids is None else np.asarray(source_ids, dtype=np.int64)
+    boundary_masses = np.broadcast_to(np.asarray(particle_masses_kg if particle_masses_kg is not None else np.nan), (len(x0),))
     if collisions is None:
         collisions = make_collision_config()
     has_density = int(density_grid is not None)
@@ -571,8 +591,10 @@ def _run_particles(x0, v0, charge_mass_ratio, b_grid, *, dt, steps, e_grid=None,
                           last_inside_step, b_grid, e_grid, has_e, dt, step,
                           collisions, density_grid, has_density, random_states, int(freq_corr),
                           chunk_steps, trace_heads, trace_next, traces, trace_stride,
-                          active_ids, use_compaction, histogram],
+                          active_ids, use_compaction, histogram, boundaries],
                   device=device)
+        if boundary_recorder is not None:
+            drain_buffer(boundaries, boundary_recorder, dt, boundary_source_ids, boundary_masses)
         if progress is not None:
             progress.update(chunk_steps)
         # Filtering/counting synchronizes only at the selected chunk boundaries.
@@ -664,7 +686,7 @@ def _vector_grid_from_torch(mesh):
 
 def warp_solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), trace_stride=1,
           freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
-          step_chunk_size=16, compaction_interval=256, plane_histogram=None):
+          step_chunk_size=16, compaction_interval=256, plane_histogram=None, boundary_recorder=None):
     """Adapter returning the same four Torch tensors as Boris.parallel_solver."""
     from contextlib import nullcontext
     import logging
@@ -710,7 +732,8 @@ def warp_solve(solver, ions, Bfield, Efield=None, nfield=None, trace_IDs=(), tra
             trace_stride=trace_stride, freq_corr=freq_corr, show_progress=True,
             step_chunk_size=step_chunk_size, compaction_interval=compaction_interval,
             plane_histogram=plane_histogram,
-            particle_masses_kg=[particle.mass for particle in ions] if plane_histogram is not None else None)
+            particle_masses_kg=[particle.mass for particle in ions],
+            boundary_recorder=boundary_recorder, source_ids=[particle.particleID for particle in ions])
         for particle in ions:
             particle.setPosition(0, particle.pos0_XYZ)
         traces = (wp.to_torch(result['traces'])[:result['trace_count']] if len(trace_IDs)

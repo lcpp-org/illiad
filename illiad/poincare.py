@@ -130,6 +130,7 @@ class Poincare():
         """
         self.IO = io_handler
         self.anlys_name = anlys_name
+        self.boundary_options = None
         self.solver = solvr
         self.r_tol = r_tol
         self.a_tol = a_tol
@@ -218,6 +219,27 @@ class Poincare():
             self.IO.log.info(f"|     {str(ic):<23}   |")
         self.IO.log.info("+----------------+-------------------------+")
 
+    def set_boundaries(self, config, *, max_step=.005, curve_tolerance=1e-7,
+                       tolerance=1e-10, buffer_rows=65536):
+        """Enable box events for the default Cartesian Poincare workflow."""
+        from pathlib import Path
+        from .boundaries import parse_boundaries, validate_initial_positions
+        boxes = parse_boundaries(config)
+        if not boxes:
+            return
+        if not self.use_plane_reconstruction:
+            raise ValueError('Box boundaries require the default reconstructed Poincare planes')
+        validate_initial_positions(boxes, np.asarray([p.pos0_XYZ for p in self.fieldlines]), tolerance)
+        if not all(np.isfinite(v) and v > 0 for v in (max_step, curve_tolerance, tolerance)):
+            raise ValueError('Boundary step size and tolerances must be positive and finite')
+        directory = Path(self.IO._outputPath(self.IO.data_dir, 'Boundary_events'))
+        directory.mkdir(parents=True, exist_ok=False)
+        self.boundary_options = dict(boxes=boxes, directory=directory, max_step=max_step,
+                                     curve_tolerance=curve_tolerance, tolerance=tolerance, buffer_rows=buffer_rows)
+        for index, particle in enumerate(self.fieldlines):
+            particle.boundary_trajectory_id = index % self.nlines
+            particle.boundary_directory = f'line_{index:06d}'
+
     def parallel_solver(self) -> iter:
         """Runs the solver in parallel for each particle.
 
@@ -253,7 +275,23 @@ class Poincare():
         maxLength = particle.maxLife
 
         tic = perf_counter()
-        if self.use_plane_reconstruction:
+        if self.boundary_options is not None:
+            from .boundaries import BoundaryRecorder
+            from .boundary_fieldlines import trace_fieldline
+            options = self.boundary_options
+            recorder = BoundaryRecorder(options['boxes'], options['directory']/particle.boundary_directory,
+                                        coordinate='arc_length_m', tolerance=options['tolerance'],
+                                        buffer_rows=options['buffer_rows'])
+            fieldlines = trace_fieldline(
+                lambda s, x: particle.pushXYZ(s, x, self.field), init_cond, maxLength, recorder,
+                trajectory_id=particle.boundary_trajectory_id, source_id=particle.particleID,
+                direction=int(particle.direction), major_radius=self.field.R0, vessel_radius=self.field.a,
+                method=self.solver, rtol=self.r_tol, atol=self.a_tol,
+                max_step=options['max_step'], curve_tolerance=options['curve_tolerance'])
+            recorder.finish()
+            plane_output = _extract_plane_crossings(fieldlines.sol, fieldlines.t, fieldlines.y.T, self.plot_angles)
+            wall_output = fieldlines.y_events[0]
+        elif self.use_plane_reconstruction:
             fieldlines = solve_ivp(particle.pushXYZ, (0.0, maxLength), init_cond,
                                     args=([self.field]), dense_output=True,
                                     events=self.solver_events,
@@ -291,11 +329,11 @@ class Poincare():
                     tmax))
         elif fieldlines.status == 1: #termination event
             self.IO.log.info(
-                'Success!: Particle {} of {} took {:.4f} sec.\tWall Event at t={}'.format(
+                'Success!: Particle {} of {} took {:.4f} sec.\tBoundary Event at t={}'.format(
                     particle.particleID,
                     particle.particleCount,
                     elapsed_timeInd,
-                    fieldlines.t_events[0]))
+                    tmax))
         else: #solver failure
             self.IO.log.critical('FAILURE!: Particle {}'
                 .format(particle.particleID))
@@ -326,6 +364,18 @@ class Poincare():
                 wall_points.append(XYZ_to_RTP(wall_out[0], self.field.R0))
 
 
+
+        if self.boundary_options is not None:
+            import json
+            directory = self.boundary_options['directory']
+            manifests = [json.loads((directory/p.boundary_directory/'manifest.json').read_text())
+                         for p in self.fieldlines]
+            combined = dict(manifests[0])
+            combined['shards'] = [p.boundary_directory+'/'+name for p, m in zip(self.fieldlines, manifests)
+                                  for name in m['shards']]
+            combined['event_count'] = sum(m['event_count'] for m in manifests)
+            combined['complete'] = all(m['complete'] for m in manifests)
+            (directory/'manifest.json').write_text(json.dumps(combined, indent=2)+'\n')
 
         if self.double_line:
             # Combine the positive and negative fieldlines into one

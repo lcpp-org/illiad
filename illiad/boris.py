@@ -130,7 +130,7 @@ class Boris(Collisions):
     def parallel_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1, freq_corr=False, ion_neutral_collisions=None,
                         ion_ion_collisions=None, method=None, warp_step_chunk_size=16,
-                        warp_compaction_interval=256, plane_histogram=None):
+                        warp_compaction_interval=256, plane_histogram=None, boundary_recorder=None):
         """Dispatch to Torch (default) or optional Warp with identical outputs.
 
         method overrides the constructor's choice for this call only. Both
@@ -147,16 +147,16 @@ class Boris(Collisions):
                          freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
                          ion_ion_collisions=ion_ion_collisions,
                          step_chunk_size=warp_step_chunk_size,
-                         compaction_interval=warp_compaction_interval, plane_histogram=plane_histogram)
+                         compaction_interval=warp_compaction_interval, plane_histogram=plane_histogram, boundary_recorder=boundary_recorder)
         return self.torch_solver(ions, Bfield, Efield=Efield, nfield=nfield,
                                  trace_IDs=trace_IDs, trace_stride=trace_stride,
                                  freq_corr=freq_corr, ion_neutral_collisions=ion_neutral_collisions,
-                                 ion_ion_collisions=ion_ion_collisions, plane_histogram=plane_histogram)
+                                 ion_ion_collisions=ion_ion_collisions, plane_histogram=plane_histogram, boundary_recorder=boundary_recorder)
 
     def torch_solver(self, ions, Bfield, Efield=None, nfield=None, trace_IDs=[],
                         trace_stride=1,
                         freq_corr=False, ion_neutral_collisions=None, ion_ion_collisions=None,
-                        plane_histogram=None):
+                        plane_histogram=None, boundary_recorder=None):
         """
         Function to take in a particle and field object and solves the particle path until termination event or tmax
         using a fixed-step Boris-Buneman Solver, based on (Birdsall, 4-3&4).
@@ -226,6 +226,14 @@ class Boris(Collisions):
 
             [ion.setPosition(0, ion.pos0_XYZ) for ion in ions]
             pos_k = torch.tensor(np.array([ion.pos0_XYZ for ion in ions]), dtype=torch.float64, device=device)
+
+            absorbed = torch.zeros(Nparticles, dtype=torch.bool, device=device)
+            if boundary_recorder is not None:
+                from .boundaries import validate_initial_positions
+                validate_initial_positions(boundary_recorder.boxes, pos_k.cpu().numpy(), boundary_recorder.tolerance)
+                boundary_recorder.set_vessel(Bfield.R0, Bfield.a)
+                source_ids = torch.tensor([ion.particleID for ion in ions], dtype=torch.int64, device=device)
+                boundary_masses = torch.tensor([ion.mass for ion in ions], dtype=torch.float64, device=device)
 
             # NEED v_n-1/2 TO START
             if Efield:
@@ -342,6 +350,12 @@ class Boris(Collisions):
                     v_k_active = vplus_active + Evec_active
 
                     next_position = pos_active + v_k_active * self.dt
+                    if boundary_recorder is not None:
+                        next_position, hit_box, _ = boundary_recorder.process_torch(
+                            pos_active, next_position, running, k, (k-1)*self.dt, self.dt, v_k_active,
+                            major_radius=Bfield.R0, vessel_radius=Bfield.a,
+                            source_ids=source_ids[running], masses=boundary_masses[running])
+                        absorbed[running] |= hit_box
                     if plane_histogram is not None:
                         plane_histogram.accumulate_torch(pos_active, next_position, v_k_active, histogram_masses[running])
                     pos_active = next_position
@@ -377,7 +391,7 @@ class Boris(Collisions):
                     z2 = pos_k.T[2]**2
                     r_k = torch.sqrt(x2 + y2 + z2 + Bfield.R0 * Bfield.R0
                                                - 2 * Bfield.R0 * torch.sqrt(x2 + y2))
-                    running = torch.where(r_k < Bfield.a)[0]
+                    running = torch.where((r_k < Bfield.a) & ~absorbed)[0]
 
 
                     maxStep[running] = k # +1?
@@ -399,7 +413,7 @@ class Boris(Collisions):
 
 
 
-            terminated = torch.where(r_k >= Bfield.a)[0]
+            terminated = torch.where((r_k >= Bfield.a) & ~absorbed)[0]
             wallPts[terminated] = pos_k[terminated]
             wallVelocities[terminated] = v_k[terminated]
 
@@ -503,7 +517,7 @@ class Boris(Collisions):
 
     def run(self, Bfield, Efield=None, nfield=None,
             ion_neutral_collisions=None, ion_ion_collisions=None, trace_IDs=[],
-            trace_stride=1, method=None, warp_step_chunk_size=16, warp_compaction_interval=256, plane_histogram=None):
+            trace_stride=1, method=None, warp_step_chunk_size=16, warp_compaction_interval=256, plane_histogram=None, boundary_recorder=None):
         """Runs the Boris solver and processes the results.
 
         Args:
@@ -518,6 +532,7 @@ class Boris(Collisions):
             warp_step_chunk_size: Physical steps per Warp launch (default 16); ignored by Torch.
             warp_compaction_interval: Steps between Warp active-ID filtering (default 256; 0 disables).
             plane_histogram: Optional PlaneCrossingHistogram accumulated every physical step.
+            boundary_recorder: Optional BoundaryRecorder for finite box events and termination.
 
         Returns:
             Tuple containing:
@@ -539,7 +554,8 @@ class Boris(Collisions):
             method = method,
             warp_step_chunk_size = warp_step_chunk_size,
             warp_compaction_interval = warp_compaction_interval,
-            plane_histogram = plane_histogram
+            plane_histogram = plane_histogram,
+            boundary_recorder = boundary_recorder
         )
 
         outputArray, energy_output, deposition_angles_deg, toroidal_angles_deg, ion_traces = self.post_solver(solv_out, Bfield)

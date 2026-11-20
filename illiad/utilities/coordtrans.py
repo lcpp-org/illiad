@@ -39,6 +39,25 @@ def wall_plot_angles(rtp):
     theta = np.where(theta > np.pi, theta - 2.0 * np.pi, theta)
     return computational_phi_to_wall_deg(rtp[..., 2]), np.rad2deg(theta)
 
+
+def RZphi_to_XYZ(rzphi):
+    """Convert (..., 3) [R metres, Z metres, computational phi degrees] to XYZ.
+
+    R is cylindrical radius from the machine axis. Positive phi is clockwise
+    viewed from +Z, matching RTP_to_XYZ; no wall-display offset is applied.
+    """
+    rzphi = np.asarray(rzphi, dtype=float)
+    phi = np.deg2rad(rzphi[..., 2] % 360.)
+    return np.stack((rzphi[..., 0]*np.cos(phi), -rzphi[..., 0]*np.sin(phi), rzphi[..., 1]), axis=-1)
+
+
+def XYZ_to_RZphi(xyz):
+    """Inverse cylindrical transform, returning [R m, Z m, phi deg in [0,360)]."""
+    xyz = np.asarray(xyz, dtype=float)
+    phi = np.rad2deg(-np.arctan2(xyz[..., 1], xyz[..., 0])) % 360.
+    phi = np.where(phi >= 360., 0., phi)
+    return np.stack((np.hypot(xyz[..., 0], xyz[..., 1]), xyz[..., 2], phi), axis=-1)
+
 def RTP_to_XYZ(p_RTP, Rmajor=0.72):
     """Converts r-theta-phi coordinates to Cartesian coordinates.
 
