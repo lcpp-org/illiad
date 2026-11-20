@@ -1,0 +1,18 @@
+{
+  "BOUNDARIES": [
+    {
+      "name": "diagnostic_box",
+      "shape": "box",
+      "width_m": 0.085,
+      "depth_m": 0.10,
+      "height_m": 0.031,
+      "center_rzphi": [0.72, -0.12, 0.0],
+      "rotation_local_xyz_deg": [0.0, 0.0, 25.0],
+      "mode": "transparent"
+    }
+  ],
+  "BOUNDARY_TOLERANCE_M": 1e-10,
+  "BOUNDARY_BUFFER_ROWS": 65536,
+  "BOUNDARY_MAX_STEP_M": 0.005,
+  "BOUNDARY_CURVE_TOLERANCE_M": 1e-7
+}
