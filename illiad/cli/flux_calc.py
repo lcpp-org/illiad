@@ -45,6 +45,13 @@ DEFAULT_INPUTS = {
     "ISLAND_ALGORITHM": "histogram",
     "HIST_BINS": 90,
     "PLOT_ALL": True,
+    "PLOT_STRAIGHT_ANGLE": False,
+    "SL_NTHETA": 16,
+    "SL_MODES": 8,
+    "SL_REGULARIZATION": 1e-8,
+    "SL_MAX_REL_ERROR": 0.03,
+    "SL_MAX_POINTS": None,
+    "SL_TOROIDAL_DIRECTION": 1,
     "BIG_MESH": True,
 }
 
@@ -118,6 +125,13 @@ def main(input_overrides=_CLI_INPUTS):
             "ISLAND_ALGORITHM",
             "HIST_BINS",
             "PLOT_ALL",
+            "PLOT_STRAIGHT_ANGLE",
+            "SL_NTHETA",
+            "SL_MODES",
+            "SL_REGULARIZATION",
+            "SL_MAX_REL_ERROR",
+            "SL_MAX_POINTS",
+            "SL_TOROIDAL_DIRECTION",
             "BIG_MESH",
         ],
     )

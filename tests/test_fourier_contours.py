@@ -74,6 +74,12 @@ class FourierContourTests(unittest.TestCase):
             0, 0, 1, [False], np.array([np.pi, 0.]), 180)
         self.assertTrue(output[-1])
         self.assertIsInstance(calc.integrate_flux.call_args.args[0], FourierContour)
+        calc.integrate_flux.reset_mock()
+        geometry_only = calc.fit_and_integrate_surface_subsets(
+            [[np.column_stack((theta, radius))]], [np.array([[0., 0.]])],
+            0, 0, 1, [False], np.array([np.pi, 0.]), 180, integrate=False)
+        calc.integrate_flux.assert_not_called()
+        np.testing.assert_allclose(geometry_only[0], output[0])
         np.testing.assert_allclose(output[0][0, :, 1], output[1][0, :, 1], atol=1e-14)
         output = calc.fit_and_integrate_surface_subsets(
             [[np.column_stack((theta[:8], radius[:8]))]], [np.array([[0., 0.]])],
