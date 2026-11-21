@@ -107,10 +107,16 @@ Currents are in kiloamperes, radii in meters, and angles in degrees.
 | Experimental regular-surface fit | `SURFACE_FIT` (`spline` default or `fourier`), `FOURIER_MODES`, `FOURIER_REGULARIZATION`, `FOURIER_MAX_GAP_DEG` |
 | Retained legacy inputs | `ISLAND_ALGORITHM`, `HIST_BINS` |
 | Diagnostics | `PLOT_ALL`, `BIG_MESH` |
+| Straight-angle plots | `PLOT_STRAIGHT_ANGLE`, `SL_NTHETA`, `SL_MODES`, `SL_REGULARIZATION`, `SL_MAX_REL_ERROR`, `SL_MAX_POINTS`, `SL_TOROIDAL_DIRECTION` |
 
 When `PHI_GENs` is absent or `null`, positive `NPHI` produces
 `numpy.linspace(360.0 / NPHI, 360.0, NPHI)` in degrees. Explicit values are
 normalized to a floating-point NumPy array.
+
+`PLOT_STRAIGHT_ANGLE=true` adds Fourier cross-sections and constant straight-angle
+lines independently of `PLOT_ALL`. `SL_NTHETA` counts these lines; `NTHETA` retains
+its existing output-mesh meaning. See [straight-angle reconstruction](straight_angle_plots.md)
+for the Predebon method, numerical extensions, restrictions, and plot-only command.
 
 The active island detector measures rotational transform from each ordered
 Poincare surface, matches low-order rationals with denominators no greater
