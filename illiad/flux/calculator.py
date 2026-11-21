@@ -53,6 +53,11 @@ class FluxCalculator:
         self.hist_bins = input_params['HIST_BINS']
         self.plot_all = input_params['PLOT_ALL']
         self.big_mesh = input_params['BIG_MESH']
+        self.surface_parameter_options = dict(input_params)
+        self.plot_surface_parameter = input_params.get("PLOT_SURFACE_PARAMETER", False)
+        if self.plot_surface_parameter or self.surface_parameter_options.get("PLOT_PARAMETER_PROFILES", False):
+            from .surface_parameter_plots import validate_options
+            validate_options(input_params)
         self.straight_angle_plots = None
         if input_params.get('PLOT_STRAIGHT_ANGLE', False):
             from .straight_angle import StraightAnglePlots
@@ -162,6 +167,9 @@ class FluxCalculator:
         self.simIO.saveNumpyData(self.total_flux_norm, filename_fluxNorms)
         self.simIO.saveNumpyData(self.valid_surfs, filename_validSurfaces)
 
+        if hasattr(self, "iota_array"):
+            self.simIO.saveNumpyData(self.iota_array, self.anlys_subdir + "/Iota.npy")
+
         # plot a big array of fluxes
         self.simIO.log.info('Plotting Flux v Surface Index...')
         fig_post = plt.figure()
@@ -216,6 +224,8 @@ class FluxCalculator:
         """Initializes the output arrays."""
         self.tot_flux_array = np.zeros([self.nsurfaces, len(self.phi_gens)])
         self.total_flux_norm = np.zeros([self.nsurfaces, len(self.phi_gens)])
+        self.iota_array = np.full_like(self.tot_flux_array, np.nan)
+        self.parameter_contours = [[None]*self.nsurfaces for _ in self.phi_gens]
         self.centers_array = np.zeros([self.nsurfaces, len(self.phi_gens), self.max_subsets, 2])
         if self.big_mesh:
             self.flat_point_meshes = np.full([self.nsurfaces, len(self.phi_gens), self.ntheta*self.max_subsets, 2], np.nan)
@@ -256,6 +266,7 @@ class FluxCalculator:
         """
         surface_fluxes = []
         iota_values, rational_iotas, wrap_flag = iota_output
+        self.iota_array[:, phi_index] = iota_values
         for surf_index in range(self.lcfs_index, self.nsurfaces):
             n_subsets = num_subsets[surf_index]
             # loop to spline, calculate flux, and create regularly-spaced points
@@ -277,6 +288,11 @@ class FluxCalculator:
                                         spline_tr_magAxis,
                                         n_subsets,
                                         spline_lcfs_magaxis)
+
+            if self.plot_surface_parameter and self.valid_surfs[surf_index, phi_index]:
+                theta, radius = points_tr_geoAxis[..., 0], points_tr_geoAxis[..., 1]
+                self.parameter_contours[phi_index][surf_index] = np.stack(
+                    (radius*np.cos(theta), radius*np.sin(theta)), axis=-1)
 
             # flatten spline points for output storage and polar plotting
             total_npts = n_subsets * self.ntheta
@@ -847,3 +863,6 @@ class FluxCalculator:
         self.process_all_phi_angles()
         self.normalize_fluxes()
         self.save_output()
+        if self.plot_surface_parameter or self.surface_parameter_options.get("PLOT_PARAMETER_PROFILES", False):
+            from .surface_parameter_plots import plot_parameters
+            plot_parameters(self)
