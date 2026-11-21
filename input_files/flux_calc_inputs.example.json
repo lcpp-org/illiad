@@ -22,5 +22,12 @@
   "ISLAND_ALGORITHM": "histogram",
   "HIST_BINS": 90,
   "PLOT_ALL": true,
+  "PLOT_STRAIGHT_ANGLE": false,
+  "SL_NTHETA": 16,
+  "SL_MODES": 8,
+  "SL_REGULARIZATION": 1e-8,
+  "SL_MAX_REL_ERROR": 0.03,
+  "SL_MAX_POINTS": null,
+  "SL_TOROIDAL_DIRECTION": 1,
   "BIG_MESH": true
 }

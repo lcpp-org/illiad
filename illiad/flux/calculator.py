@@ -53,6 +53,10 @@ class FluxCalculator:
         self.hist_bins = input_params['HIST_BINS']
         self.plot_all = input_params['PLOT_ALL']
         self.big_mesh = input_params['BIG_MESH']
+        self.straight_angle_plots = None
+        if input_params.get('PLOT_STRAIGHT_ANGLE', False):
+            from .straight_angle import StraightAnglePlots
+            self.straight_angle_plots = StraightAnglePlots(self, input_params)
         self.surface_fit = input_params.get('SURFACE_FIT', 'spline')
         if self.surface_fit not in ('spline', 'fourier'):
             raise ValueError("SURFACE_FIT must be 'spline' or 'fourier'")
@@ -113,6 +117,8 @@ class FluxCalculator:
             first_loop_output = self.identify_surface_subsets(flux_surfaces, mag_axis)
             smallest_island_index, num_subsets, subset_data, subset_centers, iota_output = first_loop_output
             self.smallest_island_index = smallest_island_index
+            if self.straight_angle_plots is not None:
+                self.straight_angle_plots.plot_plane(phi_deg, flux_surfaces, mag_axis, num_subsets)
             # spline surfaces, calculate surface fluxes, validate fits, and store output data.
             surface_fluxes = self.process_surfaces_for_phi(phi_index, phi_deg, flux_surfaces, mag_axis,
                                         mag_axis_rev, smallest_island_index, num_subsets,
@@ -720,7 +726,7 @@ class FluxCalculator:
 
     def fit_and_integrate_surface_subsets(self, subset_data, subset_centers, surf_index,
                       smallest_island_index, num_subsets, wrap_flag,
-                      mag_axis_rev, phi_deg):
+                      mag_axis_rev, phi_deg, *, integrate=True):
         """
     Loop through subsets of a flux surface, fit spline, calculate flux, and generate
         regularly-spaced points evaluated on the spline fit.
@@ -787,7 +793,7 @@ class FluxCalculator:
             # integrate an amount of toroidal field bounded by the flux surface [Tesla*m^2]
             this_flux = self.integrate_flux(surface_spline_params, np.array(current_center, copy=True),
                                             phi_deg*np.pi/180, self.field, err_abs=self.integrate_epsabs,
-                                            err_rel=self.integrate_epsrel)
+                                            err_rel=self.integrate_epsrel) if integrate else np.nan
             subset_flux_list += [this_flux]
 
             # create a set of regularly-spaced points evaluated on the spline fit
