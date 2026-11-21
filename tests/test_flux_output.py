@@ -31,7 +31,8 @@ class FluxOutputTests(unittest.TestCase):
                 calc.save_output()
                 np.testing.assert_array_equal(calc.tot_flux_array, original)
                 paths = [call.args[1] for call in io.saveNumpyData.call_args_list]
-                self.assertEqual(len(paths), 9)  # Three core arrays + centers/meshes.
+                self.assertEqual(len(paths), 10)  # Four core arrays + centers/meshes.
+                self.assertTrue(any(p.endswith('Iota.npy') for p in paths))
                 self.assertTrue(any(p.endswith('fSurf_002_POINTmesh.npy') for p in paths))
 
 
