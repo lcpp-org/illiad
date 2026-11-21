@@ -411,3 +411,13 @@ of the same ILLIAD release, not yet stable cross-version interchange formats.
 
 An internal Python interface becomes public only when it is listed here and
 exported through an `illiad` namespace.
+
+Surface-parameter contour lines and colormaps are controlled by
+`PLOT_SURFACE_PARAMETER`, `SURFACE_PARAMETER` (`flux`, `iota`, `iota_normalized`, `blend`, `both`, `all`),
+`SURFACE_PARAMETER_STYLE` (`lines`, `filled`, `both`), and
+`SURFACE_PARAMETER_LEVELS`. See [surface-parameter plots](surface_parameter_plots.md).
+
+`PLOT_PARAMETER_PROFILES` enables flux/normalized-iota/blend comparisons versus
+surface index. `IOTA_WEIGHT` (default 0.5, range 0–1) sets the blend, and
+`IOTA_AXIS_VALUE` optionally supplies the axis reference (default null: innermost
+finite non-axis surface). See the normalization conventions in the plot guide.
